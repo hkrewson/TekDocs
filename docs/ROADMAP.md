@@ -124,10 +124,10 @@ Evidence: `docs/releases/0.0.6.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, and editor round-trip fixture gate. |
-| `0.2.2` | Title-first Documentation index, documents, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence; live titles open the editor while STATIC publication titles open immutable output. |
+| `0.2.2` | Title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. Live titles open the authorized editor while STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
-| `0.2.5` | Backlinks, reuse-impact preview, permission-aware shared editing, detach, and entity mentions. |
+| `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
 | `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |

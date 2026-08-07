@@ -113,7 +113,7 @@ Evidence: `docs/releases/0.0.5.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, and editor round-trip fixture gate. |
-| `0.2.2` | Documents, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. |
+| `0.2.2` | Title-first Documentation index, documents, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence; live titles open the editor while STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview, permission-aware shared editing, detach, and entity mentions. |

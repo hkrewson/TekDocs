@@ -26,8 +26,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | --- | --- | --- |
 | `0.0.1` | Complete | Governance, threat model, repository, Compose stack, Django/React skeleton, OpenAPI, CI, design system, and feasibility spikes. |
 | `0.0.2` | Complete | One-time installation state and first-owner API protected by a deployment bootstrap secret. Concurrent/repeated claims and public signup fail safely. |
-| `0.0.3` | Next | Accessible browser bootstrap, sign-in/sign-out, CSRF lifecycle, and authenticated shell boundary. |
-| `0.0.4` | Planned | Invitations, email verification, password reset, development mail capture, and enumeration-safe responses. |
+| `0.0.3` | Complete | Accessible browser bootstrap, sign-in/sign-out, CSRF lifecycle, and authenticated shell boundary. |
+| `0.0.4` | Next | Invitations, email verification, password reset, development mail capture, and enumeration-safe responses. |
 | `0.0.5` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.6` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.7` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
@@ -56,6 +56,17 @@ Evidence: `docs/releases/0.0.1.md`. Hosted workflows remain unverified until the
 - [x] Migration, OpenAPI, Docker runtime, dependency, static-analysis, and secret-scanning gates pass.
 
 Evidence: `docs/releases/0.0.2.md`.
+
+### `0.0.3` acceptance criteria
+
+- [x] The browser derives setup, sign-in, and authenticated states from server responses without exposing identity data before authentication.
+- [x] First-owner setup is keyboard-accessible and responsive, never persists the deployment token or password, and establishes a normal Django session after success.
+- [x] Sign-in and sign-out use maintained `django-allauth` headless endpoints with same-origin credentials and CSRF enforcement; missing/invalid CSRF and invalid credentials fail safely.
+- [x] The application shell renders only after an authenticated server context succeeds and displays the actual owner/workspace identity.
+- [x] Loading, validation, server-denial, retry, mobile, and sign-out failure states have unit, accessibility, and browser coverage.
+- [x] OpenAPI, operator/security documentation, Docker runtime, Chromium, dependency, static-analysis, and secret-scanning gates pass.
+
+Evidence: `docs/releases/0.0.3.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

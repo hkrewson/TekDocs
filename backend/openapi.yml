@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.0.2
+  version: 0.0.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -18,6 +18,24 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/auth/context:
+    get:
+      operationId: auth_context_retrieve
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedContext'
+          description: ''
+        '403':
+          description: Authentication or installation ownership required
+        '503':
+          description: Installation context unavailable
   /api/v1/bootstrap/owner:
     post:
       operationId: bootstrap_owner_create
@@ -110,6 +128,31 @@ paths:
           description: ''
 components:
   schemas:
+    AuthenticatedContext:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthenticatedUser'
+        tenant:
+          $ref: '#/components/schemas/BootstrapTenantResult'
+      required:
+      - tenant
+      - user
+    AuthenticatedUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+      required:
+      - display_name
+      - email
+      - id
     BootstrapOwnerResult:
       type: object
       properties:

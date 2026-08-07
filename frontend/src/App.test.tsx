@@ -1,10 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
+import type { AuthenticatedContext } from './auth/api'
+
+const authContext: AuthenticatedContext = {
+  user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
+  tenant: { id: '00000000-0000-4000-8000-000000000002', name: 'Example MSP' },
+}
+
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} />
 
 describe('application shell', () => {
   it('renders sectioned navigation and the active route', () => {
-    render(<App initialPath="/overview" />)
+    render(app('/overview'))
 
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
@@ -13,9 +21,9 @@ describe('application shell', () => {
 
   it('provides profile routes through the account menu', async () => {
     const user = userEvent.setup()
-    render(<App initialPath="/overview" />)
+    render(app('/overview'))
 
-    await user.click(screen.getByRole('button', { name: /Workspace owner/i }))
+    await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('menuitem', { name: 'Integrations' })).toHaveAttribute('href', '/integrations')
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
@@ -24,7 +32,7 @@ describe('application shell', () => {
 
   it('collapses the desktop navigation without removing accessible links', async () => {
     const user = userEvent.setup()
-    render(<App initialPath="/organizations" />)
+    render(app('/organizations'))
 
     expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))

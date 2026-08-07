@@ -2,6 +2,7 @@ import secrets
 import threading
 
 import pytest
+from allauth.account.models import EmailAddress
 from django.db import connection
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -51,6 +52,10 @@ def test_owner_bootstrap_creates_exactly_one_tenant_owner_and_audit_event(client
     assert owner.check_password(BOOTSTRAP_PAYLOAD["password"])
     assert owner.is_staff is False
     assert owner.is_superuser is False
+    email = EmailAddress.objects.get(user=owner)
+    assert email.email == owner.email
+    assert email.primary is True
+    assert email.verified is True
     installation_state.refresh_from_db()
     assert installation_state.tenant_id == Tenant.objects.get().id
     assert installation_state.owner_id == owner.id

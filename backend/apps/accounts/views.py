@@ -3,7 +3,7 @@ from typing import Any
 
 from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,9 +11,20 @@ from rest_framework.views import APIView
 from apps.core.models import InstallationState
 
 from .bootstrap import bootstrap_owner
-from .serializers import BootstrapStatusSerializer, OwnerBootstrapResultSerializer, OwnerBootstrapSerializer
+from .serializers import (
+    AuthenticatedContextSerializer,
+    BootstrapStatusSerializer,
+    OwnerBootstrapResultSerializer,
+    OwnerBootstrapSerializer,
+)
 
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
+
+
+class AuthenticationContextUnavailable(APIException):
+    status_code = 503
+    default_detail = "The authenticated installation context is unavailable."
+    default_code = "authentication_context_unavailable"
 
 
 class BootstrapStatusView(APIView):
@@ -66,4 +77,34 @@ class OwnerBootstrapView(APIView):
                 "owner": {"id": str(result.owner.id), "display_name": result.owner.display_name},
             },
             status=201,
+        )
+
+
+class AuthenticatedContextView(APIView):
+    @extend_schema(
+        responses={
+            200: AuthenticatedContextSerializer,
+            403: OpenApiResponse(description="Authentication or installation ownership required"),
+            503: OpenApiResponse(description="Installation context unavailable"),
+        }
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        try:
+            state = InstallationState.objects.select_related("tenant", "owner").get(
+                pk=InstallationState.SINGLETON_ID,
+                bootstrapped_at__isnull=False,
+            )
+        except InstallationState.DoesNotExist as exc:
+            raise AuthenticationContextUnavailable() from exc
+        if state.tenant is None or state.owner_id != request.user.pk:
+            raise PermissionDenied("Installation ownership is required.")
+        return Response(
+            {
+                "user": {
+                    "id": str(request.user.pk),
+                    "email": request.user.email,
+                    "display_name": request.user.display_name,
+                },
+                "tenant": {"id": str(state.tenant.id), "name": state.tenant.name},
+            }
         )

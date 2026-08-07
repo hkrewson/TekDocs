@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from apps.accounts.views import BootstrapStatusView, OwnerBootstrapView
+from apps.accounts.views import AuthenticatedContextView, BootstrapStatusView, OwnerBootstrapView
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 
 urlpatterns = [
@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/bootstrap/status", BootstrapStatusView.as_view(), name="bootstrap-status"),
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
+    path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
     path("api/v1/health/live", LiveHealthView.as_view(), name="health-live"),
     path("api/v1/health/ready", ReadyHealthView.as_view(), name="health-ready"),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from allauth.account.models import EmailAddress
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -42,6 +43,7 @@ def bootstrap_owner(*, tenant_name: str, owner_email: str, owner_display_name: s
             password=password,
             display_name=owner_display_name,
         )
+        EmailAddress.objects.create(user=owner, email=owner.email, primary=True, verified=True)
         state.tenant = tenant
         state.owner = owner
         state.bootstrapped_at = timezone.now()

@@ -11,6 +11,7 @@ import {
   CircleUserRound,
   FileCheck2,
   KeyRound,
+  LogOut,
   Menu,
   Network,
   Plug,
@@ -20,6 +21,9 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
+import { AuthGate } from './auth/AuthGate'
+import { browserAuthClient } from './auth/api'
+import type { AuthClient, AuthenticatedContext } from './auth/api'
 const EditorSpike = lazy(async () => {
   const module = await import('./editor/EditorSpike')
   return { default: module.EditorSpike }
@@ -94,13 +98,18 @@ function NavSection({ items, collapsed, onNavigate, currentPath, navigate }: { i
   )
 }
 
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath, navigate }: {
+function workspaceInitials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'TD'
+}
+
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath, navigate, workspaceName }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
   onMobileClose: () => void
   currentPath: string
   navigate: Navigate
+  workspaceName: string
 }) {
   return (
     <>
@@ -114,9 +123,9 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath
           <button className="icon-button mobile-close" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button>
         </div>
 
-        <button className="tenant-switcher" type="button" title={collapsed ? 'Northwind IT' : undefined}>
-          <span className="tenant-initials">NI</span>
-          {!collapsed && <><span className="tenant-copy"><strong>Northwind IT</strong><span>MSP workspace</span></span><ChevronDown size={15} /></>}
+        <button className="tenant-switcher" type="button" title={collapsed ? workspaceName : undefined}>
+          <span className="tenant-initials">{workspaceInitials(workspaceName)}</span>
+          {!collapsed && <><span className="tenant-copy"><strong>{workspaceName}</strong><span>MSP workspace</span></span><ChevronDown size={15} /></>}
         </button>
 
         <div className="sidebar-scroll">
@@ -129,7 +138,13 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath
   )
 }
 
-function ProfileMenu({ currentPath, navigate }: { currentPath: string; navigate: Navigate }) {
+function ProfileMenu({ currentPath, navigate, user, onSignOut, signingOut }: {
+  currentPath: string
+  navigate: Navigate
+  user: AuthenticatedContext['user']
+  onSignOut: () => Promise<void>
+  signingOut: boolean
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -144,15 +159,16 @@ function ProfileMenu({ currentPath, navigate }: { currentPath: string; navigate:
 
   return (
     <div className="profile-menu" ref={ref}>
-      <button className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+      <button className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Account menu for ${user.display_name}`}>
         <CircleUserRound size={22} />
-        <span className="profile-copy"><strong>Workspace owner</strong><span>owner@example.com</span></span>
+        <span className="profile-copy"><strong>{user.display_name}</strong><span>{user.email}</span></span>
         <ChevronDown size={15} />
       </button>
       {open && (
         <div className="profile-popover" role="menu">
           <AppLink to="/settings" currentPath={currentPath} navigate={navigate} role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
           <AppLink to="/integrations" currentPath={currentPath} navigate={navigate} role="menuitem" onClick={() => setOpen(false)}><Plug size={17} />Integrations</AppLink>
+          <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
     </div>
@@ -196,14 +212,14 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.2 adds a secure, one-time installation ownership boundary." />
+      <PageHeader title="Overview" description="TekDocs 0.0.3 provides the secure browser authentication boundary." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.2</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.3</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
             ['Tenant and entity primitives', 'Available'],
-            ['Authentication foundation', 'In progress'],
+            ['Owner authentication', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
@@ -221,7 +237,13 @@ function Documentation() {
   )
 }
 
-export function App({ initialPath }: { initialPath?: string }) {
+export function ApplicationShell({ initialPath, authContext, onSignOut, signingOut = false, signOutError = null }: {
+  initialPath?: string
+  authContext: AuthenticatedContext
+  onSignOut: () => Promise<void>
+  signingOut?: boolean
+  signOutError?: string | null
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [currentPath, setCurrentPath] = useState(() => initialPath ?? window.location.pathname)
@@ -250,15 +272,38 @@ export function App({ initialPath }: { initialPath?: string }) {
 
   return (
     <div className="app-shell">
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} workspaceName={authContext.tenant.name} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <div className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
-          <ProfileMenu currentPath={routedPath} navigate={navigate} />
+          <ProfileMenu currentPath={routedPath} navigate={navigate} user={authContext.user} onSignOut={onSignOut} signingOut={signingOut} />
         </div>
-        <main className="main-content" key={routedPath}>{page}</main>
+        <main className="main-content" key={routedPath}>
+          {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
+          {page}
+        </main>
       </div>
     </div>
+  )
+}
+
+export function App({ initialPath, authClient = browserAuthClient, initialAuthContext }: {
+  initialPath?: string
+  authClient?: AuthClient
+  initialAuthContext?: AuthenticatedContext
+}) {
+  return (
+    <AuthGate client={authClient} initialContext={initialAuthContext}>
+      {({ context, signOut, signingOut, signOutError }) => (
+        <ApplicationShell
+          initialPath={initialPath}
+          authContext={context}
+          onSignOut={signOut}
+          signingOut={signingOut}
+          signOutError={signOutError}
+        />
+      )}
+    </AuthGate>
   )
 }

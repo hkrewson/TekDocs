@@ -37,3 +37,14 @@ class BootstrapOwnerResultSerializer(serializers.Serializer):
 class OwnerBootstrapResultSerializer(serializers.Serializer):
     tenant = BootstrapTenantResultSerializer()
     owner = BootstrapOwnerResultSerializer()
+
+
+class AuthenticatedUserSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    email = serializers.EmailField()
+    display_name = serializers.CharField()
+
+
+class AuthenticatedContextSerializer(serializers.Serializer):
+    user = AuthenticatedUserSerializer()
+    tenant = BootstrapTenantResultSerializer()

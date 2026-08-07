@@ -23,4 +23,12 @@ The shell renders only after the allauth session and TekDocs context both succee
 
 `0.0.6` adds controlled invitation acceptance. The browser reads the token from the URL fragment, removes the fragment immediately, and submits the token with account details only in a CSRF-protected request body. Successful acceptance creates one active user, verified primary allauth email, and tenant membership before consuming the invitation and establishing a normal Django session. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
 
-Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Password reset remains `0.0.7`. Authentication audit expansion, session inventory/revocation, and throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.
+Login errors shown by TekDocs do not distinguish an unknown address from a wrong password.
+
+## Password recovery
+
+`0.0.7` uses allauth’s headless password-reset request and completion endpoints with Django’s maintained password-reset token generator. Request responses and browser confirmation copy do not reveal whether an address belongs to an active account. The default expiry is one hour and can be reduced or increased from five minutes to 24 hours with `PASSWORD_RESET_TIMEOUT_SECONDS`.
+
+The reset email points to `TEKDOCS_PUBLIC_URL` with the opaque key in the URL fragment. The browser removes that fragment immediately, validates the key through the allauth header contract, and submits it only in a CSRF-protected request body. The key is not stored in local storage, session storage, cookies, application logs, or API URLs.
+
+A completed reset does not sign the user in. Changing the password invalidates the key and Django’s password-derived session authentication hash, so every existing session is rejected on its next request. The user returns to sign-in with the new password. Authentication audit expansion, explicit session inventory/revocation, login throttles, and recovery-rate policy remain scoped to `0.0.8`; allauth’s maintained rate-limit paths remain enabled in the interim.

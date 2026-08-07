@@ -29,6 +29,9 @@ export interface AuthClient {
   bootstrapAndLogin(details: BootstrapDetails): Promise<AuthenticatedContext>
   login(email: string, password: string): Promise<AuthenticatedContext>
   acceptInvitation(details: InvitationAcceptance): Promise<AuthenticatedContext>
+  requestPasswordReset(email: string): Promise<void>
+  validatePasswordReset(key: string): Promise<void>
+  completePasswordReset(key: string, password: string): Promise<void>
   logout(): Promise<void>
 }
 
@@ -114,6 +117,14 @@ export function takeInvitationFromLocation(): { isInvitationPath: boolean; token
   return { isInvitationPath: true, token: token || null }
 }
 
+export function takePasswordResetFromLocation(): { isPasswordResetPath: boolean; key: string | null } {
+  const isPasswordResetPath = window.location.pathname === '/auth/reset-password'
+  if (!isPasswordResetPath) return { isPasswordResetPath: false, key: null }
+  const key = new URLSearchParams(window.location.hash.slice(1)).get('key')
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`)
+  return { isPasswordResetPath: true, key: key || null }
+}
+
 export const browserAuthClient: AuthClient = {
   async load() {
     const [bootstrapResponse, authenticated] = await Promise.all([
@@ -176,6 +187,34 @@ export const browserAuthClient: AuthClient = {
       throw new AuthRequestError(messages[response.status] ?? 'The invitation was not accepted.', response.status)
     }
     return responseJson<AuthenticatedContext>(response)
+  },
+
+  async requestPasswordReset(email) {
+    const response = await mutation('/_allauth/browser/v1/auth/password/request', 'POST', { email })
+    if (!response.ok) {
+      throw new AuthRequestError(
+        response.status === 400 ? 'Enter a valid email address.' : 'The reset request was not completed.',
+        response.status,
+      )
+    }
+  },
+
+  async validatePasswordReset(key) {
+    const response = await fetch('/_allauth/browser/v1/auth/password/reset', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'X-Password-Reset-Key': key },
+    })
+    if (!response.ok) throw new AuthRequestError('This password reset link is invalid or has expired.', response.status)
+  },
+
+  async completePasswordReset(key, password) {
+    const response = await mutation('/_allauth/browser/v1/auth/password/reset', 'POST', { key, password })
+    if (!response.ok && response.status !== 401) {
+      throw new AuthRequestError(
+        response.status === 400 ? 'Review the password requirements or request a new reset link.' : 'The password was not changed.',
+        response.status,
+      )
+    }
   },
 
   async logout() {

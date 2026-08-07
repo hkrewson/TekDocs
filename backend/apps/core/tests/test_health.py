@@ -6,7 +6,7 @@ from django.urls import reverse
 def test_liveness_contract(client):
     response = client.get(reverse("health-live"))
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "backend", "version": "0.0.6"}
+    assert response.json() == {"status": "ok", "service": "backend", "version": "0.0.7"}
     assert response.headers["X-Request-ID"]
     assert response.headers["Content-Security-Policy"]
 

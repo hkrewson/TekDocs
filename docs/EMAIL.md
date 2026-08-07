@@ -30,4 +30,6 @@ Set the following deployment values:
 
 `TEKDOCS_ALLOW_INSECURE_SMTP=true` is an explicit exception for a trusted private SMTP hop such as the local Mailpit container. It must not be used to send mail across an untrusted network. Production startup fails when SMTP configuration is incomplete, contradictory, or unexpectedly plaintext.
 
-Mail delivery remains synchronous. `0.0.5` adds invitation templates and explicit owner-triggered resend; automatic queues, retry policy, recovery flows, notifications, and bounce handling remain separate roadmap work. Invitation SMTP failures retain a pending record without returning the address, token, or backend exception.
+Mail delivery remains synchronous. Invitation delivery has an explicit owner-triggered resend, while password recovery sends multipart request and change notifications through the same template boundary. Automatic queues, general retry policy, notification preferences, and bounce handling remain separate roadmap work. Invitation SMTP failures retain a pending record without returning the address, token, or backend exception.
+
+Password-reset links use `TEKDOCS_PUBLIC_URL` and expire after `PASSWORD_RESET_TIMEOUT_SECONDS` (3600 seconds by default; permitted range five minutes to 24 hours). Configure the public URL before enabling user access. Reset keys are carried in URL fragments so they do not enter proxy access logs, and the browser removes the fragment immediately.

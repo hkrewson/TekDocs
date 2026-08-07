@@ -30,8 +30,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.4` | Complete | SMTP configuration boundary, transactional email templates, operator delivery check, and development Mailpit capture. |
 | `0.0.5` | Complete | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
 | `0.0.6` | Complete | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
-| `0.0.7` | Next | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
-| `0.0.8` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
+| `0.0.7` | Complete | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
+| `0.0.8` | Next | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.9` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.10` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
 | `0.0.11` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
@@ -103,6 +103,17 @@ Evidence: `docs/releases/0.0.5.md`.
 - [x] Public signup remains closed; invitation administration remains owner-only; migration, OpenAPI, Docker/PostgreSQL, browser, and security gates pass at `0.0.6`.
 
 Evidence: `docs/releases/0.0.6.md`.
+
+### `0.0.7` acceptance criteria
+
+- [x] Sign-in exposes a responsive, keyboard-accessible password-recovery path with one request confirmation for known and unknown account addresses.
+- [x] Reset issuance and completion use maintained allauth/Django primitives, CSRF protection, verified active accounts, and a configurable one-hour expiry by default.
+- [x] Reset keys are delivered only in the email URL fragment, removed from browser history immediately, never persisted by the client, and rejected after expiry or first use.
+- [x] Password completion applies Django validators, clears browser password fields on submission, does not auto-login, and invalidates all existing password-bound sessions.
+- [x] Multipart request/change notifications use the central transactional email boundary without placing credentials or reset material in logs or response bodies.
+- [x] Unit, Docker/PostgreSQL, Chromium, accessibility, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.7`.
+
+Evidence: `docs/releases/0.0.7.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

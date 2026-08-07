@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { LoaderCircle } from 'lucide-react'
-import { AuthRequestError, takeInvitationFromLocation } from './api'
+import { AuthRequestError, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
 import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance } from './api'
 
 type AuthState =
@@ -10,6 +10,12 @@ type AuthState =
   | { phase: 'sign-in' }
   | { phase: 'invitation'; token: string }
   | { phase: 'invitation-unavailable' }
+  | { phase: 'password-reset-request' }
+  | { phase: 'password-reset-sent' }
+  | { phase: 'password-reset-validating'; key: string }
+  | { phase: 'password-reset'; key: string }
+  | { phase: 'password-reset-unavailable' }
+  | { phase: 'password-reset-complete' }
   | { phase: 'authenticated'; context: AuthenticatedContext }
   | { phase: 'error'; message: string }
 
@@ -98,7 +104,10 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
   )
 }
 
-function SignInForm({ submit }: { submit: (email: string, password: string) => Promise<void> }) {
+function SignInForm({ submit, forgotPassword }: {
+  submit: (email: string, password: string) => Promise<void>
+  forgotPassword: () => void
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -125,9 +134,122 @@ function SignInForm({ submit }: { submit: (email: string, password: string) => P
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
         <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
+        <button className="auth-text-button" type="button" onClick={forgotPassword}>Forgot password?</button>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>
+    </AuthFrame>
+  )
+}
+
+function PasswordResetRequestForm({ submit }: { submit: (email: string) => Promise<void> }) {
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      await submit(email)
+    } catch (submitError) {
+      setError(message(submitError))
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <h1>Reset password</h1>
+      <p className="auth-intro">Enter your account email. If it belongs to an active account, TekDocs will send a reset link.</p>
+      <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
+        <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Sending reset link…' : 'Send reset link'}</button>
+      </form>
+      <a className="auth-return-link" href="/">Return to sign in</a>
+    </AuthFrame>
+  )
+}
+
+function PasswordResetSentState() {
+  return (
+    <AuthFrame>
+      <h1>Check your email</h1>
+      <p className="auth-intro">If that address belongs to an active account, a password reset link has been sent. The same message is shown for every address.</p>
+      <a className="secondary-button auth-submit auth-link" href="/">Return to sign in</a>
+    </AuthFrame>
+  )
+}
+
+function PasswordResetUnavailableState() {
+  return (
+    <AuthFrame>
+      <h1>Reset link unavailable</h1>
+      <p className="auth-intro">This password reset link is invalid, expired, or has already been used.</p>
+      <a className="primary-button auth-submit auth-link" href="/auth/reset-password">Request a new reset link</a>
+    </AuthFrame>
+  )
+}
+
+function PasswordResetForm({ submit, unavailable }: {
+  submit: (password: string) => Promise<void>
+  unavailable: () => void
+}) {
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    if (password !== confirmation) {
+      setError('The password confirmation does not match.')
+      return
+    }
+    const submittedPassword = password
+    setPassword('')
+    setConfirmation('')
+    setSubmitting(true)
+    try {
+      await submit(submittedPassword)
+    } catch (submitError) {
+      if (submitError instanceof AuthRequestError && submitError.status === 400) {
+        setError(message(submitError))
+        setSubmitting(false)
+        return
+      }
+      if (submitError instanceof AuthRequestError && [401, 409].includes(submitError.status ?? 0)) {
+        unavailable()
+        return
+      }
+      setError(message(submitError))
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <h1>Choose a new password</h1>
+      <p className="auth-intro">Changing your password signs out any existing TekDocs sessions.</p>
+      <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
+        <label>New password<input aria-label="New password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required autoFocus /><span>Use at least 12 characters and a unique password.</span></label>
+        <label>Confirm new password<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Changing password…' : 'Change password'}</button>
+      </form>
+    </AuthFrame>
+  )
+}
+
+function PasswordResetCompleteState() {
+  return (
+    <AuthFrame>
+      <h1>Password changed</h1>
+      <p className="auth-intro">Your password has been changed and existing sessions are no longer valid. Sign in with the new password.</p>
+      <a className="primary-button auth-submit auth-link" href="/">Continue to sign in</a>
     </AuthFrame>
   )
 }
@@ -197,9 +319,15 @@ export function AuthGate({ client, initialContext, children }: {
   children: (props: AuthenticatedRenderProps) => ReactNode
 }) {
   const [invitation] = useState(() => takeInvitationFromLocation())
+  const [passwordReset] = useState(() => takePasswordResetFromLocation())
   const [state, setState] = useState<AuthState>(() => {
     if (invitation.isInvitationPath) {
       return invitation.token ? { phase: 'invitation', token: invitation.token } : { phase: 'invitation-unavailable' }
+    }
+    if (passwordReset.isPasswordResetPath) {
+      return passwordReset.key
+        ? { phase: 'password-reset-validating', key: passwordReset.key }
+        : { phase: 'password-reset-request' }
     }
     return initialContext ? { phase: 'authenticated', context: initialContext } : { phase: 'loading' }
   })
@@ -208,7 +336,7 @@ export function AuthGate({ client, initialContext, children }: {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    if (initialContext || invitation.isInvitationPath) return
+    if (initialContext || invitation.isInvitationPath || passwordReset.isPasswordResetPath) return
     let current = true
     client.load()
       .then((result) => {
@@ -221,7 +349,17 @@ export function AuthGate({ client, initialContext, children }: {
       })
       .catch((error: unknown) => current && setState({ phase: 'error', message: message(error) }))
     return () => { current = false }
-  }, [attempt, client, initialContext, invitation.isInvitationPath])
+  }, [attempt, client, initialContext, invitation.isInvitationPath, passwordReset.isPasswordResetPath])
+
+  useEffect(() => {
+    if (state.phase !== 'password-reset-validating') return
+    let current = true
+    const key = state.key
+    client.validatePasswordReset(key)
+      .then(() => current && setState({ phase: 'password-reset', key }))
+      .catch(() => current && setState({ phase: 'password-reset-unavailable' }))
+    return () => { current = false }
+  }, [client, state])
 
   const bootstrap = async (details: BootstrapDetails) => {
     const authenticated = await client.bootstrapAndLogin(details)
@@ -253,7 +391,13 @@ export function AuthGate({ client, initialContext, children }: {
 
   if (state.phase === 'loading') return <LoadingState />
   if (state.phase === 'bootstrap') return <BootstrapForm submit={bootstrap} />
-  if (state.phase === 'sign-in') return <SignInForm submit={login} />
+  if (state.phase === 'sign-in') return <SignInForm submit={login} forgotPassword={() => setState({ phase: 'password-reset-request' })} />
+  if (state.phase === 'password-reset-request') return <PasswordResetRequestForm submit={async (email) => { await client.requestPasswordReset(email); setState({ phase: 'password-reset-sent' }) }} />
+  if (state.phase === 'password-reset-sent') return <PasswordResetSentState />
+  if (state.phase === 'password-reset-validating') return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />Checking reset link…</div></AuthFrame>
+  if (state.phase === 'password-reset-unavailable') return <PasswordResetUnavailableState />
+  if (state.phase === 'password-reset') return <PasswordResetForm submit={async (password) => { await client.completePasswordReset(state.key, password); setState({ phase: 'password-reset-complete' }) }} unavailable={() => setState({ phase: 'password-reset-unavailable' })} />
+  if (state.phase === 'password-reset-complete') return <PasswordResetCompleteState />
   if (state.phase === 'invitation-unavailable') return <InvitationUnavailableState />
   if (state.phase === 'invitation') return <InvitationForm token={state.token} submit={acceptInvitation} unavailable={() => setState({ phase: 'invitation-unavailable' })} />
   if (state.phase === 'error') return <ErrorState detail={state.message} retry={() => { setState({ phase: 'loading' }); setAttempt((value) => value + 1) }} />

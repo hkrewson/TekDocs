@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.6`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.7`.
 
 ## Start locally
 
@@ -15,7 +15,7 @@ Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with ge
 
 Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
 
-Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations and see `docs/INVITATIONS.md` for token and lifecycle behavior.
+Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
 
 ### First-owner bootstrap
 
@@ -46,7 +46,7 @@ The running Docker stack is authoritative for runtime claims. See `docs/PRODUCT_
 
 ## Current boundaries
 
-- Registration is deliberately closed. Owners issue invitations through controlled APIs; `0.0.6` lets recipients activate a verified account through a single-use invitation.
+- Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
 - Tenant/entity/link models establish future data boundaries but are not yet exposed as CRUD APIs.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { browserAuthClient, takeInvitationFromLocation } from './api'
+import { browserAuthClient, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
 
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -100,5 +100,46 @@ describe('browser authentication client', () => {
       display_name: 'Invited Technician',
       password,
     })
+  })
+
+  it('takes a password reset key from the fragment and removes it immediately', () => {
+    const key = `${crypto.randomUUID()}-${crypto.randomUUID()}`
+    window.history.replaceState({}, '', `/auth/reset-password#key=${encodeURIComponent(key)}`)
+
+    expect(takePasswordResetFromLocation()).toEqual({ isPasswordResetPath: true, key })
+    expect(window.location.href).not.toContain(key)
+    expect(window.location.hash).toBe('')
+  })
+
+  it('sends reset credentials through protected allauth interfaces', async () => {
+    const csrf = crypto.randomUUID()
+    const key = `${crypto.randomUUID()}-${crypto.randomUUID()}`
+    const password = `${crypto.randomUUID()}Aa7!`
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await browserAuthClient.requestPasswordReset('owner@example.com')
+    await browserAuthClient.validatePasswordReset(key)
+    await browserAuthClient.completePasswordReset(key, password)
+
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
+    const requestCall = calls[0]
+    expect(requestCall[0]).toBe('/_allauth/browser/v1/auth/password/request')
+    expect(requestCall[0]).not.toContain('owner@example.com')
+    expect(requestCall[1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ email: 'owner@example.com' }),
+    }))
+    expect(requestCall[1].headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
+    expect(calls[1][1]?.headers).toEqual(expect.objectContaining({ 'X-Password-Reset-Key': key }))
+    expect(calls[2][0]).not.toContain(key)
+    expect(calls[2][1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ key, password }),
+    }))
   })
 })

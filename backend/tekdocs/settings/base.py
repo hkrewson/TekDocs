@@ -33,6 +33,9 @@ TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL"
 INVITATION_TTL_HOURS = env_int("INVITATION_TTL_HOURS", 168)
 if not 1 <= INVITATION_TTL_HOURS <= 2160:
     raise ImproperlyConfigured("INVITATION_TTL_HOURS must be between 1 and 2160")
+PASSWORD_RESET_TIMEOUT = env_int("PASSWORD_RESET_TIMEOUT_SECONDS", 3600)
+if not 300 <= PASSWORD_RESET_TIMEOUT <= 86400:
+    raise ImproperlyConfigured("PASSWORD_RESET_TIMEOUT_SECONDS must be between 300 and 86400")
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -120,6 +123,7 @@ ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_ADAPTER = "apps.accounts.adapters.InviteOnlyAccountAdapter"
+ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
 HEADLESS_ONLY = True
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": "/auth/verify-email/{key}",
@@ -146,7 +150,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.6",
+    "VERSION": "0.0.7",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

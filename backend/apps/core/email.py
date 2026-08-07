@@ -14,6 +14,9 @@ from django.template.loader import render_to_string
 class TransactionalTemplate(StrEnum):
     SYSTEM_TEST = "system_test"
     INVITATION = "invitation"
+    RECOVERY_REQUEST = "password_reset"
+    RECOVERY_UNAVAILABLE = "password_reset_unavailable"
+    CREDENTIAL_CHANGED = "password_changed"
 
 
 def send_transactional_email(
@@ -67,4 +70,29 @@ def send_invitation_email(
             "tenant_name": tenant_name,
             "expires_at": expires_at,
         },
+    )
+
+
+def send_password_reset_email(*, recipient: str, reset_url: str, expires_in_minutes: int) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.RECOVERY_REQUEST,
+        subject="Reset your TekDocs password",
+        recipient=recipient,
+        context={"reset_url": reset_url, "expires_in_minutes": expires_in_minutes},
+    )
+
+
+def send_password_changed_email(*, recipient: str) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.CREDENTIAL_CHANGED,
+        subject="Your TekDocs password was changed",
+        recipient=recipient,
+    )
+
+
+def send_password_reset_unavailable_email(*, recipient: str) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.RECOVERY_UNAVAILABLE,
+        subject="TekDocs password reset request",
+        recipient=recipient,
     )

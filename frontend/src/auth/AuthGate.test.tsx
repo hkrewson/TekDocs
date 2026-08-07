@@ -16,6 +16,9 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     bootstrapAndLogin: vi.fn().mockResolvedValue(context),
     login: vi.fn().mockResolvedValue(context),
     acceptInvitation: vi.fn().mockResolvedValue(context),
+    requestPasswordReset: vi.fn().mockResolvedValue(undefined),
+    validatePasswordReset: vi.fn().mockResolvedValue(undefined),
+    completePasswordReset: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
@@ -169,5 +172,54 @@ describe('authentication boundary', () => {
     expect(await screen.findByRole('heading', { name: 'Invitation unavailable' })).toBeInTheDocument()
     expect(screen.getByText(/missing, expired, revoked, or has already been used/i)).toBeInTheDocument()
     expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
+  })
+
+  it('offers an enumeration-safe password reset request from sign in', async () => {
+    const user = userEvent.setup()
+    const requestPasswordReset = vi.fn().mockResolvedValue(undefined)
+    render(<App authClient={client({
+      load: vi.fn().mockResolvedValue({ bootstrapRequired: false, context: null }),
+      requestPasswordReset,
+    })} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Forgot password?' }))
+    await user.type(screen.getByLabelText('Email address'), 'someone@example.com')
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }))
+
+    expect(requestPasswordReset).toHaveBeenCalledWith('someone@example.com')
+    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
+    expect(screen.getByText(/same message is shown for every address/i)).toBeInTheDocument()
+  })
+
+  it('scrubs the reset key and completes a validated password reset', async () => {
+    const user = userEvent.setup()
+    const key = `${crypto.randomUUID()}-${crypto.randomUUID()}`
+    const password = `${crypto.randomUUID()}Aa7!`
+    const validatePasswordReset = vi.fn().mockResolvedValue(undefined)
+    const completePasswordReset = vi.fn().mockResolvedValue(undefined)
+    window.history.replaceState({}, '', `/auth/reset-password#key=${encodeURIComponent(key)}`)
+    render(<App authClient={client({ validatePasswordReset, completePasswordReset })} />)
+
+    expect(window.location.hash).toBe('')
+    await screen.findByRole('heading', { name: 'Choose a new password' })
+    await user.type(screen.getByLabelText('New password', { exact: true }), password)
+    await user.type(screen.getByLabelText('Confirm new password'), password)
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(validatePasswordReset).toHaveBeenCalledWith(key)
+    expect(completePasswordReset).toHaveBeenCalledWith(key, password)
+    expect(await screen.findByRole('heading', { name: 'Password changed' })).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
+  })
+
+  it('shows one unavailable state when a reset key cannot be validated', async () => {
+    const key = `${crypto.randomUUID()}-${crypto.randomUUID()}`
+    window.history.replaceState({}, '', `/auth/reset-password#key=${encodeURIComponent(key)}`)
+    render(<App authClient={client({
+      validatePasswordReset: vi.fn().mockRejectedValue(new AuthRequestError('Invalid', 400)),
+    })} />)
+
+    expect(await screen.findByRole('heading', { name: 'Reset link unavailable' })).toBeInTheDocument()
+    expect(screen.getByText(/invalid, expired, or has already been used/i)).toBeInTheDocument()
   })
 })

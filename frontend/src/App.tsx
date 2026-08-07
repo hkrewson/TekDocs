@@ -212,9 +212,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.6 adds verified invitation acceptance and account activation." />
+      <PageHeader title="Overview" description="TekDocs 0.0.7 adds secure, self-service password recovery." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.6</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.7</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -223,6 +223,7 @@ function Overview() {
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],
             ['Invitation account activation', 'Available'],
+            ['Password recovery', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>

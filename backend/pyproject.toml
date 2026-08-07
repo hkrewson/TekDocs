@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tekdocs-backend"
+version = "0.0.1"
+description = "TekDocs API and background services"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "celery[redis]>=5.5,<5.6",
+  "cryptography>=50,<51",
+  "django>=5.2,<5.3",
+  "django-allauth[headless,mfa]>=65.9,<66",
+  "djangorestframework>=3.16,<3.17",
+  "drf-spectacular>=0.28,<0.29",
+  "gunicorn>=23,<24",
+  "markdown-it-py>=3,<4",
+  "nh3>=0.3,<0.4",
+  "psycopg[binary]>=3.2,<3.3",
+  "reportlab>=4.4,<5",
+  "whitenoise>=6.9,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "bandit>=1.8,<1.9",
+  "django-stubs[compatible-mypy]>=5.2,<5.3",
+  "factory-boy>=3.3,<3.4",
+  "hypothesis>=6.130,<7",
+  "mypy>=1.15,<2",
+  "pip-audit>=2.8,<3",
+  "pytest>=9.0.3,<10",
+  "pytest-cov>=6,<7",
+  "pytest-django>=4.11,<5",
+  "ruff>=0.11,<0.12",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "tekdocs*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tekdocs.settings.test"
+python_files = ["test_*.py", "*_test.py"]
+addopts = "--strict-markers --strict-config --disable-warnings -q"
+testpaths = ["apps"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+exclude = ["*/migrations/*", "build", "*.egg-info"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "DJ", "S", "UP"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S106"]
+"tekdocs/settings/*" = ["S105"]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["mypy_django_plugin.main"]
+strict = true
+ignore_missing_imports = true
+disallow_subclassing_any = false
+exclude = ["migrations", "tests", "admin.py"]
+
+[tool.django-stubs]
+django_settings_module = "tekdocs.settings.test"
+
+[tool.coverage.run]
+branch = true
+source = ["apps", "tekdocs"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", "tekdocs/settings"]

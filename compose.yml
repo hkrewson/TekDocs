@@ -1,0 +1,114 @@
+name: ${COMPOSE_PROJECT_NAME:-tekdocs}
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
+      POSTGRES_USER: ${POSTGRES_USER:?Run make bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make bootstrap}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    networks: [internal]
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    networks: [internal]
+
+  backend:
+    build:
+      context: ./backend
+      target: development
+    environment: &backend-environment
+      DJANGO_SETTINGS_MODULE: tekdocs.settings.production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Run make bootstrap}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3200}
+      POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
+      POSTGRES_USER: ${POSTGRES_USER:?Run make bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make bootstrap}
+      POSTGRES_HOST: db
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+      TEKDOCS_MASTER_KEY: ${TEKDOCS_MASTER_KEY:?Run make bootstrap}
+      TEKDOCS_PUBLICATION_SIGNING_KEY: ${TEKDOCS_PUBLICATION_SIGNING_KEY:?Run make bootstrap}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
+      TZ: ${TZ:-America/Chicago}
+      TEKDOCS_RUN_MIGRATIONS: "true"
+    command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-", "tekdocs.wsgi:application"]
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    depends_on:
+      db: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8000/api/v1/health/ready"]
+      interval: 8s
+      timeout: 4s
+      start_period: 15s
+      retries: 10
+    restart: unless-stopped
+    networks: [internal]
+
+  worker:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      <<: *backend-environment
+      TEKDOCS_RUN_MIGRATIONS: "false"
+    command: ["celery", "-A", "tekdocs", "worker", "--loglevel=INFO", "--concurrency=2"]
+    depends_on:
+      backend: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [internal]
+
+  scheduler:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      <<: *backend-environment
+      TEKDOCS_RUN_MIGRATIONS: "false"
+    command: ["celery", "-A", "tekdocs", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    depends_on:
+      backend: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    ports:
+      - "${TEKDOCS_PORT:-3200}:8080"
+    depends_on:
+      backend: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  valkey_data:
+  static_data:
+  media_data:
+
+networks:
+  internal:
+    driver: bridge

@@ -1,0 +1,11 @@
+services:
+  backend:
+    environment:
+      DJANGO_SETTINGS_MODULE: tekdocs.settings.production
+    restart: "no"
+  worker:
+    restart: "no"
+  scheduler:
+    restart: "no"
+  frontend:
+    restart: "no"

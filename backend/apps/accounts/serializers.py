@@ -54,6 +54,12 @@ class InvitationRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
 
 
+class InvitationAcceptanceSerializer(serializers.Serializer):
+    token = serializers.CharField(required=False, default="", trim_whitespace=False, write_only=True)
+    display_name = serializers.CharField(max_length=160)
+    password = serializers.CharField(max_length=128, trim_whitespace=False, write_only=True)
+
+
 class InvitationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invitation

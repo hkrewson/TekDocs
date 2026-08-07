@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { browserAuthClient } from './api'
+import { browserAuthClient, takeInvitationFromLocation } from './api'
 
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -13,6 +13,7 @@ function jsonResponse(body: object, status = 200) {
 afterEach(() => {
   vi.unstubAllGlobals()
   document.cookie = 'csrftoken=; Max-Age=0; path=/'
+  window.history.replaceState({}, '', '/')
 })
 
 describe('browser authentication client', () => {
@@ -69,5 +70,35 @@ describe('browser authentication client', () => {
     expect(path).not.toContain(deploymentToken)
     expect(options.headers).toEqual(expect.objectContaining({ 'X-TekDocs-Bootstrap-Token': deploymentToken }))
     expect(options.body as string).not.toContain(deploymentToken)
+  })
+
+  it('takes the invitation token from the fragment and removes it from browser history', () => {
+    const token = `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`
+    window.history.replaceState({}, '', `/auth/invitations/accept#token=${token}`)
+
+    expect(takeInvitationFromLocation()).toEqual({ isInvitationPath: true, token })
+    expect(window.location.pathname).toBe('/auth/invitations/accept')
+    expect(window.location.hash).toBe('')
+  })
+
+  it('submits invitation secrets only in a CSRF-protected request body', async () => {
+    const csrf = crypto.randomUUID()
+    const token = `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`
+    const password = `${crypto.randomUUID()}Aa7!`
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(context))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await browserAuthClient.acceptInvitation({ token, displayName: 'Invited Technician', password })
+
+    const [path, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/v1/invitations/accept')
+    expect(path).not.toContain(token)
+    expect(options.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
+    expect(JSON.parse(options.body as string)).toEqual({
+      token,
+      display_name: 'Invited Technician',
+      password,
+    })
   })
 })

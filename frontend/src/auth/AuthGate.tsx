@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { LoaderCircle } from 'lucide-react'
-import type { AuthClient, AuthenticatedContext, BootstrapDetails } from './api'
+import { AuthRequestError, takeInvitationFromLocation } from './api'
+import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance } from './api'
 
 type AuthState =
   | { phase: 'loading' }
   | { phase: 'bootstrap' }
   | { phase: 'sign-in' }
+  | { phase: 'invitation'; token: string }
+  | { phase: 'invitation-unavailable' }
   | { phase: 'authenticated'; context: AuthenticatedContext }
   | { phase: 'error'; message: string }
 
@@ -129,18 +132,83 @@ function SignInForm({ submit }: { submit: (email: string, password: string) => P
   )
 }
 
+function InvitationUnavailableState() {
+  return (
+    <AuthFrame>
+      <h1>Invitation unavailable</h1>
+      <p className="auth-intro">This invitation is missing, expired, revoked, or has already been used. Ask the TekDocs owner for a new invitation.</p>
+      <a className="secondary-button auth-submit auth-link" href="/">Return to sign in</a>
+    </AuthFrame>
+  )
+}
+
+function InvitationForm({ token, submit, unavailable }: {
+  token: string
+  submit: (details: InvitationAcceptance) => Promise<void>
+  unavailable: () => void
+}) {
+  const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    if (password !== confirmation) {
+      setError('The password confirmation does not match.')
+      return
+    }
+    const submittedPassword = password
+    setPassword('')
+    setConfirmation('')
+    setSubmitting(true)
+    try {
+      await submit({ token, displayName, password: submittedPassword })
+    } catch (submitError) {
+      if (submitError instanceof AuthRequestError && submitError.status === 410) {
+        unavailable()
+        return
+      }
+      setError(message(submitError))
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <h1>Accept invitation</h1>
+      <p className="auth-intro">Create your TekDocs account. Your email address is fixed by the invitation.</p>
+      <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
+        <label>Your name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required autoFocus /></label>
+        <label>Password<input aria-label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required /><span>Use at least 12 characters and a unique password.</span></label>
+        <label>Confirm password<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Activating account…' : 'Activate account'}</button>
+      </form>
+    </AuthFrame>
+  )
+}
+
 export function AuthGate({ client, initialContext, children }: {
   client: AuthClient
   initialContext?: AuthenticatedContext
   children: (props: AuthenticatedRenderProps) => ReactNode
 }) {
-  const [state, setState] = useState<AuthState>(initialContext ? { phase: 'authenticated', context: initialContext } : { phase: 'loading' })
+  const [invitation] = useState(() => takeInvitationFromLocation())
+  const [state, setState] = useState<AuthState>(() => {
+    if (invitation.isInvitationPath) {
+      return invitation.token ? { phase: 'invitation', token: invitation.token } : { phase: 'invitation-unavailable' }
+    }
+    return initialContext ? { phase: 'authenticated', context: initialContext } : { phase: 'loading' }
+  })
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    if (initialContext) return
+    if (initialContext || invitation.isInvitationPath) return
     let current = true
     client.load()
       .then((result) => {
@@ -153,7 +221,7 @@ export function AuthGate({ client, initialContext, children }: {
       })
       .catch((error: unknown) => current && setState({ phase: 'error', message: message(error) }))
     return () => { current = false }
-  }, [attempt, client, initialContext])
+  }, [attempt, client, initialContext, invitation.isInvitationPath])
 
   const bootstrap = async (details: BootstrapDetails) => {
     const authenticated = await client.bootstrapAndLogin(details)
@@ -162,6 +230,11 @@ export function AuthGate({ client, initialContext, children }: {
 
   const login = async (email: string, password: string) => {
     const authenticated = await client.login(email, password)
+    setState({ phase: 'authenticated', context: authenticated })
+  }
+
+  const acceptInvitation = async (details: InvitationAcceptance) => {
+    const authenticated = await client.acceptInvitation(details)
     setState({ phase: 'authenticated', context: authenticated })
   }
 
@@ -181,6 +254,8 @@ export function AuthGate({ client, initialContext, children }: {
   if (state.phase === 'loading') return <LoadingState />
   if (state.phase === 'bootstrap') return <BootstrapForm submit={bootstrap} />
   if (state.phase === 'sign-in') return <SignInForm submit={login} />
+  if (state.phase === 'invitation-unavailable') return <InvitationUnavailableState />
+  if (state.phase === 'invitation') return <InvitationForm token={state.token} submit={acceptInvitation} unavailable={() => setState({ phase: 'invitation-unavailable' })} />
   if (state.phase === 'error') return <ErrorState detail={state.message} retry={() => { setState({ phase: 'loading' }); setAttempt((value) => value + 1) }} />
   return children({ context: state.context, signOut, signingOut, signOutError })
 }

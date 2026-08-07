@@ -2,8 +2,10 @@ import secrets
 from typing import Any
 
 from django.conf import settings
+from django.contrib.auth import login
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -12,12 +14,13 @@ from rest_framework.views import APIView
 from apps.core.models import InstallationState
 
 from .bootstrap import bootstrap_owner
-from .invitations import issue_invitation, resend_invitation, revoke_invitation
+from .invitations import InvitationConflict, accept_invitation, issue_invitation, resend_invitation, revoke_invitation
 from .models import Invitation
-from .policy import require_installation_owner
+from .policy import require_installation_member, require_installation_owner
 from .serializers import (
     AuthenticatedContextSerializer,
     BootstrapStatusSerializer,
+    InvitationAcceptanceSerializer,
     InvitationRequestSerializer,
     InvitationSerializer,
     OwnerBootstrapResultSerializer,
@@ -84,12 +87,12 @@ class AuthenticatedContextView(APIView):
     @extend_schema(
         responses={
             200: AuthenticatedContextSerializer,
-            403: OpenApiResponse(description="Authentication or installation ownership required"),
+            403: OpenApiResponse(description="Authentication or installation membership required"),
             503: OpenApiResponse(description="Installation context unavailable"),
         }
     )
     def get(self, request):  # type: ignore[no-untyped-def]
-        context = require_installation_owner(request.user)
+        context = require_installation_member(request.user)
         return Response(
             {
                 "user": {
@@ -98,6 +101,43 @@ class AuthenticatedContextView(APIView):
                     "display_name": request.user.display_name,
                 },
                 "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
+            }
+        )
+
+
+class InvitationAcceptView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=InvitationAcceptanceSerializer,
+        responses={
+            200: AuthenticatedContextSerializer,
+            400: OpenApiResponse(description="Invalid account details or password"),
+            403: OpenApiResponse(description="CSRF validation failed"),
+            409: OpenApiResponse(description="Sign out before accepting an invitation"),
+            410: OpenApiResponse(description="Invitation unavailable"),
+        },
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        SessionAuthentication().enforce_csrf(request)
+        if request.user.is_authenticated:
+            raise InvitationConflict("Sign out before accepting an invitation.")
+        serializer = InvitationAcceptanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        accepted = accept_invitation(**serializer.validated_data)
+        login(request._request, accepted.user, backend="django.contrib.auth.backends.ModelBackend")
+        return Response(
+            {
+                "user": {
+                    "id": str(accepted.user.id),
+                    "email": accepted.user.email,
+                    "display_name": accepted.user.display_name,
+                },
+                "tenant": {
+                    "id": str(accepted.invitation.tenant.id),
+                    "name": accepted.invitation.tenant.name,
+                },
             }
         )
 

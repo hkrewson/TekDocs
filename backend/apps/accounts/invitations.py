@@ -1,21 +1,23 @@
 from __future__ import annotations
 
+import re
 import secrets
 import smtplib
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from allauth.account.models import EmailAddress
 from django.conf import settings
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ValidationError
 
 from apps.core.email import send_invitation_email
 from apps.core.models import AuditEvent, Tenant
 
-from .models import Invitation, InvitationState, User
-
-EMPTY_DIGEST = ""
+from .models import EMPTY_DIGEST, Invitation, InvitationState, TenantMembership, User
 
 
 class InvitationConflict(APIException):
@@ -34,10 +36,22 @@ class InvitationDeliveryRejected(Exception):
     pass
 
 
+class InvitationUnavailable(APIException):
+    status_code = 410
+    default_detail = "This invitation is no longer available. Ask the TekDocs owner for a new invitation."
+    default_code = "invitation_unavailable"
+
+
 @dataclass(frozen=True)
 class IssuedInvitation:
     invitation: Invitation
     token: str
+
+
+@dataclass(frozen=True)
+class AcceptedInvitation:
+    invitation: Invitation
+    user: User
 
 
 def _new_token() -> str:
@@ -52,7 +66,7 @@ def _acceptance_url(token: str) -> str:
     return f"{settings.TEKDOCS_PUBLIC_URL.rstrip('/')}/auth/invitations/accept#token={token}"
 
 
-def _audit(*, invitation: Invitation, actor: User, action: str) -> None:
+def _audit(*, invitation: Invitation, actor: User | None, action: str) -> None:
     AuditEvent.objects.create(
         tenant=invitation.tenant,
         actor=actor,
@@ -62,7 +76,7 @@ def _audit(*, invitation: Invitation, actor: User, action: str) -> None:
     )
 
 
-def _mark_expired(invitation: Invitation, actor: User) -> None:
+def _mark_expired(invitation: Invitation, actor: User | None) -> None:
     invitation.state = InvitationState.EXPIRED
     invitation.token_digest = EMPTY_DIGEST
     invitation.save(update_fields=("state", "token_digest", "updated_at"))
@@ -157,3 +171,55 @@ def revoke_invitation(*, invitation: Invitation, actor: User) -> Invitation:
         current.save(update_fields=("state", "revoked_at", "token_digest", "updated_at"))
         _audit(invitation=current, actor=actor, action="invitation.revoked")
     return current
+
+
+def accept_invitation(*, token: str, display_name: str, password: str) -> AcceptedInvitation:
+    if re.fullmatch(r"[A-Za-z0-9_-]{43,128}", token) is None:
+        raise InvitationUnavailable()
+
+    digest = Invitation.digest_token(token)
+    accepted: AcceptedInvitation | None = None
+    try:
+        with transaction.atomic():
+            invitation = (
+                Invitation.objects.select_for_update()
+                .select_related("tenant")
+                .filter(token_digest=digest)
+                .first()
+            )
+            if invitation is None or invitation.state != InvitationState.PENDING:
+                pass
+            elif invitation.expires_at <= timezone.now():
+                _mark_expired(invitation, actor=None)
+            elif not invitation.matches_active_token(token):
+                pass
+            elif User.objects.filter(email__iexact=invitation.email).exists():
+                pass
+            else:
+                candidate = User(email=invitation.email, display_name=display_name.strip())
+                try:
+                    password_validation.validate_password(password, candidate)
+                except DjangoValidationError as exc:
+                    raise ValidationError({"password": list(exc.messages)}) from exc
+                user = User.objects.create_user(
+                    email=invitation.email,
+                    password=password,
+                    display_name=display_name.strip(),
+                )
+                EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
+                TenantMembership.objects.create(tenant=invitation.tenant, user=user)
+                invitation.state = InvitationState.ACCEPTED
+                invitation.accepted_by = user
+                invitation.accepted_at = timezone.now()
+                invitation.token_digest = EMPTY_DIGEST
+                invitation.save(
+                    update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at")
+                )
+                _audit(invitation=invitation, actor=user, action="invitation.accepted")
+                accepted = AcceptedInvitation(invitation=invitation, user=user)
+    except IntegrityError as exc:
+        raise InvitationUnavailable() from exc
+
+    if accepted is None:
+        raise InvitationUnavailable()
+    return accepted

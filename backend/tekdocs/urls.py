@@ -5,6 +5,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.accounts.views import (
     AuthenticatedContextView,
     BootstrapStatusView,
+    InvitationAcceptView,
     InvitationListCreateView,
     InvitationResendView,
     InvitationRevokeView,
@@ -19,6 +20,7 @@ urlpatterns = [
     path("api/v1/bootstrap/status", BootstrapStatusView.as_view(), name="bootstrap-status"),
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
+    path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path(
         "api/v1/invitations/<uuid:invitation_id>/revoke",

@@ -11,16 +11,16 @@ The browser requests both:
 
 When bootstrap is required, the shell is not rendered. The setup form submits the deployment token only in `X-TekDocs-Bootstrap-Token`; it is never placed in a URL, JSON body, local storage, session storage, cookie, log, or rendered error. Password fields are cleared when submission starts.
 
-A successful bootstrap creates the tenant and first owner, records the owner’s deployment-asserted email as the verified primary allauth address, and immediately performs a normal allauth password login. This first-owner exception is necessary before invitation issuance in `0.0.5` and verified-email activation in `0.0.6`; later users do not inherit it.
+A successful bootstrap creates the tenant, first owner, and owner membership; records the owner’s deployment-asserted email as the verified primary allauth address; and immediately performs a normal allauth password login.
 
 ## Session lifecycle
 
 - Login: `POST /_allauth/browser/v1/auth/login` with same-origin credentials and `X-CSRFToken`.
 - Logout: `DELETE /_allauth/browser/v1/auth/session` with same-origin credentials and `X-CSRFToken`.
-- Shell context: `GET /api/v1/auth/context`; it requires an authenticated session and, during the bootstrap-only release, the installation-owner identity.
+- Shell context: `GET /api/v1/auth/context`; it requires an authenticated session and an explicit membership in the installation tenant.
 
-The shell renders only after the allauth session and TekDocs context both succeed. A session-authenticated identity that is not the installation owner receives a denial until controlled invitations and scoped roles are implemented.
+The shell renders only after the allauth session and TekDocs context both succeed. The owner and accounts created from accepted invitations receive tenant membership; unrelated identities remain denied. Invitation administration continues to require installation ownership until scoped roles are implemented.
 
-`0.0.5` adds owner-only invitation issuance, listing, revocation, and resend through the TekDocs API. It does not open allauth signup or create invited accounts. Tokens are delivered only by email, stored only as digests, rotated on resend, and cleared on revocation or observed expiry. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
+`0.0.6` adds controlled invitation acceptance. The browser reads the token from the URL fragment, removes the fragment immediately, and submits the token with account details only in a CSRF-protected request body. Successful acceptance creates one active user, verified primary allauth email, and tenant membership before consuming the invitation and establishing a normal Django session. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
 
-Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Invitation acceptance and verified-email activation remain `0.0.6`. Authentication audit events, session inventory/revocation, and expanded throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.
+Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Password reset remains `0.0.7`. Authentication audit expansion, session inventory/revocation, and throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.

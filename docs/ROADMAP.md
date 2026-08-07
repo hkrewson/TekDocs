@@ -29,8 +29,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.3` | Complete | Accessible browser bootstrap, sign-in/sign-out, CSRF lifecycle, and authenticated shell boundary. |
 | `0.0.4` | Complete | SMTP configuration boundary, transactional email templates, operator delivery check, and development Mailpit capture. |
 | `0.0.5` | Complete | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
-| `0.0.6` | Next | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
-| `0.0.7` | Planned | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
+| `0.0.6` | Complete | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
+| `0.0.7` | Next | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
 | `0.0.8` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.9` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.10` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
@@ -92,6 +92,17 @@ Evidence: `docs/releases/0.0.4.md`.
 - [x] Migration, OpenAPI, unit, PostgreSQL/Compose, mail-capture, authorization-negative, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.5`.
 
 Evidence: `docs/releases/0.0.5.md`.
+
+### `0.0.6` acceptance criteria
+
+- [x] A pending, unexpired invitation can be accepted exactly once to create one active user, one verified primary allauth email, and one tenant membership.
+- [x] Acceptance validates the password through Django, locks the invitation transactionally, clears its token digest, records its accepting user and timestamp, and emits a value-free audit event.
+- [x] Missing, malformed, expired, revoked, accepted, mismatched, and concurrently reused tokens fail through one non-enumerating unavailable response without creating partial identity data.
+- [x] The browser reads the token only from the invitation URL fragment, removes that fragment immediately, never persists the token or password, and establishes a normal CSRF-protected session after activation.
+- [x] Valid, unavailable, password-validation, submitting, and completed activation states are responsive, keyboard accessible, and covered by unit and Chromium tests.
+- [x] Public signup remains closed; invitation administration remains owner-only; migration, OpenAPI, Docker/PostgreSQL, browser, and security gates pass at `0.0.6`.
+
+Evidence: `docs/releases/0.0.6.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

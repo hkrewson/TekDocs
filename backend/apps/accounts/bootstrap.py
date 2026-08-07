@@ -8,7 +8,7 @@ from rest_framework.exceptions import APIException
 
 from apps.core.models import AuditEvent, InstallationState, Tenant
 
-from .models import User
+from .models import TenantMembership, User
 
 
 class BootstrapConflict(APIException):
@@ -44,6 +44,7 @@ def bootstrap_owner(*, tenant_name: str, owner_email: str, owner_display_name: s
             display_name=owner_display_name,
         )
         EmailAddress.objects.create(user=owner, email=owner.email, primary=True, verified=True)
+        TenantMembership.objects.create(tenant=tenant, user=owner)
         state.tenant = tenant
         state.owner = owner
         state.bootstrapped_at = timezone.now()

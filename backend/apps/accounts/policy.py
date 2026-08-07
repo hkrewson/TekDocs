@@ -4,7 +4,7 @@ from rest_framework.exceptions import APIException, PermissionDenied
 
 from apps.core.models import InstallationState, Tenant
 
-from .models import User
+from .models import TenantMembership, User
 
 
 class InstallationContextUnavailable(APIException):
@@ -14,12 +14,13 @@ class InstallationContextUnavailable(APIException):
 
 
 @dataclass(frozen=True)
-class InstallationOwnerContext:
+class InstallationMemberContext:
     state: InstallationState
     tenant: Tenant
+    is_owner: bool
 
 
-def require_installation_owner(user: User) -> InstallationOwnerContext:
+def require_installation_member(user: User) -> InstallationMemberContext:
     if not user.is_authenticated:
         raise PermissionDenied("Authentication is required.")
     try:
@@ -29,6 +30,16 @@ def require_installation_owner(user: User) -> InstallationOwnerContext:
         )
     except InstallationState.DoesNotExist as exc:
         raise InstallationContextUnavailable() from exc
-    if state.tenant is None or state.owner_id != user.pk:
+    if state.tenant is None:
+        raise InstallationContextUnavailable()
+    is_owner = state.owner_id == user.pk
+    if not is_owner and not TenantMembership.objects.filter(tenant=state.tenant, user=user).exists():
+        raise PermissionDenied("Installation membership is required.")
+    return InstallationMemberContext(state=state, tenant=state.tenant, is_owner=is_owner)
+
+
+def require_installation_owner(user: User) -> InstallationMemberContext:
+    context = require_installation_member(user)
+    if not context.is_owner:
         raise PermissionDenied("Installation ownership is required.")
-    return InstallationOwnerContext(state=state, tenant=state.tenant)
+    return context

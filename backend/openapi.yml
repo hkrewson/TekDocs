@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.0.5
+  version: 0.0.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -33,7 +33,7 @@ paths:
                 $ref: '#/components/schemas/AuthenticatedContext'
           description: ''
         '403':
-          description: Authentication or installation ownership required
+          description: Authentication or installation membership required
         '503':
           description: Installation context unavailable
   /api/v1/bootstrap/owner:
@@ -233,6 +233,41 @@ paths:
           description: Invitation not found
         '409':
           description: Invitation is not pending
+  /api/v1/invitations/accept:
+    post:
+      operationId: invitations_accept_create
+      tags:
+      - invitations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationAcceptance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvitationAcceptance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvitationAcceptance'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedContext'
+          description: ''
+        '400':
+          description: Invalid account details or password
+        '403':
+          description: CSRF validation failed
+        '409':
+          description: Sign out before accepting an invitation
+        '410':
+          description: Invitation unavailable
 components:
   schemas:
     AuthenticatedContext:
@@ -343,6 +378,23 @@ components:
       - send_count
       - state
       - updated_at
+    InvitationAcceptance:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+          default: ''
+        display_name:
+          type: string
+          maxLength: 160
+        password:
+          type: string
+          writeOnly: true
+          maxLength: 128
+      required:
+      - display_name
+      - password
     InvitationRequest:
       type: object
       properties:

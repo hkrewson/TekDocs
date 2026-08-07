@@ -18,10 +18,17 @@ export type BootstrapDetails = {
   password: string
 }
 
+export type InvitationAcceptance = {
+  token: string
+  displayName: string
+  password: string
+}
+
 export interface AuthClient {
   load(): Promise<{ bootstrapRequired: boolean; context: AuthenticatedContext | null }>
   bootstrapAndLogin(details: BootstrapDetails): Promise<AuthenticatedContext>
   login(email: string, password: string): Promise<AuthenticatedContext>
+  acceptInvitation(details: InvitationAcceptance): Promise<AuthenticatedContext>
   logout(): Promise<void>
 }
 
@@ -99,6 +106,14 @@ async function login(email: string, password: string): Promise<AuthenticatedCont
   return context()
 }
 
+export function takeInvitationFromLocation(): { isInvitationPath: boolean; token: string | null } {
+  const isInvitationPath = window.location.pathname === '/auth/invitations/accept'
+  if (!isInvitationPath) return { isInvitationPath: false, token: null }
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('token')
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`)
+  return { isInvitationPath: true, token: token || null }
+}
+
 export const browserAuthClient: AuthClient = {
   async load() {
     const [bootstrapResponse, authenticated] = await Promise.all([
@@ -145,6 +160,23 @@ export const browserAuthClient: AuthClient = {
   },
 
   login,
+
+  async acceptInvitation(details) {
+    const response = await mutation('/api/v1/invitations/accept', 'POST', {
+      token: details.token,
+      display_name: details.displayName,
+      password: details.password,
+    })
+    if (!response.ok) {
+      const messages: Record<number, string> = {
+        400: 'Review the account details and password requirements.',
+        409: 'Sign out before accepting this invitation.',
+        410: 'This invitation is no longer available. Ask the TekDocs owner for a new invitation.',
+      }
+      throw new AuthRequestError(messages[response.status] ?? 'The invitation was not accepted.', response.status)
+    }
+    return responseJson<AuthenticatedContext>(response)
+  },
 
   async logout() {
     const response = await mutation('/_allauth/browser/v1/auth/session', 'DELETE')

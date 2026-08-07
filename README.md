@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.5`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.6`.
 
 ## Start locally
 
@@ -46,9 +46,9 @@ The running Docker stack is authoritative for runtime claims. See `docs/PRODUCT_
 
 ## Current boundaries
 
-- Registration is deliberately closed. `0.0.5` provides owner-only invitation issuance, revocation, and resend APIs; account activation and invitation acceptance arrive in `0.0.6`.
+- Registration is deliberately closed. Owners issue invitations through controlled APIs; `0.0.6` lets recipients activate a verified account through a single-use invitation.
 - The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
-- Tenant/entity/link models establish future data boundaries but are not exposed as CRUD APIs in `0.0.5`.
+- Tenant/entity/link models establish future data boundaries but are not yet exposed as CRUD APIs.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
 
 ## License

@@ -8,7 +8,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 
 from apps.accounts.adapters import InviteOnlyAccountAdapter
-from apps.accounts.models import User
+from apps.accounts.models import TenantMembership, User
 from apps.core.models import AuditEvent, InstallationState, Tenant
 
 BOOTSTRAP_TOKEN = secrets.token_urlsafe(32)
@@ -48,6 +48,7 @@ def test_owner_bootstrap_creates_exactly_one_tenant_owner_and_audit_event(client
     assert Tenant.objects.count() == 1
     assert User.objects.count() == 1
     owner = User.objects.get()
+    assert TenantMembership.objects.filter(tenant=Tenant.objects.get(), user=owner).exists()
     assert owner.email == "owner@example.com"
     assert owner.check_password(BOOTSTRAP_PAYLOAD["password"])
     assert owner.is_staff is False

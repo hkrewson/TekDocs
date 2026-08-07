@@ -12,7 +12,7 @@ class ApiRootView(APIView):
 
     @extend_schema(responses={200: dict})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return Response({"name": "TekDocs API", "version": "0.0.5", "status": "pre-alpha"})
+        return Response({"name": "TekDocs API", "version": "0.0.6", "status": "pre-alpha"})
 
 
 class LiveHealthView(APIView):
@@ -21,7 +21,7 @@ class LiveHealthView(APIView):
 
     @extend_schema(responses={200: dict})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return Response({"status": "ok", "service": "backend", "version": "0.0.5"})
+        return Response({"status": "ok", "service": "backend", "version": "0.0.6"})
 
 
 class ReadyHealthView(APIView):
@@ -36,4 +36,4 @@ class ReadyHealthView(APIView):
                 cursor.fetchone()
         except Exception:  # noqa: BLE001
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
-        return Response({"status": "ok", "database": "ready", "version": "0.0.5"})
+        return Response({"status": "ok", "database": "ready", "version": "0.0.6"})

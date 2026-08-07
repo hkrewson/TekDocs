@@ -10,6 +10,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - The browser reads the CSRF cookie established by `django-allauth` and sends it as `X-CSRFToken` for login and logout. Session cookies remain HTTP-only; the deployment token and password are never written to browser storage.
 - Production mail requires Django's SMTP backend, a valid sender and host, paired credentials, one TLS mode, or an explicit plaintext-SMTP acknowledgement for a trusted private hop. The development Mailpit UI binds only to loopback and must not receive real customer data.
 - Invitation management is installation-owner-only. Raw invitation tokens use maintained high-entropy randomness, are delivered in URL fragments, stored only as digests, rotated on resend, cleared on expiry/revocation, and excluded from API responses and audit metadata.
+- Invitation acceptance requires CSRF, consumes a locked invitation exactly once, creates identity and membership atomically, returns one unavailable state for invalid lifecycle conditions, and removes the browser URL fragment before account entry.
 - MFA for privileged roles and secret reveal.
 - Central policy authorization with cross-tenant and cross-client negative tests.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.

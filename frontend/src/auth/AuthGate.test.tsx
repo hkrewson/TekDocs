@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import { App } from '../App'
+import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext } from './api'
 
 const context: AuthenticatedContext = {
@@ -14,10 +15,15 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     load: vi.fn().mockResolvedValue({ bootstrapRequired: false, context }),
     bootstrapAndLogin: vi.fn().mockResolvedValue(context),
     login: vi.fn().mockResolvedValue(context),
+    acceptInvitation: vi.fn().mockResolvedValue(context),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
+
+beforeEach(() => {
+  window.history.replaceState({}, '', '/')
+})
 
 describe('authentication boundary', () => {
   it('does not render the application shell while session state is unresolved', () => {
@@ -123,5 +129,45 @@ describe('authentication boundary', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument())
     expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('activates an invited account without retaining the URL token or password', async () => {
+    const user = userEvent.setup()
+    const token = `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`
+    const password = `${crypto.randomUUID()}Aa7!`
+    const acceptInvitation = vi.fn().mockResolvedValue(context)
+    window.history.replaceState({}, '', `/auth/invitations/accept#token=${token}`)
+    render(<App authClient={client({ acceptInvitation })} />)
+
+    expect(screen.getByRole('heading', { name: 'Accept invitation' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('')
+    await user.type(screen.getByLabelText('Your name'), 'Invited Technician')
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), password)
+    await user.type(screen.getByLabelText('Confirm password'), password)
+    await user.click(screen.getByRole('button', { name: 'Activate account' }))
+
+    await screen.findByRole('heading', { name: 'Overview' })
+    expect(acceptInvitation).toHaveBeenCalledWith({ token, displayName: 'Invited Technician', password })
+    expect(screen.queryByDisplayValue(token)).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
+  })
+
+  it('uses one safe unavailable state for a rejected or missing invitation', async () => {
+    const user = userEvent.setup()
+    const token = `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`
+    window.history.replaceState({}, '', `/auth/invitations/accept#token=${token}`)
+    render(<App authClient={client({
+      acceptInvitation: vi.fn().mockRejectedValue(new AuthRequestError('Invitation unavailable', 410)),
+    })} />)
+
+    await user.type(screen.getByLabelText('Your name'), 'Invited Technician')
+    const password = `${crypto.randomUUID()}Aa7!`
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), password)
+    await user.type(screen.getByLabelText('Confirm password'), password)
+    await user.click(screen.getByRole('button', { name: 'Activate account' }))
+
+    expect(await screen.findByRole('heading', { name: 'Invitation unavailable' })).toBeInTheDocument()
+    expect(screen.getByText(/missing, expired, revoked, or has already been used/i)).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
   })
 })

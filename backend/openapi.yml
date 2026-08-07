@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.0.4
+  version: 0.0.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -126,6 +126,113 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/invitations:
+    get:
+      operationId: invitations_list
+      tags:
+      - invitations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+          description: ''
+        '403':
+          description: Owner required
+    post:
+      operationId: invitations_create
+      tags:
+      - invitations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+          description: ''
+        '400':
+          description: Invalid invitation details
+        '403':
+          description: Owner required
+        '409':
+          description: Invitation conflict
+        '503':
+          description: Invitation retained but email delivery failed
+  /api/v1/invitations/{invitation_id}/resend:
+    post:
+      operationId: invitations_resend_create
+      parameters:
+      - in: path
+        name: invitation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - invitations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+          description: ''
+        '403':
+          description: Owner required
+        '404':
+          description: Invitation not found
+        '409':
+          description: Invitation is not pending
+        '503':
+          description: Invitation retained but email delivery failed
+  /api/v1/invitations/{invitation_id}/revoke:
+    post:
+      operationId: invitations_revoke_create
+      parameters:
+      - in: path
+        name: invitation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - invitations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+          description: ''
+        '403':
+          description: Owner required
+        '404':
+          description: Invitation not found
+        '409':
+          description: Invitation is not pending
 components:
   schemas:
     AuthenticatedContext:
@@ -182,6 +289,69 @@ components:
       required:
       - id
       - name
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_delivery_failed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        delivery_attempts:
+          type: integer
+          readOnly: true
+        send_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - delivery_attempts
+      - email
+      - expires_at
+      - id
+      - last_delivery_failed_at
+      - last_sent_at
+      - send_count
+      - state
+      - updated_at
+    InvitationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+      required:
+      - email
     OwnerBootstrap:
       type: object
       properties:
@@ -214,6 +384,18 @@ components:
       required:
       - owner
       - tenant
+    StateEnum:
+      enum:
+      - pending
+      - expired
+      - revoked
+      - accepted
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `expired` - Expired
+        * `revoked` - Revoked
+        * `accepted` - Accepted
   securitySchemes:
     cookieAuth:
       type: apiKey

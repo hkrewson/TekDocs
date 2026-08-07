@@ -3,7 +3,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .validation import validate_production_email
+from .validation import validate_production_email, validate_production_public_url
 
 DEBUG = False
 SESSION_COOKIE_SECURE = True
@@ -40,4 +40,8 @@ validate_production_email(
     use_tls=EMAIL_USE_TLS,  # noqa: F405
     use_ssl=EMAIL_USE_SSL,  # noqa: F405
     allow_insecure_smtp=TEKDOCS_ALLOW_INSECURE_SMTP,  # noqa: F405
+)
+validate_production_public_url(
+    public_url=TEKDOCS_PUBLIC_URL,  # noqa: F405
+    allow_insecure=TEKDOCS_ALLOW_INSECURE_PUBLIC_URL,  # noqa: F405
 )

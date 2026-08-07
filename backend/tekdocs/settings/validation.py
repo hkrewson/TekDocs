@@ -1,9 +1,30 @@
 from email.utils import getaddresses
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import validate_email
 
 SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+
+def validate_production_public_url(*, public_url: str, allow_insecure: bool) -> None:
+    errors: list[str] = []
+    try:
+        parsed = urlsplit(public_url)
+        hostname = parsed.hostname
+    except ValueError:
+        parsed = urlsplit("")
+        hostname = None
+    if public_url.strip() != public_url or any(ord(character) < 32 for character in public_url):
+        errors.append("TEKDOCS_PUBLIC_URL cannot contain whitespace or control characters")
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        errors.append("TEKDOCS_PUBLIC_URL must be an absolute HTTP(S) URL")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        errors.append("TEKDOCS_PUBLIC_URL cannot contain credentials, a query, or a fragment")
+    if parsed.scheme != "https" and not allow_insecure:
+        errors.append("HTTP requires TEKDOCS_ALLOW_INSECURE_PUBLIC_URL=true")
+    if errors:
+        raise ImproperlyConfigured("Invalid public URL configuration: " + "; ".join(errors))
 
 
 def validate_production_email(

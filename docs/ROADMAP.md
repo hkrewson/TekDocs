@@ -28,8 +28,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.2` | Complete | One-time installation state and first-owner API protected by a deployment bootstrap secret. Concurrent/repeated claims and public signup fail safely. |
 | `0.0.3` | Complete | Accessible browser bootstrap, sign-in/sign-out, CSRF lifecycle, and authenticated shell boundary. |
 | `0.0.4` | Complete | SMTP configuration boundary, transactional email templates, operator delivery check, and development Mailpit capture. |
-| `0.0.5` | Next | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
-| `0.0.6` | Planned | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
+| `0.0.5` | Complete | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
+| `0.0.6` | Next | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
 | `0.0.7` | Planned | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
 | `0.0.8` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.9` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
@@ -81,6 +81,17 @@ Evidence: `docs/releases/0.0.3.md`.
 - [x] Version, security/operator documentation, dependency scans, static analysis, secret scanning, and container gates agree at `0.0.4`.
 
 Evidence: `docs/releases/0.0.4.md`.
+
+### `0.0.5` acceptance criteria
+
+- [x] Only the authenticated installation owner can list, issue, revoke, or resend tenant-scoped invitations; anonymous and unrelated authenticated users are denied.
+- [x] Invitation tokens use maintained randomness, are stored only as digests, appear only in the email URL fragment, expire, rotate on resend, and become unusable after revocation.
+- [x] Issuance prevents duplicate active invitations and existing-user invitations while allowing an expired invitation to be replaced safely.
+- [x] Delivery uses the central multipart template service; failures retain a recoverable pending invitation without exposing its address or token in API errors, audits, or logs.
+- [x] Invitation state changes create value-free append-only audit events and the API never returns token material.
+- [x] Migration, OpenAPI, unit, PostgreSQL/Compose, mail-capture, authorization-negative, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.5`.
+
+Evidence: `docs/releases/0.0.5.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

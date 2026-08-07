@@ -30,4 +30,4 @@ Set the following deployment values:
 
 `TEKDOCS_ALLOW_INSECURE_SMTP=true` is an explicit exception for a trusted private SMTP hop such as the local Mailpit container. It must not be used to send mail across an untrusted network. Production startup fails when SMTP configuration is incomplete, contradictory, or unexpectedly plaintext.
 
-Mail delivery is synchronous during this foundation slice. Invitations, recovery flows, queued delivery, retry policy, and delivery-event audit behavior remain separate roadmap work.
+Mail delivery remains synchronous. `0.0.5` adds invitation templates and explicit owner-triggered resend; automatic queues, retry policy, recovery flows, notifications, and bounce handling remain separate roadmap work. Invitation SMTP failures retain a pending record without returning the address, token, or backend exception.

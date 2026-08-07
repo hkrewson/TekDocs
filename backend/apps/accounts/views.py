@@ -2,8 +2,9 @@ import secrets
 from typing import Any
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import APIException, PermissionDenied
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,20 +12,19 @@ from rest_framework.views import APIView
 from apps.core.models import InstallationState
 
 from .bootstrap import bootstrap_owner
+from .invitations import issue_invitation, resend_invitation, revoke_invitation
+from .models import Invitation
+from .policy import require_installation_owner
 from .serializers import (
     AuthenticatedContextSerializer,
     BootstrapStatusSerializer,
+    InvitationRequestSerializer,
+    InvitationSerializer,
     OwnerBootstrapResultSerializer,
     OwnerBootstrapSerializer,
 )
 
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
-
-
-class AuthenticationContextUnavailable(APIException):
-    status_code = 503
-    default_detail = "The authenticated installation context is unavailable."
-    default_code = "authentication_context_unavailable"
 
 
 class BootstrapStatusView(APIView):
@@ -89,15 +89,7 @@ class AuthenticatedContextView(APIView):
         }
     )
     def get(self, request):  # type: ignore[no-untyped-def]
-        try:
-            state = InstallationState.objects.select_related("tenant", "owner").get(
-                pk=InstallationState.SINGLETON_ID,
-                bootstrapped_at__isnull=False,
-            )
-        except InstallationState.DoesNotExist as exc:
-            raise AuthenticationContextUnavailable() from exc
-        if state.tenant is None or state.owner_id != request.user.pk:
-            raise PermissionDenied("Installation ownership is required.")
+        context = require_installation_owner(request.user)
         return Response(
             {
                 "user": {
@@ -105,6 +97,68 @@ class AuthenticatedContextView(APIView):
                     "email": request.user.email,
                     "display_name": request.user.display_name,
                 },
-                "tenant": {"id": str(state.tenant.id), "name": state.tenant.name},
+                "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
             }
         )
+
+
+class InvitationListCreateView(APIView):
+    @extend_schema(responses={200: InvitationSerializer(many=True), 403: OpenApiResponse(description="Owner required")})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        context = require_installation_owner(request.user)
+        invitations = Invitation.objects.filter(tenant=context.tenant)
+        return Response(InvitationSerializer(invitations, many=True).data)
+
+    @extend_schema(
+        request=InvitationRequestSerializer,
+        responses={
+            201: InvitationSerializer,
+            400: OpenApiResponse(description="Invalid invitation details"),
+            403: OpenApiResponse(description="Owner required"),
+            409: OpenApiResponse(description="Invitation conflict"),
+            503: OpenApiResponse(description="Invitation retained but email delivery failed"),
+        },
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        context = require_installation_owner(request.user)
+        serializer = InvitationRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invitation = issue_invitation(
+            tenant=context.tenant,
+            actor=request.user,
+            email=serializer.validated_data["email"],
+        )
+        return Response(InvitationSerializer(invitation).data, status=201)
+
+
+class InvitationRevokeView(APIView):
+    @extend_schema(
+        request=None,
+        responses={
+            200: InvitationSerializer,
+            403: OpenApiResponse(description="Owner required"),
+            404: OpenApiResponse(description="Invitation not found"),
+            409: OpenApiResponse(description="Invitation is not pending"),
+        },
+    )
+    def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
+        context = require_installation_owner(request.user)
+        invitation = get_object_or_404(Invitation, pk=invitation_id, tenant=context.tenant)
+        return Response(InvitationSerializer(revoke_invitation(invitation=invitation, actor=request.user)).data)
+
+
+class InvitationResendView(APIView):
+    @extend_schema(
+        request=None,
+        responses={
+            200: InvitationSerializer,
+            403: OpenApiResponse(description="Owner required"),
+            404: OpenApiResponse(description="Invitation not found"),
+            409: OpenApiResponse(description="Invitation is not pending"),
+            503: OpenApiResponse(description="Invitation retained but email delivery failed"),
+        },
+    )
+    def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
+        context = require_installation_owner(request.user)
+        invitation = get_object_or_404(Invitation, pk=invitation_id, tenant=context.tenant)
+        return Response(InvitationSerializer(resend_invitation(invitation=invitation, actor=request.user)).data)

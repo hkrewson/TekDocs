@@ -11,6 +11,7 @@ Client documentation, credentials, personal/contact information, asset and netwo
 | Cross-client or cross-tenant access | Explicit ownership columns, central policy service, scoped query APIs, database constraints/RLS, IDOR regression matrix. |
 | Account takeover | Maintained authentication library, invite-only onboarding, MFA, rate limits, session inventory/revocation, secure recovery. |
 | Email disclosure or delivery interception | Central templates, header validation, bounded SMTP timeout, TLS-by-default production validation, paired credentials, loopback-only development inbox, and no message contents in command output. |
+| Invitation theft, replay, or enumeration | Owner-only issuance, 256-bit random tokens, digest-only storage, constant-time matching, fragment-based delivery links, expiry, resend rotation, revocation, generic delivery failures, and value-free audit events. |
 | Stored XSS through Markdown | No raw HTML/MDX, server allowlist sanitizer, client defense in depth, CSP, malicious fixture corpus. |
 | Credential disclosure | Envelope encryption, external wrapping key, narrow reveal endpoint, reauthentication, audit without values, redaction tests. |
 | Malicious integration target | Address validation, private/reserved network blocking, redirect revalidation, time/size limits, signed webhooks, replay cache. |

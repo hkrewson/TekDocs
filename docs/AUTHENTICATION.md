@@ -21,4 +21,6 @@ A successful bootstrap creates the tenant and first owner, records the owner’s
 
 The shell renders only after the allauth session and TekDocs context both succeed. A session-authenticated identity that is not the installation owner receives a denial until controlled invitations and scoped roles are implemented.
 
-Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Authentication audit events, session inventory/revocation, and expanded throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.
+`0.0.5` adds owner-only invitation issuance, listing, revocation, and resend through the TekDocs API. It does not open allauth signup or create invited accounts. Tokens are delivered only by email, stored only as digests, rotated on resend, and cleared on revocation or observed expiry. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
+
+Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Invitation acceptance and verified-email activation remain `0.0.6`. Authentication audit events, session inventory/revocation, and expanded throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.

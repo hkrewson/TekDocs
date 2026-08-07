@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -12,6 +13,7 @@ from django.template.loader import render_to_string
 
 class TransactionalTemplate(StrEnum):
     SYSTEM_TEST = "system_test"
+    INVITATION = "invitation"
 
 
 def send_transactional_email(
@@ -46,4 +48,23 @@ def send_system_test_email(recipient: str) -> int:
         template=TransactionalTemplate.SYSTEM_TEST,
         subject="TekDocs email delivery test",
         recipient=recipient,
+    )
+
+
+def send_invitation_email(
+    *,
+    recipient: str,
+    acceptance_url: str,
+    tenant_name: str,
+    expires_at: datetime,
+) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.INVITATION,
+        subject="You are invited to TekDocs",
+        recipient=recipient,
+        context={
+            "acceptance_url": acceptance_url,
+            "tenant_name": tenant_name,
+            "expires_at": expires_at,
+        },
     )

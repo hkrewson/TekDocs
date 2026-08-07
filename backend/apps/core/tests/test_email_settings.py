@@ -4,7 +4,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from tekdocs.settings.base import env_int
-from tekdocs.settings.validation import SMTP_BACKEND, validate_production_email
+from tekdocs.settings.validation import SMTP_BACKEND, validate_production_email, validate_production_public_url
 
 VALID_CONFIGURATION = {
     "backend": SMTP_BACKEND,
@@ -49,3 +49,32 @@ def test_non_integer_email_setting_is_rejected(monkeypatch):
 def test_invalid_production_email_configuration_is_rejected(changes, message):
     with pytest.raises(ImproperlyConfigured, match=message):
         validate_production_email(**{**VALID_CONFIGURATION, **changes})
+
+
+@pytest.mark.parametrize(
+    ("public_url", "allow_insecure"),
+    [
+        ("https://docs.example.com", False),
+        ("http://localhost:3200", True),
+        ("https://docs.example.com/tekdocs", False),
+    ],
+)
+def test_valid_public_url_configuration_is_accepted(public_url, allow_insecure):
+    validate_production_public_url(public_url=public_url, allow_insecure=allow_insecure)
+
+
+@pytest.mark.parametrize(
+    "public_url",
+    [
+        "http://docs.example.com",
+        "docs.example.com",
+        "https://user:password@docs.example.com",
+        "https://docs.example.com?token=unsafe",
+        "https://docs.example.com#unsafe",
+        "https://docs.example.com\n.evil.test",
+        "https://[invalid",
+    ],
+)
+def test_invalid_public_url_configuration_is_rejected(public_url):
+    with pytest.raises(ImproperlyConfigured, match="public URL"):
+        validate_production_public_url(public_url=public_url, allow_insecure=False)

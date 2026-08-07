@@ -2,7 +2,7 @@ from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import User
+from .models import Invitation, User
 
 
 class OwnerBootstrapSerializer(serializers.Serializer):
@@ -48,3 +48,25 @@ class AuthenticatedUserSerializer(serializers.Serializer):
 class AuthenticatedContextSerializer(serializers.Serializer):
     user = AuthenticatedUserSerializer()
     tenant = BootstrapTenantResultSerializer()
+
+
+class InvitationRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+
+class InvitationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invitation
+        fields = (
+            "id",
+            "email",
+            "state",
+            "expires_at",
+            "last_sent_at",
+            "last_delivery_failed_at",
+            "delivery_attempts",
+            "send_count",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields

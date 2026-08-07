@@ -28,6 +28,11 @@ def env_int(name: str, default: int) -> int:
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
 TEKDOCS_BOOTSTRAP_TOKEN = os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", "")
+TEKDOCS_PUBLIC_URL = os.getenv("TEKDOCS_PUBLIC_URL", "http://localhost:3200").rstrip("/")
+TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL", False)
+INVITATION_TTL_HOURS = env_int("INVITATION_TTL_HOURS", 168)
+if not 1 <= INVITATION_TTL_HOURS <= 2160:
+    raise ImproperlyConfigured("INVITATION_TTL_HOURS must be between 1 and 2160")
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -141,7 +146,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.4",
+    "VERSION": "0.0.5",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

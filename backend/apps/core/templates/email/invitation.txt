@@ -1,0 +1,6 @@
+You have been invited to {{ tenant_name }} in {{ product_name }}.
+
+Accept this invitation:
+{{ acceptance_url }}
+
+This invitation expires {{ expires_at|date:"DATETIME_FORMAT" }}. If you were not expecting it, you can ignore this message.

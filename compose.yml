@@ -30,6 +30,24 @@ services:
     restart: unless-stopped
     networks: [internal]
 
+  mailpit:
+    image: axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "500"
+      TZ: ${TZ:-America/Chicago}
+    volumes:
+      - mailpit_data:/data
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8025/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    networks: [internal]
+
   backend:
     build:
       context: ./backend
@@ -48,6 +66,16 @@ services:
       TEKDOCS_MASTER_KEY: ${TEKDOCS_MASTER_KEY:?Run make bootstrap}
       TEKDOCS_PUBLICATION_SIGNING_KEY: ${TEKDOCS_PUBLICATION_SIGNING_KEY:?Run make bootstrap}
       TEKDOCS_BOOTSTRAP_TOKEN: ${TEKDOCS_BOOTSTRAP_TOKEN:?Run make bootstrap}
+      EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      EMAIL_PORT: ${EMAIL_PORT:-1025}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-TekDocs <noreply@tekdocs.local>}
+      TEKDOCS_ALLOW_INSECURE_SMTP: ${TEKDOCS_ALLOW_INSECURE_SMTP:-true}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
       TZ: ${TZ:-America/Chicago}
       TEKDOCS_RUN_MIGRATIONS: "true"
@@ -58,6 +86,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
       valkey: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8000/api/v1/health/ready"]
       interval: 8s
@@ -109,6 +138,7 @@ volumes:
   valkey_data:
   static_data:
   media_data:
+  mailpit_data:
 
 networks:
   internal:

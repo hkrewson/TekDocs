@@ -1,0 +1,3 @@
+{{ product_name }} email delivery is working.
+
+This message was requested by an operator to verify the configured SMTP connection. No action is required.

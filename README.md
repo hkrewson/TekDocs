@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.3`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.4`.
 
 ## Start locally
 
@@ -12,6 +12,8 @@ make up
 ```
 
 Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with generated local secrets, installs the frontend lockfile, and builds the images. For an existing `.env`, it only adds newly required generated values and never replaces an existing value.
+
+Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
 
 ### First-owner bootstrap
 
@@ -42,9 +44,9 @@ The running Docker stack is authoritative for runtime claims. See `docs/PRODUCT_
 
 ## Current boundaries
 
-- Registration is deliberately closed. `0.0.3` provides deployment-authorized first-owner setup and owner sign-in; controlled invitations arrive in `0.0.4`.
+- Registration is deliberately closed. `0.0.4` provides deployment-authorized first-owner setup, owner sign-in, and the email delivery foundation; invitation issuance begins in `0.0.5`.
 - The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
-- Tenant/entity/link models establish future data boundaries but are not exposed as CRUD APIs in `0.0.3`.
+- Tenant/entity/link models establish future data boundaries but are not exposed as CRUD APIs in `0.0.4`.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
 
 ## License

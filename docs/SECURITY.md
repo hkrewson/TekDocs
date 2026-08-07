@@ -8,6 +8,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - Invite-only registration after a one-time owner bootstrap.
 - The first-owner endpoint requires a high-entropy deployment secret, compares it in constant time, and transactionally locks a migration-created singleton installation record. The status endpoint exposes only whether bootstrap remains required.
 - The browser reads the CSRF cookie established by `django-allauth` and sends it as `X-CSRFToken` for login and logout. Session cookies remain HTTP-only; the deployment token and password are never written to browser storage.
+- Production mail requires Django's SMTP backend, a valid sender and host, paired credentials, one TLS mode, or an explicit plaintext-SMTP acknowledgement for a trusted private hop. The development Mailpit UI binds only to loopback and must not receive real customer data.
 - MFA for privileged roles and secret reveal.
 - Central policy authorization with cross-tenant and cross-client negative tests.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.

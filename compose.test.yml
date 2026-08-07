@@ -7,5 +7,7 @@ services:
     restart: "no"
   scheduler:
     restart: "no"
+  mailpit:
+    restart: "no"
   frontend:
     restart: "no"

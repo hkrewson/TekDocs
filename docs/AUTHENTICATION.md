@@ -11,7 +11,7 @@ The browser requests both:
 
 When bootstrap is required, the shell is not rendered. The setup form submits the deployment token only in `X-TekDocs-Bootstrap-Token`; it is never placed in a URL, JSON body, local storage, session storage, cookie, log, or rendered error. Password fields are cleared when submission starts.
 
-A successful bootstrap creates the tenant and first owner, records the owner’s deployment-asserted email as the verified primary allauth address, and immediately performs a normal allauth password login. This first-owner exception is necessary before invitation and email-verification delivery arrive in `0.0.4`; later users do not inherit it.
+A successful bootstrap creates the tenant and first owner, records the owner’s deployment-asserted email as the verified primary allauth address, and immediately performs a normal allauth password login. This first-owner exception is necessary before invitation issuance in `0.0.5` and verified-email activation in `0.0.6`; later users do not inherit it.
 
 ## Session lifecycle
 
@@ -21,4 +21,4 @@ A successful bootstrap creates the tenant and first owner, records the owner’s
 
 The shell renders only after the allauth session and TekDocs context both succeed. A session-authenticated identity that is not the installation owner receives a denial until controlled invitations and scoped roles are implemented.
 
-Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Authentication audit events, session inventory/revocation, and expanded throttling remain scoped to `0.0.5`; allauth’s maintained login rate-limit path remains enabled in the interim.
+Login errors shown by TekDocs do not distinguish an unknown address from a wrong password. Authentication audit events, session inventory/revocation, and expanded throttling remain scoped to `0.0.8`; allauth’s maintained login rate-limit path remains enabled in the interim.

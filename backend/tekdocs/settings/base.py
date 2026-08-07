@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -15,6 +17,13 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError as exc:
+        raise ImproperlyConfigured(f"{name} must be an integer") from exc
 
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
@@ -132,7 +141,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.3",
+    "VERSION": "0.0.4",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }
@@ -159,13 +168,16 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "TekDocs <noreply@localhost>")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_PORT = env_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
+TEKDOCS_ALLOW_INSECURE_SMTP = env_bool("TEKDOCS_ALLOW_INSECURE_SMTP", False)
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://valkey:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://valkey:6379/1")

@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ./scripts/bootstrap-env.sh .env
-      - run: docker compose build backend frontend
+      - run: docker compose build backend frontend && docker compose pull mailpit
       - uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: tekdocs-backend
@@ -63,6 +63,13 @@ jobs:
           output: frontend-trivy.sarif
           severity: HIGH,CRITICAL
           exit-code: "1"
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+          format: sarif
+          output: mailpit-trivy.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
       - uses: anchore/sbom-action@v0
         with:
           image: tekdocs-backend
@@ -73,6 +80,11 @@ jobs:
           image: tekdocs-frontend
           format: cyclonedx-json
           output-file: frontend-sbom.cdx.json
+      - uses: anchore/sbom-action@v0
+        with:
+          image: axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+          format: cyclonedx-json
+          output-file: mailpit-sbom.cdx.json
       - uses: actions/upload-artifact@v4
         with:
           name: image-sboms

@@ -212,14 +212,15 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.3 provides the secure browser authentication boundary." />
+      <PageHeader title="Overview" description="TekDocs 0.0.4 establishes tested transactional email delivery." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.3</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.4</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
             ['Tenant and entity primitives', 'Available'],
             ['Owner authentication', 'Available'],
+            ['Email delivery foundation', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>

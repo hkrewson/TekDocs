@@ -31,6 +31,7 @@ jobs:
           mypy apps tekdocs
           python manage.py makemigrations --check --dry-run --settings=tekdocs.settings.test
           python manage.py spectacular --file /tmp/openapi.yml --validate --settings=tekdocs.settings.test
+          diff -u openapi.yml /tmp/openapi.yml
       - name: Backend tests
         working-directory: backend
         run: pytest --cov
@@ -66,6 +67,8 @@ jobs:
       - name: Verify runtime
         run: |
           curl --fail --silent http://localhost:3200/api/v1/health/ready
+          curl --fail --silent http://127.0.0.1:8025/readyz
+          docker compose exec -T backend python manage.py send_test_email operator-test@example.invalid
           docker compose exec -T backend python manage.py check --deploy
       - name: Collect logs
         if: always()

@@ -27,11 +27,14 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.1` | Complete | Governance, threat model, repository, Compose stack, Django/React skeleton, OpenAPI, CI, design system, and feasibility spikes. |
 | `0.0.2` | Complete | One-time installation state and first-owner API protected by a deployment bootstrap secret. Concurrent/repeated claims and public signup fail safely. |
 | `0.0.3` | Complete | Accessible browser bootstrap, sign-in/sign-out, CSRF lifecycle, and authenticated shell boundary. |
-| `0.0.4` | Next | Invitations, email verification, password reset, development mail capture, and enumeration-safe responses. |
-| `0.0.5` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
-| `0.0.6` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
-| `0.0.7` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
-| `0.0.8` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
+| `0.0.4` | Complete | SMTP configuration boundary, transactional email templates, operator delivery check, and development Mailpit capture. |
+| `0.0.5` | Next | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
+| `0.0.6` | Planned | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
+| `0.0.7` | Planned | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
+| `0.0.8` | Planned | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
+| `0.0.9` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
+| `0.0.10` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
+| `0.0.11` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
 | `0.1.0` | Planned stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
 
 ### `0.0.1` acceptance evidence
@@ -67,6 +70,17 @@ Evidence: `docs/releases/0.0.2.md`.
 - [x] OpenAPI, operator/security documentation, Docker runtime, Chromium, dependency, static-analysis, and secret-scanning gates pass.
 
 Evidence: `docs/releases/0.0.3.md`.
+
+### `0.0.4` acceptance criteria
+
+- [x] The default Compose environment captures application mail in a pinned Mailpit container whose UI is bound only to the local host.
+- [x] TekDocs-authored application mail uses Django's maintained SMTP backend through one multipart transactional-template service; callers do not construct ad hoc messages.
+- [x] Production startup rejects a non-SMTP backend, missing host, invalid sender/port, partial credentials, conflicting TLS modes, or unacknowledged plaintext SMTP.
+- [x] An operator command sends a non-sensitive delivery test and reports failures without printing recipient addresses, credentials, or message contents.
+- [x] Unit and Docker tests prove text/HTML rendering, header/recipient validation, SMTP capture, and failure behavior.
+- [x] Version, security/operator documentation, dependency scans, static analysis, secret scanning, and container gates agree at `0.0.4`.
+
+Evidence: `docs/releases/0.0.4.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

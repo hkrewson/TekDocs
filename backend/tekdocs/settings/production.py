@@ -3,6 +3,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
+from .validation import validate_production_email
 
 DEBUG = False
 SESSION_COOKIE_SECURE = True
@@ -28,3 +29,15 @@ if _invalid:
     raise ImproperlyConfigured(f"Missing or weak production secrets: {', '.join(_invalid)}")
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must contain explicit production hosts")
+
+validate_production_email(
+    backend=EMAIL_BACKEND,  # noqa: F405
+    host=EMAIL_HOST,  # noqa: F405
+    port=EMAIL_PORT,  # noqa: F405
+    default_from_email=DEFAULT_FROM_EMAIL,  # noqa: F405
+    username=EMAIL_HOST_USER,  # noqa: F405
+    password=EMAIL_HOST_PASSWORD,  # noqa: F405
+    use_tls=EMAIL_USE_TLS,  # noqa: F405
+    use_ssl=EMAIL_USE_SSL,  # noqa: F405
+    allow_insecure_smtp=TEKDOCS_ALLOW_INSECURE_SMTP,  # noqa: F405
+)

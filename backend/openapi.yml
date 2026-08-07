@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.0.1
+  version: 0.0.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -17,6 +17,59 @@ paths:
               schema:
                 type: object
                 additionalProperties: {}
+          description: ''
+  /api/v1/bootstrap/owner:
+    post:
+      operationId: bootstrap_owner_create
+      parameters:
+      - in: header
+        name: X-TekDocs-Bootstrap-Token
+        schema:
+          type: string
+        description: High-entropy deployment bootstrap secret
+        required: true
+      tags:
+      - bootstrap
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerBootstrap'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OwnerBootstrap'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OwnerBootstrap'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerBootstrapResult'
+          description: ''
+        '400':
+          description: Invalid bootstrap details
+        '403':
+          description: Bootstrap authorization failed
+        '409':
+          description: Installation already bootstrapped or not pristine
+  /api/v1/bootstrap/status:
+    get:
+      operationId: bootstrap_status_retrieve
+      tags:
+      - bootstrap
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapStatus'
           description: ''
   /api/v1/health/live:
     get:
@@ -56,6 +109,68 @@ paths:
                 additionalProperties: {}
           description: ''
 components:
+  schemas:
+    BootstrapOwnerResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+      required:
+      - display_name
+      - id
+    BootstrapStatus:
+      type: object
+      properties:
+        bootstrap_required:
+          type: boolean
+      required:
+      - bootstrap_required
+    BootstrapTenantResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    OwnerBootstrap:
+      type: object
+      properties:
+        tenant_name:
+          type: string
+          maxLength: 160
+        owner_email:
+          type: string
+          format: email
+          maxLength: 254
+        owner_display_name:
+          type: string
+          maxLength: 160
+        password:
+          type: string
+          writeOnly: true
+          maxLength: 128
+      required:
+      - owner_display_name
+      - owner_email
+      - password
+      - tenant_name
+    OwnerBootstrapResult:
+      type: object
+      properties:
+        tenant:
+          $ref: '#/components/schemas/BootstrapTenantResult'
+        owner:
+          $ref: '#/components/schemas/BootstrapOwnerResult'
+      required:
+      - owner
+      - tenant
   securitySchemes:
     cookieAuth:
       type: apiKey

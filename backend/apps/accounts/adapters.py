@@ -2,7 +2,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 
 
 class InviteOnlyAccountAdapter(DefaultAccountAdapter):
-    """Registration remains closed until the bootstrap/invite flow lands in 0.1.0."""
+    """Public registration remains closed; users enter through controlled invitations."""
 
     def is_open_for_signup(self, request):  # type: ignore[no-untyped-def]
         return False

@@ -196,9 +196,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.1 establishes the secure application and delivery foundation." />
+      <PageHeader title="Overview" description="TekDocs 0.0.2 adds a secure, one-time installation ownership boundary." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.1</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.2</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],

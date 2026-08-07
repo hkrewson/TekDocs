@@ -23,6 +23,51 @@ class Tenant(TimestampedModel):
         return self.name
 
 
+class InstallationState(models.Model):
+    """The single, migration-created installation bootstrap record."""
+
+    SINGLETON_ID = 1
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=SINGLETON_ID, editable=False)
+    tenant = models.OneToOneField(
+        Tenant,
+        on_delete=models.PROTECT,
+        related_name="installation_state",
+        null=True,
+        blank=True,
+    )
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_installation",
+        null=True,
+        blank=True,
+    )
+    bootstrapped_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(id=1), name="installation_state_singleton"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(tenant__isnull=True, owner__isnull=True, bootstrapped_at__isnull=True)
+                    | models.Q(tenant__isnull=False, owner__isnull=False, bootstrapped_at__isnull=False)
+                ),
+                name="installation_state_complete_or_empty",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return "TekDocs installation state"
+
+    @property
+    def is_bootstrapped(self) -> bool:
+        return self.bootstrapped_at is not None
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Installation state cannot be deleted")
+
+
 class Entity(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entities")

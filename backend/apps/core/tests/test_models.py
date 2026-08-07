@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.core.models import AuditEvent, Entity, EntityLink, Tenant
+from apps.core.models import AuditEvent, Entity, EntityLink, InstallationState, Tenant
 
 
 @pytest.mark.django_db
@@ -25,3 +25,12 @@ def test_audit_events_are_append_only():
         event.save()
     with pytest.raises(ValidationError, match="append-only"):
         event.delete()
+
+
+@pytest.mark.django_db
+def test_installation_state_is_migration_created_and_not_deletable():
+    state = InstallationState.objects.get(pk=InstallationState.SINGLETON_ID)
+
+    assert state.is_bootstrapped is False
+    with pytest.raises(ValidationError, match="cannot be deleted"):
+        state.delete()

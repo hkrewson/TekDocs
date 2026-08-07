@@ -18,6 +18,7 @@ _required = {
     "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
     "TEKDOCS_MASTER_KEY": os.getenv("TEKDOCS_MASTER_KEY", ""),
     "TEKDOCS_PUBLICATION_SIGNING_KEY": os.getenv("TEKDOCS_PUBLICATION_SIGNING_KEY", ""),
+    "TEKDOCS_BOOTSTRAP_TOKEN": os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", ""),
 }
 _weak_values = {"", "changeme", "change-me", "replace-me", "development", "password", "secret"}
 _invalid = [

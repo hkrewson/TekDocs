@@ -47,6 +47,7 @@ services:
       CELERY_RESULT_BACKEND: redis://valkey:6379/1
       TEKDOCS_MASTER_KEY: ${TEKDOCS_MASTER_KEY:?Run make bootstrap}
       TEKDOCS_PUBLICATION_SIGNING_KEY: ${TEKDOCS_PUBLICATION_SIGNING_KEY:?Run make bootstrap}
+      TEKDOCS_BOOTSTRAP_TOKEN: ${TEKDOCS_BOOTSTRAP_TOKEN:?Run make bootstrap}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
       TZ: ${TZ:-America/Chicago}
       TEKDOCS_RUN_MIGRATIONS: "true"

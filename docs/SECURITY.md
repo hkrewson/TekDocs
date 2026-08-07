@@ -6,6 +6,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 
 - Same-origin, HTTP-only, secure production session cookies with CSRF middleware enabled.
 - Invite-only registration after a one-time owner bootstrap.
+- The first-owner endpoint requires a high-entropy deployment secret, compares it in constant time, and transactionally locks a migration-created singleton installation record. The status endpoint exposes only whether bootstrap remains required.
 - MFA for privileged roles and secret reveal.
 - Central policy authorization with cross-tenant and cross-client negative tests.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { Link } from 'react-router'
 import { browserOrganizationClient } from './api'
 import type { Organization, OrganizationClassification, OrganizationClient, OrganizationInput } from './api'
 
@@ -151,7 +152,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
             <div className="organization-table-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Classifications</span><span role="columnheader">Website</span><span role="columnheader">Actions</span></div>
             {visibleRecords.map((organization) => (
               <div className="organization-table-row" role="row" key={organization.id}>
-                <span role="cell"><strong>{organization.name}</strong>{organization.legal_name && organization.legal_name !== organization.name && <span>{organization.legal_name}</span>}</span>
+                <span role="cell"><Link className="organization-name-link" to={`/workspaces/organizations/${organization.id}/overview`}>{organization.name}</Link>{organization.legal_name && organization.legal_name !== organization.name && <span>{organization.legal_name}</span>}</span>
                 <span role="cell">{organization.classifications.map((classification) => classificationLabels[classification]).join(', ')}</span>
                 <span role="cell">{organization.website ? <a href={organization.website} target="_blank" rel="noreferrer">Visit site <ExternalLink size={13} aria-hidden="true" /></a> : '—'}</span>
                 <span role="cell" className="organization-row-actions">

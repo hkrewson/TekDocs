@@ -1,0 +1,10 @@
+services:
+  backend:
+    build:
+      target: production
+  worker:
+    build:
+      target: production
+  scheduler:
+    build:
+      target: production

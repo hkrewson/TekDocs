@@ -2,15 +2,13 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-a7ec106}
+baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-1c434b2}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
 project_name="tekdocs_upgrade_$$"
 test_email="upgrade-owner-$$@example.invalid"
 test_password=$(openssl rand -base64 36 | tr -d '\n')
-test_port=$((32000 + ($$ % 1000)))
-mailpit_port=$((8200 + ($$ % 1000)))
 
 baseline_compose() {
   docker compose --project-name "$project_name" --env-file "$environment_file" \
@@ -23,7 +21,7 @@ current_compose() {
 }
 
 cleanup() {
-  current_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  current_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
 }
 trap cleanup EXIT HUP INT TERM
@@ -33,14 +31,14 @@ mkdir -p "$baseline_directory"
 git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directory"
 "$baseline_directory/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
 {
-  echo "TEKDOCS_PORT=$test_port"
-  echo "MAILPIT_UI_PORT=$mailpit_port"
+  echo "TEKDOCS_PORT=0"
+  echo "MAILPIT_UI_PORT=0"
 } >> "$environment_file"
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.1.1" ]; then
-  echo "Upgrade rehearsal expected baseline 0.1.1, found $baseline_version" >&2
+if [ "$baseline_version" != "0.1.2" ]; then
+  echo "Upgrade rehearsal expected baseline 0.1.2, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" = "$baseline_version" ]; then

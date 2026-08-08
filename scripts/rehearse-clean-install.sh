@@ -14,7 +14,7 @@ clean_compose() {
 }
 
 cleanup() {
-  clean_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  clean_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
 }
 trap cleanup EXIT HUP INT TERM

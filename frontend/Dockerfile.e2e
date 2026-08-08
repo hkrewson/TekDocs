@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1.7
+ARG PLAYWRIGHT_VERSION=1.62.1
+FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .

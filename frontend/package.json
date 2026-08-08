@@ -1,7 +1,7 @@
 {
   "name": "tekdocs-frontend",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -21,7 +21,8 @@
     "lucide-react": "^1.29.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-router": "8.3.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
@@ -41,6 +42,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "jsdom": "^27.2.0",
+    "otpauth": "9.5.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^8.2.0",

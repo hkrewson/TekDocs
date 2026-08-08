@@ -32,6 +32,7 @@ def test_bootstrap_status_is_public_and_non_sensitive(client, installation_state
 
     assert response.status_code == 200
     assert response.json() == {"bootstrap_required": True}
+    assert client.cookies["csrftoken"].value
 
 
 @pytest.mark.django_db

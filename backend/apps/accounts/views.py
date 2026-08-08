@@ -5,6 +5,8 @@ from django.conf import settings
 from django.contrib.auth import login
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
@@ -34,6 +36,7 @@ from .serializers import (
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
 
 
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class BootstrapStatusView(APIView):
     authentication_classes: list[Any] = []
     permission_classes = [AllowAny]

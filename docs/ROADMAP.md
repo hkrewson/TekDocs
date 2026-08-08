@@ -4,6 +4,8 @@ The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are
 
 Most patch slices should fit one to three focused engineering sessions. A slice that grows beyond its stated exit condition must be split rather than silently expanded. Dates follow demonstrated velocity; security, migration, isolation, backup, and upgrade gates never compress to preserve a date.
 
+Known limitations are release obligations, not informal notes. `docs/ENGINEERING_RISKS.md` records the reasoning, required solution, and owning milestone for every accepted concern; milestone closeout must disposition its assigned risk IDs.
+
 ## Release-line overview
 
 | Stable release | Capability certified |
@@ -176,16 +178,16 @@ Evidence: `docs/releases/0.1.0.md`.
 | --- | --- | --- |
 | `0.1.1` | Complete | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
 | `0.1.2` | Complete | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
-| `0.1.3` | Planned | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, and safe creation defaults. |
-| `0.1.4` | Planned | Searchable workspace switcher, organization drill-in, MSP return, classification-aware navigation, independent-tab history, and stale-data isolation. |
+| `0.1.3` | Complete | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, safe creation defaults, and closure of `TD-RISK-003`, `005`, `011`, and `016`; document the `TD-RISK-004` and `007` deployment plans. |
+| `0.1.4` | Planned | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
 | `0.1.5` | Planned | People plus employment/contact associations in MSP and organization workspaces. |
 | `0.1.6` | Planned | Sites and locations with organization ownership and workspace-aware navigation. |
 | `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
 | `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
-| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, and no inline role-name decisions. |
-| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped assignments with MSP-private hard constraints. |
-| `0.1.11` | Planned | Recycle bin/recovery, field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
-| `0.1.12` | Planned | Reference-dataset performance, migration rehearsal, API/UI accessibility, workspace switching, and isolation remediation. |
+| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, no inline role-name decisions, and the first half of `TD-RISK-001`. |
+| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
+| `0.1.11` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
+| `0.1.12` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), hosted-automation evidence when authorized (`TD-RISK-010`), reference performance, migration, accessibility, workspace, and isolation remediation. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
 
 ### `0.1.1` acceptance criteria
@@ -220,12 +222,17 @@ ADR 0007 defines the workspace-context boundary.
 
 ### `0.1.3` acceptance criteria
 
-- [ ] Clicking an active organization title opens a stable organization workspace overview route; refreshing or sharing that route restores the same authorized context.
-- [ ] One server-owned resolver returns either the MSP workspace or an authorized organization workspace with stable identity, display name, classifications, and available domain capabilities without accepting tenant ownership from the browser.
-- [ ] Workspace-aware APIs derive organization ownership for creates and require the same tenant-plus-organization scope for reads and mutations; a selected identifier never grants permission.
-- [ ] MSP-owned organization anchors remain discoverable from the MSP workspace while organization-owned child records cannot leak into MSP-only or sibling-organization queries except through an explicit reference contract.
-- [ ] Missing, archived, cross-tenant, unauthorized, malformed, and mismatched workspace identifiers fail without disclosing organization data and receive API/negative-isolation coverage.
-- [ ] This slice supplies the route, overview, and context contract; the searchable shell switcher remains `0.1.4` scope.
+- [x] Clicking an active organization title opens a stable organization workspace overview route; refreshing or sharing that route restores the same authorized context.
+- [x] One server-owned resolver returns either the MSP workspace or an authorized organization workspace with stable identity, display name, classifications, and available domain capabilities without accepting tenant ownership from the browser.
+- [x] Workspace-aware APIs derive organization ownership for creates and require the same tenant-plus-organization scope for reads and mutations; a selected identifier never grants permission.
+- [x] MSP-owned organization anchors remain discoverable from the MSP workspace while organization-owned child records cannot leak into MSP-only or sibling-organization queries except through an explicit reference contract.
+- [x] Missing, archived, cross-tenant, unauthorized, malformed, and mismatched workspace identifiers fail without disclosing organization data and receive API/negative-isolation coverage.
+- [x] This slice supplies the route, overview, and context contract; the searchable shell switcher remains `0.1.4` scope.
+- [x] A maintained routing boundary replaces pathname conditionals; an isolated non-mocked browser journey proves owner bootstrap, MFA, organization creation, record click, context resolution, and PostgreSQL-backed drill-in (`TD-RISK-003`, `TD-RISK-011`).
+- [x] Local Compose provenance is checked and normalized without deleting persistent data, and local frontend gates enforce or supply Node 24 (`TD-RISK-005`, `TD-RISK-016`).
+- [x] The secret-file injection and exact production-image rehearsal plans document owners, failure behavior, test gates, and later enforcement milestones (`TD-RISK-004`, `TD-RISK-007`).
+
+Evidence: `docs/releases/0.1.3.md`.
 
 ### `0.1.4` acceptance criteria
 
@@ -240,7 +247,7 @@ ADR 0007 defines the workspace-context boundary.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, and editor round-trip fixture gate. |
+| `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and explicit disposition of `TD-RISK-014`. |
 | `0.2.2` | Workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. Live titles open the authorized editor while STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
@@ -248,14 +255,14 @@ ADR 0007 defines the workspace-context boundary.
 | `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
 | `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
-| `0.2.9` | Documentation alpha stabilization, large-history performance, accessibility, upgrade, and backup evidence. |
+| `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
 | `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.3.1` | `SecretProvider` contract, PostgreSQL envelope-encrypted versions, associated data, and master-key validation. |
+| `0.3.1` | `SecretProvider` contract, PostgreSQL envelope-encrypted versions, associated data, master-key validation, and secret-file injection implementation from `TD-RISK-004`. |
 | `0.3.2` | Explicit reveal boundary, recent MFA, value-free audit, redaction, rewrap rotation, and backup failure tests. |
 | `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
@@ -305,7 +312,7 @@ ADR 0007 defines the workspace-context boundary.
 | `0.6.3` | Signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
 | `0.6.4` | Integration provider contract and envelope-encrypted connection configuration. |
 | `0.6.5` | Scheduled sync jobs, cursors, backoff, idempotency, and worker failure recovery. |
-| `0.6.6` | Provider logs/metrics with secret redaction and bounded retention. |
+| `0.6.6` | Maintained structured logging plus provider logs/metrics with field allowlists, secret redaction, bounded retention, and `TD-RISK-015`. |
 | `0.6.7` | Conflict model and permission-aware reconciliation workflow; database remains canonical. |
 | `0.6.8` | Deterministic sanitized Git export for selected non-secret documents/manifests. |
 | `0.6.9` | Integration-runtime stabilization, webhook/SSRF abuse suites, upgrade, and load evidence. |
@@ -331,13 +338,13 @@ ADR 0007 defines the workspace-context boundary.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.8.1` | Encrypted backup/restore tooling, separate-key recovery, and destructive-operation safeguards. |
+| `0.8.1` | Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and implementation of `TD-RISK-006`. |
 | `0.8.2` | Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
 | `0.8.3` | WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | Localization readiness, timezone/locale correctness, and translatable UI contract. |
-| `0.8.5` | Reference-dataset load/performance profiling and p95 remediation. |
+| `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
-| `0.8.7` | DAST, container/runtime hardening, dependency/license review, and abuse-suite remediation. |
+| `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
 | `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion. |
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
 | `0.9.0` | Feature freeze and public beta; only fixes, hardening, and release evidence follow. |
@@ -348,8 +355,8 @@ ADR 0007 defines the workspace-context boundary.
 | --- | --- |
 | `0.9.1` | Beta defect triage, dependency freeze policy, and zero unresolved Critical/untriaged High findings. |
 | `0.9.2` | Clean-install and every-supported-version upgrade matrix on documented reference platforms. |
-| `0.9.3` | Backup, restore, database recovery, key recovery, storage/mail outage, and worker retry rehearsal. |
-| `0.9.4` | Signed release images, CycloneDX SBOMs, digests, attestations, and provenance dry run. |
+| `0.9.3` | Backup, restore, database recovery, key recovery, storage/mail outage, worker retry rehearsal, and final closure evidence for `TD-RISK-006`. |
+| `0.9.4` | Signed exact production images, CycloneDX SBOMs, digests, attestations, provenance, and final closure evidence for `TD-RISK-007` and `TD-RISK-009`. |
 | `0.9.5` | Final accessibility, performance, browser, DAST, and external-review remediation candidate. |
 | `0.9.6` | Documentation freeze, release notes, support policy, final go/no-go packet, and release candidate. |
 | `1.0.0` | Publish only after manual go/no-go approval; no new feature work enters this release. |

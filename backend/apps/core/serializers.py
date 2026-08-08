@@ -49,3 +49,12 @@ class OrganizationSerializer(serializers.Serializer):
 
     def get_classifications(self, organization: Organization) -> list[str]:
         return sorted(classification.kind for classification in organization.classifications.all())
+
+
+class WorkspaceContextSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=("msp", "organization"))
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    classifications = serializers.ListField(child=serializers.ChoiceField(choices=OrganizationKind.choices))
+    capabilities = serializers.ListField(child=serializers.CharField())
+    organization = OrganizationSerializer(allow_null=True)

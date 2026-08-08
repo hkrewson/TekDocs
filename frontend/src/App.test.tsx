@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { App } from './App'
 import type { AuthenticatedContext } from './auth/api'
 import type { AuthClient } from './auth/api'
+import type { WorkspaceClient } from './workspaces/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -14,7 +15,27 @@ const authClient = {
   listSessions: vi.fn().mockResolvedValue([]),
   loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
 } as unknown as AuthClient
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} />
+const loadOrganization = vi.fn().mockResolvedValue({
+  kind: 'organization',
+  id: '00000000-0000-4000-8000-000000000010',
+  name: 'Acme Dental',
+  classifications: ['client'],
+  capabilities: ['overview', 'documentation', 'people', 'assets', 'networks', 'credentials'],
+  organization: {
+    id: '00000000-0000-4000-8000-000000000010',
+    name: 'Acme Dental',
+    legal_name: 'Acme Dental Associates, LLC',
+    website: 'https://acme.example.com',
+    classifications: ['client'],
+    created_at: '2026-08-08T12:00:00Z',
+    updated_at: '2026-08-08T12:00:00Z',
+  },
+})
+const workspaceClient = {
+  loadMsp: vi.fn(),
+  loadOrganization,
+} as unknown as WorkspaceClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} />
 
 describe('application shell', () => {
   it('renders sectioned navigation and the active route', () => {
@@ -44,5 +65,13 @@ describe('application shell', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()
+  })
+
+  it('resolves a deep-linked organization route through the workspace boundary', async () => {
+    render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/overview'))
+
+    expect(await screen.findByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
+    expect(loadOrganization).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000010')
+    expect(screen.getByText('client workspace')).toBeInTheDocument()
   })
 })

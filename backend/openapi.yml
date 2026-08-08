@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.2
+  version: 0.1.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -440,6 +440,51 @@ paths:
           description: Installation owner with MFA required
         '404':
           description: Organization not found
+  /api/v1/workspaces/msp:
+    get:
+      operationId: workspaces_msp_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceContext'
+          description: ''
+        '403':
+          description: Installation membership required
+        '503':
+          description: Installation context unavailable
+  /api/v1/workspaces/organizations/{entity_id}:
+    get:
+      operationId: workspaces_organizations_retrieve
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceContext'
+          description: ''
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Organization workspace not found
+        '503':
+          description: Installation context unavailable
 components:
   schemas:
     AuthenticatedContext:
@@ -588,6 +633,14 @@ components:
           maxLength: 254
       required:
       - email
+    KindEnum:
+      enum:
+      - msp
+      - organization
+      type: string
+      description: |-
+        * `msp` - msp
+        * `organization` - organization
     OidcProvider:
       type: object
       properties:
@@ -733,6 +786,35 @@ components:
         * `expired` - Expired
         * `revoked` - Revoked
         * `accepted` - Accepted
+    WorkspaceContext:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        classifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassificationsEnum'
+        capabilities:
+          type: array
+          items:
+            type: string
+        organization:
+          allOf:
+          - $ref: '#/components/schemas/Organization'
+          nullable: true
+      required:
+      - capabilities
+      - classifications
+      - id
+      - kind
+      - name
+      - organization
   securitySchemes:
     cookieAuth:
       type: apiKey

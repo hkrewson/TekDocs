@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
 import {
   Activity,
   BookOpenText,
@@ -26,6 +27,9 @@ import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
 import { Organizations } from './organizations/Organizations'
+import { browserWorkspaceClient } from './workspaces/api'
+import type { WorkspaceClient, WorkspaceContext } from './workspaces/api'
+import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 const EditorSpike = lazy(async () => {
   const module = await import('./editor/EditorSpike')
   return { default: module.EditorSpike }
@@ -37,22 +41,12 @@ type NavigationItem = {
   icon: typeof BookOpenText
 }
 
-type Navigate = (path: string) => void
-
-function AppLink({ to, currentPath, navigate, className, children, ...props }: {
+function AppLink({ to, className, children, ...props }: {
   to: string
-  currentPath: string
-  navigate: Navigate
   className?: string
   children: ReactNode
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
-  const follow = (event: ReactMouseEvent<HTMLAnchorElement>) => {
-    props.onClick?.(event)
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    navigate(to)
-  }
-  return <a {...props} href={to} className={`${className ?? ''}${currentPath === to ? ' active' : ''}`} onClick={follow}>{children}</a>
+  return <NavLink {...props} to={to} className={({ isActive }) => `${className ?? ''}${isActive ? ' active' : ''}`}>{children}</NavLink>
 }
 
 const workspaceNavigation: NavigationItem[] = [
@@ -79,15 +73,13 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function NavSection({ items, label, collapsed, onNavigate, currentPath, navigate }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void; currentPath: string; navigate: Navigate }) {
+function NavSection({ items, label, collapsed, onNavigate }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void }) {
   return (
     <nav className="nav-list" aria-label={label}>
       {items.map(({ label, path, icon: Icon }) => (
         <AppLink
           key={path}
           to={path}
-          currentPath={currentPath}
-          navigate={navigate}
           onClick={onNavigate}
           className="nav-link"
           title={collapsed ? label : undefined}
@@ -104,14 +96,14 @@ function workspaceInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'TD'
 }
 
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath, navigate, workspaceName }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, workspaceName, workspaceLabel, workspaceLoading }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
   onMobileClose: () => void
-  currentPath: string
-  navigate: Navigate
   workspaceName: string
+  workspaceLabel: string
+  workspaceLoading: boolean
 }) {
   return (
     <>
@@ -125,24 +117,22 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath
           <button className="icon-button mobile-close" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button>
         </div>
 
-        <button className="tenant-switcher" type="button" title={collapsed ? workspaceName : undefined}>
+        <button className="tenant-switcher" type="button" title={collapsed ? workspaceName : undefined} disabled={workspaceLoading}>
           <span className="tenant-initials">{workspaceInitials(workspaceName)}</span>
-          {!collapsed && <><span className="tenant-copy"><strong>{workspaceName}</strong><span>MSP workspace</span></span><ChevronDown size={15} /></>}
+          {!collapsed && <><span className="tenant-copy"><strong>{workspaceLoading ? 'Loading workspace…' : workspaceName}</strong><span>{workspaceLabel}</span></span><ChevronDown size={15} /></>}
         </button>
 
         <div className="sidebar-scroll">
-          <NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
+          <NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} />
           <div className="nav-divider" />
-          <NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
+          <NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} />
         </div>
       </aside>
     </>
   )
 }
 
-function ProfileMenu({ currentPath, navigate, user, onSignOut, signingOut }: {
-  currentPath: string
-  navigate: Navigate
+function ProfileMenu({ user, onSignOut, signingOut }: {
   user: AuthenticatedContext['user']
   onSignOut: () => Promise<void>
   signingOut: boolean
@@ -168,8 +158,8 @@ function ProfileMenu({ currentPath, navigate, user, onSignOut, signingOut }: {
       </button>
       {open && (
         <div className="profile-popover" role="menu">
-          <AppLink to="/settings" currentPath={currentPath} navigate={navigate} role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
-          <AppLink to="/integrations" currentPath={currentPath} navigate={navigate} role="menuitem" onClick={() => setOpen(false)}><Plug size={17} />Integrations</AppLink>
+          <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
+          <AppLink to="/integrations" role="menuitem" onClick={() => setOpen(false)}><Plug size={17} />Integrations</AppLink>
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
@@ -212,9 +202,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.2 adds classified organization records and administration." />
+      <PageHeader title="Overview" description="TekDocs 0.1.3 adds routable organization workspaces and verified scope boundaries." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.2</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.3</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -244,75 +234,100 @@ function Documentation() {
   )
 }
 
-export function ApplicationShell({ initialPath, authContext, authClient, onSignOut, signingOut = false, signOutError = null }: {
-  initialPath?: string
+type OrganizationWorkspaceState =
+  | { phase: 'idle' }
+  | { phase: 'ready'; organizationId: string; workspace: WorkspaceContext }
+  | { phase: 'error'; organizationId: string; message: string }
+
+function workspaceErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'The workspace could not be loaded.'
+}
+
+function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceState | { phase: 'loading' } }) {
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
+  if (state.phase === 'error') {
+    return <section className="content-section workspace-error" role="alert"><h1>Workspace unavailable</h1><p>{state.message}</p><Link className="secondary-button" to="/organizations">Return to organizations</Link></section>
+  }
+  return <WorkspaceOverview workspace={state.workspace} />
+}
+
+export function ApplicationShell({ authContext, authClient, workspaceClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
+  workspaceClient: WorkspaceClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [currentPath, setCurrentPath] = useState(() => initialPath ?? window.location.pathname)
   const [shellContext, setShellContext] = useState(authContext)
+  const [organizationWorkspace, setOrganizationWorkspace] = useState<OrganizationWorkspaceState>({ phase: 'idle' })
+  const location = useLocation()
+  const organizationMatch = useMatch('/workspaces/organizations/:organizationId/*')
+  const organizationId = organizationMatch?.params.organizationId
 
   useEffect(() => {
-    if (initialPath) return
-    const followBrowser = () => setCurrentPath(window.location.pathname)
-    window.addEventListener('popstate', followBrowser)
-    return () => window.removeEventListener('popstate', followBrowser)
-  }, [initialPath])
+    if (!organizationId) return
+    let active = true
+    workspaceClient.loadOrganization(organizationId)
+      .then((workspace) => { if (active) setOrganizationWorkspace({ phase: 'ready', organizationId, workspace }) })
+      .catch((error: unknown) => { if (active) setOrganizationWorkspace({ phase: 'error', organizationId, message: workspaceErrorMessage(error) }) })
+    return () => { active = false }
+  }, [organizationId, workspaceClient])
 
-  const navigate = (path: string) => {
-    if (!initialPath) window.history.pushState({}, '', path)
-    setCurrentPath(path)
-  }
-
-  const routedPath = currentPath === '/' || (currentPath !== '/overview' && currentPath !== '/documentation' && currentPath !== '/organizations' && currentPath !== '/settings' && !plannedAreas[currentPath])
-    ? '/overview'
-    : currentPath
-
-  const page = routedPath === '/overview'
-    ? <Overview />
-    : routedPath === '/documentation'
-      ? <Documentation />
-      : routedPath === '/organizations'
-        ? <Organizations />
-      : routedPath === '/settings'
-        ? <SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />
-        : <PlannedPage path={routedPath} />
+  const visibleWorkspaceState = organizationId && (organizationWorkspace.phase === 'idle' || organizationWorkspace.organizationId !== organizationId)
+    ? { phase: 'loading' as const }
+    : organizationWorkspace
+  const selectedWorkspace = visibleWorkspaceState.phase === 'ready' ? visibleWorkspaceState.workspace : null
+  const workspaceName = organizationId ? selectedWorkspace?.name ?? shellContext.tenant.name : shellContext.tenant.name
+  const workspaceLabel = organizationId
+    ? selectedWorkspace
+      ? `${selectedWorkspace.classifications.join(' · ')} workspace`
+      : 'Organization workspace'
+    : 'MSP workspace'
 
   return (
     <div className="app-shell">
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} workspaceName={shellContext.tenant.name} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} workspaceName={workspaceName} workspaceLabel={workspaceLabel} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
-          <ProfileMenu currentPath={routedPath} navigate={navigate} user={shellContext.user} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
-        <main className="main-content" key={routedPath}>
+        <main className="main-content" key={location.pathname}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
-          {page}
+          <Routes>
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+            <Route path="/overview" element={<Overview />} />
+            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/organizations" element={<Organizations />} />
+            <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
+            {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
+            <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
+            <Route path="*" element={<Navigate to="/overview" replace />} />
+          </Routes>
         </main>
       </div>
     </div>
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
+  workspaceClient?: WorkspaceClient
   initialAuthContext?: AuthenticatedContext
 }) {
-  return (
+  const application = (
     <AuthGate client={authClient} initialContext={initialAuthContext}>
       {({ context, signOut, signingOut, signOutError }) => (
         <ApplicationShell
-          initialPath={initialPath}
           authContext={context}
           authClient={authClient}
+          workspaceClient={workspaceClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}
@@ -320,4 +335,7 @@ export function App({ initialPath, authClient = browserAuthClient, initialAuthCo
       )}
     </AuthGate>
   )
+  return initialPath
+    ? <MemoryRouter initialEntries={[initialPath]}>{application}</MemoryRouter>
+    : <BrowserRouter>{application}</BrowserRouter>
 }

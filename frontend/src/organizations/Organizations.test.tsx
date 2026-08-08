@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { Organizations } from './Organizations'
 import type { Organization, OrganizationClient } from './api'
@@ -24,12 +25,17 @@ function client(overrides: Partial<OrganizationClient> = {}): OrganizationClient
   }
 }
 
+function renderOrganizations(organizationClient: OrganizationClient) {
+  return render(<MemoryRouter><Organizations client={organizationClient} /></MemoryRouter>)
+}
+
 describe('Organizations', () => {
   it('loads, filters, and exposes organization details accessibly', async () => {
     const user = userEvent.setup()
-    render(<Organizations client={client()} />)
+    renderOrganizations(client())
 
     expect(await screen.findByRole('button', { name: 'Edit Acme Dental' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Acme Dental' })).toHaveAttribute('href', `/workspaces/organizations/${acme.id}/overview`)
     expect(screen.getByText('Client, Partner')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Visit site' })).toHaveAttribute('href', 'https://acme.example.com')
 
@@ -41,7 +47,7 @@ describe('Organizations', () => {
     const user = userEvent.setup()
     const create = vi.fn().mockResolvedValue({ ...acme, id: '00000000-0000-4000-8000-000000000011' })
     const organizationClient = client({ list: vi.fn().mockResolvedValue([]), create })
-    render(<Organizations client={organizationClient} />)
+    renderOrganizations(organizationClient)
 
     await screen.findByText('No organizations have been added.')
     await user.click(screen.getByRole('button', { name: 'New organization' }))
@@ -65,7 +71,7 @@ describe('Organizations', () => {
     const update = vi.fn().mockResolvedValue({ ...acme, name: 'Acme Health' })
     const archive = vi.fn().mockResolvedValue(undefined)
     const organizationClient = client({ update, archive })
-    render(<Organizations client={organizationClient} />)
+    renderOrganizations(organizationClient)
     await screen.findByRole('button', { name: 'Edit Acme Dental' })
 
     await user.click(screen.getByRole('button', { name: 'Edit Acme Dental' }))
@@ -89,7 +95,7 @@ describe('Organizations', () => {
       list: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockRejectedValue(new Error('Your account is not authorized for organization administration.')),
     })
-    render(<Organizations client={organizationClient} />)
+    renderOrganizations(organizationClient)
     await screen.findByText('No organizations have been added.')
 
     await user.click(screen.getByRole('button', { name: 'New organization' }))

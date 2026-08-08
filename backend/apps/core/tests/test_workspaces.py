@@ -69,6 +69,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
             "organizations",
             "people",
             "sites",
+            "custom_fields",
             "documentation",
             "files",
             "assets",
@@ -97,6 +98,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "overview",
         "people",
         "sites",
+        "custom_fields",
         "documentation",
         "files",
         "assets",
@@ -187,7 +189,7 @@ def test_workspace_search_is_ordered_searchable_and_page_bounded(owner_client, i
             "id": str(Entity.objects.get(display_name="Supplier Alias").id),
             "name": "Supplier Alias",
             "classifications": ["manufacturer"],
-            "capabilities": ["overview", "people", "sites", "documentation", "files", "products"],
+            "capabilities": ["overview", "people", "sites", "custom_fields", "documentation", "files", "products"],
         }
     ]
 

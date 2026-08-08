@@ -16,6 +16,7 @@ const capabilityLabels = {
   organizations: 'Organizations',
   people: 'People',
   sites: 'Sites',
+  custom_fields: 'Custom fields',
   assets: 'Assets',
   licenses: 'Licenses',
   networks: 'Networks',

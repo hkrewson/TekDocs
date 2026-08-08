@@ -6,6 +6,7 @@ export type WorkspaceCapability =
   | 'organizations'
   | 'people'
   | 'sites'
+  | 'custom_fields'
   | 'documentation'
   | 'files'
   | 'assets'

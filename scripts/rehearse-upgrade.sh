@@ -98,7 +98,7 @@ from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from apps.accounts.mfa_storage import PREFIX, decrypt_mfa_value
 from apps.accounts.models import TenantMembership, User
-from apps.core.models import AuditEvent, InstallationState, Location, Organization, OrganizationClassification, Site, Tenant
+from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, InstallationState, Location, Organization, OrganizationClassification, Site, Tenant
 
 email = os.environ["UPGRADE_TEST_EMAIL"]
 owner = User.objects.get(email=email)
@@ -131,24 +131,32 @@ assert OrganizationClassification.scoped.for_tenant(state.tenant).filter(
 ).count() == 1
 assert Site.scoped.for_tenant(state.tenant).count() == 0
 assert Location.scoped.for_tenant(state.tenant).count() == 0
+assert CustomFieldDefinition.scoped.for_tenant(state.tenant).count() == 0
+assert CustomFieldDefinitionVersion.scoped.for_tenant(state.tenant).count() == 0
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute(
-        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s)",
+        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s)",
         [
             "core_organizationclassification",
             "core_site",
             "core_location",
+            "core_customfielddefinition",
+            "core_customfielddefinitionversion",
             "tekdocs_validate_organization_classification_scope()",
             "tekdocs_validate_location_scope()",
+            "tekdocs_validate_entity_custom_fields()",
         ],
     )
-    classification_table, site_table, location_table, guard_function, location_guard = cursor.fetchone()
+    classification_table, site_table, location_table, definition_table, version_table, guard_function, location_guard, custom_field_guard = cursor.fetchone()
 assert classification_table == "core_organizationclassification"
 assert site_table == "core_site"
 assert location_table == "core_location"
+assert definition_table == "core_customfielddefinition"
+assert version_table == "core_customfielddefinitionversion"
 assert guard_function == "tekdocs_validate_organization_classification_scope()"
 assert location_guard == "tekdocs_validate_location_scope()"
+assert custom_field_guard == "tekdocs_validate_entity_custom_fields()"
 print("Upgraded identity and authentication invariants verified")
 '
 current_compose exec -T backend python manage.py check

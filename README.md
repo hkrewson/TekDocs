@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.6`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.7`.
 
 ## Start locally
 
@@ -20,6 +20,8 @@ Invitation issuance is currently API-only and restricted to the installation own
 Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use. Optional OpenID Connect configuration is documented in `docs/AUTHENTICATION.md`.
 
 The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL. The workspace control searches the authorized organization directory, preserves equivalent section routes when switching, exposes the union of classification capabilities, and always provides a return to the MSP workspace. Broader role-based administration arrives with the RBAC slices.
+
+The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
 
 ### First-owner bootstrap
 
@@ -58,7 +60,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
-- Organization records are the first entity-backed CRUD domain. Other entity/link families remain foundation-only until their scheduled slices.
+- Organizations, People, Sites, Locations, and their versioned custom fields are entity-backed CRUD domains. Other entity/link families remain foundation-only until their scheduled slices.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
 
 ## License

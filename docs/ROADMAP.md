@@ -182,7 +182,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.4` | Complete | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
 | `0.1.5` | Complete | People plus employment/contact associations in MSP and organization workspaces. |
 | `0.1.6` | Complete | Sites and hierarchical locations with MSP/organization ownership, structured People placement, workspace-aware navigation, and PostgreSQL integrity guards. |
-| `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
+| `0.1.7` | Complete | Versioned MSP-wide and organization-specific custom-field definitions with JSON Schema validation, migration-safe values, and Site/Location value entry. |
 | `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
 | `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
 | `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped user assignments, per-client MSP employee assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
@@ -244,6 +244,21 @@ ADR 0009 defines the site/location hierarchy and retained-label contract.
 ADR 0007 defines the workspace-context boundary.
 
 Evidence: `docs/releases/0.1.6.md`.
+
+### `0.1.7` acceptance criteria
+
+- [x] A stable custom-field definition belongs to the MSP or exactly one organization and targets one Entity type. Its key, target type, and ownership scope cannot be silently reinterpreted.
+- [x] Creating or editing a definition produces an immutable, sequential version containing its label, help text, required flag, field type, and server-generated JSON Schema. Prior versions remain readable.
+- [x] Supported text, integer, number, boolean, date, URL, email, choice, and multi-choice values validate through a maintained JSON Schema implementation; arbitrary executable schemas and secret field types are not accepted.
+- [x] Entity values record the exact definition version that validated them. Publishing an incompatible definition version preserves old values, reports migration impact, and requires an explicit later edit rather than rewriting or discarding data.
+- [x] MSP-wide definitions are inherited by matching organization-owned entities. Organization definitions apply only inside their owning workspace and cannot be edited from another organization or through the MSP definition route.
+- [x] Route-derived APIs and PostgreSQL guards reject cross-tenant, cross-organization, wrong-entity-type, wrong-definition-version, malformed-envelope, and archived-definition writes without exposing record existence or field values in audit events.
+- [x] The Custom Fields interface manages definitions and version history in MSP and organization contexts. Site and Location records provide the first responsive, keyboard-accessible value-entry workflow with loading, empty, validation, stale-version, denial, and stale-workspace states.
+- [x] Migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, clean-install, preserved-data upgrade, security, and real browser-to-database evidence agree at `0.1.7`.
+
+ADR 0010 defines definition ownership, immutable versions, inherited applicability, and version-pinned Entity value envelopes.
+
+Evidence: `docs/releases/0.1.7.md`.
 
 ### `0.1.3` acceptance criteria
 

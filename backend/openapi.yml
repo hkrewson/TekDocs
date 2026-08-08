@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.6
+  version: 0.1.7
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -132,6 +132,174 @@ paths:
               schema:
                 $ref: '#/components/schemas/BootstrapStatus'
           description: ''
+  /api/v1/custom-field-definitions:
+    get:
+      operationId: custom_fields_msp_list
+      tags:
+      - custom-field-definitions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionResult'
+          description: ''
+    post:
+      operationId: custom_fields_msp_create
+      tags:
+      - custom-field-definitions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinition'
+          description: ''
+  /api/v1/custom-field-definitions/{definition_id}:
+    patch:
+      operationId: custom_fields_msp_version
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - custom-field-definitions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionVersionResult'
+          description: ''
+    delete:
+      operationId: custom_fields_msp_archive
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - custom-field-definitions
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/entities/{entity_id}/custom-fields:
+    get:
+      operationId: entity_custom_fields_msp_list
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityCustomFieldResult'
+          description: ''
+  /api/v1/entities/{entity_id}/custom-fields/{definition_id}:
+    patch:
+      operationId: entity_custom_fields_msp_set
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityCustomFieldResult'
+          description: ''
+    delete:
+      operationId: entity_custom_fields_msp_clear
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/health/live:
     get:
       operationId: health_live_retrieve
@@ -890,6 +1058,218 @@ paths:
           description: Organization workspace not found
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations/{organization_entity_id}/custom-field-definitions:
+    get:
+      operationId: custom_fields_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionResult'
+          description: ''
+    post:
+      operationId: custom_fields_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomFieldDefinitionWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinition'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/custom-field-definitions/{definition_id}:
+    patch:
+      operationId: custom_fields_organization_version
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionVersionResult'
+          description: ''
+    delete:
+      operationId: custom_fields_organization_archive
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields:
+    get:
+      operationId: entity_custom_fields_organization_list
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityCustomFieldResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields/{definition_id}:
+    patch:
+      operationId: entity_custom_fields_organization_set
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityCustomFieldResult'
+          description: ''
+    delete:
+      operationId: entity_custom_fields_organization_clear
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
       operationId: people_organization_list
@@ -1376,6 +1756,219 @@ components:
       required:
       - id
       - name
+    CustomFieldDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        entity_type:
+          type: string
+        owner:
+          type: string
+          readOnly: true
+        organization_id:
+          type: string
+          nullable: true
+          readOnly: true
+        inherited:
+          type: boolean
+          readOnly: true
+        archived:
+          type: boolean
+          readOnly: true
+        current_version:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomFieldVersion'
+      required:
+      - archived
+      - current_version
+      - entity_type
+      - id
+      - inherited
+      - key
+      - organization_id
+      - owner
+      - versions
+    CustomFieldDefinitionResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomFieldDefinition'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    CustomFieldDefinitionVersionResult:
+      type: object
+      properties:
+        definition:
+          $ref: '#/components/schemas/CustomFieldDefinition'
+        migration_impact:
+          $ref: '#/components/schemas/MigrationImpact'
+      required:
+      - definition
+      - migration_impact
+    CustomFieldDefinitionWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 160
+          minLength: 1
+        description:
+          type: string
+          maxLength: 500
+        required:
+          type: boolean
+          default: false
+        field_type:
+          $ref: '#/components/schemas/FieldTypeEnum'
+        display_order:
+          type: integer
+          maximum: 1000
+          minimum: -1000
+          default: 0
+        options:
+          type: array
+          items:
+            type: string
+            maxLength: 160
+            minLength: 1
+          maxItems: 50
+        key:
+          type: string
+          description: Stable lowercase key beginning with a letter.
+          maxLength: 80
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_-]*$
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+      required:
+      - entity_type
+      - field_type
+      - key
+      - label
+    CustomFieldVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        label:
+          type: string
+        description:
+          type: string
+        required:
+          type: boolean
+        field_type:
+          $ref: '#/components/schemas/FieldTypeEnum'
+        schema: {}
+        display_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - description
+      - display_order
+      - field_type
+      - id
+      - label
+      - required
+      - schema
+      - version
+    EntityCustomField:
+      type: object
+      properties:
+        definition:
+          $ref: '#/components/schemas/CustomFieldDefinition'
+        has_value:
+          type: boolean
+        value:
+          nullable: true
+        value_version_id:
+          type: string
+          format: uuid
+          nullable: true
+        value_version:
+          type: integer
+          nullable: true
+        is_current:
+          type: boolean
+        valid_for_current:
+          type: boolean
+      required:
+      - definition
+      - has_value
+      - is_current
+      - valid_for_current
+      - value
+      - value_version
+      - value_version_id
+    EntityCustomFieldResult:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        entity_type:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityCustomField'
+      required:
+      - entity_id
+      - entity_type
+      - fields
+    EntityTypeEnum:
+      enum:
+      - organization
+      - person
+      - site
+      - location
+      type: string
+      description: |-
+        * `organization` - organization
+        * `person` - person
+        * `site` - site
+        * `location` - location
+    FieldTypeEnum:
+      enum:
+      - text
+      - integer
+      - number
+      - boolean
+      - date
+      - url
+      - email
+      - choice
+      - multi_choice
+      type: string
+      description: |-
+        * `text` - Text
+        * `integer` - Integer
+        * `number` - Number
+        * `boolean` - Boolean
+        * `date` - Date
+        * `url` - URL
+        * `email` - Email
+        * `choice` - Choice
+        * `multi_choice` - Multiple choice
     Invitation:
       type: object
       properties:
@@ -1527,6 +2120,19 @@ components:
       required:
       - kind
       - name
+    MigrationImpact:
+      type: object
+      properties:
+        total:
+          type: integer
+        compatible:
+          type: integer
+        incompatible:
+          type: integer
+      required:
+      - compatible
+      - incompatible
+      - total
     OidcProvider:
       type: object
       properties:
@@ -1645,6 +2251,37 @@ components:
       required:
       - owner
       - tenant
+    PatchedCustomFieldValueWrite:
+      type: object
+      properties:
+        value: {}
+    PatchedCustomFieldVersionWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 160
+          minLength: 1
+        description:
+          type: string
+          maxLength: 500
+        required:
+          type: boolean
+          default: false
+        field_type:
+          $ref: '#/components/schemas/FieldTypeEnum'
+        display_order:
+          type: integer
+          maximum: 1000
+          minimum: -1000
+          default: 0
+        options:
+          type: array
+          items:
+            type: string
+            maxLength: 160
+            minLength: 1
+          maxItems: 50
     PatchedLocationWrite:
       type: object
       properties:

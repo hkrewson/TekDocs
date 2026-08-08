@@ -13,6 +13,16 @@ from apps.accounts.views import (
     OwnerBootstrapView,
     ProfileView,
 )
+from apps.core.custom_field_views import (
+    MSPCustomFieldDefinitionDetailView,
+    MSPCustomFieldDefinitionListCreateView,
+    MSPEntityCustomFieldDetailView,
+    MSPEntityCustomFieldListView,
+    OrganizationCustomFieldDefinitionDetailView,
+    OrganizationCustomFieldDefinitionListCreateView,
+    OrganizationEntityCustomFieldDetailView,
+    OrganizationEntityCustomFieldListView,
+)
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -56,6 +66,26 @@ urlpatterns = [
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
     path(
+        "api/v1/custom-field-definitions",
+        MSPCustomFieldDefinitionListCreateView.as_view(),
+        name="msp-custom-field-definition-list-create",
+    ),
+    path(
+        "api/v1/custom-field-definitions/<uuid:definition_id>",
+        MSPCustomFieldDefinitionDetailView.as_view(),
+        name="msp-custom-field-definition-detail",
+    ),
+    path(
+        "api/v1/entities/<uuid:entity_id>/custom-fields",
+        MSPEntityCustomFieldListView.as_view(),
+        name="msp-entity-custom-field-list",
+    ),
+    path(
+        "api/v1/entities/<uuid:entity_id>/custom-fields/<uuid:definition_id>",
+        MSPEntityCustomFieldDetailView.as_view(),
+        name="msp-entity-custom-field-detail",
+    ),
+    path(
         "api/v1/sites/<uuid:site_entity_id>/locations",
         MSPLocationListCreateView.as_view(),
         name="msp-location-list-create",
@@ -90,6 +120,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites",
         OrganizationSiteListCreateView.as_view(),
         name="organization-site-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/custom-field-definitions",
+        OrganizationCustomFieldDefinitionListCreateView.as_view(),
+        name="organization-custom-field-definition-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/custom-field-definitions/<uuid:definition_id>",
+        OrganizationCustomFieldDefinitionDetailView.as_view(),
+        name="organization-custom-field-definition-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/<uuid:entity_id>/custom-fields",
+        OrganizationEntityCustomFieldListView.as_view(),
+        name="organization-entity-custom-field-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/<uuid:entity_id>/custom-fields/<uuid:definition_id>",
+        OrganizationEntityCustomFieldDetailView.as_view(),
+        name="organization-entity-custom-field-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites/<uuid:site_entity_id>",

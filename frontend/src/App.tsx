@@ -18,6 +18,7 @@ import {
   Globe2,
   Handshake,
   KeyRound,
+  ListPlus,
   LogOut,
   Menu,
   MapPin,
@@ -36,6 +37,9 @@ import { AuthGate } from './auth/AuthGate'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
+import { CustomFields } from './custom-fields/CustomFields'
+import { browserCustomFieldsClient } from './custom-fields/api'
+import type { CustomFieldsClient } from './custom-fields/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
@@ -101,6 +105,7 @@ const navigationSections: NavigationSection[] = [
     { label: 'Accounting', path: '/accounting', area: 'accounting', icon: BadgeDollarSign },
   ] },
   { label: 'Governance', items: [
+    { label: 'Custom fields', path: '/custom-fields', area: 'custom_fields', icon: ListPlus },
     { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
     { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
     { label: 'Integrations', path: '/integrations', area: 'integrations', icon: Plug },
@@ -260,15 +265,16 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.6 adds structured sites, nested locations, and People placement." />
+      <PageHeader title="Overview" description="TekDocs 0.1.7 adds versioned custom fields for addressable records." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.6</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.7</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
             ['Tenant and entity primitives', 'Available'],
             ['Tenant and organization isolation', 'Available'],
             ['Organization records and classifications', 'Available'],
+            ['Versioned custom-field definitions', 'Available'],
             ['Owner authentication', 'Available'],
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],
@@ -312,6 +318,7 @@ function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceSta
 const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
   people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
   sites: { title: 'Sites', description: 'Sites and nested physical locations scoped to this organization.', release: '0.1.6' },
+  custom_fields: { title: 'Custom fields', description: 'Versioned extensions scoped to this organization or inherited from the MSP.', release: '0.1.7' },
   documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
   assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
@@ -326,7 +333,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} />
@@ -334,7 +341,8 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient }: { sta
     return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
   }
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
-  if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} />
+  if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
+  if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
   const details = organizationAreaDetails[area]
   return (
     <>
@@ -345,12 +353,13 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient }: { sta
   )
 }
 
-export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   workspaceClient: WorkspaceClient
   peopleClient: PeopleClient
   sitesClient: SitesClient
+  customFieldsClient: CustomFieldsClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -401,13 +410,14 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
             <Route path="/overview" element={<Overview />} />
             <Route path="/documentation" element={<Documentation />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
-            <Route path="/sites" element={<Sites workspace={null} client={sitesClient} />} />
+            <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
+            <Route path="/custom-fields" element={<CustomFields workspace={null} client={customFieldsClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
@@ -416,12 +426,13 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   workspaceClient?: WorkspaceClient
   peopleClient?: PeopleClient
   sitesClient?: SitesClient
+  customFieldsClient?: CustomFieldsClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -433,6 +444,7 @@ export function App({ initialPath, authClient = browserAuthClient, workspaceClie
           workspaceClient={workspaceClient}
           peopleClient={peopleClient}
           sitesClient={sitesClient}
+          customFieldsClient={customFieldsClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

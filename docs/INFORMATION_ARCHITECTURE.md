@@ -19,6 +19,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Organizations | All clients, vendors, manufacturers, and partners | — | — | records available |
 | People | MSP employees and shared contacts | Client employees and contacts | Supplier representatives | records available (`0.1.5`) |
 | Sites | MSP offices and nested locations | Client sites, buildings, floors, rooms, offices, and desks | Supplier sites and offices | records available (`0.1.6`) |
+| Custom fields | MSP-wide definitions and values on MSP records | Inherited MSP definitions plus client-local Site/Location definitions | Inherited MSP definitions plus supplier-local Site/Location definitions | definitions and Site/Location values available (`0.1.7`) |
 | Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |

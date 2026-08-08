@@ -43,7 +43,7 @@ clean_compose exec -T backend python manage.py migrate --check
 clean_compose exec -T backend python manage.py makemigrations --check --dry-run
 clean_compose exec -T backend python manage.py shell -c '
 from apps.accounts.models import TenantMembership, User
-from apps.core.models import AuditEvent, InstallationState, Tenant
+from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, InstallationState, Tenant
 
 state = InstallationState.objects.get(pk=InstallationState.SINGLETON_ID)
 assert not state.is_bootstrapped
@@ -53,6 +53,8 @@ assert Tenant.objects.count() == 0
 assert User.objects.count() == 0
 assert TenantMembership.objects.count() == 0
 assert AuditEvent.objects.count() == 0
+assert CustomFieldDefinition.objects.count() == 0
+assert CustomFieldDefinitionVersion.objects.count() == 0
 print("Fresh installation state verified")
 '
 

@@ -12,7 +12,7 @@ const clientWorkspace = {
   id: crypto.randomUUID(),
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
   organization: { id: '', name: 'Acme Dental', legal_name: 'Acme Dental, LLC', website: '', classifications: ['client'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 clientWorkspace.organization.id = clientWorkspace.id
@@ -22,7 +22,7 @@ const supplierWorkspace = {
   id: crypto.randomUUID(),
   name: 'Northwind Supply',
   classifications: ['vendor', 'manufacturer'],
-  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'products'],
+  capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'products'],
   organization: { id: '', name: 'Northwind Supply', legal_name: 'Northwind Supply Company', website: '', classifications: ['vendor', 'manufacturer'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 supplierWorkspace.organization.id = supplierWorkspace.id
@@ -58,6 +58,12 @@ const site = {
   locations: [{ id: crypto.randomUUID(), site_id: '', parent_id: null, name: 'Office 214', kind: 'office', code: '214', created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' }],
 }
 site.locations[0].site_id = site.id
+const customFieldVersion = {
+  id: crypto.randomUUID(), version: 1, label: 'Door code', description: 'Facilities entry code', required: false, field_type: 'text', schema: { type: 'string' }, display_order: 1, created_at: '2026-08-08T12:00:00Z',
+}
+const customFieldDefinition = {
+  id: crypto.randomUUID(), key: 'door_code', entity_type: 'site', owner: 'organization', organization_id: clientWorkspace.id, inherited: false, archived: false, current_version: customFieldVersion, versions: [customFieldVersion],
+}
 
 async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
@@ -65,6 +71,15 @@ async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/api/v1/workspaces/organizations**', (route) => {
     const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/custom-field-definitions')) {
+      return route.fulfill({ json: { results: [customFieldDefinition], count: 1 } })
+    }
+    if (url.pathname.endsWith('/custom-fields')) {
+      return route.fulfill({ json: { entity_id: site.id, entity_type: 'site', fields: [{ definition: customFieldDefinition, has_value: true, value: '4231', value_version_id: customFieldVersion.id, value_version: 1, is_current: true, valid_for_current: true }] } })
+    }
+    if (url.pathname.endsWith(`/custom-fields/${customFieldDefinition.id}`)) {
+      return route.fulfill({ json: { entity_id: site.id, entity_type: 'site', fields: [{ definition: customFieldDefinition, has_value: true, value: '9912', value_version_id: customFieldVersion.id, value_version: 1, is_current: true, valid_for_current: true }] } })
+    }
     if (url.pathname.endsWith('/people')) {
       return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
     }
@@ -185,6 +200,25 @@ test('client Sites area shows nested workspace-owned locations accessibly', asyn
   await expect(page.getByRole('heading', { name: 'North Campus' })).toBeVisible()
   await expect(page.getByText('Office 214')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sites' })).toHaveAttribute('href', `/workspaces/organizations/${clientWorkspace.id}/sites`)
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})
+
+test('client custom-field definitions and Site values remain workspace scoped and accessible', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/custom_fields`)
+
+  await expect(page.getByRole('heading', { name: 'Custom fields' })).toBeVisible()
+  await expect(page.getByText('Door code', { exact: true })).toBeVisible()
+  await expect(page.getByText('This organization')).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+
+  await page.getByRole('link', { name: 'Sites' }).click()
+  await page.getByRole('button', { name: 'Custom fields for site North Campus' }).click()
+  await expect(page.getByRole('heading', { name: 'Custom fields for North Campus' })).toBeVisible()
+  await expect(page.getByLabel('Door code')).toHaveValue('4231')
+  await page.getByLabel('Door code').fill('9912')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByLabel('Door code')).toHaveValue('9912')
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

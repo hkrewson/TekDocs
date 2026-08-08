@@ -7,6 +7,8 @@ from django.db import IntegrityError, connection, transaction
 from apps.accounts.models import Invitation, TenantMembership
 from apps.core.models import (
     AuditEvent,
+    CustomFieldDefinition,
+    CustomFieldDefinitionVersion,
     Entity,
     EntityLink,
     Location,
@@ -31,6 +33,8 @@ def _organization(tenant: Tenant, name: str) -> Organization:
     "model",
     [
         AuditEvent,
+        CustomFieldDefinition,
+        CustomFieldDefinitionVersion,
         Entity,
         EntityLink,
         Location,

@@ -75,6 +75,16 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Live Acme Client. Client · Vendor' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/overview$/)
 
+  await page.getByRole('link', { name: 'Custom fields' }).click()
+  await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/custom_fields$/)
+  await page.getByRole('button', { name: /New field/ }).click()
+  await page.getByLabel('Label').fill('Support tier')
+  await page.getByLabel('Stable key').fill('support_tier')
+  await page.getByLabel('Field type').selectOption('choice')
+  await page.getByLabel(/Choices/).fill('Standard\nPriority')
+  await page.getByRole('button', { name: 'Add field' }).click()
+  await expect(page.getByText('Support tier', { exact: true })).toBeVisible()
+
   await page.getByRole('link', { name: 'Sites' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/sites$/)
   await page.getByRole('button', { name: 'New site' }).click()
@@ -101,6 +111,10 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Location added.', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Office 214', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Custom fields for site Live Main Campus' }).click()
+  await page.getByLabel('Support tier').selectOption('Priority')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByLabel('Support tier')).toHaveValue('Priority')
 
   await page.getByRole('link', { name: 'People' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/people$/)

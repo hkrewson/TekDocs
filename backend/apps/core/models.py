@@ -285,6 +285,114 @@ class Location(TimestampedModel):
             raise ValidationError("Location parent must be a different location in the same site")
 
 
+class CustomFieldType(models.TextChoices):
+    TEXT = "text", "Text"
+    INTEGER = "integer", "Integer"
+    NUMBER = "number", "Number"
+    BOOLEAN = "boolean", "Boolean"
+    DATE = "date", "Date"
+    URL = "url", "URL"
+    EMAIL = "email", "Email"
+    CHOICE = "choice", "Choice"
+    MULTI_CHOICE = "multi_choice", "Multiple choice"
+
+
+class CustomFieldDefinition(TimestampedModel):
+    """Stable identity and ownership for a versioned custom field."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="custom_field_definitions")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="custom_field_definitions",
+        null=True,
+        blank=True,
+    )
+    key = models.SlugField(max_length=80)
+    entity_type = models.CharField(max_length=80)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "organization", "entity_type", "key"],
+                name="unique_custom_field_key_in_scope",
+                nulls_distinct=False,
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["tenant", "organization", "entity_type", "archived_at"],
+                name="core_cfdef_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.entity_type}.{self.key}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Custom-field definitions change only through versioning and archival services")
+        return super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and organization.tenant_id != self.tenant_id:
+            raise ValidationError("Custom-field organization must belong to its tenant")
+
+
+class CustomFieldDefinitionVersion(models.Model):
+    """Immutable validation and presentation contract for one definition revision."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="custom_field_definition_versions")
+    definition = models.ForeignKey(CustomFieldDefinition, on_delete=models.PROTECT, related_name="versions")
+    version = models.PositiveIntegerField()
+    label = models.CharField(max_length=160)
+    description = models.CharField(max_length=500, blank=True)
+    required = models.BooleanField(default=False)
+    field_type = models.CharField(max_length=32, choices=CustomFieldType.choices)
+    schema = models.JSONField()
+    display_order = models.IntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="custom_field_definition_versions",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["definition", "version"], name="unique_custom_field_definition_version"),
+            models.CheckConstraint(condition=models.Q(version__gte=1), name="custom_field_version_positive"),
+        ]
+        ordering = ("definition_id", "version")
+
+    def __str__(self) -> str:
+        return f"{self.definition_id} v{self.version}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Custom-field definition versions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Custom-field definition versions are immutable")
+
+    def clean(self) -> None:
+        if self.definition_id and self.definition.tenant_id != self.tenant_id:
+            raise ValidationError("Custom-field version must belong to the definition tenant")
+
+
 class Person(TimestampedModel):
     """One tenant-wide human identity anchored to the entity registry."""
 
@@ -420,6 +528,7 @@ class EntityLink(TimestampedModel):
             raise ValidationError("Source entity must belong to the link tenant")
         if self.target_id and self.tenant_id != self.target.tenant_id:
             raise ValidationError("Target entity must belong to the link tenant")
+
 
 class AuditEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

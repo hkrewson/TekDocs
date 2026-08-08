@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-isolation test-organizations test-workspaces test-people test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-isolation test-organizations test-workspaces test-people test-sites test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -46,6 +46,9 @@ test-workspaces:
 test-people:
 	docker compose exec -T backend pytest apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
 
+test-sites:
+	docker compose exec -T backend pytest apps/core/tests/test_sites.py apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
+
 test-compose:
 	docker compose -f compose.yml -f compose.test.yml up -d --build --wait
 	curl --fail --silent http://localhost:$${TEKDOCS_PORT:-3200}/api/v1/health/ready
@@ -73,7 +76,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-isolation test-organizations test-workspaces test-people test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+release-gate: check test test-auth-abuse test-compose test-isolation test-organizations test-workspaces test-people test-sites test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

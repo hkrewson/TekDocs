@@ -15,13 +15,15 @@ export type PersonRecord = {
   responsibility: string
   location: string
   office: string
+  site_id: string | null
+  structured_location_id: string | null
   phone: string
   email: string
   created_at: string
   updated_at: string
 }
 
-export type PersonInput = Pick<PersonRecord, 'full_name' | 'preferred_name' | 'kind' | 'role' | 'responsibility' | 'location' | 'office' | 'phone' | 'email'>
+export type PersonInput = Pick<PersonRecord, 'full_name' | 'preferred_name' | 'kind' | 'role' | 'responsibility' | 'location' | 'office' | 'site_id' | 'structured_location_id' | 'phone' | 'email'>
 
 export type PeopleQuery = {
   q: string

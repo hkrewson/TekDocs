@@ -12,7 +12,7 @@ const clientWorkspace = {
   id: crypto.randomUUID(),
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
   organization: { id: '', name: 'Acme Dental', legal_name: 'Acme Dental, LLC', website: '', classifications: ['client'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 clientWorkspace.organization.id = clientWorkspace.id
@@ -22,7 +22,7 @@ const supplierWorkspace = {
   id: crypto.randomUUID(),
   name: 'Northwind Supply',
   classifications: ['vendor', 'manufacturer'],
-  capabilities: ['overview', 'people', 'documentation', 'files', 'products'],
+  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'products'],
   organization: { id: '', name: 'Northwind Supply', legal_name: 'Northwind Supply Company', website: '', classifications: ['vendor', 'manufacturer'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 supplierWorkspace.organization.id = supplierWorkspace.id
@@ -46,11 +46,18 @@ const person = {
   responsibility: 'Network and identity operations',
   location: 'North Office',
   office: 'Desk 214',
+  site_id: null,
+  structured_location_id: null,
   phone: '+1 555 010 0240',
   email: 'jordan@example.com',
   created_at: '2026-08-08T12:00:00Z',
   updated_at: '2026-08-08T12:00:00Z',
 }
+const site = {
+  id: crypto.randomUUID(), organization_id: clientWorkspace.id, name: 'North Campus', code: 'NORTH', address_line_1: '100 Main Street', address_line_2: '', city: 'Madison', region: 'WI', postal_code: '53703', country_code: 'US', timezone: 'America/Chicago', phone: '', created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z',
+  locations: [{ id: crypto.randomUUID(), site_id: '', parent_id: null, name: 'Office 214', kind: 'office', code: '214', created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' }],
+}
+site.locations[0].site_id = site.id
 
 async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
@@ -61,6 +68,7 @@ async function mockWorkspaceApplication(page: Page) {
     if (url.pathname.endsWith('/people')) {
       return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
     }
+    if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
     const id = url.pathname.split('/').at(-1)
     if (id === clientWorkspace.id) return route.fulfill({ json: clientWorkspace })
     if (id === secondClientWorkspace.id) return route.fulfill({ json: secondClientWorkspace })
@@ -167,6 +175,17 @@ test('client People directory supports field controls and remains accessible', a
   await page.getByRole('button', { name: 'Full name' }).click()
   await expect(page.getByRole('columnheader', { name: 'Full name' })).toHaveAttribute('aria-sort', 'descending')
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+})
+
+test('client Sites area shows nested workspace-owned locations accessibly', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/sites`)
+
+  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'North Campus' })).toBeVisible()
+  await expect(page.getByText('Office 214')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Sites' })).toHaveAttribute('href', `/workspaces/organizations/${clientWorkspace.id}/sites`)
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
 test('separate tabs retain independent URL-derived workspace context', async ({ page }) => {

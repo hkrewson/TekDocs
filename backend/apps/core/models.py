@@ -162,6 +162,129 @@ class OrganizationClassification(TimestampedModel):
             raise ValidationError("Organization classification must belong to its tenant")
 
 
+class Site(TimestampedModel):
+    """An addressable physical or operational site in one workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="sites")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="sites",
+        null=True,
+        blank=True,
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="site_record")
+    code = models.CharField(max_length=64, blank=True)
+    address_line_1 = models.CharField(max_length=240, blank=True)
+    address_line_2 = models.CharField(max_length=240, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    region = models.CharField(max_length=120, blank=True)
+    postal_code = models.CharField(max_length=32, blank=True)
+    country_code = models.CharField(max_length=2, blank=True)
+    timezone = models.CharField(max_length=64, blank=True)
+    phone = models.CharField(max_length=64, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "organization", "code"],
+                condition=~models.Q(code=""),
+                name="unique_site_code_in_workspace",
+                nulls_distinct=False,
+            )
+        ]
+        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and self.tenant_id != organization.tenant_id:
+            raise ValidationError("Site organization must belong to its tenant")
+        if self.entity_id and self.tenant_id != self.entity.tenant_id:
+            raise ValidationError("Site entity must belong to the site tenant")
+        if self.entity_id and self.entity.organization_id != self.organization_id:
+            raise ValidationError("Site entity must use the site's workspace scope")
+
+
+class LocationKind(models.TextChoices):
+    BUILDING = "building", "Building"
+    FLOOR = "floor", "Floor"
+    SUITE = "suite", "Suite"
+    ROOM = "room", "Room"
+    OFFICE = "office", "Office"
+    DESK = "desk", "Desk"
+    AREA = "area", "Area"
+
+
+class Location(TimestampedModel):
+    """An addressable hierarchical place within one site."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="locations")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="locations",
+        null=True,
+        blank=True,
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="location_record")
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, related_name="locations")
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="children",
+        null=True,
+        blank=True,
+    )
+    kind = models.CharField(max_length=32, choices=LocationKind.choices)
+    code = models.CharField(max_length=64, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(parent=models.F("id")), name="location_not_own_parent"),
+            models.UniqueConstraint(
+                fields=["site", "parent", "code"],
+                condition=~models.Q(code=""),
+                name="unique_location_code_under_parent",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "organization", "site", "archived_at"]),
+            models.Index(fields=["site", "parent", "kind"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and self.tenant_id != organization.tenant_id:
+            raise ValidationError("Location organization must belong to its tenant")
+        if self.entity_id and self.tenant_id != self.entity.tenant_id:
+            raise ValidationError("Location entity must belong to the location tenant")
+        if self.entity_id and self.entity.organization_id != self.organization_id:
+            raise ValidationError("Location entity must use the location's workspace scope")
+        site = self.site if self.site_id else None
+        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
+            raise ValidationError("Location site must use the location's workspace scope")
+        parent = self.parent if self.parent_id else None
+        if parent is not None and (parent.site_id != self.site_id or self.parent_id == self.id):
+            raise ValidationError("Location parent must be a different location in the same site")
+
+
 class Person(TimestampedModel):
     """One tenant-wide human identity anchored to the entity registry."""
 
@@ -211,6 +334,20 @@ class PersonAssociation(TimestampedModel):
     responsibility = models.CharField(max_length=240, blank=True)
     location = models.CharField(max_length=160, blank=True)
     office = models.CharField(max_length=120, blank=True)
+    site = models.ForeignKey(
+        Site,
+        on_delete=models.PROTECT,
+        related_name="person_associations",
+        null=True,
+        blank=True,
+    )
+    structured_location = models.ForeignKey(
+        Location,
+        on_delete=models.PROTECT,
+        related_name="person_associations",
+        null=True,
+        blank=True,
+    )
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
@@ -243,6 +380,18 @@ class PersonAssociation(TimestampedModel):
         organization = self.organization if self.organization_id else None
         if organization is not None and self.tenant_id != organization.tenant_id:
             raise ValidationError("Person association organization must belong to its tenant")
+        site = self.site if self.site_id else None
+        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
+            raise ValidationError("Person association site must use its workspace scope")
+        structured_location = self.structured_location if self.structured_location_id else None
+        if structured_location is not None:
+            if self.site_id != structured_location.site_id:
+                raise ValidationError("Person association location must belong to its selected site")
+            if (
+                structured_location.tenant_id != self.tenant_id
+                or structured_location.organization_id != self.organization_id
+            ):
+                raise ValidationError("Person association location must use its workspace scope")
 
 
 class EntityLink(TimestampedModel):

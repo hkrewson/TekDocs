@@ -6,6 +6,7 @@ import type { AuthenticatedContext } from './auth/api'
 import type { AuthClient } from './auth/api'
 import type { WorkspaceClient } from './workspaces/api'
 import type { PeopleClient } from './people/api'
+import type { SitesClient } from './sites/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -21,7 +22,7 @@ const loadOrganization = vi.fn().mockResolvedValue({
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
   organization: {
     id: '00000000-0000-4000-8000-000000000010',
     name: 'Acme Dental',
@@ -44,7 +45,17 @@ const peopleClient = {
   update: vi.fn(),
   archive: vi.fn(),
 } as unknown as PeopleClient
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} />
+const listSites = vi.fn().mockResolvedValue({ results: [], count: 0 })
+const sitesClient = {
+  list: listSites,
+  create: vi.fn(),
+  update: vi.fn(),
+  archive: vi.fn(),
+  createLocation: vi.fn(),
+  updateLocation: vi.fn(),
+  archiveLocation: vi.fn(),
+} as unknown as SitesClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} />
 
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -115,6 +126,19 @@ describe('application shell', () => {
       expect.objectContaining({ ordering: 'full_name' }),
       expect.any(AbortSignal),
     ))
+  })
+
+  it('loads Sites through the selected organization boundary', async () => {
+    render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/sites'))
+
+    expect(await screen.findByRole('heading', { name: 'Sites' })).toBeInTheDocument()
+    expect(screen.getByText('Sites and physical locations owned by Acme Dental.')).toBeInTheDocument()
+    expect(await screen.findByText('No sites have been added to Acme Dental.')).toBeInTheDocument()
+    expect(listSites).toHaveBeenCalledWith(
+      { organizationId: '00000000-0000-4000-8000-000000000010' },
+      '',
+      expect.any(AbortSignal),
+    )
   })
 
   it('clears retained organization context when returning to an MSP route', async () => {

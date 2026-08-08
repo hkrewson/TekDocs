@@ -12,10 +12,12 @@ from apps.core.models import (
     AuditEvent,
     Entity,
     InstallationState,
+    Location,
     Organization,
     OrganizationClassification,
     Person,
     PersonAssociation,
+    Site,
     Tenant,
 )
 from apps.core.scoping import DataScope
@@ -262,6 +264,72 @@ def test_one_person_identity_can_have_msp_and_organization_associations(installa
     assert list(
         PersonAssociation.scoped.for_scope(DataScope.organization(installation.tenant, client_organization))
     ) == [client_contact]
+
+
+@pytest.mark.django_db
+def test_people_can_reference_active_structured_placement_only_within_their_workspace(owner_client, installation):
+    client_organization = organization(installation.tenant, "Placed Client")
+    other_organization = organization(installation.tenant, "Other Client")
+    site_response = owner_client.post(
+        reverse(
+            "organization-site-list-create",
+            kwargs={"organization_entity_id": client_organization.entity_id},
+        ),
+        {"name": "Main Campus", "code": "MAIN"},
+        content_type="application/json",
+    )
+    site_id = site_response.json()["id"]
+    location_response = owner_client.post(
+        reverse(
+            "organization-location-list-create",
+            kwargs={"organization_entity_id": client_organization.entity_id, "site_entity_id": site_id},
+        ),
+        {"name": "Desk 214", "kind": "desk"},
+        content_type="application/json",
+    )
+    location_id = location_response.json()["id"]
+    people_url = reverse(
+        "organization-people-list-create",
+        kwargs={"organization_entity_id": client_organization.entity_id},
+    )
+
+    created = owner_client.post(
+        people_url,
+        person_payload(
+            location="Old campus label",
+            office="Old desk label",
+            site_id=site_id,
+            structured_location_id=location_id,
+        ),
+        content_type="application/json",
+    )
+
+    assert created.status_code == 201
+    assert created.json()["site_id"] == site_id
+    assert created.json()["structured_location_id"] == location_id
+    assert created.json()["location"] == "Main Campus"
+    assert created.json()["office"] == "Desk 214"
+
+    other_people_url = reverse(
+        "organization-people-list-create",
+        kwargs={"organization_entity_id": other_organization.entity_id},
+    )
+    cross_workspace = owner_client.post(
+        other_people_url,
+        person_payload(full_name="Wrong Workspace", site_id=site_id, structured_location_id=location_id),
+        content_type="application/json",
+    )
+    missing_site = owner_client.post(
+        people_url,
+        person_payload(full_name="Missing Site", site_id=None, structured_location_id=location_id),
+        content_type="application/json",
+    )
+    assert cross_workspace.status_code == 404
+    assert missing_site.status_code == 400
+
+    association = PersonAssociation.objects.get(person__entity_id=created.json()["id"])
+    assert isinstance(association.site, Site)
+    assert isinstance(association.structured_location, Location)
 
 
 @pytest.mark.django_db(transaction=True)

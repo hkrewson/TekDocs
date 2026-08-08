@@ -16,6 +16,7 @@ MSP_CAPABILITIES = (
     "overview",
     "organizations",
     "people",
+    "sites",
     "documentation",
     "files",
     "assets",
@@ -38,6 +39,7 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "client": (
         "overview",
         "people",
+        "sites",
         "documentation",
         "files",
         "assets",
@@ -50,9 +52,9 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "tickets",
         "vendors",
     ),
-    "vendor": ("overview", "people", "documentation", "files", "products"),
-    "manufacturer": ("overview", "people", "documentation", "files", "products"),
-    "partner": ("overview", "people", "documentation", "files", "products"),
+    "vendor": ("overview", "people", "sites", "documentation", "files", "products"),
+    "manufacturer": ("overview", "people", "sites", "documentation", "files", "products"),
+    "partner": ("overview", "people", "sites", "documentation", "files", "products"),
 }
 
 

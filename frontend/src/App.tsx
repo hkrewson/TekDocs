@@ -20,6 +20,7 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  MapPin,
   Network,
   Package,
   Plug,
@@ -39,6 +40,9 @@ import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
+import { Sites } from './sites/Sites'
+import { browserSitesClient } from './sites/api'
+import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
 import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
@@ -75,6 +79,7 @@ const navigationSections: NavigationSection[] = [
     { label: 'Overview', path: '/overview', area: 'overview', icon: Activity },
     { label: 'Organizations', path: '/organizations', area: 'organizations', icon: Building2 },
     { label: 'People', path: '/people', area: 'people', icon: UsersRound },
+    { label: 'Sites', path: '/sites', area: 'sites', icon: MapPin },
     { label: 'Documentation', path: '/documentation', area: 'documentation', icon: BookOpenText },
     { label: 'Files', path: '/files', area: 'files', icon: File },
   ] },
@@ -255,9 +260,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.5 adds workspace-scoped people and contact directories." />
+      <PageHeader title="Overview" description="TekDocs 0.1.6 adds structured sites, nested locations, and People placement." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.5</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.6</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -306,6 +311,7 @@ function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceSta
 
 const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
   people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
+  sites: { title: 'Sites', description: 'Sites and nested physical locations scoped to this organization.', release: '0.1.6' },
   documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
   assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
@@ -320,14 +326,15 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} />
   if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
     return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
   }
-  if (area === 'people') return <People workspace={state.workspace} client={peopleClient} />
+  if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
+  if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} />
   const details = organizationAreaDetails[area]
   return (
     <>
@@ -338,11 +345,12 @@ function OrganizationAreaRoute({ state, area, peopleClient }: { state: Organizat
   )
 }
 
-export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   workspaceClient: WorkspaceClient
   peopleClient: PeopleClient
+  sitesClient: SitesClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -392,13 +400,14 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
             <Route path="/documentation" element={<Documentation />} />
-            <Route path="/people" element={<People workspace={null} client={peopleClient} />} />
+            <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
+            <Route path="/sites" element={<Sites workspace={null} client={sitesClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
@@ -407,11 +416,12 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   workspaceClient?: WorkspaceClient
   peopleClient?: PeopleClient
+  sitesClient?: SitesClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -422,6 +432,7 @@ export function App({ initialPath, authClient = browserAuthClient, workspaceClie
           authClient={authClient}
           workspaceClient={workspaceClient}
           peopleClient={peopleClient}
+          sitesClient={sitesClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
-from .models import AuditEvent, Entity, Organization, Person, PersonAssociation, Tenant
+from .models import AuditEvent, Entity, Location, Organization, Person, PersonAssociation, Site, Tenant
 from .scoping import DataScope
 
 FILTER_LOOKUPS = {
@@ -36,7 +36,16 @@ def people_for_scope(scope: DataScope) -> QuerySet[PersonAssociation]:
     return (
         PersonAssociation.scoped.for_scope(scope)
         .filter(archived_at__isnull=True)
-        .select_related("person", "person__entity", "organization", "organization__entity")
+        .select_related(
+            "person",
+            "person__entity",
+            "organization",
+            "organization__entity",
+            "site",
+            "site__entity",
+            "structured_location",
+            "structured_location__entity",
+        )
     )
 
 
@@ -90,9 +99,15 @@ def create_person(
     responsibility: str,
     location: str,
     office: str,
+    site: Site | None,
+    structured_location: Location | None,
     phone: str,
     email: str,
 ) -> PersonAssociation:
+    if site is not None:
+        location = site.entity.display_name
+    if structured_location is not None:
+        office = structured_location.entity.display_name
     entity = Entity.objects.create(tenant=tenant, entity_type="person", display_name=full_name)
     person = Person.objects.create(
         tenant=tenant,
@@ -110,6 +125,8 @@ def create_person(
         responsibility=responsibility,
         location=location,
         office=office,
+        site=site,
+        structured_location=structured_location,
     )
     AuditEvent.objects.create(
         tenant=tenant,
@@ -133,9 +150,15 @@ def update_person(
     responsibility: str,
     location: str,
     office: str,
+    site: Site | None,
+    structured_location: Location | None,
     phone: str,
     email: str,
 ) -> PersonAssociation:
+    if site is not None:
+        location = site.entity.display_name
+    if structured_location is not None:
+        office = structured_location.entity.display_name
     person = association.person
     person.entity.display_name = full_name
     person.entity.save(update_fields=("display_name", "updated_at"))
@@ -148,8 +171,19 @@ def update_person(
     association.responsibility = responsibility
     association.location = location
     association.office = office
+    association.site = site
+    association.structured_location = structured_location
     association.save(
-        update_fields=("kind", "role", "responsibility", "location", "office", "updated_at")
+        update_fields=(
+            "kind",
+            "role",
+            "responsibility",
+            "location",
+            "office",
+            "site",
+            "structured_location",
+            "updated_at",
+        )
     )
     AuditEvent.objects.create(
         tenant=association.tenant,

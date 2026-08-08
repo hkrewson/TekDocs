@@ -20,6 +20,16 @@ from apps.core.people_views import (
     OrganizationPeopleListCreateView,
     OrganizationPersonDetailView,
 )
+from apps.core.site_views import (
+    MSPLocationDetailView,
+    MSPLocationListCreateView,
+    MSPSiteDetailView,
+    MSPSiteListCreateView,
+    OrganizationLocationDetailView,
+    OrganizationLocationListCreateView,
+    OrganizationSiteDetailView,
+    OrganizationSiteListCreateView,
+)
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 from apps.core.workspace_views import (
     MSPWorkspaceContextView,
@@ -43,6 +53,18 @@ urlpatterns = [
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/people", MSPPeopleListCreateView.as_view(), name="msp-people-list-create"),
     path("api/v1/people/<uuid:person_entity_id>", MSPPersonDetailView.as_view(), name="msp-person-detail"),
+    path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
+    path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
+    path(
+        "api/v1/sites/<uuid:site_entity_id>/locations",
+        MSPLocationListCreateView.as_view(),
+        name="msp-location-list-create",
+    ),
+    path(
+        "api/v1/sites/<uuid:site_entity_id>/locations/<uuid:location_entity_id>",
+        MSPLocationDetailView.as_view(),
+        name="msp-location-detail",
+    ),
     path("api/v1/workspaces/msp", MSPWorkspaceContextView.as_view(), name="workspace-msp"),
     path(
         "api/v1/workspaces/organizations",
@@ -63,6 +85,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people/<uuid:person_entity_id>",
         OrganizationPersonDetailView.as_view(),
         name="organization-person-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites",
+        OrganizationSiteListCreateView.as_view(),
+        name="organization-site-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites/<uuid:site_entity_id>",
+        OrganizationSiteDetailView.as_view(),
+        name="organization-site-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites/<uuid:site_entity_id>/locations",
+        OrganizationLocationListCreateView.as_view(),
+        name="organization-location-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/sites/<uuid:site_entity_id>/locations/<uuid:location_entity_id>",
+        OrganizationLocationDetailView.as_view(),
+        name="organization-location-detail",
     ),
     path(
         "api/v1/invitations/<uuid:invitation_id>/revoke",

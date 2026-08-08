@@ -4,6 +4,7 @@ import { beforeEach, vi } from 'vitest'
 import { People } from './People'
 import type { PeopleClient, PersonRecord } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
+import type { SitesClient } from '../sites/api'
 
 const workspace: WorkspaceContext = {
   kind: 'organization',
@@ -32,11 +33,14 @@ const person: PersonRecord = {
   responsibility: 'Network operations',
   location: 'North Office',
   office: 'Desk 214',
+  site_id: null,
+  structured_location_id: null,
   phone: '+1 555 010 0240',
   email: 'jordan@example.com',
   created_at: '2026-08-08T12:00:00Z',
   updated_at: '2026-08-08T12:00:00Z',
 }
+const sitesClient = { list: vi.fn().mockImplementation(() => new Promise(() => undefined)) } as unknown as SitesClient
 
 function peopleClient(overrides: Partial<PeopleClient> = {}): PeopleClient {
   return {
@@ -57,7 +61,7 @@ describe('People', () => {
 
   it('shows the scoped directory and customizes visible columns', async () => {
     const user = userEvent.setup()
-    render(<People workspace={workspace} client={peopleClient()} />)
+    render(<People workspace={workspace} client={peopleClient()} sitesClient={sitesClient} />)
 
     expect(await screen.findByRole('cell', { name: 'Jordan Avery' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
@@ -76,10 +80,10 @@ describe('People', () => {
       .mockResolvedValueOnce({ results: [person], page: 1, page_size: 25, count: 1, has_more: false })
       .mockImplementationOnce(() => new Promise(() => undefined))
     const client = peopleClient({ list })
-    const { rerender } = render(<People workspace={workspace} client={client} />)
+    const { rerender } = render(<People workspace={workspace} client={client} sitesClient={sitesClient} />)
     expect(await screen.findByRole('cell', { name: /^Jordan Avery$/ })).toBeInTheDocument()
 
-    rerender(<People workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000030', name: 'Second Client' }} client={client} />)
+    rerender(<People workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000030', name: 'Second Client' }} client={client} sitesClient={sitesClient} />)
 
     expect(screen.queryByRole('cell', { name: /^Jordan Avery$/ })).not.toBeInTheDocument()
     expect(screen.getByText('Loading people…')).toBeInTheDocument()
@@ -88,7 +92,7 @@ describe('People', () => {
   it('searches all fields, filters one field, and changes sorting', async () => {
     const user = userEvent.setup()
     const list = vi.fn().mockResolvedValue({ results: [person], page: 1, page_size: 25, count: 1, has_more: false })
-    render(<People workspace={workspace} client={peopleClient({ list })} />)
+    render(<People workspace={workspace} client={peopleClient({ list })} sitesClient={sitesClient} />)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search all person fields' }), 'north')
@@ -111,7 +115,7 @@ describe('People', () => {
     const create = vi.fn().mockResolvedValue(person)
     const update = vi.fn().mockResolvedValue({ ...person, preferred_name: 'Jordan' })
     const archive = vi.fn().mockResolvedValue(undefined)
-    render(<People workspace={workspace} client={peopleClient({ create, update, archive })} />)
+    render(<People workspace={workspace} client={peopleClient({ create, update, archive })} sitesClient={sitesClient} />)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.click(screen.getByRole('button', { name: 'New person' }))
@@ -139,10 +143,42 @@ describe('People', () => {
     expect(archive).toHaveBeenCalledWith({ organizationId: workspace.id }, person.id)
   })
 
+  it('uses structured site and location choices while retaining display labels', async () => {
+    const user = userEvent.setup()
+    const create = vi.fn().mockResolvedValue(person)
+    const structuredSitesClient = {
+      list: vi.fn().mockResolvedValue({
+        count: 1,
+        results: [{
+          id: '00000000-0000-4000-8000-000000000040', organization_id: workspace.id, name: 'Main Campus', code: 'MAIN', address_line_1: '', address_line_2: '', city: '', region: '', postal_code: '', country_code: '', timezone: '', phone: '', created_at: person.created_at, updated_at: person.updated_at,
+          locations: [{ id: '00000000-0000-4000-8000-000000000041', site_id: '00000000-0000-4000-8000-000000000040', parent_id: null, name: 'Desk 214', kind: 'desk', code: '', created_at: person.created_at, updated_at: person.updated_at }],
+        }],
+      }),
+    } as unknown as SitesClient
+    render(<People workspace={workspace} client={peopleClient({ create })} sitesClient={structuredSitesClient} />)
+    await screen.findByRole('cell', { name: 'Jordan Avery' })
+
+    await user.click(screen.getByRole('button', { name: 'New person' }))
+    await user.type(screen.getByLabelText('Full name'), 'Placed Person')
+    await screen.findByRole('option', { name: 'Main Campus' })
+    await user.selectOptions(screen.getByLabelText(/Structured site/), '00000000-0000-4000-8000-000000000040')
+    await user.selectOptions(screen.getByLabelText(/Structured location/), '00000000-0000-4000-8000-000000000041')
+    expect(screen.getByLabelText(/Location label/)).toHaveValue('Main Campus')
+    expect(screen.getByLabelText(/Office label/)).toHaveValue('Desk 214')
+    await user.click(screen.getByRole('button', { name: 'Save person' }))
+
+    expect(create).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({
+      site_id: '00000000-0000-4000-8000-000000000040',
+      structured_location_id: '00000000-0000-4000-8000-000000000041',
+      location: 'Main Campus',
+      office: 'Desk 214',
+    }))
+  })
+
   it('keeps the form open when the server denies a change', async () => {
     const user = userEvent.setup()
     const create = vi.fn().mockRejectedValue(new Error('Your account is not authorized to manage people in this workspace.'))
-    render(<People workspace={null} client={peopleClient({ list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }), create })} />)
+    render(<People workspace={null} client={peopleClient({ list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }), create })} sitesClient={sitesClient} />)
     await screen.findByText('No people have been added to this workspace.')
 
     await user.click(screen.getByRole('button', { name: 'New person' }))

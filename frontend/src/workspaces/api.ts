@@ -5,6 +5,7 @@ export type WorkspaceCapability =
   | 'overview'
   | 'organizations'
   | 'people'
+  | 'sites'
   | 'documentation'
   | 'files'
   | 'assets'

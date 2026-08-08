@@ -1,8 +1,11 @@
+from typing import cast
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import Organization, OrganizationKind, PersonAssociationKind
+from .models import LocationKind, Organization, OrganizationKind, PersonAssociationKind, Site
 
 
 def _clean_name(value: str) -> str:
@@ -86,6 +89,96 @@ class WorkspaceSearchResultSerializer(serializers.Serializer):
     has_more = serializers.BooleanField()
 
 
+class LocationWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    kind = serializers.ChoiceField(choices=LocationKind.choices)
+    code = serializers.CharField(max_length=64, required=False, allow_blank=True, trim_whitespace=True)
+    parent_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        for field in ("code",):
+            value = attrs.get(field)
+            if isinstance(value, str) and any(ord(character) < 32 for character in value):
+                raise serializers.ValidationError({field: "Control characters are not allowed."})
+        return attrs
+
+
+class LocationSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    site_id = serializers.UUIDField(source="site.entity_id")
+    parent_id = serializers.UUIDField(source="parent.entity_id", allow_null=True)
+    name = serializers.CharField(source="entity.display_name")
+    kind = serializers.ChoiceField(choices=LocationKind.choices)
+    code = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+
+class SiteWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    code = serializers.CharField(max_length=64, required=False, allow_blank=True, trim_whitespace=True)
+    address_line_1 = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True)
+    address_line_2 = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True)
+    city = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True)
+    region = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True)
+    postal_code = serializers.CharField(max_length=32, required=False, allow_blank=True, trim_whitespace=True)
+    country_code = serializers.RegexField(
+        r"^[A-Za-z]{2}$",
+        max_length=2,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+    timezone = serializers.CharField(max_length=64, required=False, allow_blank=True, trim_whitespace=True)
+    phone = serializers.CharField(max_length=64, required=False, allow_blank=True, trim_whitespace=True)
+
+    def validate(self, attrs: dict[str, str]) -> dict[str, str]:
+        for field, value in attrs.items():
+            if isinstance(value, str) and any(ord(character) < 32 for character in value):
+                raise serializers.ValidationError({field: "Control characters are not allowed."})
+        if "country_code" in attrs:
+            attrs["country_code"] = attrs["country_code"].upper()
+        timezone = attrs.get("timezone", "")
+        if timezone:
+            try:
+                ZoneInfo(timezone)
+            except ZoneInfoNotFoundError as exc:
+                raise serializers.ValidationError({"timezone": "Use a valid IANA timezone name."}) from exc
+        return attrs
+
+
+class SiteSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)
+    name = serializers.CharField(source="entity.display_name")
+    code = serializers.CharField()
+    address_line_1 = serializers.CharField()
+    address_line_2 = serializers.CharField()
+    city = serializers.CharField()
+    region = serializers.CharField()
+    postal_code = serializers.CharField()
+    country_code = serializers.CharField()
+    timezone = serializers.CharField()
+    phone = serializers.CharField()
+    locations = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    @extend_schema_field(LocationSerializer(many=True))
+    def get_locations(self, site: Site) -> list[dict[str, object]]:
+        records = getattr(site, "active_locations", ())
+        return cast(list[dict[str, object]], LocationSerializer(records, many=True).data)
+
+
+class SiteQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+
+
+class SiteResultSerializer(serializers.Serializer):
+    results = SiteSerializer(many=True)
+    count = serializers.IntegerField()
+
+
 PERSON_SORT_FIELDS = (
     "full_name",
     "preferred_name",
@@ -108,6 +201,8 @@ class PersonWriteSerializer(serializers.Serializer):
     responsibility = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True)
     location = serializers.CharField(max_length=160, required=False, allow_blank=True, trim_whitespace=True)
     office = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True)
+    site_id = serializers.UUIDField(required=False, allow_null=True)
+    structured_location_id = serializers.UUIDField(required=False, allow_null=True)
     phone = serializers.CharField(max_length=64, required=False, allow_blank=True, trim_whitespace=True)
     email = serializers.EmailField(max_length=254, required=False, allow_blank=True)
 
@@ -129,6 +224,8 @@ class PersonSerializer(serializers.Serializer):
     responsibility = serializers.CharField()
     location = serializers.CharField()
     office = serializers.CharField()
+    site_id = serializers.UUIDField(source="site.entity_id", allow_null=True)
+    structured_location_id = serializers.UUIDField(source="structured_location.entity_id", allow_null=True)
     phone = serializers.CharField(source="person.phone")
     email = serializers.EmailField(source="person.email")
     created_at = serializers.DateTimeField()

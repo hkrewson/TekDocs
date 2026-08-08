@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.5
+  version: 0.1.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -583,6 +583,213 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/sites:
+    get:
+      operationId: sites_msp_list
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - sites
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteResult'
+          description: ''
+    post:
+      operationId: sites_msp_create
+      tags:
+      - sites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+  /api/v1/sites/{site_entity_id}:
+    get:
+      operationId: sites_msp_retrieve
+      parameters:
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+        '404':
+          description: No response body
+    patch:
+      operationId: sites_msp_update
+      parameters:
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+    delete:
+      operationId: sites_msp_archive
+      parameters:
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/sites/{site_entity_id}/locations:
+    post:
+      operationId: locations_msp_create
+      parameters:
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+  /api/v1/sites/{site_entity_id}/locations/{location_entity_id}:
+    patch:
+      operationId: locations_msp_update
+      parameters:
+      - in: path
+        name: location_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+    delete:
+      operationId: locations_msp_archive
+      parameters:
+      - in: path
+        name: location_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - sites
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/workspaces/msp:
     get:
       operationId: workspaces_msp_retrieve
@@ -857,6 +1064,262 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/sites:
+    get:
+      operationId: sites_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteResult'
+          description: ''
+    post:
+      operationId: sites_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SiteWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/sites/{site_entity_id}:
+    get:
+      operationId: sites_organization_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+        '404':
+          description: No response body
+    patch:
+      operationId: sites_organization_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSiteWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Site'
+          description: ''
+    delete:
+      operationId: sites_organization_archive
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/sites/{site_entity_id}/locations:
+    post:
+      operationId: locations_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LocationWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/sites/{site_entity_id}/locations/{location_entity_id}:
+    patch:
+      operationId: locations_organization_update
+      parameters:
+      - in: path
+        name: location_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLocationWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+    delete:
+      operationId: locations_organization_archive
+      parameters:
+      - in: path
+        name: location_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: site_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
     AuthenticatedContext:
@@ -993,6 +1456,77 @@ components:
           maxLength: 254
       required:
       - email
+    Location:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        site_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/LocationKindEnum'
+        code:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - code
+      - created_at
+      - id
+      - kind
+      - name
+      - parent_id
+      - site_id
+      - updated_at
+    LocationKindEnum:
+      enum:
+      - building
+      - floor
+      - suite
+      - room
+      - office
+      - desk
+      - area
+      type: string
+      description: |-
+        * `building` - Building
+        * `floor` - Floor
+        * `suite` - Suite
+        * `room` - Room
+        * `office` - Office
+        * `desk` - Desk
+        * `area` - Area
+    LocationWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        kind:
+          $ref: '#/components/schemas/LocationKindEnum'
+        code:
+          type: string
+          maxLength: 64
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - kind
+      - name
     OidcProvider:
       type: object
       properties:
@@ -1111,6 +1645,22 @@ components:
       required:
       - owner
       - tenant
+    PatchedLocationWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        kind:
+          $ref: '#/components/schemas/LocationKindEnum'
+        code:
+          type: string
+          maxLength: 64
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
     PatchedOrganizationWrite:
       type: object
       properties:
@@ -1155,6 +1705,14 @@ components:
         office:
           type: string
           maxLength: 120
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        structured_location_id:
+          type: string
+          format: uuid
+          nullable: true
         phone:
           type: string
           maxLength: 64
@@ -1169,6 +1727,41 @@ components:
           type: string
           maxLength: 160
           minLength: 1
+    PatchedSiteWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        code:
+          type: string
+          maxLength: 64
+        address_line_1:
+          type: string
+          maxLength: 240
+        address_line_2:
+          type: string
+          maxLength: 240
+        city:
+          type: string
+          maxLength: 120
+        region:
+          type: string
+          maxLength: 120
+        postal_code:
+          type: string
+          maxLength: 32
+        country_code:
+          type: string
+          maxLength: 2
+          pattern: ^[A-Za-z]{2}$
+        timezone:
+          type: string
+          maxLength: 64
+        phone:
+          type: string
+          maxLength: 64
     PeopleResult:
       type: object
       properties:
@@ -1217,6 +1810,14 @@ components:
           type: string
         office:
           type: string
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        structured_location_id:
+          type: string
+          format: uuid
+          nullable: true
         phone:
           type: string
         email:
@@ -1242,6 +1843,8 @@ components:
       - preferred_name
       - responsibility
       - role
+      - site_id
+      - structured_location_id
       - updated_at
     PersonAssociationKindEnum:
       enum:
@@ -1275,6 +1878,14 @@ components:
         office:
           type: string
           maxLength: 120
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        structured_location_id:
+          type: string
+          format: uuid
+          nullable: true
         phone:
           type: string
           maxLength: 64
@@ -1285,6 +1896,112 @@ components:
       required:
       - full_name
       - kind
+    Site:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        code:
+          type: string
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        postal_code:
+          type: string
+        country_code:
+          type: string
+        timezone:
+          type: string
+        phone:
+          type: string
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - address_line_1
+      - address_line_2
+      - city
+      - code
+      - country_code
+      - created_at
+      - id
+      - locations
+      - name
+      - organization_id
+      - phone
+      - postal_code
+      - region
+      - timezone
+      - updated_at
+    SiteResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Site'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    SiteWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        code:
+          type: string
+          maxLength: 64
+        address_line_1:
+          type: string
+          maxLength: 240
+        address_line_2:
+          type: string
+          maxLength: 240
+        city:
+          type: string
+          maxLength: 120
+        region:
+          type: string
+          maxLength: 120
+        postal_code:
+          type: string
+          maxLength: 32
+        country_code:
+          type: string
+          maxLength: 2
+          pattern: ^[A-Za-z]{2}$
+        timezone:
+          type: string
+          maxLength: 64
+        phone:
+          type: string
+          maxLength: 64
+      required:
+      - name
     StateEnum:
       enum:
       - pending

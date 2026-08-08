@@ -181,7 +181,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.3` | Complete | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, safe creation defaults, and closure of `TD-RISK-003`, `005`, `011`, and `016`; document the `TD-RISK-004` and `007` deployment plans. |
 | `0.1.4` | Complete | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
 | `0.1.5` | Complete | People plus employment/contact associations in MSP and organization workspaces. |
-| `0.1.6` | Planned | Sites and locations with organization ownership and workspace-aware navigation. |
+| `0.1.6` | Complete | Sites and hierarchical locations with MSP/organization ownership, structured People placement, workspace-aware navigation, and PostgreSQL integrity guards. |
 | `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
 | `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
 | `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
@@ -230,7 +230,20 @@ Organization classifications are additive capabilities. A business classified as
 
 Evidence: `docs/releases/0.1.5.md`.
 
+### `0.1.6` acceptance criteria
+
+- [x] Sites and locations have stable Entity identities and belong to exactly one MSP or organization workspace; nested locations remain within one site and workspace.
+- [x] Owner-plus-MFA CRUD supports site address/contact metadata and hierarchical building, floor, suite, room, office, desk, and area locations with value-free audit events and safe archival.
+- [x] MSP and organization Sites routes resolve ownership exclusively from their URL-derived workspace, clear stale-workspace data, and reject cross-tenant or cross-organization reads and mutations without revealing record existence.
+- [x] People associations may optionally reference an active structured site and location from the same workspace. Existing free-text location/office labels remain available and are retained as display snapshots when structured references are assigned or later archived.
+- [x] PostgreSQL guards reject mismatched tenant, organization, entity, site, location-parent, and Person-association placement relationships even if application scoping is bypassed.
+- [x] Responsive, keyboard, loading, empty, error, hierarchy, cycle, denial, accessibility, migration, OpenAPI, Docker/PostgreSQL, browser, clean-install, upgrade, and security evidence agree at `0.1.6`.
+
+ADR 0009 defines the site/location hierarchy and retained-label contract.
+
 ADR 0007 defines the workspace-context boundary.
+
+Evidence: `docs/releases/0.1.6.md`.
 
 ### `0.1.3` acceptance criteria
 

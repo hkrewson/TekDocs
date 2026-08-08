@@ -49,7 +49,7 @@ docker run --rm \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
 live_compose exec -T backend python manage.py shell -c '
-from apps.core.models import Organization, PersonAssociation
+from apps.core.models import Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
@@ -61,6 +61,15 @@ association = PersonAssociation.objects.select_related("person__entity", "organi
 assert association.organization == organization
 assert association.person.tenant == organization.tenant
 assert association.role == "Office Manager"
+site = Site.objects.select_related("entity", "organization").get(entity__display_name="Live Main Campus")
+location = Location.objects.select_related("entity", "site", "parent__entity").get(entity__display_name="Office 214")
+assert site.organization == organization
+assert location.site == site
+assert location.parent.entity.display_name == "Building A"
+assert association.site == site
+assert association.structured_location == location
+assert association.location == "Live Main Campus"
+assert association.office == "Office 214"
 print("Live workspace database fixture verified")
 '
 echo "Real browser-to-Django-to-PostgreSQL workspace journey passed"

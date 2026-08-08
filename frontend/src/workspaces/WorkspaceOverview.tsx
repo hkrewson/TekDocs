@@ -15,6 +15,7 @@ const capabilityLabels = {
   files: 'Files',
   organizations: 'Organizations',
   people: 'People',
+  sites: 'Sites',
   assets: 'Assets',
   licenses: 'Licenses',
   networks: 'Networks',

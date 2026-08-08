@@ -208,6 +208,7 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "OrganizationKindEnum": "apps.core.models.OrganizationKind",
         "PersonAssociationKindEnum": "apps.core.models.PersonAssociationKind",
+        "LocationKindEnum": "apps.core.models.LocationKind",
     },
 }
 

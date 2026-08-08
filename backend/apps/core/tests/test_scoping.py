@@ -9,10 +9,12 @@ from apps.core.models import (
     AuditEvent,
     Entity,
     EntityLink,
+    Location,
     Organization,
     OrganizationClassification,
     Person,
     PersonAssociation,
+    Site,
     Tenant,
 )
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
@@ -31,11 +33,13 @@ def _organization(tenant: Tenant, name: str) -> Organization:
         AuditEvent,
         Entity,
         EntityLink,
+        Location,
         Invitation,
         Organization,
         OrganizationClassification,
         Person,
         PersonAssociation,
+        Site,
         TenantMembership,
     ],
 )

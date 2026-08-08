@@ -11,6 +11,8 @@ const input: PersonInput = {
   responsibility: 'Network operations',
   location: 'North Office',
   office: 'Desk 214',
+  site_id: null,
+  structured_location_id: null,
   phone: '+1 555 010 0240',
   email: 'jordan@example.com',
 }

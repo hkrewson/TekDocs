@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -13,7 +14,24 @@ from .models import PersonAssociation
 from .people import archive_person_association, create_person, people_for_scope, query_people, update_person
 from .scoping import DataScope
 from .serializers import PeopleQuerySerializer, PeopleResultSerializer, PersonSerializer, PersonWriteSerializer
+from .sites import locations_for_scope, sites_for_scope
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
+
+
+def _placement(workspace: ResolvedWorkspace, site_entity_id, location_entity_id):  # type: ignore[no-untyped-def]
+    if site_entity_id is None:
+        if location_entity_id is not None:
+            raise serializers.ValidationError({"structured_location_id": "A location requires a selected site."})
+        return None, None
+    site = get_object_or_404(sites_for_scope(workspace.data_scope), entity_id=site_entity_id)
+    if location_entity_id is None:
+        return site, None
+    location = get_object_or_404(
+        locations_for_scope(workspace.data_scope),
+        site=site,
+        entity_id=location_entity_id,
+    )
+    return site, location
 
 
 def _query_parameters() -> list[OpenApiParameter]:
@@ -65,11 +83,30 @@ def _list(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no
 def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
     serializer = PersonWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
+    values = {
+        "preferred_name": "",
+        "role": "",
+        "responsibility": "",
+        "location": "",
+        "office": "",
+        "phone": "",
+        "email": "",
+        "site_id": None,
+        "structured_location_id": None,
+        **serializer.validated_data,
+    }
+    site, structured_location = _placement(
+        workspace,
+        values.pop("site_id"),
+        values.pop("structured_location_id"),
+    )
     association = create_person(
         tenant=workspace.member.tenant,
         organization=workspace.organization,
         actor_id=request.user.pk,
-        **serializer.validated_data,
+        site=site,
+        structured_location=structured_location,
+        **values,
     )
     association = people_for_scope(workspace.data_scope).get(pk=association.pk)
     return Response(PersonSerializer(association).data, status=201)
@@ -87,6 +124,8 @@ def _update(workspace: ResolvedWorkspace, person_entity_id: UUID, request) -> Re
     association = _get_association(workspace, person_entity_id)
     serializer = PersonWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
+    current_site = association.site if association.site_id else None
+    current_location = association.structured_location if association.structured_location_id else None
     values = {
         "full_name": association.person.entity.display_name,
         "preferred_name": association.person.preferred_name,
@@ -95,11 +134,24 @@ def _update(workspace: ResolvedWorkspace, person_entity_id: UUID, request) -> Re
         "responsibility": association.responsibility,
         "location": association.location,
         "office": association.office,
+        "site_id": current_site.entity_id if current_site is not None else None,
+        "structured_location_id": current_location.entity_id if current_location is not None else None,
         "phone": association.person.phone,
         "email": association.person.email,
         **serializer.validated_data,
     }
-    update_person(association=association, actor_id=request.user.pk, **values)
+    site, structured_location = _placement(
+        workspace,
+        values.pop("site_id"),
+        values.pop("structured_location_id"),
+    )
+    update_person(
+        association=association,
+        actor_id=request.user.pk,
+        site=site,
+        structured_location=structured_location,
+        **values,
+    )
     return Response(PersonSerializer(_get_association(workspace, person_entity_id)).data)
 
 

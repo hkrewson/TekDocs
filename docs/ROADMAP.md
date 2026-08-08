@@ -10,9 +10,9 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | --- | --- |
 | `0.0.1` | Greenfield repository and delivery foundation. |
 | `0.1.0` | Secure identity, authentication, owner administration, and tenant shell. |
-| `0.2.0` | Addressable entities, MSP/client organization model, scoped RBAC, and isolation. |
+| `0.2.0` | Addressable entities, selectable MSP/organization workspaces, scoped RBAC, and isolation. |
 | `0.3.0` | Reusable Markdown documentation and immutable STATIC publication. |
-| `0.4.0` | Encrypted credentials and hardware/software inventory. |
+| `0.4.0` | Encrypted credentials, supplier catalogs, and client hardware/software inventory. |
 | `0.5.0` | Network inventory and relationship-derived views. |
 | `0.6.0` | Controlled client portal, publication workflow, and notifications. |
 | `0.7.0` | Stable integration API, provider runtime, webhooks, and reconciliation. |
@@ -176,13 +176,16 @@ Evidence: `docs/releases/0.1.0.md`.
 | --- | --- | --- |
 | `0.1.1` | Complete | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
 | `0.1.2` | Complete | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
-| `0.1.3` | Planned | People, employment/contact associations, sites, and locations. |
-| `0.1.4` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
-| `0.1.5` | Planned | Typed entity links, backlinks, and permission-filtered search foundation. |
-| `0.1.6` | Planned | Central policy service, permission catalog, built-in roles, and no inline role-name decisions. |
-| `0.1.7` | Planned | Custom roles and tenant/client/collection-scoped assignments with MSP-private hard constraints. |
-| `0.1.8` | Planned | Recycle bin/recovery, field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
-| `0.1.9` | Planned | Reference-dataset performance, migration rehearsal, API/UI accessibility, and isolation remediation. |
+| `0.1.3` | Planned | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, and safe creation defaults. |
+| `0.1.4` | Planned | Searchable workspace switcher, organization drill-in, MSP return, classification-aware navigation, independent-tab history, and stale-data isolation. |
+| `0.1.5` | Planned | People plus employment/contact associations in MSP and organization workspaces. |
+| `0.1.6` | Planned | Sites and locations with organization ownership and workspace-aware navigation. |
+| `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
+| `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
+| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, and no inline role-name decisions. |
+| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped assignments with MSP-private hard constraints. |
+| `0.1.11` | Planned | Recycle bin/recovery, field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
+| `0.1.12` | Planned | Reference-dataset performance, migration rehearsal, API/UI accessibility, workspace switching, and isolation remediation. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
 
 ### `0.1.1` acceptance criteria
@@ -207,12 +210,38 @@ Evidence: `docs/releases/0.1.1.md`.
 
 Evidence: `docs/releases/0.1.2.md`.
 
+### Workspace conformance rule
+
+Beginning with `0.1.3`, every domain family must declare whether each record is MSP-owned, organization-owned, or an explicitly permission-aware reference. List, detail, create, update, archive, search, export, notification, and worker paths must resolve the same URL-derived workspace context and include cross-workspace negative tests. Selecting a workspace changes presentation and scope; it never grants access.
+
+Organization classifications are additive capabilities. A business classified as both vendor and manufacturer has one identity and one workspace with the authorized union of supplier features. Client workspaces eventually expose client-owned people, documentation, assets, networks, vendors derived from asset relationships, and other scoped data. Supplier workspaces eventually expose contacts, product/model templates, and supplier-owned documentation that retains provenance when instantiated for a client.
+
+ADR 0007 defines the workspace-context boundary.
+
+### `0.1.3` acceptance criteria
+
+- [ ] Clicking an active organization title opens a stable organization workspace overview route; refreshing or sharing that route restores the same authorized context.
+- [ ] One server-owned resolver returns either the MSP workspace or an authorized organization workspace with stable identity, display name, classifications, and available domain capabilities without accepting tenant ownership from the browser.
+- [ ] Workspace-aware APIs derive organization ownership for creates and require the same tenant-plus-organization scope for reads and mutations; a selected identifier never grants permission.
+- [ ] MSP-owned organization anchors remain discoverable from the MSP workspace while organization-owned child records cannot leak into MSP-only or sibling-organization queries except through an explicit reference contract.
+- [ ] Missing, archived, cross-tenant, unauthorized, malformed, and mismatched workspace identifiers fail without disclosing organization data and receive API/negative-isolation coverage.
+- [ ] This slice supplies the route, overview, and context contract; the searchable shell switcher remains `0.1.4` scope.
+
+### `0.1.4` acceptance criteria
+
+- [ ] The shell workspace control opens a keyboard-accessible searchable list of authorized client, vendor, manufacturer, and partner organizations plus a persistent MSP-workspace entry.
+- [ ] Selecting an organization from its record or switcher updates the workspace name, all applicable classification labels, navigation capabilities, page title/breadcrumb context, and URL; multi-classified organizations receive the authorized union of capabilities.
+- [ ] Navigation preserves the active workspace when moving among available areas, while returning to the MSP workspace preserves the equivalent top-level route when one exists.
+- [ ] Switching clears prior-workspace content before loading, ignores late responses from the old context, and never stores organization selection as authorization-bearing session state.
+- [ ] Browser history, bookmarks, refreshes, mobile navigation, and separate tabs remain independent and deterministic.
+- [ ] Component and browser tests cover search, empty/no-access states, keyboard behavior, direct organization drill-in, MSP return, stale-response isolation, cross-workspace denial, and accessibility.
+
 ## Reusable documentation: `0.2.x` → `0.3.0`
 
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, and editor round-trip fixture gate. |
-| `0.2.2` | Title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. Live titles open the authorized editor while STATIC publication titles open immutable output. |
+| `0.2.2` | Workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. Live titles open the authorized editor while STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
@@ -228,13 +257,14 @@ Evidence: `docs/releases/0.1.2.md`.
 | --- | --- |
 | `0.3.1` | `SecretProvider` contract, PostgreSQL envelope-encrypted versions, associated data, and master-key validation. |
 | `0.3.2` | Explicit reveal boundary, recent MFA, value-free audit, redaction, rewrap rotation, and backup failure tests. |
-| `0.3.3` | Manufacturers/vendors, hardware models, and versioned specification definitions. |
-| `0.3.4` | Hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
-| `0.3.5` | Software products, installations, licenses, seats, renewals, and relationships. |
-| `0.3.6` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
-| `0.3.7` | Attachments, asset relationships, bulk operations, and safe file-processing corpus. |
-| `0.3.8` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
-| `0.3.9` | Inventory/vault stabilization, reference-data performance, restore, upgrade, and accessibility evidence. |
+| `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
+| `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
+| `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
+| `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
+| `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
+| `0.3.8` | Attachments, asset relationships, bulk operations, and safe file-processing corpus. |
+| `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
+| `0.3.10` | Inventory/vault stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify encrypted credentials and hardware/software inventory. |
 
 ## Network inventory: `0.4.x` → `0.5.0`

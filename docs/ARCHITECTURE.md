@@ -14,6 +14,10 @@ Tenant-owned domain reads use explicit scoped managers. Omitting the tenant from
 
 Organization CRUD is initially restricted to the installation owner with MFA through the central authentication policy boundary. This is a conservative temporary policy, not an inline role decision; the permission catalog and scoped role assignments replace it in the dedicated RBAC slices.
 
+Workspace context is an explicit URL and query boundary, not ambient authorization stored in a browser or server session. The MSP workspace selects tenant-owned records whose organization scope is null. An organization workspace selects that organization's owned records through both tenant and organization identifiers after policy authorization. Organization anchor records remain MSP-owned so they can be discovered and selected without making their child data visible. Opening separate browser tabs in different workspaces cannot alter either tab's scope.
+
+The shell derives its workspace label and available sections from organization classifications. A multi-classified organization receives the union of applicable navigation capabilities and displays every applicable classification; vendor, manufacturer, and partner are retained as classifications rather than separate table hierarchies. Hidden navigation is only presentation—every endpoint, worker, search result, backlink, export, and creation path independently enforces the selected scope.
+
 PostgreSQL scope helpers consume transaction-local tenant, organization, and organization-mode settings. Same-tenant organization anchors, entity ownership, and entity-link endpoints are protected by database triggers. RLS policies are not yet enabled for the runtime role: ADR 0006 defines the staged activation work required before that defense can be claimed.
 
 Documents compose stable blocks. Block content changes only by adding immutable revisions. Placements select the latest revision or pin an exact revision. A STATIC publication resolves all dependencies and stores a signed manifest plus immutable render artifacts.

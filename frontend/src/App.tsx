@@ -212,9 +212,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.9 adds two-factor authentication and recovery controls." />
+      <PageHeader title="Overview" description="TekDocs 0.0.10 adds profile administration and an optional OpenID Connect boundary." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.9</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.10</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -253,6 +253,7 @@ export function ApplicationShell({ initialPath, authContext, authClient, onSignO
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [currentPath, setCurrentPath] = useState(() => initialPath ?? window.location.pathname)
+  const [shellContext, setShellContext] = useState(authContext)
 
   useEffect(() => {
     if (initialPath) return
@@ -275,17 +276,17 @@ export function ApplicationShell({ initialPath, authContext, authClient, onSignO
     : routedPath === '/documentation'
       ? <Documentation />
       : routedPath === '/settings'
-        ? <SecuritySettings client={authClient} />
+        ? <SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />
         : <PlannedPage path={routedPath} />
 
   return (
     <div className="app-shell">
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} workspaceName={authContext.tenant.name} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} workspaceName={shellContext.tenant.name} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
-          <ProfileMenu currentPath={routedPath} navigate={navigate} user={authContext.user} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu currentPath={routedPath} navigate={navigate} user={shellContext.user} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main className="main-content" key={routedPath}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}

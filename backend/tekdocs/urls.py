@@ -9,17 +9,22 @@ from apps.accounts.views import (
     InvitationListCreateView,
     InvitationResendView,
     InvitationRevokeView,
+    OidcProviderListView,
     OwnerBootstrapView,
+    ProfileView,
 )
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("_allauth/oidc/", include("allauth.socialaccount.providers.openid_connect.urls")),
     path("_allauth/", include("allauth.headless.urls")),
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/bootstrap/status", BootstrapStatusView.as_view(), name="bootstrap-status"),
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
+    path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
+    path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path(

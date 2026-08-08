@@ -33,8 +33,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.7` | Complete | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
 | `0.0.8` | Complete | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.9` | Complete | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
-| `0.0.10` | Next | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
-| `0.0.11` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
+| `0.0.10` | Complete | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
+| `0.0.11` | Next | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
 | `0.1.0` | Planned stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
 
 ### `0.0.1` acceptance evidence
@@ -136,6 +136,17 @@ Evidence: `docs/releases/0.0.8.md`.
 - [x] Unit, migration, Docker/PostgreSQL, Chromium, accessibility, CSRF, denial, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.9`.
 
 Evidence: `docs/releases/0.0.9.md`.
+
+### `0.0.10` acceptance criteria
+
+- [x] An authenticated installation member can edit their own display name from Settings; email remains read-only, invalid input is rejected, the shell updates immediately, and the change creates a value-free audit event.
+- [x] Settings presents profile, two-factor, recovery-code, and active-session administration as one responsive security surface without weakening existing reauthentication or authorization boundaries.
+- [x] OIDC is disabled by default and enabled only by one complete environment-supplied provider configuration; public provider discovery exposes only its stable identifier and display name, never client credentials or discovery internals.
+- [x] OIDC login uses maintained allauth OpenID Connect redirect and state handling with issuer, audience, and signature validation; it admits only an existing invited account with a provider-verified matching email and leaves public account creation closed.
+- [x] Production startup rejects partial or malformed OIDC configuration, insecure public/CSRF origins, disabled secure redirect/cookies, or inadequate HSTS while retaining the explicit localhost-only insecure public URL override used by the development Compose stack.
+- [x] OpenAPI, unit, Docker/PostgreSQL, Chromium, accessibility, CSRF, denial, configuration-redaction, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.10`.
+
+Evidence: `docs/releases/0.0.10.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.9`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.10`.
 
 ## Start locally
 
@@ -17,7 +17,7 @@ Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is b
 
 Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
 
-Authenticated users can open **Profile → Settings** to review active browser sessions and revoke any session other than the one currently in use.
+Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use. Optional OpenID Connect configuration is documented in `docs/AUTHENTICATION.md`.
 
 ### First-owner bootstrap
 

@@ -3,6 +3,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import login
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.authentication import SessionAuthentication
@@ -13,6 +14,7 @@ from rest_framework.views import APIView
 
 from apps.core.models import InstallationState
 
+from .audit import record_auth_event
 from .bootstrap import bootstrap_owner
 from .invitations import InvitationConflict, accept_invitation, issue_invitation, resend_invitation, revoke_invitation
 from .models import Invitation
@@ -23,8 +25,10 @@ from .serializers import (
     InvitationAcceptanceSerializer,
     InvitationRequestSerializer,
     InvitationSerializer,
+    OidcProviderListSerializer,
     OwnerBootstrapResultSerializer,
     OwnerBootstrapSerializer,
+    ProfileUpdateSerializer,
 )
 
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
@@ -103,6 +107,46 @@ class AuthenticatedContextView(APIView):
                 "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
             }
         )
+
+
+class ProfileView(APIView):
+    @extend_schema(
+        request=ProfileUpdateSerializer,
+        responses={
+            200: AuthenticatedContextSerializer,
+            400: OpenApiResponse(description="Invalid profile details"),
+            403: OpenApiResponse(description="Authentication or installation membership required"),
+        },
+    )
+    @transaction.atomic
+    def patch(self, request):  # type: ignore[no-untyped-def]
+        context = require_installation_member(request.user)
+        serializer = ProfileUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request.user.display_name = serializer.validated_data["display_name"]
+        request.user.save(update_fields=("display_name",))
+        record_auth_event(action="auth.profile_updated", request=request, user=request.user)
+        return Response(
+            {
+                "user": {
+                    "id": str(request.user.pk),
+                    "email": request.user.email,
+                    "display_name": request.user.display_name,
+                },
+                "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
+            }
+        )
+
+
+class OidcProviderListView(APIView):
+    authentication_classes: list[Any] = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(responses={200: OidcProviderListSerializer})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        provider = settings.TEKDOCS_OIDC_PROVIDER
+        providers = [] if provider is None else [{"id": provider["id"], "name": provider["name"]}]
+        return Response({"providers": providers})
 
 
 class InvitationAcceptView(APIView):

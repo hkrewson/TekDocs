@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { KeyRound, Laptop, RefreshCw, ShieldCheck } from 'lucide-react'
 import { AuthRequestError } from './api'
-import type { AuthClient, AuthSession, MfaStatus, TotpSetup } from './api'
+import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
 
 function sessionName(userAgent: string): string {
   const browser = userAgent.includes('Edg/') ? 'Edge' : userAgent.includes('Chrome/') ? 'Chrome' : userAgent.includes('Firefox/') ? 'Firefox' : userAgent.includes('Safari/') ? 'Safari' : 'Browser'
@@ -20,7 +20,14 @@ function errorMessage(error: unknown, fallback: string): string {
 
 type SensitiveAction = 'enroll' | 'replace-codes' | 'disable'
 
-export function SecuritySettings({ client }: { client: AuthClient }) {
+export function SecuritySettings({ client, context, onProfileUpdated }: {
+  client: AuthClient
+  context: AuthenticatedContext
+  onProfileUpdated: (context: AuthenticatedContext) => void
+}) {
+  const [displayName, setDisplayName] = useState(context.user.display_name)
+  const [profileMessage, setProfileMessage] = useState<string | null>(null)
+  const [savingProfile, setSavingProfile] = useState(false)
   const [sessions, setSessions] = useState<AuthSession[] | null>(null)
   const [mfa, setMfa] = useState<MfaStatus | null>(null)
   const [setup, setSetup] = useState<TotpSetup | null>(null)
@@ -130,12 +137,42 @@ export function SecuritySettings({ client }: { client: AuthClient }) {
     }
   }
 
+  const saveProfile = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    setProfileMessage(null)
+    setSavingProfile(true)
+    try {
+      const updated = await client.updateProfile(displayName)
+      setDisplayName(updated.user.display_name)
+      onProfileUpdated(updated)
+      setProfileMessage('Profile updated.')
+    } catch (profileError) {
+      setError(errorMessage(profileError, 'Your profile could not be updated.'))
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
   return (
     <>
       <header className="page-header">
         <div><h1>Settings</h1><p>Manage account security and browsers signed in to TekDocs.</p></div>
       </header>
       {error && <div className="form-error settings-error" role="alert">{error}</div>}
+      <section className="content-section profile-section" aria-labelledby="profile-heading">
+        <div className="section-heading settings-heading">
+          <div><h2 id="profile-heading">Profile</h2><p>Choose how your name appears in TekDocs. Your sign-in email is managed separately.</p></div>
+        </div>
+        <form className="profile-settings-form" onSubmit={(event) => { void saveProfile(event) }}>
+          <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" maxLength={160} required /></label>
+          <label>Email address<input value={context.user.email} readOnly aria-readonly="true" /></label>
+          <div className="settings-actions">
+            <button className="primary-button" type="submit" disabled={savingProfile || displayName.trim() === context.user.display_name}>{savingProfile ? 'Saving…' : 'Save profile'}</button>
+            {profileMessage && <span className="settings-success" role="status">{profileMessage}</span>}
+          </div>
+        </form>
+      </section>
       <section className="content-section security-section" aria-labelledby="two-factor-heading">
         <div className="section-heading settings-heading">
           <div><h2 id="two-factor-heading">Two-factor authentication</h2><p>Protect your account with a time-based authenticator and single-use recovery codes.</p></div>

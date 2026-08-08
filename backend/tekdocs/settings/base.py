@@ -5,6 +5,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from .validation import oidc_provider_from_environment
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -40,6 +42,7 @@ if not 300 <= PASSWORD_RESET_TIMEOUT <= 86400:
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+TEKDOCS_OIDC_PROVIDER = oidc_provider_from_environment(os.environ)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -55,6 +58,8 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.headless",
     "allauth.mfa",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
     "allauth.usersessions",
     "apps.accounts",
     "apps.core",
@@ -141,6 +146,28 @@ ACCOUNT_RATE_LIMITS = {
     "reset_password": "10/h/ip,3/h/key",
     "reset_password_from_key": "10/h/ip",
 }
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_PROVIDERS = {}
+if TEKDOCS_OIDC_PROVIDER:
+    SOCIALACCOUNT_PROVIDERS = {
+        "openid_connect": {
+            "APPS": [
+                {
+                    "provider_id": TEKDOCS_OIDC_PROVIDER["id"],
+                    "name": TEKDOCS_OIDC_PROVIDER["name"],
+                    "client_id": TEKDOCS_OIDC_PROVIDER["client_id"],
+                    "secret": TEKDOCS_OIDC_PROVIDER["client_secret"],
+                    "settings": {
+                        "server_url": TEKDOCS_OIDC_PROVIDER["discovery_url"],
+                        "email_authentication": True,
+                        "email_authentication_auto_connect": True,
+                    },
+                }
+            ]
+        }
+    }
 HEADLESS_ONLY = True
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": "/auth/verify-email/{key}",
@@ -172,7 +199,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.9",
+    "VERSION": "0.0.10",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

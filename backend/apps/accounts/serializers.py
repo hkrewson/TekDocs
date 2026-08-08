@@ -50,6 +50,24 @@ class AuthenticatedContextSerializer(serializers.Serializer):
     tenant = BootstrapTenantResultSerializer()
 
 
+class ProfileUpdateSerializer(serializers.Serializer):
+    display_name = serializers.CharField(min_length=1, max_length=160, trim_whitespace=True)
+
+    def validate_display_name(self, value: str) -> str:
+        if any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Display name cannot contain control characters.")
+        return value
+
+
+class OidcProviderSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField()
+
+
+class OidcProviderListSerializer(serializers.Serializer):
+    providers = OidcProviderSerializer(many=True)
+
+
 class InvitationRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
 

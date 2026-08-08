@@ -3,13 +3,13 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .validation import validate_production_email, validate_production_public_url
+from .validation import validate_production_email, validate_production_public_url, validate_production_security
 
 DEBUG = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "true").lower() in {"1", "true", "yes", "on"}
-SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)  # noqa: F405
+SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 31536000)  # noqa: F405
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -44,4 +44,13 @@ validate_production_email(
 validate_production_public_url(
     public_url=TEKDOCS_PUBLIC_URL,  # noqa: F405
     allow_insecure=TEKDOCS_ALLOW_INSECURE_PUBLIC_URL,  # noqa: F405
+)
+validate_production_security(
+    public_url=TEKDOCS_PUBLIC_URL,  # noqa: F405
+    csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,  # noqa: F405
+    ssl_redirect=SECURE_SSL_REDIRECT,
+    hsts_seconds=SECURE_HSTS_SECONDS,
+    session_cookie_secure=SESSION_COOKIE_SECURE,
+    csrf_cookie_secure=CSRF_COOKIE_SECURE,
+    allow_insecure_public_url=TEKDOCS_ALLOW_INSECURE_PUBLIC_URL,  # noqa: F405
 )

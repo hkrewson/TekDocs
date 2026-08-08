@@ -190,6 +190,29 @@ describe('browser authentication client', () => {
     expect(revokeOptions.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
   })
 
+  it('loads safe OIDC descriptors and updates the profile with CSRF protection', async () => {
+    const csrf = crypto.randomUUID()
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const providers = [{ id: 'company-sso', name: 'Company SSO' }]
+    const updated = { ...context, user: { ...context.user, display_name: 'Operations Lead' } }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ providers }))
+      .mockResolvedValueOnce(jsonResponse(updated))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.listOidcProviders()).resolves.toEqual(providers)
+    await expect(browserAuthClient.updateProfile('Operations Lead')).resolves.toEqual(updated)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/auth/providers', expect.objectContaining({ credentials: 'same-origin' }))
+    const [profilePath, profileOptions] = fetchMock.mock.calls[1] as unknown as [string, RequestInit]
+    expect(profilePath).toBe('/api/v1/auth/profile')
+    expect(profileOptions).toEqual(expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ display_name: 'Operations Lead' }),
+    }))
+    expect(profileOptions.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
+  })
+
   it('keeps authenticator secrets in protected request bodies and reads recovery codes once', async () => {
     const csrf = crypto.randomUUID()
     document.cookie = `csrftoken=${csrf}; path=/`

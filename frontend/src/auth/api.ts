@@ -46,6 +46,11 @@ export type TotpSetup = {
   totpUrl: string
 }
 
+export type OidcProvider = {
+  id: string
+  name: string
+}
+
 export interface AuthClient {
   load(): Promise<{ bootstrapRequired: boolean; context: AuthenticatedContext | null }>
   bootstrapAndLogin(details: BootstrapDetails): Promise<AuthenticatedContext>
@@ -55,6 +60,8 @@ export interface AuthClient {
   requestPasswordReset(email: string): Promise<void>
   validatePasswordReset(key: string): Promise<void>
   completePasswordReset(key: string, password: string): Promise<void>
+  listOidcProviders(): Promise<OidcProvider[]>
+  updateProfile(displayName: string): Promise<AuthenticatedContext>
   listSessions(): Promise<AuthSession[]>
   revokeSession(id: number): Promise<AuthSession[]>
   loadMfa(): Promise<MfaStatus>
@@ -94,7 +101,7 @@ export class AuthRequestError extends Error {
   }
 }
 
-function csrfToken(): string | null {
+export function browserCsrfToken(): string | null {
   const value = document.cookie
     .split('; ')
     .find((part) => part.startsWith('csrftoken='))
@@ -130,9 +137,9 @@ async function context(): Promise<AuthenticatedContext> {
   return responseJson<AuthenticatedContext>(response)
 }
 
-async function mutation(path: string, method: 'POST' | 'DELETE', body?: object): Promise<Response> {
-  if (!csrfToken()) await session()
-  const token = csrfToken()
+async function mutation(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object): Promise<Response> {
+  if (!browserCsrfToken()) await session()
+  const token = browserCsrfToken()
   if (!token) throw new AuthRequestError('The browser security token is unavailable. Refresh and try again.')
   return fetch(path, {
     method,
@@ -310,6 +317,27 @@ export const browserAuthClient: AuthClient = {
         response.status,
       )
     }
+  },
+
+  async listOidcProviders() {
+    const response = await fetch('/api/v1/auth/providers', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new AuthRequestError('Single sign-on providers could not be loaded.', response.status)
+    const payload = await responseJson<{ providers?: OidcProvider[] }>(response)
+    return payload.providers ?? []
+  },
+
+  async updateProfile(displayName) {
+    const response = await mutation('/api/v1/auth/profile', 'PATCH', { display_name: displayName })
+    if (!response.ok) {
+      throw new AuthRequestError(
+        response.status === 400 ? 'Enter a display name between 1 and 160 characters.' : 'Your profile could not be updated.',
+        response.status,
+      )
+    }
+    return responseJson<AuthenticatedContext>(response)
   },
 
   async listSessions() {

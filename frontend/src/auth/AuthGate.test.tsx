@@ -20,6 +20,8 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     requestPasswordReset: vi.fn().mockResolvedValue(undefined),
     validatePasswordReset: vi.fn().mockResolvedValue(undefined),
     completePasswordReset: vi.fn().mockResolvedValue(undefined),
+    listOidcProviders: vi.fn().mockResolvedValue([]),
+    updateProfile: vi.fn().mockResolvedValue(context),
     listSessions: vi.fn().mockResolvedValue([]),
     revokeSession: vi.fn().mockResolvedValue([]),
     loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
@@ -95,6 +97,21 @@ describe('authentication boundary', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('email address or password is incorrect')
     expect(password).toHaveValue('')
     expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+
+  it('offers only the configured public OIDC provider descriptor', async () => {
+    const provider = { id: 'company-sso', name: 'Company SSO' }
+    document.cookie = `csrftoken=${crypto.randomUUID()}; path=/`
+    render(<App authClient={client({
+      load: vi.fn().mockResolvedValue({ bootstrapRequired: false, context: null }),
+      listOidcProviders: vi.fn().mockResolvedValue([provider]),
+    })} />)
+
+    const button = await screen.findByRole('button', { name: 'Continue with Company SSO' })
+    const form = button.closest('form')
+    expect(form).toHaveAttribute('action', '/_allauth/browser/v1/auth/provider/redirect')
+    expect(form?.querySelector('input[name="provider"]')).toHaveAttribute('value', 'company-sso')
+    expect(form?.textContent).not.toContain('secret')
   })
 
   it('completes the pending two-factor challenge without retaining the code', async () => {

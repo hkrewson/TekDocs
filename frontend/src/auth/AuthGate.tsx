@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { LoaderCircle } from 'lucide-react'
-import { AuthRequestError, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
-import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance } from './api'
+import { AuthRequestError, browserCsrfToken, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
+import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance, OidcProvider } from './api'
 
 type AuthState =
   | { phase: 'loading' }
@@ -105,7 +105,8 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
   )
 }
 
-function SignInForm({ submit, forgotPassword }: {
+function SignInForm({ client, submit, forgotPassword }: {
+  client: AuthClient
   submit: (email: string, password: string) => Promise<void>
   forgotPassword: () => void
 }) {
@@ -113,6 +114,15 @@ function SignInForm({ submit, forgotPassword }: {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [providers, setProviders] = useState<OidcProvider[]>([])
+
+  useEffect(() => {
+    let active = true
+    client.listOidcProviders().then((configured) => {
+      if (active) setProviders(configured)
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [client])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -139,6 +149,20 @@ function SignInForm({ submit, forgotPassword }: {
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>
+      {providers.length > 0 && (
+        <div className="sso-options">
+          <span>or</span>
+          {providers.map((provider) => (
+            <form key={provider.id} method="post" action="/_allauth/browser/v1/auth/provider/redirect">
+              <input type="hidden" name="csrfmiddlewaretoken" value={browserCsrfToken() ?? ''} />
+              <input type="hidden" name="provider" value={provider.id} />
+              <input type="hidden" name="process" value="login" />
+              <input type="hidden" name="callback_url" value={`${window.location.origin}/`} />
+              <button className="secondary-button auth-submit" type="submit">Continue with {provider.name}</button>
+            </form>
+          ))}
+        </div>
+      )}
     </AuthFrame>
   )
 }
@@ -430,7 +454,7 @@ export function AuthGate({ client, initialContext, children }: {
 
   if (state.phase === 'loading') return <LoadingState />
   if (state.phase === 'bootstrap') return <BootstrapForm submit={bootstrap} />
-  if (state.phase === 'sign-in') return <SignInForm submit={login} forgotPassword={() => setState({ phase: 'password-reset-request' })} />
+  if (state.phase === 'sign-in') return <SignInForm client={client} submit={login} forgotPassword={() => setState({ phase: 'password-reset-request' })} />
   if (state.phase === 'mfa-challenge') return <MfaChallengeForm submit={async (code) => { setState({ phase: 'authenticated', context: await client.completeMfaLogin(code) }) }} cancel={() => setState({ phase: 'sign-in' })} />
   if (state.phase === 'password-reset-request') return <PasswordResetRequestForm submit={async (email) => { await client.requestPasswordReset(email); setState({ phase: 'password-reset-sent' }) }} />
   if (state.phase === 'password-reset-sent') return <PasswordResetSentState />

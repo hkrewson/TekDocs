@@ -21,6 +21,8 @@ A successful bootstrap creates the tenant, first owner, and owner membership; re
 
 The shell renders only after the allauth session and TekDocs context both succeed. The owner and accounts created from accepted invitations receive tenant membership; unrelated identities remain denied. Invitation administration continues to require installation ownership until scoped roles are implemented. Beginning with `0.0.9`, the owner must also have an active TOTP authenticator before using privileged invitation administration.
 
+An authenticated member can update their display name through `PATCH /api/v1/auth/profile`. The endpoint is session- and CSRF-protected, requires installation membership, leaves the sign-in email unchanged, and records `auth.profile_updated` without old or new profile values. The Settings form applies the returned context immediately so the account menu and form stay consistent.
+
 `0.0.8` enables allauth’s maintained user-session inventory with activity tracking. `GET /_allauth/browser/v1/auth/sessions` returns only the authenticated user’s browsers. The Settings page identifies the current browser and exposes CSRF-protected revocation of another session through `DELETE` on the same endpoint. The server scopes submitted IDs to the requesting user before ending the underlying Django session. A password change continues to invalidate every password-bound session regardless of whether an inventory row exists.
 
 ## Two-factor authentication
@@ -36,6 +38,20 @@ Allauth’s MFA adapter is replaced only at its documented encryption hooks. TOT
 `0.0.6` adds controlled invitation acceptance. The browser reads the token from the URL fragment, removes the fragment immediately, and submits the token with account details only in a CSRF-protected request body. Successful acceptance creates one active user, verified primary allauth email, and tenant membership before consuming the invitation and establishing a normal Django session. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
 
 Login errors shown by TekDocs do not distinguish an unknown address from a wrong password.
+
+## OpenID Connect
+
+OIDC is disabled unless all five deployment values are configured: `TEKDOCS_OIDC_PROVIDER_ID`, `TEKDOCS_OIDC_PROVIDER_NAME`, `TEKDOCS_OIDC_DISCOVERY_URL`, `TEKDOCS_OIDC_CLIENT_ID`, and `TEKDOCS_OIDC_CLIENT_SECRET`. The provider identifier uses lowercase letters, digits, hyphens, or underscores; the discovery URL must use HTTPS. Partial or malformed configuration stops application startup. The client secret belongs in the deployment secret store, not `.env` committed to source.
+
+Register this redirect URI with the provider, substituting the public TekDocs origin and configured provider identifier:
+
+```text
+https://docs.example.com/_allauth/oidc/company-sso/login/callback/
+```
+
+The public `GET /api/v1/auth/providers` response contains only the provider identifier and display name. The browser posts the selected provider to allauth’s headless redirect endpoint with CSRF protection; allauth owns discovery, state, callback, token, issuer, audience, and signature validation. TekDocs requests `openid`, `profile`, and `email` scopes and does not persist provider access or refresh tokens.
+
+OIDC does not create TekDocs accounts. Public signup remains closed, and a provider login is admitted only when the provider asserts a verified email matching an existing account created through owner bootstrap or an accepted invitation. On first successful match, allauth connects that provider identity to the existing account. Operators should require verified email claims at the identity provider and test the callback from the final public URL before announcing SSO.
 
 ## Password recovery
 

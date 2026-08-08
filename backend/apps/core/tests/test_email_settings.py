@@ -4,7 +4,13 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from tekdocs.settings.base import env_int
-from tekdocs.settings.validation import SMTP_BACKEND, validate_production_email, validate_production_public_url
+from tekdocs.settings.validation import (
+    SMTP_BACKEND,
+    oidc_provider_from_environment,
+    validate_production_email,
+    validate_production_public_url,
+    validate_production_security,
+)
 
 VALID_CONFIGURATION = {
     "backend": SMTP_BACKEND,
@@ -78,3 +84,72 @@ def test_valid_public_url_configuration_is_accepted(public_url, allow_insecure):
 def test_invalid_public_url_configuration_is_rejected(public_url):
     with pytest.raises(ImproperlyConfigured, match="public URL"):
         validate_production_public_url(public_url=public_url, allow_insecure=False)
+
+
+OIDC_CONFIGURATION = {
+    "TEKDOCS_OIDC_PROVIDER_ID": "company-sso",
+    "TEKDOCS_OIDC_PROVIDER_NAME": "Company SSO",
+    "TEKDOCS_OIDC_DISCOVERY_URL": "https://identity.example.com/.well-known/openid-configuration",
+    "TEKDOCS_OIDC_CLIENT_ID": "tekdocs-client",
+    "TEKDOCS_OIDC_CLIENT_SECRET": secrets.token_urlsafe(32),
+}
+
+
+def test_oidc_is_optional_and_complete_configuration_is_accepted():
+    assert oidc_provider_from_environment({}) is None
+    provider = oidc_provider_from_environment(OIDC_CONFIGURATION)
+    assert provider == {
+        "id": "company-sso",
+        "name": "Company SSO",
+        "discovery_url": OIDC_CONFIGURATION["TEKDOCS_OIDC_DISCOVERY_URL"],
+        "client_id": "tekdocs-client",
+        "client_secret": OIDC_CONFIGURATION["TEKDOCS_OIDC_CLIENT_SECRET"],
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"TEKDOCS_OIDC_CLIENT_SECRET": ""},
+        {"TEKDOCS_OIDC_PROVIDER_ID": "Company SSO"},
+        {"TEKDOCS_OIDC_PROVIDER_NAME": " Company SSO"},
+        {"TEKDOCS_OIDC_DISCOVERY_URL": "http://identity.example.com/.well-known/openid-configuration"},
+        {"TEKDOCS_OIDC_DISCOVERY_URL": "https://user:secret@identity.example.com/config"},
+        {"TEKDOCS_OIDC_DISCOVERY_URL": "https://identity.example.com/config?secret=unsafe"},
+    ],
+)
+def test_partial_or_malformed_oidc_configuration_is_rejected(changes):
+    with pytest.raises(ImproperlyConfigured, match="OIDC configuration"):
+        oidc_provider_from_environment({**OIDC_CONFIGURATION, **changes})
+
+
+VALID_SECURITY_CONFIGURATION = {
+    "public_url": "https://docs.example.com",
+    "csrf_trusted_origins": ["https://docs.example.com"],
+    "ssl_redirect": True,
+    "hsts_seconds": 31536000,
+    "session_cookie_secure": True,
+    "csrf_cookie_secure": True,
+    "allow_insecure_public_url": False,
+}
+
+
+def test_valid_production_security_configuration_is_accepted():
+    validate_production_security(**VALID_SECURITY_CONFIGURATION)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"ssl_redirect": False},
+        {"hsts_seconds": 300},
+        {"session_cookie_secure": False},
+        {"csrf_cookie_secure": False},
+        {"csrf_trusted_origins": []},
+        {"csrf_trusted_origins": ["http://docs.example.com"]},
+        {"csrf_trusted_origins": ["https://docs.example.com/path"]},
+    ],
+)
+def test_insecure_production_security_configuration_is_rejected(changes):
+    with pytest.raises(ImproperlyConfigured, match="production security"):
+        validate_production_security(**{**VALID_SECURITY_CONFIGURATION, **changes})

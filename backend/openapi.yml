@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.0.9
+  version: 0.0.10
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -36,6 +36,49 @@ paths:
           description: Authentication or installation membership required
         '503':
           description: Installation context unavailable
+  /api/v1/auth/profile:
+    patch:
+      operationId: auth_profile_partial_update
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedContext'
+          description: ''
+        '400':
+          description: Invalid profile details
+        '403':
+          description: Authentication or installation membership required
+  /api/v1/auth/providers:
+    get:
+      operationId: auth_providers_retrieve
+      tags:
+      - auth
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderList'
+          description: ''
   /api/v1/bootstrap/owner:
     post:
       operationId: bootstrap_owner_create
@@ -404,6 +447,25 @@ components:
           maxLength: 254
       required:
       - email
+    OidcProvider:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+      - id
+      - name
+    OidcProviderList:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OidcProvider'
+      required:
+      - providers
     OwnerBootstrap:
       type: object
       properties:
@@ -436,6 +498,13 @@ components:
       required:
       - owner
       - tenant
+    PatchedProfileUpdate:
+      type: object
+      properties:
+        display_name:
+          type: string
+          maxLength: 160
+          minLength: 1
     StateEnum:
       enum:
       - pending

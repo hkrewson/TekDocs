@@ -17,7 +17,7 @@ This document defines which navigation families belong to the MSP and organizati
 | --- | --- | --- | --- | --- |
 | Overview | MSP operational summary | Selected client summary | Selected supplier summary | route available |
 | Organizations | All clients, vendors, manufacturers, and partners | — | — | records available |
-| People | MSP employees and shared contacts | Client employees and contacts | Supplier representatives | `0.1.5` |
+| People | MSP employees and shared contacts | Client employees and contacts | Supplier representatives | records available (`0.1.5`) |
 | Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |

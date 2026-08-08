@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.4
+  version: 0.1.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -440,6 +440,149 @@ paths:
           description: Installation owner with MFA required
         '404':
           description: Organization not found
+  /api/v1/people:
+    get:
+      operationId: people_msp_list
+      parameters:
+      - in: query
+        name: filter_field
+        schema:
+          type: string
+      - in: query
+        name: filter_value
+        schema:
+          type: string
+      - in: query
+        name: ordering
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Search every displayed person and association field.
+      tags:
+      - people
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeopleResult'
+          description: ''
+        '403':
+          description: No response body
+    post:
+      operationId: people_msp_create
+      tags:
+      - people
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '403':
+          description: No response body
+  /api/v1/people/{person_entity_id}:
+    get:
+      operationId: people_msp_retrieve
+      parameters:
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - people
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '404':
+          description: No response body
+    patch:
+      operationId: people_msp_update
+      parameters:
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - people
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '404':
+          description: No response body
+    delete:
+      operationId: people_msp_archive
+      parameters:
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - people
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          description: No response body
   /api/v1/workspaces/msp:
     get:
       operationId: workspaces_msp_retrieve
@@ -540,6 +683,180 @@ paths:
           description: Organization workspace not found
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations/{organization_entity_id}/people:
+    get:
+      operationId: people_organization_list
+      parameters:
+      - in: query
+        name: filter_field
+        schema:
+          type: string
+      - in: query
+        name: filter_value
+        schema:
+          type: string
+      - in: query
+        name: ordering
+        schema:
+          type: string
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Search every displayed person and association field.
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeopleResult'
+          description: ''
+        '404':
+          description: No response body
+    post:
+      operationId: people_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PersonWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '404':
+          description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/people/{person_entity_id}:
+    get:
+      operationId: people_organization_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '404':
+          description: No response body
+    patch:
+      operationId: people_organization_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPersonWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+          description: ''
+        '404':
+          description: No response body
+    delete:
+      operationId: people_organization_archive
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: person_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          description: No response body
 components:
   schemas:
     AuthenticatedContext:
@@ -596,18 +913,6 @@ components:
       required:
       - id
       - name
-    ClassificationsEnum:
-      enum:
-      - client
-      - vendor
-      - manufacturer
-      - partner
-      type: string
-      description: |-
-        * `client` - Client
-        * `vendor` - Vendor
-        * `manufacturer` - Manufacturer
-        * `partner` - Partner
     Invitation:
       type: object
       properties:
@@ -688,14 +993,6 @@ components:
           maxLength: 254
       required:
       - email
-    KindEnum:
-      enum:
-      - msp
-      - organization
-      type: string
-      description: |-
-        * `msp` - msp
-        * `organization` - organization
     OidcProvider:
       type: object
       properties:
@@ -747,6 +1044,18 @@ components:
       - name
       - updated_at
       - website
+    OrganizationKindEnum:
+      enum:
+      - client
+      - vendor
+      - manufacturer
+      - partner
+      type: string
+      description: |-
+        * `client` - Client
+        * `vendor` - Vendor
+        * `manufacturer` - Manufacturer
+        * `partner` - Partner
     OrganizationWrite:
       type: object
       properties:
@@ -764,7 +1073,7 @@ components:
         classifications:
           type: array
           items:
-            $ref: '#/components/schemas/ClassificationsEnum'
+            $ref: '#/components/schemas/OrganizationKindEnum'
           maxItems: 4
           minItems: 1
       required:
@@ -819,9 +1128,40 @@ components:
         classifications:
           type: array
           items:
-            $ref: '#/components/schemas/ClassificationsEnum'
+            $ref: '#/components/schemas/OrganizationKindEnum'
           maxItems: 4
           minItems: 1
+    PatchedPersonWrite:
+      type: object
+      properties:
+        full_name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        preferred_name:
+          type: string
+          maxLength: 160
+        kind:
+          $ref: '#/components/schemas/PersonAssociationKindEnum'
+        role:
+          type: string
+          maxLength: 160
+        responsibility:
+          type: string
+          maxLength: 240
+        location:
+          type: string
+          maxLength: 160
+        office:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 254
     PatchedProfileUpdate:
       type: object
       properties:
@@ -829,6 +1169,122 @@ components:
           type: string
           maxLength: 160
           minLength: 1
+    PeopleResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    Person:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        association_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        full_name:
+          type: string
+        preferred_name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/PersonAssociationKindEnum'
+        role:
+          type: string
+        responsibility:
+          type: string
+        location:
+          type: string
+        office:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - association_id
+      - created_at
+      - email
+      - full_name
+      - id
+      - kind
+      - location
+      - office
+      - organization_id
+      - phone
+      - preferred_name
+      - responsibility
+      - role
+      - updated_at
+    PersonAssociationKindEnum:
+      enum:
+      - employee
+      - contact
+      type: string
+      description: |-
+        * `employee` - Employee
+        * `contact` - Contact
+    PersonWrite:
+      type: object
+      properties:
+        full_name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        preferred_name:
+          type: string
+          maxLength: 160
+        kind:
+          $ref: '#/components/schemas/PersonAssociationKindEnum'
+        role:
+          type: string
+          maxLength: 160
+        responsibility:
+          type: string
+          maxLength: 240
+        location:
+          type: string
+          maxLength: 160
+        office:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 254
+      required:
+      - full_name
+      - kind
     StateEnum:
       enum:
       - pending
@@ -845,7 +1301,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/WorkspaceContextKindEnum'
         id:
           type: string
           format: uuid
@@ -854,7 +1310,7 @@ components:
         classifications:
           type: array
           items:
-            $ref: '#/components/schemas/ClassificationsEnum'
+            $ref: '#/components/schemas/OrganizationKindEnum'
         capabilities:
           type: array
           items:
@@ -870,6 +1326,14 @@ components:
       - kind
       - name
       - organization
+    WorkspaceContextKindEnum:
+      enum:
+      - msp
+      - organization
+      type: string
+      description: |-
+        * `msp` - msp
+        * `organization` - organization
     WorkspaceOption:
       type: object
       properties:
@@ -881,7 +1345,7 @@ components:
         classifications:
           type: array
           items:
-            $ref: '#/components/schemas/ClassificationsEnum'
+            $ref: '#/components/schemas/OrganizationKindEnum'
         capabilities:
           type: array
           items:

@@ -162,6 +162,89 @@ class OrganizationClassification(TimestampedModel):
             raise ValidationError("Organization classification must belong to its tenant")
 
 
+class Person(TimestampedModel):
+    """One tenant-wide human identity anchored to the entity registry."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="people")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="person_record")
+    preferred_name = models.CharField(max_length=160, blank=True)
+    phone = models.CharField(max_length=64, blank=True)
+    email = models.EmailField(max_length=254, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=["tenant", "created_at"])]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and self.tenant_id != self.entity.tenant_id:
+            raise ValidationError("Person entity must belong to the person tenant")
+        if self.entity_id and self.entity.organization_id is not None:
+            raise ValidationError("A person identity must remain tenant-scoped")
+
+
+class PersonAssociationKind(models.TextChoices):
+    EMPLOYEE = "employee", "Employee"
+    CONTACT = "contact", "Contact"
+
+
+class PersonAssociation(TimestampedModel):
+    """A person's employment or contact role in one explicit workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="person_associations")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="person_associations",
+        null=True,
+        blank=True,
+    )
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="associations")
+    kind = models.CharField(max_length=32, choices=PersonAssociationKind.choices)
+    role = models.CharField(max_length=160, blank=True)
+    responsibility = models.CharField(max_length=240, blank=True)
+    location = models.CharField(max_length=160, blank=True)
+    office = models.CharField(max_length=120, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["person", "organization"],
+                condition=models.Q(organization__isnull=False),
+                name="unique_person_organization_association",
+            ),
+            models.UniqueConstraint(
+                fields=["person"],
+                condition=models.Q(organization__isnull=True),
+                name="unique_person_msp_association",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "organization", "archived_at"]),
+            models.Index(fields=["tenant", "kind", "organization"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.person_id} in {self.organization_id or 'MSP'}"
+
+    def clean(self) -> None:
+        if self.person_id and self.tenant_id != self.person.tenant_id:
+            raise ValidationError("Person association must belong to the person tenant")
+        organization = self.organization if self.organization_id else None
+        if organization is not None and self.tenant_id != organization.tenant_id:
+            raise ValidationError("Person association organization must belong to its tenant")
+
+
 class EntityLink(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entity_links")

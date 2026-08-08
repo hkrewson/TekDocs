@@ -36,6 +36,9 @@ import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
 import { Organizations } from './organizations/Organizations'
+import { People } from './people/People'
+import { browserPeopleClient } from './people/api'
+import type { PeopleClient } from './people/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
 import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
@@ -219,7 +222,6 @@ function PageHeader({ title, description, action }: { title: string; description
 }
 
 const plannedAreas: Record<string, { title: string; description: string; release: string; capabilities: string[] }> = {
-  '/people': { title: 'People', description: 'MSP staff, client employees, contacts, and access associations.', release: '0.1.5', capabilities: ['Contact records', 'Organization membership', 'Portal access boundary'] },
   '/files': { title: 'Files', description: 'Managed files and attachments with explicit ownership and references.', release: '0.3.8', capabilities: ['Safe uploads', 'Ownership scope', 'Permission-aware references'] },
   '/assets': { title: 'Assets', description: 'Hardware, software, licensing, warranty, and cost records.', release: '0.3.5', capabilities: ['Hardware inventory', 'Software and licenses', 'Cost visibility controls'] },
   '/licenses': { title: 'Licenses', description: 'Software entitlements, seats, renewals, and client assignments.', release: '0.3.6', capabilities: ['License inventory', 'Seat assignments', 'Renewal dates'] },
@@ -253,9 +255,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.4 adds bounded workspace discovery and URL-scoped navigation." />
+      <PageHeader title="Overview" description="TekDocs 0.1.5 adds workspace-scoped people and contact directories." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.4</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.5</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -318,13 +320,14 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
 }
 
-function OrganizationAreaRoute({ state, area }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability }) {
+function OrganizationAreaRoute({ state, area, peopleClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} />
   if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
     return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
   }
+  if (area === 'people') return <People workspace={state.workspace} client={peopleClient} />
   const details = organizationAreaDetails[area]
   return (
     <>
@@ -335,10 +338,11 @@ function OrganizationAreaRoute({ state, area }: { state: OrganizationWorkspaceSt
   )
 }
 
-export function ApplicationShell({ authContext, authClient, workspaceClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   workspaceClient: WorkspaceClient
+  peopleClient: PeopleClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -388,12 +392,13 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, onS
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
             <Route path="/documentation" element={<Documentation />} />
+            <Route path="/people" element={<People workspace={null} client={peopleClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
@@ -402,10 +407,11 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, onS
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   workspaceClient?: WorkspaceClient
+  peopleClient?: PeopleClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -415,6 +421,7 @@ export function App({ initialPath, authClient = browserAuthClient, workspaceClie
           authContext={context}
           authClient={authClient}
           workspaceClient={workspaceClient}
+          peopleClient={peopleClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

@@ -14,6 +14,12 @@ from apps.accounts.views import (
     ProfileView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
+from apps.core.people_views import (
+    MSPPeopleListCreateView,
+    MSPPersonDetailView,
+    OrganizationPeopleListCreateView,
+    OrganizationPersonDetailView,
+)
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 from apps.core.workspace_views import (
     MSPWorkspaceContextView,
@@ -35,6 +41,8 @@ urlpatterns = [
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
+    path("api/v1/people", MSPPeopleListCreateView.as_view(), name="msp-people-list-create"),
+    path("api/v1/people/<uuid:person_entity_id>", MSPPersonDetailView.as_view(), name="msp-person-detail"),
     path("api/v1/workspaces/msp", MSPWorkspaceContextView.as_view(), name="workspace-msp"),
     path(
         "api/v1/workspaces/organizations",
@@ -45,6 +53,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:entity_id>",
         OrganizationWorkspaceContextView.as_view(),
         name="workspace-organization",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
+        OrganizationPeopleListCreateView.as_view(),
+        name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people/<uuid:person_entity_id>",
+        OrganizationPersonDetailView.as_view(),
+        name="organization-person-detail",
     ),
     path(
         "api/v1/invitations/<uuid:invitation_id>/revoke",

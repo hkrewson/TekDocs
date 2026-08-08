@@ -180,12 +180,12 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.2` | Complete | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
 | `0.1.3` | Complete | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, safe creation defaults, and closure of `TD-RISK-003`, `005`, `011`, and `016`; document the `TD-RISK-004` and `007` deployment plans. |
 | `0.1.4` | Complete | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
-| `0.1.5` | Planned | People plus employment/contact associations in MSP and organization workspaces. |
+| `0.1.5` | Complete | People plus employment/contact associations in MSP and organization workspaces. |
 | `0.1.6` | Planned | Sites and locations with organization ownership and workspace-aware navigation. |
 | `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
 | `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
-| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, no inline role-name decisions, and the first half of `TD-RISK-001`. |
-| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
+| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
+| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped user assignments, per-client MSP employee assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
 | `0.1.11` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
 | `0.1.12` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), hosted-automation evidence when authorized (`TD-RISK-010`), reference performance, migration, accessibility, workspace, and isolation remediation. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
@@ -217,6 +217,18 @@ Evidence: `docs/releases/0.1.2.md`.
 Beginning with `0.1.3`, every domain family must declare whether each record is MSP-owned, organization-owned, or an explicitly permission-aware reference. List, detail, create, update, archive, search, export, notification, and worker paths must resolve the same URL-derived workspace context and include cross-workspace negative tests. Selecting a workspace changes presentation and scope; it never grants access.
 
 Organization classifications are additive capabilities. A business classified as both vendor and manufacturer has one identity and one workspace with the authorized union of supplier features. Client workspaces eventually expose client-owned people, documentation, assets, networks, vendors derived from asset relationships, and other scoped data. Supplier workspaces eventually expose contacts, product/model templates, and supplier-owned documentation that retains provenance when instantiated for a client.
+
+### `0.1.5` acceptance criteria
+
+- [x] A person has one tenant-wide entity identity and one or more scoped employment/contact associations; relationship fields do not become authorization roles.
+- [x] MSP People lists only MSP-scoped associations, while organization People lists only associations belonging to the URL-selected authorized organization.
+- [x] Owner-plus-MFA CRUD supports full and preferred name, relationship type, role/responsibility, location label, office, phone, and email; mutations derive scope from the route and emit value-free audit events.
+- [x] The list supports bounded server-side all-field search, field filtering, allowed-field sorting, and pagination. Users can choose visible columns with a keyboard-accessible settings control whose non-sensitive preference is stored locally.
+- [x] Loading, empty, error, denial, stale-workspace, responsive, keyboard, and accessibility behavior is covered. Cross-tenant and cross-organization reads and mutations fail without revealing record existence.
+- [x] PostgreSQL rejects mismatched tenant/person/organization associations through a database constraint or trigger, and migration, OpenAPI, Docker, unit, component, browser, isolation, clean-install, upgrade, and security evidence agree at `0.1.5`.
+- [x] ADR 0008 documents how future user identities, client assignment modes, custom roles, sites, and shared-person attachment extend this model without treating job titles as permissions.
+
+Evidence: `docs/releases/0.1.5.md`.
 
 ADR 0007 defines the workspace-context boundary.
 

@@ -5,7 +5,16 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 
 from apps.accounts.models import Invitation, TenantMembership
-from apps.core.models import AuditEvent, Entity, EntityLink, Organization, OrganizationClassification, Tenant
+from apps.core.models import (
+    AuditEvent,
+    Entity,
+    EntityLink,
+    Organization,
+    OrganizationClassification,
+    Person,
+    PersonAssociation,
+    Tenant,
+)
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope, ScopeRequiredError
 
@@ -18,7 +27,17 @@ def _organization(tenant: Tenant, name: str) -> Organization:
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "model",
-    [AuditEvent, Entity, EntityLink, Invitation, Organization, OrganizationClassification, TenantMembership],
+    [
+        AuditEvent,
+        Entity,
+        EntityLink,
+        Invitation,
+        Organization,
+        OrganizationClassification,
+        Person,
+        PersonAssociation,
+        TenantMembership,
+    ],
 )
 def test_scoped_manager_fails_closed_without_explicit_tenant(model):
     with pytest.raises(ScopeRequiredError, match="for_tenant"):

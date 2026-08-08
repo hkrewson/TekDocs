@@ -5,6 +5,7 @@ import { App } from './App'
 import type { AuthenticatedContext } from './auth/api'
 import type { AuthClient } from './auth/api'
 import type { WorkspaceClient } from './workspaces/api'
+import type { PeopleClient } from './people/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -36,7 +37,14 @@ const workspaceClient = {
   loadOrganization,
   searchOrganizations: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 15, has_more: false }),
 } as unknown as WorkspaceClient
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} />
+const listPeople = vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false })
+const peopleClient = {
+  list: listPeople,
+  create: vi.fn(),
+  update: vi.fn(),
+  archive: vi.fn(),
+} as unknown as PeopleClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} />
 
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -94,6 +102,19 @@ describe('application shell', () => {
       expect(link.getAttribute('href')).toMatch(/^\/workspaces\/organizations\/00000000-0000-4000-8000-000000000010\//)
     }
     expect(screen.queryByRole('navigation', { name: 'Governance' })).not.toBeInTheDocument()
+  })
+
+  it('loads People through the selected organization boundary', async () => {
+    render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/people'))
+
+    expect(await screen.findByRole('heading', { name: 'People' })).toBeInTheDocument()
+    expect(screen.getByText('Employees and contacts associated with Acme Dental.')).toBeInTheDocument()
+    expect(await screen.findByText('No people have been added to this workspace.')).toBeInTheDocument()
+    await vi.waitFor(() => expect(listPeople).toHaveBeenCalledWith(
+      { organizationId: '00000000-0000-4000-8000-000000000010' },
+      expect.objectContaining({ ordering: 'full_name' }),
+      expect.any(AbortSignal),
+    ))
   })
 
   it('clears retained organization context when returning to an MSP route', async () => {

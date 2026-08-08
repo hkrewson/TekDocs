@@ -35,12 +35,32 @@ const secondClientWorkspace = {
 }
 secondClientWorkspace.organization.id = secondClientWorkspace.id
 
+const person = {
+  id: crypto.randomUUID(),
+  association_id: crypto.randomUUID(),
+  organization_id: clientWorkspace.id,
+  full_name: 'Jordan Avery',
+  preferred_name: 'Jordy',
+  kind: 'employee',
+  role: 'Systems Administrator',
+  responsibility: 'Network and identity operations',
+  location: 'North Office',
+  office: 'Desk 214',
+  phone: '+1 555 010 0240',
+  email: 'jordan@example.com',
+  created_at: '2026-08-08T12:00:00Z',
+  updated_at: '2026-08-08T12:00:00Z',
+}
+
 async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/api/v1/workspaces/organizations**', (route) => {
     const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/people')) {
+      return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
+    }
     const id = url.pathname.split('/').at(-1)
     if (id === clientWorkspace.id) return route.fulfill({ json: clientWorkspace })
     if (id === secondClientWorkspace.id) return route.fulfill({ json: secondClientWorkspace })
@@ -132,6 +152,21 @@ test('client context routes every menu item to that client and searches clients 
     await expect(link).not.toHaveAttribute('href', /^\/workspaces\/organizations\//)
   }
   await expect(page.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+})
+
+test('client People directory supports field controls and remains accessible', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/people`)
+
+  await expect(page.getByRole('heading', { name: 'People' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Jordan Avery', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Choose visible columns' }).click()
+  await page.getByRole('checkbox', { name: 'Responsibility' }).check()
+  await expect(page.getByRole('columnheader', { name: 'Responsibility' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Network and identity operations' })).toBeVisible()
+  await page.getByRole('button', { name: 'Full name' }).click()
+  await expect(page.getByRole('columnheader', { name: 'Full name' })).toHaveAttribute('aria-sort', 'descending')
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
 })
 
 test('separate tabs retain independent URL-derived workspace context', async ({ page }) => {

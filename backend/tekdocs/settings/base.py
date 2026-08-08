@@ -205,6 +205,10 @@ SPECTACULAR_SETTINGS = {
     "VERSION": VERSION,
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "ENUM_NAME_OVERRIDES": {
+        "OrganizationKindEnum": "apps.core.models.OrganizationKind",
+        "PersonAssociationKindEnum": "apps.core.models.PersonAssociationKind",
+    },
 }
 
 LANGUAGE_CODE = "en-us"

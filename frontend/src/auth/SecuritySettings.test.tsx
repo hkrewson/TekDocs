@@ -83,7 +83,8 @@ describe('security settings', () => {
 
   it('enrolls an authenticator and shows recovery codes only until acknowledged', async () => {
     const user = userEvent.setup()
-    const secret = 'JBSWY3DPEHPK3PXP'
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+    const secret = Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => alphabet[value % alphabet.length]).join('')
     const setup = { secret, totpUrl: `otpauth://totp/TekDocs:owner?secret=${secret}` }
     const recoveryCodes = ['alpha-bravo', 'charlie-delta']
     const activateTotp = vi.fn().mockResolvedValue(recoveryCodes)
@@ -93,7 +94,13 @@ describe('security settings', () => {
     })))
 
     await user.click(await screen.findByRole('button', { name: 'Set up authenticator' }))
+    expect(document.querySelector('.mfa-qr-code svg')).toBeInTheDocument()
+    expect(document.querySelector('.mfa-qr-code svg')).toHaveAttribute('width', '192')
+    expect(screen.getByText('Scan with your authenticator app')).toBeInTheDocument()
     expect(screen.getByText(secret)).toBeInTheDocument()
+    expect(screen.getByText(setup.totpUrl)).not.toBeVisible()
+    await user.click(screen.getByText('Show setup address'))
+    expect(screen.getByText(setup.totpUrl)).toBeInTheDocument()
     await user.type(screen.getByLabelText('Authentication code'), '123456')
     await user.click(screen.getByRole('button', { name: 'Enable two-factor authentication' }))
 

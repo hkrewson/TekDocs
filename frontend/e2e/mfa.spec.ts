@@ -33,7 +33,8 @@ test('pending two-factor sign-in accepts a recovery code', async ({ page, baseUR
 })
 
 test('security settings enrolls an authenticator and acknowledges one-time recovery codes', async ({ page, baseURL }) => {
-  const secret = 'JBSWY3DPEHPK3PXP'
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const secret = Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => alphabet[value % alphabet.length]).join('')
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
@@ -56,7 +57,10 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
   await page.getByRole('menuitem', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Set up authenticator' }).click()
+  await expect(page.locator('.mfa-qr-code svg')).toBeVisible()
+  await expect(page.getByText('Scan with your authenticator app')).toBeVisible()
   await expect(page.getByText(secret, { exact: true })).toBeVisible()
+  await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
   await page.getByLabel('Authentication code').fill('123456')
   await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
   await expect(page.getByText('alpha-bravo')).toBeVisible()

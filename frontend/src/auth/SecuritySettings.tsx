@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { KeyRound, Laptop, RefreshCw, ShieldCheck } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
 
@@ -187,9 +188,21 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
         )}
         {setup && (
           <form className="mfa-setup" onSubmit={(event) => { void activate(event) }}>
-            <div><strong>Add TekDocs to your authenticator</strong><p>Scan the setup address with your authenticator app, or enter the key manually. Then enter the current code.</p></div>
-            <label>Setup address<code>{setup.totpUrl}</code></label>
-            <label>Manual key<code>{setup.secret}</code></label>
+            <div><strong>Add TekDocs to your authenticator</strong><p>Scan the QR code with your authenticator app, then enter the current code.</p></div>
+            <div className="mfa-enrollment">
+              <figure className="mfa-qr-code">
+                <QRCodeSVG value={setup.totpUrl} size={192} level="M" marginSize={4} aria-hidden="true" />
+                <figcaption>Scan with your authenticator app</figcaption>
+              </figure>
+              <div className="mfa-manual-setup">
+                <div><strong>Can’t scan the code?</strong><p>Enter this key manually. The setup address is also available for apps that accept one.</p></div>
+                <div className="mfa-setup-value"><span>Manual key</span><code>{setup.secret}</code></div>
+                <details>
+                  <summary>Show setup address</summary>
+                  <code>{setup.totpUrl}</code>
+                </details>
+              </div>
+            </div>
             <label>Authentication code<input value={activationCode} onChange={(event) => setActivationCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
             <div className="settings-actions">
               <button className="primary-button" type="submit" disabled={working}>{working ? 'Verifying…' : 'Enable two-factor authentication'}</button>

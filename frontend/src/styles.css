@@ -144,7 +144,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .settings-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mfa-setup, .recovery-codes { display: flex; flex-direction: column; gap: 15px; padding-top: 17px; border-top: 1px solid var(--border); }
 .mfa-setup label, .reauth-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
-.mfa-setup label > code { display: block; max-width: 100%; padding: 9px 10px; overflow: auto; color: #34352f; background: #efede7; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 400; user-select: all; }
+.mfa-enrollment { display: grid; grid-template-columns: 216px minmax(0, 1fr); align-items: start; gap: 20px; }
+.mfa-qr-code { width: 216px; margin: 0; padding: 11px; background: #fff; border: 1px solid var(--border); border-radius: 7px; }
+.mfa-qr-code svg { display: block; width: 192px; height: 192px; }
+.mfa-qr-code figcaption { margin-top: 9px; color: var(--muted); font-size: 12px; line-height: 1.35; text-align: center; }
+.mfa-manual-setup { display: flex; min-width: 0; flex-direction: column; gap: 13px; }
+.mfa-setup-value { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.mfa-setup-value code, .mfa-manual-setup details > code { display: block; max-width: 100%; padding: 9px 10px; overflow: auto; color: #34352f; background: #efede7; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 400; user-select: all; }
+.mfa-manual-setup summary { width: fit-content; color: var(--accent); font-size: 13px; cursor: pointer; }
+.mfa-manual-setup details[open] summary { margin-bottom: 7px; }
 .mfa-setup input, .reauth-form input { width: min(320px, 100%); min-height: 38px; padding: 8px 10px; background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
 .recovery-codes ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px; width: min(480px, 100%); margin: 0; padding: 14px 18px 14px 38px; background: #efede7; border: 1px solid var(--border); border-radius: 7px; }
 .recovery-codes code { font-size: 13px; user-select: all; }
@@ -193,6 +201,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .security-row { align-items: flex-start; flex-direction: column; gap: 14px; }
   .profile-settings-form { grid-template-columns: 1fr; }
   .profile-settings-form .settings-actions { grid-column: 1; }
+  .mfa-enrollment { grid-template-columns: 1fr; }
   .recovery-codes ul { grid-template-columns: 1fr; }
   .reauth-form { grid-template-columns: 24px minmax(0, 1fr); }
   .reauth-form label, .reauth-form .settings-actions { grid-column: 2; }

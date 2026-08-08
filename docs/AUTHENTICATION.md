@@ -27,7 +27,7 @@ An authenticated member can update their display name through `PATCH /api/v1/aut
 
 ## Two-factor authentication
 
-`0.0.9` enables allauth’s TOTP and recovery-code browser flows. Settings → Security can start TOTP enrollment, confirm the first code, display the resulting recovery codes once, report the remaining count, replace all codes, or disable the factor. The browser keeps setup and recovery material only in component memory and clears it after acknowledgment; it never writes those values to browser storage.
+`0.0.9` enables allauth’s TOTP and recovery-code browser flows. Settings → Security can start TOTP enrollment, render the allauth setup URI as a locally generated scannable QR code, confirm the first code, display the resulting recovery codes once, report the remaining count, replace all codes, or disable the factor. Manual key and setup-address fallbacks remain available. The browser keeps setup and recovery material only in component memory and clears it after acknowledgment; it never writes those values to browser storage or sends the setup URI to an external QR service.
 
 After enrollment, a successful password step returns a pending `mfa_authenticate` flow. The browser accepts either the current TOTP value or one unused recovery code and opens the workspace only after the second step succeeds. Recovery codes are consumed atomically by allauth and a used value is rejected on replay.
 

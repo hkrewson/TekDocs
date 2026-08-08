@@ -212,13 +212,14 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.0 certifies the secure identity and authentication foundation." />
+      <PageHeader title="Overview" description="TekDocs 0.1.1 adds the tenant and organization isolation foundation." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.0</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.1</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
             ['Tenant and entity primitives', 'Available'],
+            ['Tenant and organization isolation', 'Available'],
             ['Owner authentication', 'Available'],
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],

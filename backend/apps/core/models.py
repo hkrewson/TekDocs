@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from .scoping import OrganizationScopedManager, TenantScopedManager
+
 
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -74,16 +76,55 @@ class Entity(TimestampedModel):
     entity_type = models.CharField(max_length=80)
     display_name = models.CharField(max_length=240)
     custom_fields = models.JSONField(default=dict, blank=True)
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="scoped_entities",
+        null=True,
+        blank=True,
+    )
     archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
 
     class Meta:
         indexes = [
             models.Index(fields=["tenant", "entity_type"]),
             models.Index(fields=["tenant", "display_name"]),
+            models.Index(fields=["tenant", "organization", "entity_type"]),
         ]
 
     def __str__(self) -> str:
         return self.display_name
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and self.tenant_id != organization.tenant_id:
+            raise ValidationError("Organization scope must belong to the entity tenant")
+
+
+class Organization(TimestampedModel):
+    """The stable organization scope anchor; classifications arrive in 0.1.2."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="organizations")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="organization_record")
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=["tenant", "created_at"])]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and self.tenant_id != self.entity.tenant_id:
+            raise ValidationError("Organization entity must belong to the organization tenant")
+        if self.entity_id and self.entity.organization_id is not None:
+            raise ValidationError("An organization anchor cannot itself be organization-scoped")
 
 
 class EntityLink(TimestampedModel):
@@ -93,6 +134,9 @@ class EntityLink(TimestampedModel):
     target = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="incoming_links")
     link_type = models.CharField(max_length=80)
     metadata = models.JSONField(default=dict, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
 
     class Meta:
         constraints = [
@@ -119,6 +163,9 @@ class AuditEvent(models.Model):
     request_id = models.UUIDField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
     occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
 
     class Meta:
         ordering = ("-occurred_at",)

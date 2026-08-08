@@ -4,6 +4,7 @@ from allauth.mfa.models import Authenticator
 from rest_framework.exceptions import APIException, PermissionDenied
 
 from apps.core.models import InstallationState, Tenant
+from apps.core.scoping import DataScope
 
 from .models import TenantMembership, User
 
@@ -25,6 +26,10 @@ class InstallationMemberContext:
     tenant: Tenant
     is_owner: bool
 
+    @property
+    def data_scope(self) -> DataScope:
+        return DataScope.tenant(self.tenant)
+
 
 def require_installation_member(user: User) -> InstallationMemberContext:
     if not user.is_authenticated:
@@ -39,7 +44,7 @@ def require_installation_member(user: User) -> InstallationMemberContext:
     if state.tenant is None:
         raise InstallationContextUnavailable()
     is_owner = state.owner_id == user.pk
-    if not is_owner and not TenantMembership.objects.filter(tenant=state.tenant, user=user).exists():
+    if not is_owner and not TenantMembership.scoped.for_tenant(state.tenant).filter(user=user).exists():
         raise PermissionDenied("Installation membership is required.")
     return InstallationMemberContext(state=state, tenant=state.tenant, is_owner=is_owner)
 

@@ -190,7 +190,7 @@ class InvitationListCreateView(APIView):
     @extend_schema(responses={200: InvitationSerializer(many=True), 403: OpenApiResponse(description="Owner required")})
     def get(self, request):  # type: ignore[no-untyped-def]
         context = require_installation_owner(request.user)
-        invitations = Invitation.objects.filter(tenant=context.tenant)
+        invitations = Invitation.scoped.for_tenant(context.tenant)
         return Response(InvitationSerializer(invitations, many=True).data)
 
     @extend_schema(
@@ -227,7 +227,7 @@ class InvitationRevokeView(APIView):
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
         context = require_installation_owner(request.user)
-        invitation = get_object_or_404(Invitation, pk=invitation_id, tenant=context.tenant)
+        invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
         return Response(InvitationSerializer(revoke_invitation(invitation=invitation, actor=request.user)).data)
 
 
@@ -244,5 +244,5 @@ class InvitationResendView(APIView):
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
         context = require_installation_owner(request.user)
-        invitation = get_object_or_404(Invitation, pk=invitation_id, tenant=context.tenant)
+        invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
         return Response(InvitationSerializer(resend_invitation(invitation=invitation, actor=request.user)).data)

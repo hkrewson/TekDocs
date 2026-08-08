@@ -172,18 +172,29 @@ Evidence: `docs/releases/0.1.0.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 
-| Release | Slice and exit condition |
-| --- | --- |
-| `0.1.1` | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
-| `0.1.2` | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
-| `0.1.3` | People, employment/contact associations, sites, and locations. |
-| `0.1.4` | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
-| `0.1.5` | Typed entity links, backlinks, and permission-filtered search foundation. |
-| `0.1.6` | Central policy service, permission catalog, built-in roles, and no inline role-name decisions. |
-| `0.1.7` | Custom roles and tenant/client/collection-scoped assignments with MSP-private hard constraints. |
-| `0.1.8` | Recycle bin/recovery, field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
-| `0.1.9` | Reference-dataset performance, migration rehearsal, API/UI accessibility, and isolation remediation. |
-| `0.2.0` | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
+| Release | Status | Slice and exit condition |
+| --- | --- | --- |
+| `0.1.1` | Complete | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
+| `0.1.2` | Planned | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
+| `0.1.3` | Planned | People, employment/contact associations, sites, and locations. |
+| `0.1.4` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
+| `0.1.5` | Planned | Typed entity links, backlinks, and permission-filtered search foundation. |
+| `0.1.6` | Planned | Central policy service, permission catalog, built-in roles, and no inline role-name decisions. |
+| `0.1.7` | Planned | Custom roles and tenant/client/collection-scoped assignments with MSP-private hard constraints. |
+| `0.1.8` | Planned | Recycle bin/recovery, field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
+| `0.1.9` | Planned | Reference-dataset performance, migration rehearsal, API/UI accessibility, and isolation remediation. |
+| `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
+
+### `0.1.1` acceptance criteria
+
+- [x] Tenant-owned domain reads have one explicit manager contract that refuses an omitted tenant and supports immutable tenant and organization data scopes.
+- [x] A minimal organization scope anchor attaches to a stable MSP-owned entity; classifications, CRUD, and navigation remain in `0.1.2`.
+- [x] Entity, organization, entity-link, invitation, and membership access paths use or expose the scoped query boundary, while pre-authentication token resolution remains a documented narrow exception.
+- [x] PostgreSQL enforces same-tenant organization/entity/link relationships and exposes transaction-local RLS scope functions that deny missing, cross-tenant, and cross-organization context.
+- [x] ADR 0006 documents the non-owner runtime role, `USING`/`WITH CHECK`, pooled-connection safety, token redemption, worker, migration, and activation requirements; active RLS protection is not claimed early.
+- [x] `make test-isolation` and the Compose CI job run the PostgreSQL negative-isolation harness; migration, static, unit, runtime, and version gates agree at `0.1.1`.
+
+Evidence: `docs/releases/0.1.1.md`.
 
 ## Reusable documentation: `0.2.x` → `0.3.0`
 

@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-24b6f8d84996b5a03f56256394a1aaf65c9cbaf2}
+baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-1ee3b7d}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -39,8 +39,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.0.11" ]; then
-  echo "Upgrade rehearsal expected baseline 0.0.11, found $baseline_version" >&2
+if [ "$baseline_version" != "0.1.0" ]; then
+  echo "Upgrade rehearsal expected baseline 0.1.0, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" = "$baseline_version" ]; then
@@ -108,11 +108,20 @@ assert state.tenant_id == Tenant.objects.get(slug="upgrade-rehearsal-msp").id
 assert owner.display_name == "Upgrade Rehearsal Owner"
 assert owner.check_password(os.environ["UPGRADE_TEST_PASSWORD"])
 assert EmailAddress.objects.get(user=owner, email=email, primary=True, verified=True)
-assert TenantMembership.objects.filter(tenant=state.tenant, user=owner).count() == 1
+assert TenantMembership.scoped.for_tenant(state.tenant).filter(user=owner).count() == 1
 assert encrypted_secret.startswith(PREFIX)
 assert decrypt_mfa_value(encrypted_secret)
 assert AuditEvent.objects.filter(action="installation.owner_bootstrapped", actor=owner).count() == 1
 assert AuditEvent.objects.filter(action="upgrade.fixture_created", actor=owner, metadata={}).count() == 1
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        "SELECT to_regclass(%s), to_regprocedure(%s)",
+        ["core_organization", "tekdocs_scope_matches(uuid,uuid)"],
+    )
+    organization_table, scope_function = cursor.fetchone()
+assert organization_table == "core_organization"
+assert scope_function == "tekdocs_scope_matches(uuid,uuid)"
 print("Upgraded identity and authentication invariants verified")
 '
 current_compose exec -T backend python manage.py check

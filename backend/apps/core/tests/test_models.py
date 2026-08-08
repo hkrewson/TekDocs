@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.core.models import AuditEvent, Entity, EntityLink, InstallationState, Tenant
+from apps.core.models import AuditEvent, Entity, EntityLink, InstallationState, Organization, Tenant
 
 
 @pytest.mark.django_db
@@ -14,6 +14,16 @@ def test_entity_link_rejects_cross_tenant_relationships():
 
     with pytest.raises(ValidationError, match="Target entity"):
         link.full_clean()
+
+
+@pytest.mark.django_db
+def test_organization_anchor_rejects_cross_tenant_entity():
+    first = Tenant.objects.create(name="First MSP", slug="first")
+    second = Tenant.objects.create(name="Second MSP", slug="second")
+    foreign_entity = Entity.objects.create(tenant=second, entity_type="organization", display_name="Foreign")
+
+    with pytest.raises(ValidationError, match="Organization entity"):
+        Organization(tenant=first, entity=foreign_entity).full_clean()
 
 
 @pytest.mark.django_db

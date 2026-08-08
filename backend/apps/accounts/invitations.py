@@ -96,14 +96,14 @@ def _deliver(issued: IssuedInvitation, actor: User) -> Invitation:
             raise InvitationDeliveryRejected
     except (InvitationDeliveryRejected, OSError, smtplib.SMTPException):
         with transaction.atomic():
-            current = Invitation.objects.select_for_update().get(pk=invitation.pk)
+            current = Invitation.scoped.for_tenant(invitation.tenant).select_for_update().get(pk=invitation.pk)
             current.last_delivery_failed_at = timezone.now()
             current.save(update_fields=("last_delivery_failed_at", "updated_at"))
             _audit(invitation=current, actor=actor, action="invitation.delivery_failed")
         raise InvitationDeliveryUnavailable() from None
 
     with transaction.atomic():
-        current = Invitation.objects.select_for_update().get(pk=invitation.pk)
+        current = Invitation.scoped.for_tenant(invitation.tenant).select_for_update().get(pk=invitation.pk)
         current.last_sent_at = timezone.now()
         current.last_delivery_failed_at = None
         current.send_count += 1
@@ -120,8 +120,9 @@ def issue_invitation(*, tenant: Tenant, actor: User, email: str) -> Invitation:
             if User.objects.filter(email__iexact=normalized_email).exists():
                 raise InvitationConflict("An account already uses this email address.")
             existing = (
-                Invitation.objects.select_for_update()
-                .filter(tenant=tenant, email=normalized_email, state=InvitationState.PENDING)
+                Invitation.scoped.for_tenant(tenant)
+                .select_for_update()
+                .filter(email=normalized_email, state=InvitationState.PENDING)
                 .first()
             )
             if existing is not None:
@@ -145,7 +146,12 @@ def issue_invitation(*, tenant: Tenant, actor: User, email: str) -> Invitation:
 def resend_invitation(*, invitation: Invitation, actor: User) -> Invitation:
     token = _new_token()
     with transaction.atomic():
-        current = Invitation.objects.select_for_update().select_related("tenant").get(pk=invitation.pk)
+        current = (
+            Invitation.scoped.for_tenant(invitation.tenant)
+            .select_for_update()
+            .select_related("tenant")
+            .get(pk=invitation.pk)
+        )
         if current.state == InvitationState.PENDING and current.expires_at <= timezone.now():
             _mark_expired(current, actor)
         if current.state != InvitationState.PENDING:
@@ -160,7 +166,7 @@ def resend_invitation(*, invitation: Invitation, actor: User) -> Invitation:
 
 def revoke_invitation(*, invitation: Invitation, actor: User) -> Invitation:
     with transaction.atomic():
-        current = Invitation.objects.select_for_update().get(pk=invitation.pk)
+        current = Invitation.scoped.for_tenant(invitation.tenant).select_for_update().get(pk=invitation.pk)
         if current.state == InvitationState.PENDING and current.expires_at <= timezone.now():
             _mark_expired(current, actor)
         if current.state != InvitationState.PENDING:
@@ -181,6 +187,9 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
     accepted: AcceptedInvitation | None = None
     try:
         with transaction.atomic():
+            # Token redemption is the deliberately narrow pre-authentication lookup boundary:
+            # the tenant cannot be known until the digest resolves, and lifecycle checks remain
+            # generic and transactional below. Ordinary domain reads must use ``scoped``.
             invitation = (
                 Invitation.objects.select_for_update()
                 .select_related("tenant")

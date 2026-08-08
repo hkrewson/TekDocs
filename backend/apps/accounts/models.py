@@ -6,6 +6,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 
+from apps.core.scoping import TenantScopedManager
+
 from .managers import UserManager
 
 EMPTY_DIGEST = ""
@@ -56,6 +58,9 @@ class Invitation(models.Model):
     send_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
 
     class Meta:
         ordering = ("-created_at",)
@@ -119,6 +124,9 @@ class TenantMembership(models.Model):
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="memberships")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="tenant_memberships")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
 
     class Meta:
         constraints = [

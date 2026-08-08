@@ -17,7 +17,7 @@ def record_auth_event(*, action: str, request: HttpRequest | None = None, user: 
     if state is not None and state.tenant is not None:
         tenant = state.tenant
         if user is not None and (
-            state.owner_id == user.pk or TenantMembership.objects.filter(tenant=tenant, user=user).exists()
+            state.owner_id == user.pk or TenantMembership.scoped.for_tenant(tenant).filter(user=user).exists()
         ):
             actor = user
     return AuditEvent.objects.create(

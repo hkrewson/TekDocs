@@ -40,7 +40,17 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/_allauth/browser/v1/auth/sessions', (route) => route.fulfill({ json: { data: [] } }))
-  await page.route('**/_allauth/browser/v1/account/authenticators', (route) => route.fulfill({ json: { data: [] } }))
+  let mfaEnabled = false
+  await page.route('**/_allauth/browser/v1/account/authenticators', (route) => route.fulfill({
+    json: {
+      data: mfaEnabled
+        ? [
+            { type: 'totp', created_at: 1_786_000_000, last_used_at: null },
+            { type: 'recovery_codes', total_code_count: 2, unused_code_count: 2 },
+          ]
+        : [],
+    },
+  }))
   let activationAttempts = 0
   await page.route('**/_allauth/browser/v1/account/authenticators/totp', async (route) => {
     if (route.request().method() === 'POST') {
@@ -50,14 +60,19 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
         await route.fulfill({ status: 401, json: { data: { flows: [{ id: 'reauthenticate', is_pending: true }] } } })
         return
       }
+      mfaEnabled = true
       await route.fulfill({ json: { data: { type: 'totp' } } })
       return
     }
     await route.fulfill({ status: 404, json: { meta: { secret, totp_url: `otpauth://totp/TekDocs?secret=${secret}` } } })
   })
-  await page.route('**/_allauth/browser/v1/account/authenticators/recovery-codes', (route) => route.fulfill({
-    json: { data: { total_code_count: 2, unused_code_count: 2, unused_codes: ['alpha-bravo', 'charlie-delta'] } },
-  }))
+  let recoveryCodeRequests = 0
+  await page.route('**/_allauth/browser/v1/account/authenticators/recovery-codes', (route) => {
+    recoveryCodeRequests += 1
+    return route.fulfill({
+      json: { data: { total_code_count: 2, unused_code_count: 2, unused_codes: ['alpha-bravo', 'charlie-delta'] } },
+    })
+  })
   await page.route('**/_allauth/browser/v1/auth/reauthenticate', async (route) => {
     expect(route.request().postDataJSON()).toEqual({ password: 'temporary-password' })
     await route.fulfill({ json: { data: { user: context.user } } })
@@ -85,4 +100,7 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
 
   await expect(page.getByText('alpha-bravo')).not.toBeVisible()
   await expect(page.getByText('2 of 2 codes remain. Each code works once.')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('2 of 2 codes remain. Each code works once.')).toBeVisible()
+  expect(recoveryCodeRequests).toBe(1)
 })

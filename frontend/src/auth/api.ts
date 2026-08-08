@@ -89,7 +89,12 @@ type AllauthUserSession = {
 type AllauthSessionsResponse = { data?: AllauthUserSession[] }
 
 type AllauthFlowResponse = { data?: { flows?: Array<{ id?: string; is_pending?: boolean }> } }
-type AllauthAuthenticatorsResponse = { data?: Array<{ type?: string }> }
+type AllauthAuthenticator = {
+  type?: string
+  total_code_count?: number
+  unused_code_count?: number
+}
+type AllauthAuthenticatorsResponse = { data?: AllauthAuthenticator[] }
 type AllauthRecoveryResponse = {
   data?: { total_code_count?: number; unused_code_count?: number; unused_codes?: string[] }
 }
@@ -362,18 +367,14 @@ export const browserAuthClient: AuthClient = {
     })
     if (!response.ok) throw new AuthRequestError('Two-factor settings could not be loaded.', response.status)
     const payload = await responseJson<AllauthAuthenticatorsResponse>(response)
-    const totpEnabled = payload.data?.some((item) => item.type === 'totp') ?? false
+    const authenticators = payload.data ?? []
+    const totpEnabled = authenticators.some((item) => item.type === 'totp')
     if (!totpEnabled) return { totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }
-    const recoveryResponse = await fetch('/_allauth/browser/v1/account/authenticators/recovery-codes', {
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-    })
-    if (!recoveryResponse.ok) throw new AuthRequestError('Recovery-code status could not be loaded.', recoveryResponse.status)
-    const recovery = await responseJson<AllauthRecoveryResponse>(recoveryResponse)
+    const recovery = authenticators.find((item) => item.type === 'recovery_codes')
     return {
       totpEnabled: true,
-      recoveryCodeTotal: recovery.data?.total_code_count ?? 0,
-      recoveryCodeUnused: recovery.data?.unused_code_count ?? 0,
+      recoveryCodeTotal: recovery?.total_code_count ?? 0,
+      recoveryCodeUnused: recovery?.unused_code_count ?? 0,
     }
   },
 

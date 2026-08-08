@@ -242,6 +242,27 @@ describe('browser authentication client', () => {
     expect(calls[6][1].headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
   })
 
+  it('loads recovery-code counts from the safe authenticator list after refresh', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({
+      data: [
+        { type: 'totp', created_at: 1_786_000_000, last_used_at: null },
+        { type: 'recovery_codes', total_code_count: 10, unused_code_count: 7 },
+      ],
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.loadMfa()).resolves.toEqual({
+      totpEnabled: true,
+      recoveryCodeTotal: 10,
+      recoveryCodeUnused: 7,
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/_allauth/browser/v1/account/authenticators',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+  })
+
   it('turns authentication rate limits into safe wait-and-retry messages', async () => {
     document.cookie = `csrftoken=${crypto.randomUUID()}; path=/`
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 429 }, 429)))

@@ -178,8 +178,7 @@ def test_postgres_rls_scope_function_denies_missing_cross_tenant_and_cross_organ
         bind_local_rls_scope(scope, organization_mode=OrganizationRLSMode.ORGANIZATION)
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT tekdocs_scope_matches(%s, %s), tekdocs_scope_matches(%s, %s), "
-                "tekdocs_scope_matches(%s, %s)",
+                "SELECT tekdocs_scope_matches(%s, %s), tekdocs_scope_matches(%s, %s), tekdocs_scope_matches(%s, %s)",
                 [tenant_id, organization_id, other_id, organization_id, tenant_id, other_id],
             )
             assert cursor.fetchone() == (True, False, False)

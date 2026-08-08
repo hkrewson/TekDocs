@@ -216,9 +216,9 @@ def update_location(
 def archive_location(*, location: Location, actor_id: UUID) -> None:
     scope = DataScope(tenant_id=location.tenant_id, organization_id=location.organization_id)
     all_locations = list(
-        Location.scoped.for_scope(scope).filter(site=location.site, archived_at__isnull=True).values(
-            "id", "parent_id", "entity_id"
-        )
+        Location.scoped.for_scope(scope)
+        .filter(site=location.site, archived_at__isnull=True)
+        .values("id", "parent_id", "entity_id")
     )
     selected_ids = {location.id}
     changed = True

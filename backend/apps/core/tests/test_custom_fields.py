@@ -273,7 +273,8 @@ def test_custom_field_endpoints_require_owner_mfa_and_csrf(client, owner_client,
     assert client.get(url).status_code == 403
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(url).status_code == 403
+    assert owner_client.get(url).status_code == 200
+    assert owner_client.post(url, definition_payload(), content_type="application/json").status_code == 403
     TOTP.activate(installation.owner, generate_totp_secret())
 
     csrf_client = Client(enforce_csrf_checks=True)

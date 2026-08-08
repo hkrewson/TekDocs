@@ -83,8 +83,14 @@ def test_owner_issues_and_lists_digest_only_invitation(owner_client, installatio
 def test_owner_without_totp_cannot_use_privileged_invitation_actions(owner_client, installation):
     installation.owner.authenticator_set.filter(type="totp").delete()
 
-    response = owner_client.get(reverse("invitation-list-create"))
+    listed = owner_client.get(reverse("invitation-list-create"))
+    response = owner_client.post(
+        reverse("invitation-list-create"),
+        {"email": "mfa-required@example.com"},
+        content_type="application/json",
+    )
 
+    assert listed.status_code == 200
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "privileged_mfa_required"
 

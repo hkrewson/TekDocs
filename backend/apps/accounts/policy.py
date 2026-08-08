@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from allauth.mfa.models import Authenticator
+from django.db.models import QuerySet
 from rest_framework.exceptions import APIException, PermissionDenied
 
-from apps.core.models import InstallationState, Tenant
+from apps.core.models import InstallationState, Organization, OrganizationAccessMode, Tenant
 from apps.core.scoping import DataScope
 
-from .models import TenantMembership, User
+from .models import TENANT_ASSIGNABLE_ROLES, BuiltInRole, TenantMembership, User
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class InstallationContextUnavailable(APIException):
@@ -16,19 +24,261 @@ class InstallationContextUnavailable(APIException):
 
 
 class PrivilegedMFARequired(PermissionDenied):
-    default_detail = "Two-factor authentication is required for privileged actions."
+    default_detail = "Two-factor authentication is required for this privileged action."
     default_code = "privileged_mfa_required"
+
+
+class PermissionKey(StrEnum):
+    INSTALLATION_MANAGE = "installation.manage"
+    WORKSPACES_VIEW = "workspaces.view"
+    ORGANIZATIONS_VIEW = "organizations.view"
+    ORGANIZATIONS_CREATE = "organizations.create"
+    ORGANIZATIONS_EDIT = "organizations.edit"
+    ORGANIZATIONS_ARCHIVE = "organizations.archive"
+    ORGANIZATIONS_MANAGE_ACCESS = "organizations.manage_access"
+    PEOPLE_VIEW = "people.view"
+    PEOPLE_CREATE = "people.create"
+    PEOPLE_EDIT = "people.edit"
+    PEOPLE_ARCHIVE = "people.archive"
+    SITES_VIEW = "sites.view"
+    SITES_CREATE = "sites.create"
+    SITES_EDIT = "sites.edit"
+    SITES_ARCHIVE = "sites.archive"
+    CUSTOM_FIELDS_VIEW = "custom_fields.view"
+    CUSTOM_FIELDS_MANAGE = "custom_fields.manage"
+    CUSTOM_FIELDS_EDIT_VALUES = "custom_fields.edit_values"
+    RELATIONSHIPS_VIEW = "relationships.view"
+    RELATIONSHIPS_CREATE = "relationships.create"
+    RELATIONSHIPS_ARCHIVE = "relationships.archive"
+    INVITATIONS_VIEW = "invitations.view"
+    INVITATIONS_CREATE = "invitations.create"
+    INVITATIONS_REVOKE = "invitations.revoke"
+    INVITATIONS_RESEND = "invitations.resend"
+    MEMBERSHIPS_VIEW = "memberships.view"
+    MEMBERSHIPS_ASSIGN_ROLE = "memberships.assign_role"
+    DOCUMENTS_VIEW = "documents.view"
+    DOCUMENTS_EDIT = "documents.edit"
+    DOCUMENTS_PUBLISH = "documents.publish"
+    ASSETS_VIEW = "assets.view"
+    ASSETS_EDIT = "assets.edit"
+    NETWORKS_VIEW = "networks.view"
+    NETWORKS_EDIT = "networks.edit"
+    COSTS_VIEW = "costs.view"
+    SECRETS_VIEW = "secrets.view"
+    SECRETS_REVEAL = "secrets.reveal"
+    COMPLIANCE_VIEW = "compliance.view"
+    COMPLIANCE_EDIT = "compliance.edit"
+    INTEGRATIONS_VIEW = "integrations.view"
+    INTEGRATIONS_MANAGE = "integrations.manage"
+
+
+@dataclass(frozen=True, slots=True)
+class PermissionDefinition:
+    key: PermissionKey
+    label: str
+    category: str
+    requires_mfa: bool = False
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "key": self.key.value,
+            "label": self.label,
+            "category": self.category,
+            "requires_mfa": self.requires_mfa,
+        }
+
+
+def _permission(key: PermissionKey, label: str, category: str, *, mfa: bool = False) -> PermissionDefinition:
+    return PermissionDefinition(key=key, label=label, category=category, requires_mfa=mfa)
+
+
+PERMISSION_CATALOG = (
+    _permission(PermissionKey.INSTALLATION_MANAGE, "Manage installation ownership", "Administration", mfa=True),
+    _permission(PermissionKey.WORKSPACES_VIEW, "Open MSP and authorized organization workspaces", "Workspaces"),
+    _permission(PermissionKey.ORGANIZATIONS_VIEW, "View organizations", "Organizations"),
+    _permission(PermissionKey.ORGANIZATIONS_CREATE, "Create organizations", "Organizations", mfa=True),
+    _permission(PermissionKey.ORGANIZATIONS_EDIT, "Edit organizations", "Organizations", mfa=True),
+    _permission(PermissionKey.ORGANIZATIONS_ARCHIVE, "Archive organizations", "Organizations", mfa=True),
+    _permission(
+        PermissionKey.ORGANIZATIONS_MANAGE_ACCESS, "Manage organization access modes", "Organizations", mfa=True
+    ),
+    _permission(PermissionKey.PEOPLE_VIEW, "View people", "People"),
+    _permission(PermissionKey.PEOPLE_CREATE, "Create people", "People", mfa=True),
+    _permission(PermissionKey.PEOPLE_EDIT, "Edit people", "People", mfa=True),
+    _permission(PermissionKey.PEOPLE_ARCHIVE, "Archive people", "People", mfa=True),
+    _permission(PermissionKey.SITES_VIEW, "View sites and locations", "Sites"),
+    _permission(PermissionKey.SITES_CREATE, "Create sites and locations", "Sites", mfa=True),
+    _permission(PermissionKey.SITES_EDIT, "Edit sites and locations", "Sites", mfa=True),
+    _permission(PermissionKey.SITES_ARCHIVE, "Archive sites and locations", "Sites", mfa=True),
+    _permission(PermissionKey.CUSTOM_FIELDS_VIEW, "View custom fields", "Custom fields"),
+    _permission(PermissionKey.CUSTOM_FIELDS_MANAGE, "Manage custom-field definitions", "Custom fields", mfa=True),
+    _permission(PermissionKey.CUSTOM_FIELDS_EDIT_VALUES, "Edit custom-field values", "Custom fields", mfa=True),
+    _permission(PermissionKey.RELATIONSHIPS_VIEW, "View entity relationships", "Relationships"),
+    _permission(PermissionKey.RELATIONSHIPS_CREATE, "Create entity relationships", "Relationships", mfa=True),
+    _permission(PermissionKey.RELATIONSHIPS_ARCHIVE, "Archive entity relationships", "Relationships", mfa=True),
+    _permission(PermissionKey.INVITATIONS_VIEW, "View invitations", "Administration"),
+    _permission(PermissionKey.INVITATIONS_CREATE, "Issue invitations", "Administration", mfa=True),
+    _permission(PermissionKey.INVITATIONS_REVOKE, "Revoke invitations", "Administration", mfa=True),
+    _permission(PermissionKey.INVITATIONS_RESEND, "Resend invitations", "Administration", mfa=True),
+    _permission(PermissionKey.MEMBERSHIPS_VIEW, "View tenant members and built-in roles", "Administration"),
+    _permission(PermissionKey.MEMBERSHIPS_ASSIGN_ROLE, "Assign tenant member roles", "Administration", mfa=True),
+    _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),
+    _permission(PermissionKey.DOCUMENTS_EDIT, "Edit documentation", "Documentation", mfa=True),
+    _permission(PermissionKey.DOCUMENTS_PUBLISH, "Publish documentation", "Documentation", mfa=True),
+    _permission(PermissionKey.ASSETS_VIEW, "View assets", "Assets"),
+    _permission(PermissionKey.ASSETS_EDIT, "Edit assets", "Assets", mfa=True),
+    _permission(PermissionKey.NETWORKS_VIEW, "View networks", "Networks"),
+    _permission(PermissionKey.NETWORKS_EDIT, "Edit networks", "Networks", mfa=True),
+    _permission(PermissionKey.COSTS_VIEW, "View costs", "Sensitive data"),
+    _permission(PermissionKey.SECRETS_VIEW, "View secret metadata", "Sensitive data"),
+    _permission(PermissionKey.SECRETS_REVEAL, "Reveal secret values", "Sensitive data", mfa=True),
+    _permission(PermissionKey.COMPLIANCE_VIEW, "View compliance evidence", "Compliance"),
+    _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
+    _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
+    _permission(PermissionKey.INTEGRATIONS_MANAGE, "Manage integrations", "Integrations", mfa=True),
+)
+PERMISSION_BY_KEY = {definition.key: definition for definition in PERMISSION_CATALOG}
+
+IMPLEMENTED_READS = frozenset(
+    {
+        PermissionKey.WORKSPACES_VIEW,
+        PermissionKey.ORGANIZATIONS_VIEW,
+        PermissionKey.PEOPLE_VIEW,
+        PermissionKey.SITES_VIEW,
+        PermissionKey.CUSTOM_FIELDS_VIEW,
+        PermissionKey.RELATIONSHIPS_VIEW,
+        PermissionKey.DOCUMENTS_VIEW,
+        PermissionKey.ASSETS_VIEW,
+        PermissionKey.NETWORKS_VIEW,
+        PermissionKey.COMPLIANCE_VIEW,
+        PermissionKey.INTEGRATIONS_VIEW,
+    }
+)
+TECHNICIAN_MUTATIONS = frozenset(
+    {
+        PermissionKey.PEOPLE_CREATE,
+        PermissionKey.PEOPLE_EDIT,
+        PermissionKey.PEOPLE_ARCHIVE,
+        PermissionKey.SITES_CREATE,
+        PermissionKey.SITES_EDIT,
+        PermissionKey.SITES_ARCHIVE,
+        PermissionKey.CUSTOM_FIELDS_EDIT_VALUES,
+        PermissionKey.RELATIONSHIPS_CREATE,
+        PermissionKey.RELATIONSHIPS_ARCHIVE,
+        PermissionKey.DOCUMENTS_EDIT,
+        PermissionKey.ASSETS_EDIT,
+        PermissionKey.NETWORKS_EDIT,
+        PermissionKey.COMPLIANCE_EDIT,
+    }
+)
+ADMINISTRATOR_PERMISSIONS = frozenset(
+    definition.key
+    for definition in PERMISSION_CATALOG
+    if definition.key
+    not in {
+        PermissionKey.INSTALLATION_MANAGE,
+        PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,
+        PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,
+        PermissionKey.SECRETS_REVEAL,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class RoleDefinition:
+    value: BuiltInRole
+    label: str
+    description: str
+    assignable_scope: str
+    permissions: frozenset[PermissionKey]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "value": self.value.value,
+            "label": self.label,
+            "description": self.description,
+            "assignable_scope": self.assignable_scope,
+            "permissions": sorted(permission.value for permission in self.permissions),
+        }
+
+
+ROLE_DEFINITIONS = (
+    RoleDefinition(
+        BuiltInRole.OWNER,
+        "Owner",
+        "Immutable installation owner with every permission.",
+        "installation",
+        frozenset(PermissionKey),
+    ),
+    RoleDefinition(
+        BuiltInRole.ADMINISTRATOR,
+        "Administrator",
+        "Tenant-wide administration except ownership, role assignment, and secret reveal.",
+        "tenant",
+        ADMINISTRATOR_PERMISSIONS,
+    ),
+    RoleDefinition(
+        BuiltInRole.TECHNICIAN,
+        "Technician",
+        "Operational read and change access across authorized MSP and client workspaces.",
+        "tenant",
+        IMPLEMENTED_READS | TECHNICIAN_MUTATIONS,
+    ),
+    RoleDefinition(
+        BuiltInRole.CONTRIBUTOR,
+        "Contributor",
+        "Read access plus documentation contribution in authorized workspaces.",
+        "tenant",
+        IMPLEMENTED_READS | {PermissionKey.DOCUMENTS_EDIT},
+    ),
+    RoleDefinition(
+        BuiltInRole.READ_ONLY,
+        "Read-only",
+        "Read access to non-secret operational records in authorized workspaces.",
+        "tenant",
+        IMPLEMENTED_READS,
+    ),
+    RoleDefinition(
+        BuiltInRole.CLIENT_ADMINISTRATOR,
+        "Client Administrator",
+        "Future organization-scoped client administration role.",
+        "organization",
+        IMPLEMENTED_READS | {PermissionKey.DOCUMENTS_EDIT},
+    ),
+    RoleDefinition(
+        BuiltInRole.CLIENT_USER,
+        "Client User",
+        "Future organization-scoped client reader role.",
+        "organization",
+        frozenset({PermissionKey.WORKSPACES_VIEW, PermissionKey.DOCUMENTS_VIEW}),
+    ),
+)
+ROLE_BY_VALUE = {definition.value: definition for definition in ROLE_DEFINITIONS}
 
 
 @dataclass(frozen=True)
 class InstallationMemberContext:
     state: InstallationState
     tenant: Tenant
+    user: User
+    role: BuiltInRole
     is_owner: bool
 
     @property
     def data_scope(self) -> DataScope:
         return DataScope.tenant(self.tenant)
+
+    @property
+    def permissions(self) -> frozenset[PermissionKey]:
+        return ROLE_BY_VALUE[self.role].permissions
+
+
+def permission_catalog() -> list[dict[str, object]]:
+    return [definition.as_dict() for definition in PERMISSION_CATALOG]
+
+
+def role_catalog() -> list[dict[str, object]]:
+    return [definition.as_dict() for definition in ROLE_DEFINITIONS]
 
 
 def require_installation_member(user: User) -> InstallationMemberContext:
@@ -44,15 +294,80 @@ def require_installation_member(user: User) -> InstallationMemberContext:
     if state.tenant is None:
         raise InstallationContextUnavailable()
     is_owner = state.owner_id == user.pk
-    if not is_owner and not TenantMembership.scoped.for_tenant(state.tenant).filter(user=user).exists():
+    if is_owner:
+        return InstallationMemberContext(
+            state=state, tenant=state.tenant, user=user, role=BuiltInRole.OWNER, is_owner=True
+        )
+    membership = TenantMembership.scoped.for_tenant(state.tenant).filter(user=user).first()
+    if membership is None:
         raise PermissionDenied("Installation membership is required.")
-    return InstallationMemberContext(state=state, tenant=state.tenant, is_owner=is_owner)
+    return InstallationMemberContext(
+        state=state,
+        tenant=state.tenant,
+        user=user,
+        role=BuiltInRole(membership.role),
+        is_owner=False,
+    )
+
+
+def _organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:
+    if organization.tenant_id != context.tenant.id or organization.entity.archived_at is not None:
+        return False
+    if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED:
+        return True
+    # Explicit user-to-organization assignments arrive in 0.1.10. Until then,
+    # assigned-only is deliberately owner-only instead of silently treating a
+    # tenant-wide role as an assignment.
+    return context.is_owner
+
+
+def context_has_permission(
+    context: InstallationMemberContext,
+    permission: PermissionKey,
+    *,
+    organization: Organization | None = None,
+) -> bool:
+    if permission not in context.permissions:
+        return False
+    return organization is None or _organization_allowed(context, organization)
+
+
+def require_permission(
+    user: User,
+    permission: PermissionKey,
+    *,
+    organization: Organization | None = None,
+) -> InstallationMemberContext:
+    context = require_installation_member(user)
+    if not context_has_permission(context, permission, organization=organization):
+        raise PermissionDenied("Your account is not authorized for this action.")
+    if (
+        PERMISSION_BY_KEY[permission].requires_mfa
+        and not Authenticator.objects.filter(
+            user=user,
+            type=Authenticator.Type.TOTP,
+        ).exists()
+    ):
+        raise PrivilegedMFARequired()
+    return context
+
+
+def accessible_organizations(
+    context: InstallationMemberContext,
+    permission: PermissionKey = PermissionKey.ORGANIZATIONS_VIEW,
+) -> QuerySet[Organization]:
+    if permission not in context.permissions:
+        return Organization.scoped.for_tenant(context.tenant).none()
+    organizations = Organization.scoped.for_tenant(context.tenant).filter(entity__archived_at__isnull=True)
+    if not context.is_owner:
+        organizations = organizations.filter(access_mode=OrganizationAccessMode.ALL_AUTHORIZED)
+    return organizations
 
 
 def require_installation_owner(user: User) -> InstallationMemberContext:
-    context = require_installation_member(user)
-    if not context.is_owner:
-        raise PermissionDenied("Installation ownership is required.")
-    if not Authenticator.objects.filter(user=user, type=Authenticator.Type.TOTP).exists():
-        raise PrivilegedMFARequired()
-    return context
+    """Compatibility boundary for bootstrap-era callers; new code requests a permission key."""
+    return require_permission(user, PermissionKey.INSTALLATION_MANAGE)
+
+
+def tenant_assignable_roles() -> Iterable[BuiltInRole]:
+    return TENANT_ASSIGNABLE_ROLES

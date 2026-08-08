@@ -55,6 +55,17 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Save organization' }).click()
   await expect(page.getByRole('status')).toHaveText('Organization added.')
 
+  await page.getByRole('button', { name: /Account menu for Live Workspace Owner/ }).click()
+  await page.getByRole('menuitem', { name: 'Access control' }).click()
+  await expect(page.getByRole('heading', { name: 'Access control' })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Access mode for Live Acme Client' }).selectOption('assigned_only')
+  await page.getByRole('button', { name: 'Review change' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('Only the owner will retain access')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText("Live Acme Client's access mode was updated")
+
+  await page.goto('/organizations')
+
   await page.getByRole('link', { name: 'Live Acme Client' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/overview$/)
   await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()

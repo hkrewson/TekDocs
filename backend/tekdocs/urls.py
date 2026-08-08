@@ -2,6 +2,13 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from apps.accounts.access_views import (
+    AccessControlCatalogView,
+    MemberListView,
+    MemberRoleView,
+    OrganizationAccessDetailView,
+    OrganizationAccessListView,
+)
 from apps.accounts.views import (
     AuthenticatedContextView,
     BootstrapStatusView,
@@ -66,6 +73,23 @@ urlpatterns = [
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
+    path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),
+    path("api/v1/access-control/members", MemberListView.as_view(), name="access-control-members"),
+    path(
+        "api/v1/access-control/members/<uuid:user_id>",
+        MemberRoleView.as_view(),
+        name="access-control-member-role",
+    ),
+    path(
+        "api/v1/access-control/organizations",
+        OrganizationAccessListView.as_view(),
+        name="access-control-organizations",
+    ),
+    path(
+        "api/v1/access-control/organizations/<uuid:organization_entity_id>",
+        OrganizationAccessDetailView.as_view(),
+        name="access-control-organization-detail",
+    ),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),

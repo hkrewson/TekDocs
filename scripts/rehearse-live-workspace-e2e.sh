@@ -55,6 +55,7 @@ assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
 assert organization.classifications.filter(kind="client").exists()
 assert organization.classifications.filter(kind="vendor").exists()
+assert organization.access_mode == "assigned_only"
 association = PersonAssociation.objects.select_related("person__entity", "organization").get(
     person__entity__display_name="Live Morgan Ellis"
 )

@@ -97,8 +97,8 @@ import os
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from apps.accounts.mfa_storage import PREFIX, decrypt_mfa_value
-from apps.accounts.models import TenantMembership, User
-from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Location, Organization, OrganizationClassification, Site, Tenant
+from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Location, Organization, OrganizationAccessMode, OrganizationClassification, Site, Tenant
 
 email = os.environ["UPGRADE_TEST_EMAIL"]
 owner = User.objects.get(email=email)
@@ -112,7 +112,8 @@ assert state.tenant_id == Tenant.objects.get(slug="upgrade-rehearsal-msp").id
 assert owner.display_name == "Upgrade Rehearsal Owner"
 assert owner.check_password(os.environ["UPGRADE_TEST_PASSWORD"])
 assert EmailAddress.objects.get(user=owner, email=email, primary=True, verified=True)
-assert TenantMembership.scoped.for_tenant(state.tenant).filter(user=owner).count() == 1
+owner_membership = TenantMembership.scoped.for_tenant(state.tenant).get(user=owner)
+assert owner_membership.role == BuiltInRole.READ_ONLY
 assert encrypted_secret.startswith(PREFIX)
 assert decrypt_mfa_value(encrypted_secret)
 assert AuditEvent.objects.filter(action="installation.owner_bootstrapped", actor=owner).count() == 1
@@ -120,6 +121,7 @@ assert AuditEvent.objects.filter(action="upgrade.fixture_created", actor=owner, 
 preserved_organization = Organization.scoped.for_tenant(state.tenant).get(entity__display_name="Preserved Client")
 assert preserved_organization.legal_name == ""
 assert preserved_organization.website == ""
+assert preserved_organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED
 OrganizationClassification.objects.create(
     tenant=state.tenant,
     organization=preserved_organization,
@@ -137,7 +139,7 @@ assert EntityLink.scoped.for_tenant(state.tenant).count() == 0
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute(
-        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s)",
+        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s)",
         [
             "core_organizationclassification",
             "core_site",
@@ -149,9 +151,11 @@ with connection.cursor() as cursor:
             "tekdocs_validate_location_scope()",
             "tekdocs_validate_entity_custom_fields()",
             "tekdocs_validate_entity_link_scope()",
+            "organization_access_mode_valid",
+            "tenant_membership_role_valid",
         ],
     )
-    classification_table, site_table, location_table, definition_table, version_table, entity_link_table, guard_function, location_guard, custom_field_guard, entity_link_guard = cursor.fetchone()
+    classification_table, site_table, location_table, definition_table, version_table, entity_link_table, guard_function, location_guard, custom_field_guard, entity_link_guard, access_mode_constraint, membership_role_constraint = cursor.fetchone()
 assert classification_table == "core_organizationclassification"
 assert site_table == "core_site"
 assert location_table == "core_location"
@@ -162,6 +166,8 @@ assert guard_function == "tekdocs_validate_organization_classification_scope()"
 assert location_guard == "tekdocs_validate_location_scope()"
 assert custom_field_guard == "tekdocs_validate_entity_custom_fields()"
 assert entity_link_guard == "tekdocs_validate_entity_link_scope()"
+assert access_mode_constraint
+assert membership_role_constraint
 print("Upgraded identity and authentication invariants verified")
 '
 current_compose exec -T backend python manage.py check

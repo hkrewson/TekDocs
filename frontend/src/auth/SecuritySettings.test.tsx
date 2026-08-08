@@ -8,6 +8,8 @@ import type { AuthClient, AuthenticatedContext, AuthSession } from './api'
 const context: AuthenticatedContext = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+  role: 'owner',
+  permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
 }
 
 const current: AuthSession = {

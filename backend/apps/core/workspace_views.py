@@ -23,7 +23,7 @@ class OrganizationWorkspaceContextView(APIView):
     @extend_schema(
         responses={
             200: WorkspaceContextSerializer,
-            403: OpenApiResponse(description="Installation owner with MFA required"),
+            403: OpenApiResponse(description="Authorized organization workspace access required"),
             404: OpenApiResponse(description="Organization workspace not found"),
             503: OpenApiResponse(description="Installation context unavailable"),
         }
@@ -40,7 +40,7 @@ class OrganizationWorkspaceSearchView(APIView):
         responses={
             200: WorkspaceSearchResultSerializer,
             400: OpenApiResponse(description="Invalid search parameters"),
-            403: OpenApiResponse(description="Installation owner with MFA required"),
+            403: OpenApiResponse(description="Organization directory permission required"),
         },
     )
     def get(self, request):  # type: ignore[no-untyped-def]

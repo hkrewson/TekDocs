@@ -191,10 +191,7 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
             # the tenant cannot be known until the digest resolves, and lifecycle checks remain
             # generic and transactional below. Ordinary domain reads must use ``scoped``.
             invitation = (
-                Invitation.objects.select_for_update()
-                .select_related("tenant")
-                .filter(token_digest=digest)
-                .first()
+                Invitation.objects.select_for_update().select_related("tenant").filter(token_digest=digest).first()
             )
             if invitation is None or invitation.state != InvitationState.PENDING:
                 pass
@@ -221,9 +218,7 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
                 invitation.accepted_by = user
                 invitation.accepted_at = timezone.now()
                 invitation.token_digest = EMPTY_DIGEST
-                invitation.save(
-                    update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at")
-                )
+                invitation.save(update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at"))
                 _audit(invitation=invitation, actor=user, action="invitation.accepted")
                 accepted = AcceptedInvitation(invitation=invitation, user=user)
     except IntegrityError as exc:

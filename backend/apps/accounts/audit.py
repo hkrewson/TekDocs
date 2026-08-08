@@ -8,10 +8,14 @@ from .models import TenantMembership, User
 def record_auth_event(*, action: str, request: HttpRequest | None = None, user: User | None = None) -> AuditEvent:
     """Record an authentication event without credentials or client identifiers."""
 
-    state = InstallationState.objects.select_related("tenant", "owner").filter(
-        pk=InstallationState.SINGLETON_ID,
-        bootstrapped_at__isnull=False,
-    ).first()
+    state = (
+        InstallationState.objects.select_related("tenant", "owner")
+        .filter(
+            pk=InstallationState.SINGLETON_ID,
+            bootstrapped_at__isnull=False,
+        )
+        .first()
+    )
     tenant = None
     actor = None
     if state is not None and state.tenant is not None:

@@ -5,7 +5,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import LocationKind, Organization, OrganizationKind, PersonAssociationKind, Site
+from .models import (
+    LocationKind,
+    Organization,
+    OrganizationAccessMode,
+    OrganizationKind,
+    PersonAssociationKind,
+    Site,
+)
 
 
 def _clean_name(value: str) -> str:
@@ -46,6 +53,7 @@ class OrganizationSerializer(serializers.Serializer):
     name = serializers.CharField(source="entity.display_name")
     legal_name = serializers.CharField()
     website = serializers.URLField()
+    access_mode = serializers.ChoiceField(choices=OrganizationAccessMode.choices)
     classifications = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()

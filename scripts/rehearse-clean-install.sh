@@ -42,8 +42,8 @@ curl --fail --silent "http://127.0.0.1:$mailpit_port/readyz" >/dev/null
 clean_compose exec -T backend python manage.py migrate --check
 clean_compose exec -T backend python manage.py makemigrations --check --dry-run
 clean_compose exec -T backend python manage.py shell -c '
-from apps.accounts.models import TenantMembership, User
-from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Tenant
+from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Organization, OrganizationAccessMode, Tenant
 
 state = InstallationState.objects.get(pk=InstallationState.SINGLETON_ID)
 assert not state.is_bootstrapped
@@ -56,6 +56,8 @@ assert AuditEvent.objects.count() == 0
 assert CustomFieldDefinition.objects.count() == 0
 assert CustomFieldDefinitionVersion.objects.count() == 0
 assert EntityLink.objects.count() == 0
+assert TenantMembership._meta.get_field("role").get_default() == BuiltInRole.READ_ONLY
+assert Organization._meta.get_field("access_mode").get_default() == OrganizationAccessMode.ALL_AUTHORIZED
 print("Fresh installation state verified")
 '
 

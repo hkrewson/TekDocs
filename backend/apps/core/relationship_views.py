@@ -6,7 +6,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import require_installation_member, require_installation_owner
+from apps.accounts.policy import PermissionKey, require_permission
 
 from .relationship_serializers import (
     EntityLinkTypeSerializer,
@@ -27,10 +27,15 @@ from .relationships import (
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
-def _workspace(request, organization_entity_id: UUID | None) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+def _workspace(  # type: ignore[no-untyped-def]
+    request, organization_entity_id: UUID | None, permission: PermissionKey
+) -> ResolvedWorkspace:
     if organization_entity_id is None:
-        return resolve_msp_workspace(request.user)
-    return resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+        workspace = resolve_msp_workspace(request.user)
+    else:
+        workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+    require_permission(request.user, permission, organization=workspace.organization)
+    return workspace
 
 
 def _not_found() -> NotFound:
@@ -45,7 +50,7 @@ class EntityLinkTypeCatalogView(APIView):
         }
     )
     def get(self, request):  # type: ignore[no-untyped-def]
-        require_installation_member(request.user)
+        require_permission(request.user, PermissionKey.RELATIONSHIPS_VIEW)
         return Response(EntityLinkTypeSerializer(link_type_catalog(), many=True).data)
 
 
@@ -61,7 +66,7 @@ class EntitySearchView(APIView):
         },
     )
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
-        workspace = _workspace(request, organization_entity_id)
+        workspace = _workspace(request, organization_entity_id, PermissionKey.RELATIONSHIPS_VIEW)
         query = EntitySearchQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         values = query.validated_data
@@ -92,7 +97,7 @@ class EntityRelationshipListCreateView(APIView):
         },
     )
     def get(self, request, entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
-        workspace = _workspace(request, organization_entity_id)
+        workspace = _workspace(request, organization_entity_id, PermissionKey.RELATIONSHIPS_VIEW)
         try:
             relationships = relationships_for_entity(workspace=workspace, entity_id=entity_id)
         except ObjectDoesNotExist as exc:
@@ -105,13 +110,12 @@ class EntityRelationshipListCreateView(APIView):
         responses={
             201: EntityRelationshipSerializer,
             400: OpenApiResponse(description="Invalid or duplicate relationship"),
-            403: OpenApiResponse(description="Installation owner with MFA required"),
+            403: OpenApiResponse(description="Relationship creation permission and MFA required"),
             404: OpenApiResponse(description="Entity not found in workspace"),
         },
     )
     def post(self, request, entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
-        require_installation_owner(request.user)
-        workspace = _workspace(request, organization_entity_id)
+        workspace = _workspace(request, organization_entity_id, PermissionKey.RELATIONSHIPS_CREATE)
         serializer = EntityLinkWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -140,13 +144,12 @@ class EntityRelationshipDetailView(APIView):
         request=None,
         responses={
             204: OpenApiResponse(description="Relationship archived"),
-            403: OpenApiResponse(description="Installation owner with MFA required"),
+            403: OpenApiResponse(description="Relationship archive permission and MFA required"),
             404: OpenApiResponse(description="Relationship not found in workspace"),
         },
     )
     def delete(self, request, entity_id, link_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
-        require_installation_owner(request.user)
-        workspace = _workspace(request, organization_entity_id)
+        workspace = _workspace(request, organization_entity_id, PermissionKey.RELATIONSHIPS_ARCHIVE)
         try:
             archive_entity_link(
                 workspace=workspace,

@@ -8,7 +8,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import require_installation_owner
+from apps.accounts.policy import PermissionKey, require_permission
 
 from .models import PersonAssociation
 from .people import archive_person_association, create_person, people_for_scope, query_people, update_person
@@ -45,8 +45,8 @@ def _query_parameters() -> list[OpenApiParameter]:
     ]
 
 
-def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    member = require_installation_owner(request.user)
+def _msp_workspace(request, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    member = require_permission(request.user, permission)
     return ResolvedWorkspace(
         member=member,
         kind="msp",
@@ -58,8 +58,12 @@ def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def
     )
 
 
-def _organization_workspace(request, organization_entity_id: UUID) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    return resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _organization_workspace(  # type: ignore[no-untyped-def]
+    request, organization_entity_id: UUID, permission: PermissionKey
+) -> ResolvedWorkspace:
+    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+    require_permission(request.user, permission, organization=workspace.organization)
+    return workspace
 
 
 def _list(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
@@ -170,7 +174,7 @@ class MSPPeopleListCreateView(APIView):
         responses={200: PeopleResultSerializer, 403: OpenApiResponse()},
     )
     def get(self, request):  # type: ignore[no-untyped-def]
-        return _list(_msp_workspace(request), request)
+        return _list(_msp_workspace(request, PermissionKey.PEOPLE_VIEW), request)
 
     @extend_schema(
         operation_id="people_msp_create",
@@ -178,13 +182,13 @@ class MSPPeopleListCreateView(APIView):
         responses={201: PersonSerializer, 403: OpenApiResponse()},
     )
     def post(self, request):  # type: ignore[no-untyped-def]
-        return _create(_msp_workspace(request), request)
+        return _create(_msp_workspace(request, PermissionKey.PEOPLE_CREATE), request)
 
 
 class MSPPersonDetailView(APIView):
     @extend_schema(operation_id="people_msp_retrieve", responses={200: PersonSerializer, 404: OpenApiResponse()})
     def get(self, request, person_entity_id):  # type: ignore[no-untyped-def]
-        return _detail(_msp_workspace(request), person_entity_id)
+        return _detail(_msp_workspace(request, PermissionKey.PEOPLE_VIEW), person_entity_id)
 
     @extend_schema(
         operation_id="people_msp_update",
@@ -192,7 +196,7 @@ class MSPPersonDetailView(APIView):
         responses={200: PersonSerializer, 404: OpenApiResponse()},
     )
     def patch(self, request, person_entity_id):  # type: ignore[no-untyped-def]
-        return _update(_msp_workspace(request), person_entity_id, request)
+        return _update(_msp_workspace(request, PermissionKey.PEOPLE_EDIT), person_entity_id, request)
 
     @extend_schema(
         operation_id="people_msp_archive",
@@ -200,7 +204,7 @@ class MSPPersonDetailView(APIView):
         responses={204: OpenApiResponse(), 404: OpenApiResponse()},
     )
     def delete(self, request, person_entity_id):  # type: ignore[no-untyped-def]
-        return _archive(_msp_workspace(request), person_entity_id, request)
+        return _archive(_msp_workspace(request, PermissionKey.PEOPLE_ARCHIVE), person_entity_id, request)
 
 
 class OrganizationPeopleListCreateView(APIView):
@@ -210,7 +214,7 @@ class OrganizationPeopleListCreateView(APIView):
         responses={200: PeopleResultSerializer, 404: OpenApiResponse()},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _list(_organization_workspace(request, organization_entity_id), request)
+        return _list(_organization_workspace(request, organization_entity_id, PermissionKey.PEOPLE_VIEW), request)
 
     @extend_schema(
         operation_id="people_organization_create",
@@ -218,7 +222,7 @@ class OrganizationPeopleListCreateView(APIView):
         responses={201: PersonSerializer, 404: OpenApiResponse()},
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _create(_organization_workspace(request, organization_entity_id), request)
+        return _create(_organization_workspace(request, organization_entity_id, PermissionKey.PEOPLE_CREATE), request)
 
 
 class OrganizationPersonDetailView(APIView):
@@ -227,7 +231,9 @@ class OrganizationPersonDetailView(APIView):
         responses={200: PersonSerializer, 404: OpenApiResponse()},
     )
     def get(self, request, organization_entity_id, person_entity_id):  # type: ignore[no-untyped-def]
-        return _detail(_organization_workspace(request, organization_entity_id), person_entity_id)
+        return _detail(
+            _organization_workspace(request, organization_entity_id, PermissionKey.PEOPLE_VIEW), person_entity_id
+        )
 
     @extend_schema(
         operation_id="people_organization_update",
@@ -235,7 +241,11 @@ class OrganizationPersonDetailView(APIView):
         responses={200: PersonSerializer, 404: OpenApiResponse()},
     )
     def patch(self, request, organization_entity_id, person_entity_id):  # type: ignore[no-untyped-def]
-        return _update(_organization_workspace(request, organization_entity_id), person_entity_id, request)
+        return _update(
+            _organization_workspace(request, organization_entity_id, PermissionKey.PEOPLE_EDIT),
+            person_entity_id,
+            request,
+        )
 
     @extend_schema(
         operation_id="people_organization_archive",
@@ -243,4 +253,8 @@ class OrganizationPersonDetailView(APIView):
         responses={204: OpenApiResponse(), 404: OpenApiResponse()},
     )
     def delete(self, request, organization_entity_id, person_entity_id):  # type: ignore[no-untyped-def]
-        return _archive(_organization_workspace(request, organization_entity_id), person_entity_id, request)
+        return _archive(
+            _organization_workspace(request, organization_entity_id, PermissionKey.PEOPLE_ARCHIVE),
+            person_entity_id,
+            request,
+        )

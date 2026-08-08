@@ -136,14 +136,25 @@ def test_organization_endpoints_deny_anonymous_non_owner_missing_mfa_and_foreign
 
     member = User.objects.create_user(email="member@example.com", display_name="Member")
     client.force_login(member)
-    assert client.post(
-        reverse("organization-list-create"),
-        organization_payload(),
-        content_type="application/json",
-    ).status_code == 403
+    assert (
+        client.post(
+            reverse("organization-list-create"),
+            organization_payload(),
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(reverse("organization-list-create")).status_code == 403
+    assert owner_client.get(reverse("organization-list-create")).status_code == 200
+    assert (
+        owner_client.post(
+            reverse("organization-list-create"),
+            organization_payload(name="MFA Required"),
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
     TOTP.activate(installation.owner, generate_totp_secret())
 
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign")
@@ -154,11 +165,14 @@ def test_organization_endpoints_deny_anonymous_non_owner_missing_mfa_and_foreign
     )
     foreign = Organization.objects.create(tenant=foreign_tenant, entity=foreign_entity)
     assert owner_client.get(reverse("organization-detail", kwargs={"entity_id": foreign.entity_id})).status_code == 404
-    assert owner_client.patch(
-        reverse("organization-detail", kwargs={"entity_id": foreign.entity_id}),
-        organization_payload(name="Hijacked"),
-        content_type="application/json",
-    ).status_code == 404
+    assert (
+        owner_client.patch(
+            reverse("organization-detail", kwargs={"entity_id": foreign.entity_id}),
+            organization_payload(name="Hijacked"),
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
     foreign_delete = owner_client.delete(reverse("organization-detail", kwargs={"entity_id": foreign.entity_id}))
     assert foreign_delete.status_code == 404
     foreign.entity.refresh_from_db()

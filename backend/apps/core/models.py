@@ -104,6 +104,11 @@ class Entity(TimestampedModel):
             raise ValidationError("Organization scope must belong to the entity tenant")
 
 
+class OrganizationAccessMode(models.TextChoices):
+    ALL_AUTHORIZED = "all_authorized", "All authorized MSP staff"
+    ASSIGNED_ONLY = "assigned_only", "Assigned MSP staff only"
+
+
 class Organization(TimestampedModel):
     """A tenant-owned business organization anchored to one universal entity."""
 
@@ -112,12 +117,26 @@ class Organization(TimestampedModel):
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="organization_record")
     legal_name = models.CharField(max_length=240, blank=True)
     website = models.URLField(max_length=500, blank=True)
+    access_mode = models.CharField(
+        max_length=32,
+        choices=OrganizationAccessMode.choices,
+        default=OrganizationAccessMode.ALL_AUTHORIZED,
+    )
 
     objects = models.Manager()
     scoped = TenantScopedManager()
 
     class Meta:
-        indexes = [models.Index(fields=["tenant", "created_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(access_mode__in=OrganizationAccessMode.values),
+                name="organization_access_mode_valid",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "created_at"]),
+            models.Index(fields=["tenant", "access_mode", "entity"], name="core_org_tenant_access_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.entity.display_name

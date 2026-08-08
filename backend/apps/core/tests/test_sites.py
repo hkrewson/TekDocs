@@ -136,9 +136,13 @@ def test_owner_can_manage_nested_sites_and_locations_in_msp_and_organization_wor
     assert not Location.objects.filter(site__entity_id=site_id, archived_at__isnull=True).exists()
     actions = list(AuditEvent.objects.values_list("action", flat=True))
     assert {"site.created", "site.updated", "site.archived", "location.created", "location.updated"} <= set(actions)
-    assert not AuditEvent.objects.filter(
-        action__in={"site.created", "site.updated", "site.archived", "location.created", "location.updated"}
-    ).exclude(metadata={}).exists()
+    assert (
+        not AuditEvent.objects.filter(
+            action__in={"site.created", "site.updated", "site.archived", "location.created", "location.updated"}
+        )
+        .exclude(metadata={})
+        .exists()
+    )
 
 
 @pytest.mark.django_db
@@ -220,7 +224,11 @@ def test_site_endpoints_deny_anonymous_member_missing_mfa_csrf_and_cross_workspa
     assert client.get(first_url).status_code == 403
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(first_url).status_code == 403
+    assert owner_client.get(first_url).status_code == 200
+    assert (
+        owner_client.post(first_url, site_payload(name="MFA Required"), content_type="application/json").status_code
+        == 403
+    )
     TOTP.activate(installation.owner, generate_totp_secret())
 
     second_detail = reverse(
@@ -233,9 +241,7 @@ def test_site_endpoints_deny_anonymous_member_missing_mfa_csrf_and_cross_workspa
 
     csrf_client = Client(enforce_csrf_checks=True)
     csrf_client.force_login(installation.owner)
-    csrf_response = csrf_client.post(
-        reverse("msp-site-list-create"), site_payload(), content_type="application/json"
-    )
+    csrf_response = csrf_client.post(reverse("msp-site-list-create"), site_payload(), content_type="application/json")
     assert csrf_response.status_code == 403
 
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign-sites")

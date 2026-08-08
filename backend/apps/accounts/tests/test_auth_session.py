@@ -59,7 +59,10 @@ def test_browser_session_requires_csrf_for_login_and_logout(owner_credentials):
 
     context = client.get(reverse("auth-context"))
     assert context.status_code == 200
-    assert context.json() == {
+    context_payload = context.json()
+    assert context_payload["role"] == "owner"
+    assert "memberships.assign_role" in context_payload["permissions"]
+    assert {key: context_payload[key] for key in ("user", "tenant")} == {
         "user": {
             "id": str(result.owner.id),
             "email": result.owner.email,

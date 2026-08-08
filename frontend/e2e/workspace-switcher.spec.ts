@@ -5,6 +5,33 @@ import type { Page } from '@playwright/test'
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+  role: 'owner',
+  permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
+}
+
+const accessMember = {
+  id: crypto.randomUUID(),
+  display_name: 'Morgan Ellis',
+  email: 'morgan@example.com',
+  role: 'read_only',
+  is_owner: false,
+  joined_at: '2026-08-08T13:00:00Z',
+}
+
+const accessCatalog = {
+  permissions: [
+    { key: 'memberships.assign_role', label: 'Assign tenant roles', category: 'Access control', requires_mfa: true },
+    { key: 'organizations.manage_access', label: 'Manage organization access', category: 'Access control', requires_mfa: true },
+  ],
+  roles: [
+    { value: 'owner', label: 'Owner', description: 'Installation owner.', assignable_scope: 'installation', permissions: ['memberships.assign_role'] },
+    { value: 'administrator', label: 'Administrator', description: 'Tenant administrator.', assignable_scope: 'tenant', permissions: ['memberships.assign_role'] },
+    { value: 'technician', label: 'Technician', description: 'Operational staff.', assignable_scope: 'tenant', permissions: [] },
+    { value: 'contributor', label: 'Contributor', description: 'Documentation contributor.', assignable_scope: 'tenant', permissions: [] },
+    { value: 'read_only', label: 'Read-only', description: 'Read-only staff.', assignable_scope: 'tenant', permissions: [] },
+    { value: 'client_administrator', label: 'Client Administrator', description: 'Client administrator.', assignable_scope: 'organization', permissions: [] },
+    { value: 'client_user', label: 'Client User', description: 'Client user.', assignable_scope: 'organization', permissions: [] },
+  ],
 }
 
 const clientWorkspace = {
@@ -79,6 +106,20 @@ async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
+  await page.route('**/api/v1/access-control/catalog', (route) => route.fulfill({ json: accessCatalog }))
+  await page.route('**/api/v1/access-control/members', (route) => route.fulfill({ json: [
+    { ...context.user, role: 'owner', is_owner: true, joined_at: '2026-08-08T12:00:00Z' },
+    accessMember,
+  ] }))
+  await page.route('**/api/v1/access-control/members/*', (route) => route.fulfill({ json: { ...accessMember, role: 'technician' } }))
+  await page.route('**/api/v1/access-control/organizations', (route) => route.fulfill({ json: [
+    { id: clientWorkspace.id, name: clientWorkspace.name, access_mode: 'all_authorized' },
+  ] }))
+  await page.route('**/api/v1/access-control/organizations/*', (route) => route.fulfill({ json: {
+    id: clientWorkspace.id,
+    name: clientWorkspace.name,
+    access_mode: 'assigned_only',
+  } }))
   await page.route('**/api/v1/entity-link-types', (route) => route.fulfill({ json: [
     { value: 'related_to', forward_label: 'Related to', inverse_label: 'Related to', symmetric: true, target_types: [] },
     { value: 'supplied_by', forward_label: 'Supplied by', inverse_label: 'Supplies', symmetric: false, target_types: ['organization'] },
@@ -122,6 +163,30 @@ async function mockWorkspaceApplication(page: Page) {
     return route.fulfill({ json: { results: choices.map(({ id, name, classifications, capabilities }) => ({ id, name, classifications, capabilities })), page: 1, page_size: 15, has_more: false } })
   })
 }
+
+test('owner reviews role and client access-mode changes through the policy interface', async ({ page, baseURL }) => {
+  if (!baseURL) throw new Error('Browser test base URL is unavailable.')
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await mockWorkspaceApplication(page)
+  await page.goto('/overview')
+
+  await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
+  await page.getByRole('menuitem', { name: 'Access control' }).click()
+  await expect(page.getByRole('heading', { name: 'Access control' })).toBeVisible()
+
+  await page.getByRole('combobox', { name: 'Role for Morgan Ellis' }).selectOption('technician')
+  await page.getByRole('button', { name: 'Review change' }).first().click()
+  await expect(page.getByRole('alertdialog')).toContainText('Change Morgan Ellis from Read-only to Technician')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText("Morgan Ellis's role was updated")
+
+  await page.getByRole('combobox', { name: 'Access mode for Acme Dental' }).selectOption('assigned_only')
+  await page.getByRole('button', { name: 'Review change' }).last().click()
+  await expect(page.getByRole('alertdialog')).toContainText('Only the owner will retain access')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText("Acme Dental's access mode was updated")
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})
 
 test('workspace switcher preserves routes, capability navigation, history, and accessibility', async ({ page }) => {
   await mockWorkspaceApplication(page)

@@ -210,6 +210,9 @@ SPECTACULAR_SETTINGS = {
         "PersonAssociationKindEnum": "apps.core.models.PersonAssociationKind",
         "LocationKindEnum": "apps.core.models.LocationKind",
         "EntityLinkTypeEnum": "apps.core.models.EntityLinkType",
+        "BuiltInRoleEnum": "apps.accounts.models.BuiltInRole",
+        "TenantAssignableRoleEnum": "apps.accounts.models.TENANT_ASSIGNABLE_ROLE_CHOICES",
+        "OrganizationAccessModeEnum": "apps.core.models.OrganizationAccessMode",
     },
 }
 

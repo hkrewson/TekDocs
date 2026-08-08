@@ -13,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import require_installation_owner
+from apps.accounts.policy import PermissionKey, require_permission
 
 from .custom_field_serializers import (
     CustomFieldDefinitionResultSerializer,
@@ -43,8 +43,8 @@ from .scoping import DataScope
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
 
 
-def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    member = require_installation_owner(request.user)
+def _msp_workspace(request, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    member = require_permission(request.user, permission)
     return ResolvedWorkspace(
         member=member,
         kind="msp",
@@ -56,8 +56,12 @@ def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def
     )
 
 
-def _organization_workspace(request, organization_entity_id: UUID) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    return resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _organization_workspace(  # type: ignore[no-untyped-def]
+    request, organization_entity_id: UUID, permission: PermissionKey
+) -> ResolvedWorkspace:
+    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+    require_permission(request.user, permission, organization=workspace.organization)
+    return workspace
 
 
 def _definition_context(workspace: ResolvedWorkspace) -> dict[str, object]:
@@ -187,7 +191,7 @@ def _clear_entity_field(
 class MSPCustomFieldDefinitionListCreateView(APIView):
     @extend_schema(operation_id="custom_fields_msp_list", responses={200: CustomFieldDefinitionResultSerializer})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return _list_definitions(_msp_workspace(request))
+        return _list_definitions(_msp_workspace(request, PermissionKey.CUSTOM_FIELDS_VIEW))
 
     @extend_schema(
         operation_id="custom_fields_msp_create",
@@ -195,7 +199,7 @@ class MSPCustomFieldDefinitionListCreateView(APIView):
         responses={201: CustomFieldDefinitionSerializer},
     )
     def post(self, request):  # type: ignore[no-untyped-def]
-        return _create_definition(_msp_workspace(request), request)
+        return _create_definition(_msp_workspace(request, PermissionKey.CUSTOM_FIELDS_MANAGE), request)
 
 
 class MSPCustomFieldDefinitionDetailView(APIView):
@@ -205,11 +209,11 @@ class MSPCustomFieldDefinitionDetailView(APIView):
         responses={200: CustomFieldDefinitionVersionResultSerializer},
     )
     def patch(self, request, definition_id):  # type: ignore[no-untyped-def]
-        return _version_definition(_msp_workspace(request), definition_id, request)
+        return _version_definition(_msp_workspace(request, PermissionKey.CUSTOM_FIELDS_MANAGE), definition_id, request)
 
     @extend_schema(operation_id="custom_fields_msp_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, definition_id):  # type: ignore[no-untyped-def]
-        return _archive_definition(_msp_workspace(request), definition_id, request)
+        return _archive_definition(_msp_workspace(request, PermissionKey.CUSTOM_FIELDS_MANAGE), definition_id, request)
 
 
 class OrganizationCustomFieldDefinitionListCreateView(APIView):
@@ -218,7 +222,9 @@ class OrganizationCustomFieldDefinitionListCreateView(APIView):
         responses={200: CustomFieldDefinitionResultSerializer},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _list_definitions(_organization_workspace(request, organization_entity_id))
+        return _list_definitions(
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_VIEW)
+        )
 
     @extend_schema(
         operation_id="custom_fields_organization_create",
@@ -226,7 +232,9 @@ class OrganizationCustomFieldDefinitionListCreateView(APIView):
         responses={201: CustomFieldDefinitionSerializer},
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _create_definition(_organization_workspace(request, organization_entity_id), request)
+        return _create_definition(
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_MANAGE), request
+        )
 
 
 class OrganizationCustomFieldDefinitionDetailView(APIView):
@@ -236,17 +244,25 @@ class OrganizationCustomFieldDefinitionDetailView(APIView):
         responses={200: CustomFieldDefinitionVersionResultSerializer},
     )
     def patch(self, request, organization_entity_id, definition_id):  # type: ignore[no-untyped-def]
-        return _version_definition(_organization_workspace(request, organization_entity_id), definition_id, request)
+        return _version_definition(
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_MANAGE),
+            definition_id,
+            request,
+        )
 
     @extend_schema(operation_id="custom_fields_organization_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, organization_entity_id, definition_id):  # type: ignore[no-untyped-def]
-        return _archive_definition(_organization_workspace(request, organization_entity_id), definition_id, request)
+        return _archive_definition(
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_MANAGE),
+            definition_id,
+            request,
+        )
 
 
 class MSPEntityCustomFieldListView(APIView):
     @extend_schema(operation_id="entity_custom_fields_msp_list", responses={200: EntityCustomFieldResultSerializer})
     def get(self, request, entity_id):  # type: ignore[no-untyped-def]
-        return _entity_fields(_msp_workspace(request), entity_id)
+        return _entity_fields(_msp_workspace(request, PermissionKey.CUSTOM_FIELDS_VIEW), entity_id)
 
 
 class MSPEntityCustomFieldDetailView(APIView):
@@ -256,11 +272,15 @@ class MSPEntityCustomFieldDetailView(APIView):
         responses={200: EntityCustomFieldResultSerializer},
     )
     def patch(self, request, entity_id, definition_id):  # type: ignore[no-untyped-def]
-        return _set_entity_field(_msp_workspace(request), entity_id, definition_id, request)
+        return _set_entity_field(
+            _msp_workspace(request, PermissionKey.CUSTOM_FIELDS_EDIT_VALUES), entity_id, definition_id, request
+        )
 
     @extend_schema(operation_id="entity_custom_fields_msp_clear", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, entity_id, definition_id):  # type: ignore[no-untyped-def]
-        return _clear_entity_field(_msp_workspace(request), entity_id, definition_id, request)
+        return _clear_entity_field(
+            _msp_workspace(request, PermissionKey.CUSTOM_FIELDS_EDIT_VALUES), entity_id, definition_id, request
+        )
 
 
 class OrganizationEntityCustomFieldListView(APIView):
@@ -269,7 +289,9 @@ class OrganizationEntityCustomFieldListView(APIView):
         responses={200: EntityCustomFieldResultSerializer},
     )
     def get(self, request, organization_entity_id, entity_id):  # type: ignore[no-untyped-def]
-        return _entity_fields(_organization_workspace(request, organization_entity_id), entity_id)
+        return _entity_fields(
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_VIEW), entity_id
+        )
 
 
 class OrganizationEntityCustomFieldDetailView(APIView):
@@ -280,7 +302,10 @@ class OrganizationEntityCustomFieldDetailView(APIView):
     )
     def patch(self, request, organization_entity_id, entity_id, definition_id):  # type: ignore[no-untyped-def]
         return _set_entity_field(
-            _organization_workspace(request, organization_entity_id), entity_id, definition_id, request
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_EDIT_VALUES),
+            entity_id,
+            definition_id,
+            request,
         )
 
     @extend_schema(
@@ -290,5 +315,8 @@ class OrganizationEntityCustomFieldDetailView(APIView):
     )
     def delete(self, request, organization_entity_id, entity_id, definition_id):  # type: ignore[no-untyped-def]
         return _clear_entity_field(
-            _organization_workspace(request, organization_entity_id), entity_id, definition_id, request
+            _organization_workspace(request, organization_entity_id, PermissionKey.CUSTOM_FIELDS_EDIT_VALUES),
+            entity_id,
+            definition_id,
+            request,
         )

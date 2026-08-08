@@ -80,9 +80,7 @@ class EnvelopeCipher:
             _decode(envelope.wrap_nonce), _decode(envelope.wrapped_key), b"tekdocs:dek:" + associated_data
         )
         wrap_nonce = os.urandom(12)
-        wrapped_key = AESGCM(new_cipher._wrapping_key).encrypt(
-            wrap_nonce, data_key, b"tekdocs:dek:" + associated_data
-        )
+        wrapped_key = AESGCM(new_cipher._wrapping_key).encrypt(wrap_nonce, data_key, b"tekdocs:dek:" + associated_data)
         return Envelope(
             algorithm=envelope.algorithm,
             ciphertext=envelope.ciphertext,

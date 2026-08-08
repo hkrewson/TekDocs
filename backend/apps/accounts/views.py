@@ -19,8 +19,8 @@ from apps.core.models import InstallationState
 from .audit import record_auth_event
 from .bootstrap import bootstrap_owner
 from .invitations import InvitationConflict, accept_invitation, issue_invitation, resend_invitation, revoke_invitation
-from .models import Invitation
-from .policy import require_installation_member, require_installation_owner
+from .models import Invitation, User
+from .policy import InstallationMemberContext, PermissionKey, require_installation_member, require_permission
 from .serializers import (
     AuthenticatedContextSerializer,
     BootstrapStatusSerializer,
@@ -34,6 +34,15 @@ from .serializers import (
 )
 
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
+
+
+def _context_payload(user: User, context: InstallationMemberContext) -> dict[str, object]:
+    return {
+        "user": {"id": str(user.pk), "email": user.email, "display_name": user.display_name},
+        "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
+        "role": context.role.value,
+        "permissions": sorted(permission.value for permission in context.permissions),
+    }
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -100,16 +109,7 @@ class AuthenticatedContextView(APIView):
     )
     def get(self, request):  # type: ignore[no-untyped-def]
         context = require_installation_member(request.user)
-        return Response(
-            {
-                "user": {
-                    "id": str(request.user.pk),
-                    "email": request.user.email,
-                    "display_name": request.user.display_name,
-                },
-                "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
-            }
-        )
+        return Response(_context_payload(request.user, context))
 
 
 class ProfileView(APIView):
@@ -129,16 +129,7 @@ class ProfileView(APIView):
         request.user.display_name = serializer.validated_data["display_name"]
         request.user.save(update_fields=("display_name",))
         record_auth_event(action="auth.profile_updated", request=request, user=request.user)
-        return Response(
-            {
-                "user": {
-                    "id": str(request.user.pk),
-                    "email": request.user.email,
-                    "display_name": request.user.display_name,
-                },
-                "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
-            }
-        )
+        return Response(_context_payload(request.user, context))
 
 
 class OidcProviderListView(APIView):
@@ -174,25 +165,14 @@ class InvitationAcceptView(APIView):
         serializer.is_valid(raise_exception=True)
         accepted = accept_invitation(**serializer.validated_data)
         login(request._request, accepted.user, backend="django.contrib.auth.backends.ModelBackend")
-        return Response(
-            {
-                "user": {
-                    "id": str(accepted.user.id),
-                    "email": accepted.user.email,
-                    "display_name": accepted.user.display_name,
-                },
-                "tenant": {
-                    "id": str(accepted.invitation.tenant.id),
-                    "name": accepted.invitation.tenant.name,
-                },
-            }
-        )
+        context = require_installation_member(accepted.user)
+        return Response(_context_payload(accepted.user, context))
 
 
 class InvitationListCreateView(APIView):
     @extend_schema(responses={200: InvitationSerializer(many=True), 403: OpenApiResponse(description="Owner required")})
     def get(self, request):  # type: ignore[no-untyped-def]
-        context = require_installation_owner(request.user)
+        context = require_permission(request.user, PermissionKey.INVITATIONS_VIEW)
         invitations = Invitation.scoped.for_tenant(context.tenant)
         return Response(InvitationSerializer(invitations, many=True).data)
 
@@ -207,7 +187,7 @@ class InvitationListCreateView(APIView):
         },
     )
     def post(self, request):  # type: ignore[no-untyped-def]
-        context = require_installation_owner(request.user)
+        context = require_permission(request.user, PermissionKey.INVITATIONS_CREATE)
         serializer = InvitationRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invitation = issue_invitation(
@@ -229,7 +209,7 @@ class InvitationRevokeView(APIView):
         },
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
-        context = require_installation_owner(request.user)
+        context = require_permission(request.user, PermissionKey.INVITATIONS_REVOKE)
         invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
         return Response(InvitationSerializer(revoke_invitation(invitation=invitation, actor=request.user)).data)
 
@@ -246,6 +226,6 @@ class InvitationResendView(APIView):
         },
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
-        context = require_installation_owner(request.user)
+        context = require_permission(request.user, PermissionKey.INVITATIONS_RESEND)
         invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
         return Response(InvitationSerializer(resend_invitation(invitation=invitation, actor=request.user)).data)

@@ -35,6 +35,25 @@ class InvitationState(models.TextChoices):
     ACCEPTED = "accepted", "Accepted"
 
 
+class BuiltInRole(models.TextChoices):
+    OWNER = "owner", "Owner"
+    ADMINISTRATOR = "administrator", "Administrator"
+    TECHNICIAN = "technician", "Technician"
+    CONTRIBUTOR = "contributor", "Contributor"
+    READ_ONLY = "read_only", "Read-only"
+    CLIENT_ADMINISTRATOR = "client_administrator", "Client Administrator"
+    CLIENT_USER = "client_user", "Client User"
+
+
+TENANT_ASSIGNABLE_ROLES = (
+    BuiltInRole.ADMINISTRATOR,
+    BuiltInRole.TECHNICIAN,
+    BuiltInRole.CONTRIBUTOR,
+    BuiltInRole.READ_ONLY,
+)
+TENANT_ASSIGNABLE_ROLE_CHOICES = tuple((role.value, role.label) for role in TENANT_ASSIGNABLE_ROLES)
+
+
 class Invitation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="invitations")
@@ -123,6 +142,7 @@ class TenantMembership(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="memberships")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="tenant_memberships")
+    role = models.CharField(max_length=32, choices=TENANT_ASSIGNABLE_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -131,6 +151,10 @@ class TenantMembership(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("tenant", "user"), name="unique_tenant_membership"),
+            models.CheckConstraint(
+                condition=models.Q(role__in=tuple(role.value for role in TENANT_ASSIGNABLE_ROLES)),
+                name="tenant_membership_role_valid",
+            ),
         ]
 
     def __str__(self) -> str:

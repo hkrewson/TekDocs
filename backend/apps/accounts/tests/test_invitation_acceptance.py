@@ -74,7 +74,11 @@ def test_invitation_acceptance_creates_verified_member_and_session(installation)
 
     assert response.status_code == 200
     user = User.objects.get(email="invitee@example.com")
-    assert response.json() == {
+    payload = response.json()
+    assert payload["role"] == "read_only"
+    assert "people.view" in payload["permissions"]
+    assert "people.create" not in payload["permissions"]
+    assert {key: payload[key] for key in ("user", "tenant")} == {
         "user": {"id": str(user.id), "email": user.email, "display_name": "Invited Technician"},
         "tenant": {"id": str(installation.tenant.id), "name": installation.tenant.name},
     }
@@ -139,9 +143,10 @@ def test_revoked_and_used_tokens_cannot_be_reused(installation):
     revoked_invitation, revoked_token = issue_token(installation)
     owner_client = Client()
     owner_client.force_login(installation.owner)
-    assert owner_client.post(
-        reverse("invitation-revoke", kwargs={"invitation_id": revoked_invitation.id})
-    ).status_code == 200
+    assert (
+        owner_client.post(reverse("invitation-revoke", kwargs={"invitation_id": revoked_invitation.id})).status_code
+        == 200
+    )
     client, csrf = acceptance_client()
     revoked = accept(client, csrf, revoked_token)
 

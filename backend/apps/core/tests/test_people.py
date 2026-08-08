@@ -209,7 +209,13 @@ def test_people_endpoints_deny_anonymous_member_missing_mfa_and_cross_workspace_
     assert client.get(first_url).status_code == 403
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(first_url).status_code == 403
+    assert owner_client.get(first_url).status_code == 200
+    assert (
+        owner_client.post(
+            first_url, person_payload(full_name="MFA Required"), content_type="application/json"
+        ).status_code
+        == 403
+    )
     TOTP.activate(installation.owner, generate_totp_secret())
 
     second_detail = reverse(

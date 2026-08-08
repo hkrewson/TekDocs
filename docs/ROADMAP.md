@@ -184,7 +184,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.6` | Complete | Sites and hierarchical locations with MSP/organization ownership, structured People placement, workspace-aware navigation, and PostgreSQL integrity guards. |
 | `0.1.7` | Complete | Versioned MSP-wide and organization-specific custom-field definitions with JSON Schema validation, migration-safe values, and Site/Location value entry. |
 | `0.1.8` | Complete | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
-| `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
+| `0.1.9` | Complete | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
 | `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped user assignments, per-client MSP employee assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
 | `0.1.11` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
 | `0.1.12` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), hosted-automation evidence when authorized (`TD-RISK-010`), reference performance, migration, accessibility, workspace, and isolation remediation. |
@@ -274,6 +274,21 @@ Evidence: `docs/releases/0.1.7.md`.
 ADR 0011 defines the typed-link catalog, direction, visibility, backlink, archival, and scoped-search contracts.
 
 Evidence: `docs/releases/0.1.8.md`.
+
+### `0.1.9` acceptance criteria
+
+- [x] One maintained permission catalog defines stable keys, descriptions, and MFA requirements for every implemented read and mutation. Views, workspace resolvers, workers, and services make no role-name authorization decisions outside the central policy service.
+- [x] Owner, Administrator, Technician, Contributor, Read-only, Client Administrator, and Client User have documented built-in definitions. Owner remains an immutable installation identity; tenant memberships use only tenant-assignable roles, while client roles are reserved for the scoped assignments delivered in `0.1.10`.
+- [x] Existing and newly accepted tenant memberships migrate to least-privilege Read-only access. An owner-plus-MFA API lists members and changes tenant-assignable built-in roles without allowing owner reassignment, self-escalation, cross-tenant changes, arbitrary role values, or role metadata from the browser.
+- [x] Each organization has an explicit `all_authorized` or `assigned_only` MSP-staff access mode. `all_authorized` still requires the relevant permission; `assigned_only` fails closed for non-owners until user-to-organization assignments arrive in `0.1.10`.
+- [x] Organization lists, switcher search, direct workspace resolution, domain APIs, entity search, and relationship backlinks apply the same policy-filtered organization boundary. Selection, a guessed UUID, an MSP-wide role, or a related EntityLink cannot bypass the access mode.
+- [x] Privileged permissions require enrolled TOTP through the policy service. Read-only role changes and hidden controls never replace server authorization, and denials disclose no inaccessible organization or membership data.
+- [x] A restrained Access Control interface shows built-in role definitions, tenant members, and organization access modes with responsive, keyboard, loading, empty, error, denial, confirmation, and stale-response behavior.
+- [x] Allow/deny, missing-MFA, CSRF, cross-tenant, cross-client, access-mode, role-escalation, migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, clean-install, preserved-data upgrade, security, and real browser-to-database evidence agree at `0.1.9`.
+
+ADR 0012 defines the permission catalog, policy decision contract, built-in-role boundary, MFA enforcement, and staged organization assignment model.
+
+Evidence: `docs/releases/0.1.9.md`.
 
 ### `0.1.3` acceptance criteria
 

@@ -8,6 +8,8 @@ export type AuthenticatedContext = {
     id: string
     name: string
   }
+  role: 'owner' | 'administrator' | 'technician' | 'contributor' | 'read_only' | 'client_administrator' | 'client_user'
+  permissions: string[]
 }
 
 export type BootstrapDetails = {

@@ -7,7 +7,13 @@ from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 
 from apps.accounts.models import User
-from apps.accounts.policy import InstallationMemberContext, require_installation_member, require_installation_owner
+from apps.accounts.policy import (
+    InstallationMemberContext,
+    PermissionKey,
+    accessible_organizations,
+    context_has_permission,
+    require_permission,
+)
 
 from .models import Organization
 from .scoping import DataScope
@@ -59,6 +65,30 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products"),
 }
 
+CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
+    "overview": PermissionKey.WORKSPACES_VIEW,
+    "organizations": PermissionKey.ORGANIZATIONS_VIEW,
+    "people": PermissionKey.PEOPLE_VIEW,
+    "sites": PermissionKey.SITES_VIEW,
+    "custom_fields": PermissionKey.CUSTOM_FIELDS_VIEW,
+    "documentation": PermissionKey.DOCUMENTS_VIEW,
+    "files": PermissionKey.DOCUMENTS_VIEW,
+    "assets": PermissionKey.ASSETS_VIEW,
+    "licenses": PermissionKey.ASSETS_VIEW,
+    "networks": PermissionKey.NETWORKS_VIEW,
+    "domains": PermissionKey.NETWORKS_VIEW,
+    "certificates": PermissionKey.NETWORKS_VIEW,
+    "credentials": PermissionKey.SECRETS_VIEW,
+    "services": PermissionKey.WORKSPACES_VIEW,
+    "tickets": PermissionKey.WORKSPACES_VIEW,
+    "vendors": PermissionKey.ASSETS_VIEW,
+    "products": PermissionKey.ASSETS_VIEW,
+    "compliance": PermissionKey.COMPLIANCE_VIEW,
+    "activity": PermissionKey.WORKSPACES_VIEW,
+    "integrations": PermissionKey.INTEGRATIONS_VIEW,
+    "accounting": PermissionKey.COSTS_VIEW,
+}
+
 
 def capabilities_for_classifications(classifications: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(
@@ -93,11 +123,15 @@ class ResolvedWorkspace:
 
 
 def active_organizations_for_member(member: InstallationMemberContext) -> QuerySet[Organization]:
-    return (
-        Organization.scoped.for_tenant(member.tenant)
-        .filter(entity__archived_at__isnull=True)
-        .select_related("entity", "tenant")
-        .prefetch_related("classifications")
+    return accessible_organizations(member).select_related("entity", "tenant").prefetch_related("classifications")
+
+
+def authorized_capabilities(
+    member: InstallationMemberContext,
+    capabilities: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        capability for capability in capabilities if context_has_permission(member, CAPABILITY_PERMISSIONS[capability])
     )
 
 
@@ -109,14 +143,12 @@ def search_organization_workspaces(
     page: int,
     page_size: int,
 ) -> tuple[list[dict[str, object]], bool]:
-    member = require_installation_owner(user)
+    member = require_permission(user, PermissionKey.ORGANIZATIONS_VIEW)
     organizations = active_organizations_for_member(member)
     if classification:
         organizations = organizations.filter(classifications__kind=classification)
     if query:
-        organizations = organizations.filter(
-            Q(entity__display_name__icontains=query) | Q(legal_name__icontains=query)
-        )
+        organizations = organizations.filter(Q(entity__display_name__icontains=query) | Q(legal_name__icontains=query))
     organizations = organizations.order_by("entity__display_name", "entity_id")
     offset = (page - 1) * page_size
     selected = list(organizations[offset : offset + page_size + 1])
@@ -135,7 +167,7 @@ def search_organization_workspaces(
 
 
 def resolve_msp_workspace(user: User) -> ResolvedWorkspace:
-    member = require_installation_member(user)
+    member = require_permission(user, PermissionKey.WORKSPACES_VIEW)
     return ResolvedWorkspace(
         member=member,
         kind="msp",
@@ -143,15 +175,15 @@ def resolve_msp_workspace(user: User) -> ResolvedWorkspace:
         name=member.tenant.name,
         data_scope=DataScope.tenant(member.tenant),
         classifications=(),
-        capabilities=MSP_CAPABILITIES,
+        capabilities=authorized_capabilities(member, MSP_CAPABILITIES),
     )
 
 
 def resolve_organization_workspace(user: User, *, entity_id: UUID) -> ResolvedWorkspace:
-    member = require_installation_owner(user)
+    member = require_permission(user, PermissionKey.WORKSPACES_VIEW)
     organization = get_object_or_404(active_organizations_for_member(member), entity_id=entity_id)
     classifications = tuple(sorted(classification.kind for classification in organization.classifications.all()))
-    capabilities = capabilities_for_classifications(classifications)
+    capabilities = authorized_capabilities(member, capabilities_for_classifications(classifications))
     return ResolvedWorkspace(
         member=member,
         kind="organization",

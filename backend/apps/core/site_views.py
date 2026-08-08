@@ -10,7 +10,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import require_installation_owner
+from apps.accounts.policy import PermissionKey, require_permission
 
 from .models import Location, Site
 from .scoping import DataScope
@@ -37,8 +37,8 @@ from .sites import (
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
 
 
-def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    member = require_installation_owner(request.user)
+def _msp_workspace(request, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    member = require_permission(request.user, permission)
     return ResolvedWorkspace(
         member=member,
         kind="msp",
@@ -50,8 +50,12 @@ def _msp_workspace(request) -> ResolvedWorkspace:  # type: ignore[no-untyped-def
     )
 
 
-def _organization_workspace(request, organization_entity_id: UUID) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    return resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _organization_workspace(  # type: ignore[no-untyped-def]
+    request, organization_entity_id: UUID, permission: PermissionKey
+) -> ResolvedWorkspace:
+    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+    require_permission(request.user, permission, organization=workspace.organization)
+    return workspace
 
 
 def _site(workspace: ResolvedWorkspace, site_entity_id: UUID) -> Site:
@@ -204,25 +208,25 @@ class MSPSiteListCreateView(APIView):
         responses={200: SiteResultSerializer},
     )
     def get(self, request):  # type: ignore[no-untyped-def]
-        return _list(_msp_workspace(request), request)
+        return _list(_msp_workspace(request, PermissionKey.SITES_VIEW), request)
 
     @extend_schema(operation_id="sites_msp_create", request=SiteWriteSerializer, responses={201: SiteSerializer})
     def post(self, request):  # type: ignore[no-untyped-def]
-        return _create(_msp_workspace(request), request)
+        return _create(_msp_workspace(request, PermissionKey.SITES_CREATE), request)
 
 
 class MSPSiteDetailView(APIView):
     @extend_schema(operation_id="sites_msp_retrieve", responses={200: SiteSerializer, 404: OpenApiResponse()})
     def get(self, request, site_entity_id):  # type: ignore[no-untyped-def]
-        return _serialize_site(_msp_workspace(request), site_entity_id)
+        return _serialize_site(_msp_workspace(request, PermissionKey.SITES_VIEW), site_entity_id)
 
     @extend_schema(operation_id="sites_msp_update", request=SiteWriteSerializer, responses={200: SiteSerializer})
     def patch(self, request, site_entity_id):  # type: ignore[no-untyped-def]
-        return _update(_msp_workspace(request), site_entity_id, request)
+        return _update(_msp_workspace(request, PermissionKey.SITES_EDIT), site_entity_id, request)
 
     @extend_schema(operation_id="sites_msp_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, site_entity_id):  # type: ignore[no-untyped-def]
-        return _archive(_msp_workspace(request), site_entity_id, request)
+        return _archive(_msp_workspace(request, PermissionKey.SITES_ARCHIVE), site_entity_id, request)
 
 
 class MSPLocationListCreateView(APIView):
@@ -232,7 +236,7 @@ class MSPLocationListCreateView(APIView):
         responses={201: LocationSerializer},
     )
     def post(self, request, site_entity_id):  # type: ignore[no-untyped-def]
-        return _create_location(_msp_workspace(request), site_entity_id, request)
+        return _create_location(_msp_workspace(request, PermissionKey.SITES_CREATE), site_entity_id, request)
 
 
 class MSPLocationDetailView(APIView):
@@ -242,11 +246,15 @@ class MSPLocationDetailView(APIView):
         responses={200: LocationSerializer},
     )
     def patch(self, request, site_entity_id, location_entity_id):  # type: ignore[no-untyped-def]
-        return _update_location(_msp_workspace(request), site_entity_id, location_entity_id, request)
+        return _update_location(
+            _msp_workspace(request, PermissionKey.SITES_EDIT), site_entity_id, location_entity_id, request
+        )
 
     @extend_schema(operation_id="locations_msp_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, site_entity_id, location_entity_id):  # type: ignore[no-untyped-def]
-        return _archive_location(_msp_workspace(request), site_entity_id, location_entity_id, request)
+        return _archive_location(
+            _msp_workspace(request, PermissionKey.SITES_ARCHIVE), site_entity_id, location_entity_id, request
+        )
 
 
 class OrganizationSiteListCreateView(APIView):
@@ -256,7 +264,7 @@ class OrganizationSiteListCreateView(APIView):
         responses={200: SiteResultSerializer},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _list(_organization_workspace(request, organization_entity_id), request)
+        return _list(_organization_workspace(request, organization_entity_id, PermissionKey.SITES_VIEW), request)
 
     @extend_schema(
         operation_id="sites_organization_create",
@@ -264,13 +272,15 @@ class OrganizationSiteListCreateView(APIView):
         responses={201: SiteSerializer},
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _create(_organization_workspace(request, organization_entity_id), request)
+        return _create(_organization_workspace(request, organization_entity_id, PermissionKey.SITES_CREATE), request)
 
 
 class OrganizationSiteDetailView(APIView):
     @extend_schema(operation_id="sites_organization_retrieve", responses={200: SiteSerializer, 404: OpenApiResponse()})
     def get(self, request, organization_entity_id, site_entity_id):  # type: ignore[no-untyped-def]
-        return _serialize_site(_organization_workspace(request, organization_entity_id), site_entity_id)
+        return _serialize_site(
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_VIEW), site_entity_id
+        )
 
     @extend_schema(
         operation_id="sites_organization_update",
@@ -278,11 +288,19 @@ class OrganizationSiteDetailView(APIView):
         responses={200: SiteSerializer},
     )
     def patch(self, request, organization_entity_id, site_entity_id):  # type: ignore[no-untyped-def]
-        return _update(_organization_workspace(request, organization_entity_id), site_entity_id, request)
+        return _update(
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_EDIT),
+            site_entity_id,
+            request,
+        )
 
     @extend_schema(operation_id="sites_organization_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, organization_entity_id, site_entity_id):  # type: ignore[no-untyped-def]
-        return _archive(_organization_workspace(request, organization_entity_id), site_entity_id, request)
+        return _archive(
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_ARCHIVE),
+            site_entity_id,
+            request,
+        )
 
 
 class OrganizationLocationListCreateView(APIView):
@@ -292,7 +310,11 @@ class OrganizationLocationListCreateView(APIView):
         responses={201: LocationSerializer},
     )
     def post(self, request, organization_entity_id, site_entity_id):  # type: ignore[no-untyped-def]
-        return _create_location(_organization_workspace(request, organization_entity_id), site_entity_id, request)
+        return _create_location(
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_CREATE),
+            site_entity_id,
+            request,
+        )
 
 
 class OrganizationLocationDetailView(APIView):
@@ -303,7 +325,7 @@ class OrganizationLocationDetailView(APIView):
     )
     def patch(self, request, organization_entity_id, site_entity_id, location_entity_id):  # type: ignore[no-untyped-def]
         return _update_location(
-            _organization_workspace(request, organization_entity_id),
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_EDIT),
             site_entity_id,
             location_entity_id,
             request,
@@ -312,7 +334,7 @@ class OrganizationLocationDetailView(APIView):
     @extend_schema(operation_id="locations_organization_archive", request=None, responses={204: OpenApiResponse()})
     def delete(self, request, organization_entity_id, site_entity_id, location_entity_id):  # type: ignore[no-untyped-def]
         return _archive_location(
-            _organization_workspace(request, organization_entity_id),
+            _organization_workspace(request, organization_entity_id, PermissionKey.SITES_ARCHIVE),
             site_entity_id,
             location_entity_id,
             request,

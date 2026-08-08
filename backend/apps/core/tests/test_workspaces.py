@@ -118,7 +118,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
 
 
 @pytest.mark.django_db
-def test_workspace_context_denies_anonymous_member_without_owner_policy_and_owner_without_mfa(
+def test_workspace_context_denies_anonymous_and_allows_read_only_member_without_mfa(
     client,
     owner_client,
     installation,
@@ -133,10 +133,10 @@ def test_workspace_context_denies_anonymous_member_without_owner_policy_and_owne
     TenantMembership.objects.create(tenant=installation.tenant, user=member)
     client.force_login(member)
     assert client.get(reverse("workspace-msp")).status_code == 200
-    assert client.get(organization_url).status_code == 403
+    assert client.get(organization_url).status_code == 200
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(organization_url).status_code == 403
+    assert owner_client.get(organization_url).status_code == 200
 
 
 @pytest.mark.django_db
@@ -205,10 +205,13 @@ def test_workspace_search_can_limit_results_to_client_context(owner_client, inst
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["results"]] == [str(client_only.entity_id), str(both.entity_id)]
     assert all("client" in item["classifications"] for item in response.json()["results"])
-    assert owner_client.get(
-        reverse("workspace-organization-search"),
-        {"classification": "unsupported"},
-    ).status_code == 400
+    assert (
+        owner_client.get(
+            reverse("workspace-organization-search"),
+            {"classification": "unsupported"},
+        ).status_code
+        == 400
+    )
 
 
 @pytest.mark.django_db
@@ -230,14 +233,14 @@ def test_workspace_search_excludes_archived_and_foreign_records_and_validates_bo
 
 
 @pytest.mark.django_db
-def test_workspace_search_denies_anonymous_member_and_owner_without_mfa(client, owner_client, installation):
+def test_workspace_search_denies_anonymous_and_allows_read_only_member_without_mfa(client, owner_client, installation):
     url = reverse("workspace-organization-search")
     assert client.get(url).status_code == 403
 
     member = User.objects.create_user(email="workspace-search-member@example.com", display_name="Search Member")
     TenantMembership.objects.create(tenant=installation.tenant, user=member)
     client.force_login(member)
-    assert client.get(url).status_code == 403
+    assert client.get(url).status_code == 200
 
     installation.owner.authenticator_set.filter(type="totp").delete()
-    assert owner_client.get(url).status_code == 403
+    assert owner_client.get(url).status_code == 200

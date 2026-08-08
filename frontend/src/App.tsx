@@ -34,6 +34,9 @@ import {
   X,
 } from 'lucide-react'
 import { AuthGate } from './auth/AuthGate'
+import { AccessControl } from './access-control/AccessControl'
+import { browserAccessControlClient } from './access-control/api'
+import type { AccessControlClient } from './access-control/api'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
@@ -190,8 +193,9 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   )
 }
 
-function ProfileMenu({ user, onSignOut, signingOut }: {
+function ProfileMenu({ user, canManageAccess, onSignOut, signingOut }: {
   user: AuthenticatedContext['user']
+  canManageAccess: boolean
   onSignOut: () => Promise<void>
   signingOut: boolean
 }) {
@@ -217,6 +221,7 @@ function ProfileMenu({ user, onSignOut, signingOut }: {
       {open && (
         <div className="profile-popover" role="menu">
           <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
+          {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />Access control</AppLink>}
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
@@ -356,9 +361,10 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
+  accessControlClient: AccessControlClient
   workspaceClient: WorkspaceClient
   peopleClient: PeopleClient
   sitesClient: SitesClient
@@ -405,7 +411,7 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
-          <ProfileMenu user={shellContext.user} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main className="main-content" key={location.pathname}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
@@ -418,6 +424,7 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
             <Route path="/custom-fields" element={<CustomFields workspace={null} client={customFieldsClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
+            <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <AccessControl client={accessControlClient} /> : <Navigate to="/overview" replace />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
@@ -430,9 +437,10 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
+  accessControlClient?: AccessControlClient
   workspaceClient?: WorkspaceClient
   peopleClient?: PeopleClient
   sitesClient?: SitesClient
@@ -446,6 +454,7 @@ export function App({ initialPath, authClient = browserAuthClient, workspaceClie
         <ApplicationShell
           authContext={context}
           authClient={authClient}
+          accessControlClient={accessControlClient}
           workspaceClient={workspaceClient}
           peopleClient={peopleClient}
           sitesClient={sitesClient}

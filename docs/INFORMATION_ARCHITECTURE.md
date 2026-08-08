@@ -10,6 +10,8 @@ This document defines which navigation families belong to the MSP and organizati
 - A client-context switcher searches only authorized organizations classified as clients. Multi-classified client organizations remain eligible. The MSP return is always a distinct parent-context action.
 - The MSP-context switcher may search all authorized organization classifications so an operator can enter client or supplier workspaces.
 - Vendor, manufacturer, and partner classifications remain capabilities on one organization identity. They are not separate tables or tenant boundaries.
+- Access Control is an MSP-administration route available only when the authenticated policy context includes member-role administration. It lists built-in role definitions, tenant members, and each organization's MSP-staff access mode. It is not carried into an organization sidebar.
+- `assigned_only` organizations are intentionally owner-only in `0.1.9`; the staff-assignment UI and organization-scoped client roles arrive in `0.1.10`.
 
 ## Navigation matrix
 
@@ -21,6 +23,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Sites | MSP offices and nested locations | Client sites, buildings, floors, rooms, offices, and desks | Supplier sites and offices | records available (`0.1.6`) |
 | Custom fields | MSP-wide definitions and values on MSP records | Inherited MSP definitions plus client-local Site/Location definitions | Inherited MSP definitions plus supplier-local Site/Location definitions | definitions and Site/Location values available (`0.1.7`) |
 | Relationships | Typed links and backlinks among visible MSP records | Client-owned records plus explicit links to eligible organization anchors | Supplier-owned records plus explicit links to eligible organization anchors | organization relationship UI and scoped search available (`0.1.8`) |
+| Access control | Built-in tenant roles and organization staff-access modes | — | — | owner administration available (`0.1.9`); assignments in `0.1.10` |
 | Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |

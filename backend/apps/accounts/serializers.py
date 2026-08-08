@@ -48,6 +48,8 @@ class AuthenticatedUserSerializer(serializers.Serializer):
 class AuthenticatedContextSerializer(serializers.Serializer):
     user = AuthenticatedUserSerializer()
     tenant = BootstrapTenantResultSerializer()
+    role = serializers.CharField()
+    permissions = serializers.ListField(child=serializers.CharField())
 
 
 class ProfileUpdateSerializer(serializers.Serializer):

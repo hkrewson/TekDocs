@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.8
+  version: 0.1.9
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -18,6 +18,134 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/access-control/catalog:
+    get:
+      operationId: access_control_catalog_retrieve
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessControlCatalog'
+          description: ''
+        '403':
+          description: Member administration permission required
+  /api/v1/access-control/members:
+    get:
+      operationId: access_control_members_list
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+          description: ''
+        '403':
+          description: Member administration permission required
+  /api/v1/access-control/members/{user_id}:
+    patch:
+      operationId: access_control_members_partial_update
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberRoleWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberRoleWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberRoleWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+          description: ''
+        '400':
+          description: Invalid or non-assignable role
+        '403':
+          description: Role assignment permission and MFA required
+        '404':
+          description: Tenant member not found
+  /api/v1/access-control/organizations:
+    get:
+      operationId: access_control_organizations_list
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationAccess'
+          description: ''
+        '403':
+          description: Organization access administration permission and MFA required
+  /api/v1/access-control/organizations/{organization_entity_id}:
+    patch:
+      operationId: access_control_organizations_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationAccessWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationAccessWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationAccessWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationAccess'
+          description: ''
+        '400':
+          description: Invalid access mode
+        '403':
+          description: Organization access administration permission and MFA required
+        '404':
+          description: Organization not found
   /api/v1/auth/context:
     get:
       operationId: auth_context_retrieve
@@ -360,7 +488,7 @@ paths:
         '400':
           description: Invalid or duplicate relationship
         '403':
-          description: Installation owner with MFA required
+          description: Relationship creation permission and MFA required
         '404':
           description: Entity not found in workspace
   /api/v1/entities/{entity_id}/links/{link_id}:
@@ -387,7 +515,7 @@ paths:
         '204':
           description: Relationship archived
         '403':
-          description: Installation owner with MFA required
+          description: Relationship archive permission and MFA required
         '404':
           description: Relationship not found in workspace
   /api/v1/entities/search:
@@ -661,7 +789,7 @@ paths:
                   $ref: '#/components/schemas/Organization'
           description: ''
         '403':
-          description: Installation owner with MFA required
+          description: Organization view permission required
     post:
       operationId: organizations_create
       tags:
@@ -690,7 +818,7 @@ paths:
         '400':
           description: Invalid organization details
         '403':
-          description: Installation owner with MFA required
+          description: Organization creation permission and MFA required
   /api/v1/organizations/{entity_id}:
     get:
       operationId: organizations_retrieve
@@ -713,7 +841,7 @@ paths:
                 $ref: '#/components/schemas/Organization'
           description: ''
         '403':
-          description: Installation owner with MFA required
+          description: Organization view permission required
         '404':
           description: Organization not found
     patch:
@@ -750,7 +878,7 @@ paths:
         '400':
           description: Invalid organization details
         '403':
-          description: Installation owner with MFA required
+          description: Organization edit permission and MFA required
         '404':
           description: Organization not found
     delete:
@@ -770,7 +898,7 @@ paths:
         '204':
           description: Organization archived
         '403':
-          description: Installation owner with MFA required
+          description: Organization archive permission and MFA required
         '404':
           description: Organization not found
   /api/v1/people:
@@ -1195,7 +1323,7 @@ paths:
         '400':
           description: Invalid search parameters
         '403':
-          description: Installation owner with MFA required
+          description: Organization directory permission required
   /api/v1/workspaces/organizations/{entity_id}:
     get:
       operationId: workspaces_organizations_retrieve
@@ -1218,7 +1346,7 @@ paths:
                 $ref: '#/components/schemas/WorkspaceContext'
           description: ''
         '403':
-          description: Installation owner with MFA required
+          description: Authorized organization workspace access required
         '404':
           description: Organization workspace not found
         '503':
@@ -1507,7 +1635,7 @@ paths:
         '400':
           description: Invalid or duplicate relationship
         '403':
-          description: Installation owner with MFA required
+          description: Relationship creation permission and MFA required
         '404':
           description: Entity not found in workspace
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/links/{link_id}:
@@ -1540,7 +1668,7 @@ paths:
         '204':
           description: Relationship archived
         '403':
-          description: Installation owner with MFA required
+          description: Relationship archive permission and MFA required
         '404':
           description: Relationship not found in workspace
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/search:
@@ -2038,6 +2166,30 @@ paths:
           description: No response body
 components:
   schemas:
+    AccessControlCatalog:
+      type: object
+      properties:
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDefinition'
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleDefinition'
+      required:
+      - permissions
+      - roles
+    AssignableScopeEnum:
+      enum:
+      - installation
+      - tenant
+      - organization
+      type: string
+      description: |-
+        * `installation` - installation
+        * `tenant` - tenant
+        * `organization` - organization
     AuthenticatedContext:
       type: object
       properties:
@@ -2045,7 +2197,15 @@ components:
           $ref: '#/components/schemas/AuthenticatedUser'
         tenant:
           $ref: '#/components/schemas/BootstrapTenantResult'
+        role:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
       required:
+      - permissions
+      - role
       - tenant
       - user
     AuthenticatedUser:
@@ -2092,6 +2252,24 @@ components:
       required:
       - id
       - name
+    BuiltInRoleEnum:
+      enum:
+      - owner
+      - administrator
+      - technician
+      - contributor
+      - read_only
+      - client_administrator
+      - client_user
+      type: string
+      description: |-
+        * `owner` - Owner
+        * `administrator` - Administrator
+        * `technician` - Technician
+        * `contributor` - Contributor
+        * `read_only` - Read-only
+        * `client_administrator` - Client Administrator
+        * `client_user` - Client User
     CustomFieldDefinition:
       type: object
       properties:
@@ -2602,6 +2780,32 @@ components:
       required:
       - kind
       - name
+    Member:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/BuiltInRoleEnum'
+        is_owner:
+          type: boolean
+        joined_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - display_name
+      - email
+      - id
+      - is_owner
+      - joined_at
+      - role
     MigrationImpact:
       type: object
       properties:
@@ -2647,6 +2851,8 @@ components:
         website:
           type: string
           format: uri
+        access_mode:
+          $ref: '#/components/schemas/OrganizationAccessModeEnum'
         classifications:
           type: array
           items:
@@ -2659,6 +2865,7 @@ components:
           type: string
           format: date-time
       required:
+      - access_mode
       - classifications
       - created_at
       - id
@@ -2666,6 +2873,28 @@ components:
       - name
       - updated_at
       - website
+    OrganizationAccess:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        access_mode:
+          $ref: '#/components/schemas/OrganizationAccessModeEnum'
+      required:
+      - access_mode
+      - id
+      - name
+    OrganizationAccessModeEnum:
+      enum:
+      - all_authorized
+      - assigned_only
+      type: string
+      description: |-
+        * `all_authorized` - All authorized MSP staff
+        * `assigned_only` - Assigned MSP staff only
     OrganizationKindEnum:
       enum:
       - client
@@ -2780,6 +3009,16 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedMemberRoleWrite:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/TenantAssignableRoleEnum'
+    PatchedOrganizationAccessWrite:
+      type: object
+      properties:
+        access_mode:
+          $ref: '#/components/schemas/OrganizationAccessModeEnum'
     PatchedOrganizationWrite:
       type: object
       properties:
@@ -2902,6 +3141,22 @@ components:
       - page
       - page_size
       - results
+    PermissionDefinition:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        category:
+          type: string
+        requires_mfa:
+          type: boolean
+      required:
+      - category
+      - key
+      - label
+      - requires_mfa
     Person:
       type: object
       properties:
@@ -3015,6 +3270,27 @@ components:
       required:
       - full_name
       - kind
+    RoleDefinition:
+      type: object
+      properties:
+        value:
+          $ref: '#/components/schemas/BuiltInRoleEnum'
+        label:
+          type: string
+        description:
+          type: string
+        assignable_scope:
+          $ref: '#/components/schemas/AssignableScopeEnum'
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+      - assignable_scope
+      - description
+      - label
+      - permissions
+      - value
     Site:
       type: object
       properties:
@@ -3133,6 +3409,18 @@ components:
         * `expired` - Expired
         * `revoked` - Revoked
         * `accepted` - Accepted
+    TenantAssignableRoleEnum:
+      enum:
+      - administrator
+      - technician
+      - contributor
+      - read_only
+      type: string
+      description: |-
+        * `administrator` - Administrator
+        * `technician` - Technician
+        * `contributor` - Contributor
+        * `read_only` - Read-only
     WorkspaceContext:
       type: object
       properties:

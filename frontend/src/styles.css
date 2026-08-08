@@ -362,6 +362,21 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .revoke-button { min-height: 32px; padding-inline: 11px; font-size: 13px; }
 .revoke-button:disabled { color: var(--quiet); cursor: wait; }
 .current-session-note { max-width: 150px; padding-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.35; text-align: right; }
+.access-control-page > .section-heading { align-items: flex-start; }
+.access-control-page > .section-heading p, .access-section .section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.access-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.role-definitions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 24px; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.role-definitions li { display: grid; gap: 3px; align-content: start; padding: 12px 2px; border-bottom: 1px solid var(--border); }
+.role-definitions span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.role-definitions small { margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.access-table { border-top: 1px solid var(--border); }
+.access-row { display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(190px, .8fr) minmax(120px, auto); align-items: center; gap: 16px; min-height: 54px; padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.access-row.header { min-height: 38px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.access-row > span:first-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.access-row > span:first-child > span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.access-row select { width: min(260px, 100%); min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.access-row .secondary-button { min-height: 34px; padding: 7px 10px; }
+.access-row .secondary-button:disabled { color: var(--quiet); cursor: default; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -427,4 +442,9 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .reauth-form label, .reauth-form .settings-actions { grid-column: 2; }
   .session-list li { grid-template-columns: 24px minmax(0, 1fr); }
   .session-list .revoke-button, .current-session-note { grid-column: 2; justify-self: start; max-width: none; text-align: left; }
+  .access-row.header { display: none; }
+  .access-row { grid-template-columns: 1fr; gap: 8px; padding-block: 13px; }
+  .access-row > span:not(:first-child)::before { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 600; }
+  .access-row > span:nth-child(2)::before { content: 'Role or access mode'; }
+  .access-row > span:nth-child(3)::before { content: 'Action'; }
 }

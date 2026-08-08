@@ -133,3 +133,73 @@ def test_workspace_context_hides_archived_cross_tenant_missing_and_malformed_org
 
     malformed = owner_client.get("/api/v1/workspaces/organizations/not-a-uuid")
     assert malformed.status_code == 404
+
+
+@pytest.mark.django_db
+def test_workspace_search_is_ordered_searchable_and_page_bounded(owner_client, installation):
+    for index in range(18):
+        create_organization(
+            installation.tenant,
+            name=f"Client {index:02d}",
+            classifications=("client", "vendor") if index == 7 else ("client",),
+        )
+    supplier = create_organization(
+        installation.tenant,
+        name="Supplier Alias",
+        classifications=("manufacturer",),
+    )
+    supplier.legal_name = "Northwind Equipment"
+    supplier.save(update_fields=("legal_name", "updated_at"))
+
+    first = owner_client.get(reverse("workspace-organization-search"), {"page_size": 5})
+    second = owner_client.get(reverse("workspace-organization-search"), {"page": 2, "page_size": 5})
+    searched = owner_client.get(reverse("workspace-organization-search"), {"q": "northwind"})
+
+    assert first.status_code == 200
+    assert [result["name"] for result in first.json()["results"]] == [f"Client {index:02d}" for index in range(5)]
+    assert {key: value for key, value in first.json().items() if key != "results"} == {
+        "page": 1,
+        "page_size": 5,
+        "has_more": True,
+    }
+    assert [result["name"] for result in second.json()["results"]] == [f"Client {index:02d}" for index in range(5, 10)]
+    assert searched.json()["results"] == [
+        {
+            "id": str(Entity.objects.get(display_name="Supplier Alias").id),
+            "name": "Supplier Alias",
+            "classifications": ["manufacturer"],
+            "capabilities": ["overview", "documentation", "people", "products"],
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_workspace_search_excludes_archived_and_foreign_records_and_validates_bounds(owner_client, installation):
+    visible = create_organization(installation.tenant, name="Visible Client", classifications=("client",))
+    archived = create_organization(installation.tenant, name="Archived Client", classifications=("client",))
+    archived.entity.archived_at = archived.entity.updated_at
+    archived.entity.save(update_fields=("archived_at", "updated_at"))
+    foreign_tenant = Tenant.objects.create(name="Foreign Search", slug="foreign-search")
+    create_organization(foreign_tenant, name="Foreign Client", classifications=("client",))
+
+    response = owner_client.get(reverse("workspace-organization-search"))
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["results"]] == [str(visible.entity_id)]
+    assert owner_client.get(reverse("workspace-organization-search"), {"page_size": 26}).status_code == 400
+    assert owner_client.get(reverse("workspace-organization-search"), {"page": 101}).status_code == 400
+    assert owner_client.get(reverse("workspace-organization-search"), {"q": "x" * 81}).status_code == 400
+
+
+@pytest.mark.django_db
+def test_workspace_search_denies_anonymous_member_and_owner_without_mfa(client, owner_client, installation):
+    url = reverse("workspace-organization-search")
+    assert client.get(url).status_code == 403
+
+    member = User.objects.create_user(email="workspace-search-member@example.com", display_name="Search Member")
+    TenantMembership.objects.create(tenant=installation.tenant, user=member)
+    client.force_login(member)
+    assert client.get(url).status_code == 403
+
+    installation.owner.authenticator_set.filter(type="totp").delete()
+    assert owner_client.get(url).status_code == 403

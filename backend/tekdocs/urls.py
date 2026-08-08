@@ -15,7 +15,11 @@ from apps.accounts.views import (
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
-from apps.core.workspace_views import MSPWorkspaceContextView, OrganizationWorkspaceContextView
+from apps.core.workspace_views import (
+    MSPWorkspaceContextView,
+    OrganizationWorkspaceContextView,
+    OrganizationWorkspaceSearchView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -32,6 +36,11 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/workspaces/msp", MSPWorkspaceContextView.as_view(), name="workspace-msp"),
+    path(
+        "api/v1/workspaces/organizations",
+        OrganizationWorkspaceSearchView.as_view(),
+        name="workspace-organization-search",
+    ),
     path(
         "api/v1/workspaces/organizations/<uuid:entity_id>",
         OrganizationWorkspaceContextView.as_view(),

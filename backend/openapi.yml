@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.3
+  version: 0.1.4
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -458,6 +458,45 @@ paths:
           description: Installation membership required
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations:
+    get:
+      operationId: workspaces_organizations_search
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceSearchResult'
+          description: ''
+        '400':
+          description: Invalid search parameters
+        '403':
+          description: Installation owner with MFA required
   /api/v1/workspaces/organizations/{entity_id}:
     get:
       operationId: workspaces_organizations_retrieve
@@ -815,6 +854,45 @@ components:
       - kind
       - name
       - organization
+    WorkspaceOption:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        classifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassificationsEnum'
+        capabilities:
+          type: array
+          items:
+            type: string
+      required:
+      - capabilities
+      - classifications
+      - id
+      - name
+    WorkspaceSearchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceOption'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - has_more
+      - page
+      - page_size
+      - results
   securitySchemes:
     cookieAuth:
       type: apiKey

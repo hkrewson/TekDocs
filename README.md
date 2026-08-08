@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.3`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.4`.
 
 ## Start locally
 
@@ -19,7 +19,7 @@ Invitation issuance is currently API-only and restricted to the installation own
 
 Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use. Optional OpenID Connect configuration is documented in `docs/AUTHENTICATION.md`.
 
-The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL and an overview of the capabilities its classifications will receive. The searchable workspace switcher and organization-aware section navigation arrive in `0.1.4`; broader role-based administration arrives with the RBAC slices.
+The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL. The workspace control searches the authorized organization directory, preserves equivalent section routes when switching, exposes the union of classification capabilities, and always provides a return to the MSP workspace. Broader role-based administration arrives with the RBAC slices.
 
 ### First-owner bootstrap
 

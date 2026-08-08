@@ -59,7 +59,19 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/overview$/)
   await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
   await expect(page.getByText('Live Acme Client, LLC')).toBeVisible()
-  await expect(page.getByText('Client · Vendor workspace', { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('main').getByText('Client · Vendor workspace', { exact: true }),
+  ).toBeVisible()
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
+
+  await page.getByRole('button', { name: /Current workspace: Live Acme Client/ }).click()
+  await page.getByRole('textbox', { name: 'Find a workspace' }).fill('Live Acme')
+  await expect(page.getByRole('button', { name: 'Live Acme Client. Client · Vendor' })).toBeVisible()
+  await page.getByRole('button', { name: 'Live Workspace MSP. MSP workspace' }).click()
+  await expect(page).toHaveURL((url) => url.pathname === '/overview')
+  await page.getByRole('button', { name: /Current workspace: Live Workspace MSP/ }).click()
+  await page.getByRole('textbox', { name: 'Find a workspace' }).fill('Live Acme')
+  await page.getByRole('button', { name: 'Live Acme Client. Client · Vendor' }).click()
+  await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/overview$/)
 })

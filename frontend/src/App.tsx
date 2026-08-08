@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   Network,
+  Package,
   Plug,
   Search,
   Settings,
@@ -28,8 +29,11 @@ import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
 import { Organizations } from './organizations/Organizations'
 import { browserWorkspaceClient } from './workspaces/api'
-import type { WorkspaceClient, WorkspaceContext } from './workspaces/api'
+import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
+import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
+import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
+import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 const EditorSpike = lazy(async () => {
   const module = await import('./editor/EditorSpike')
   return { default: module.EditorSpike }
@@ -38,6 +42,7 @@ const EditorSpike = lazy(async () => {
 type NavigationItem = {
   label: string
   path: string
+  area: WorkspaceCapability
   icon: typeof BookOpenText
 }
 
@@ -50,18 +55,19 @@ function AppLink({ to, className, children, ...props }: {
 }
 
 const workspaceNavigation: NavigationItem[] = [
-  { label: 'Overview', path: '/overview', icon: Activity },
-  { label: 'Documentation', path: '/documentation', icon: BookOpenText },
-  { label: 'Organizations', path: '/organizations', icon: Building2 },
-  { label: 'People', path: '/people', icon: UsersRound },
-  { label: 'Assets', path: '/assets', icon: Boxes },
-  { label: 'Networks', path: '/networks', icon: Network },
-  { label: 'Credentials', path: '/credentials', icon: KeyRound },
+  { label: 'Overview', path: '/overview', area: 'overview', icon: Activity },
+  { label: 'Documentation', path: '/documentation', area: 'documentation', icon: BookOpenText },
+  { label: 'Organizations', path: '/organizations', area: 'organizations', icon: Building2 },
+  { label: 'People', path: '/people', area: 'people', icon: UsersRound },
+  { label: 'Assets', path: '/assets', area: 'assets', icon: Boxes },
+  { label: 'Products', path: '/overview', area: 'products', icon: Package },
+  { label: 'Networks', path: '/networks', area: 'networks', icon: Network },
+  { label: 'Credentials', path: '/credentials', area: 'credentials', icon: KeyRound },
 ]
 
 const governanceNavigation: NavigationItem[] = [
-  { label: 'Compliance', path: '/compliance', icon: ShieldCheck },
-  { label: 'Activity', path: '/activity', icon: FileCheck2 },
+  { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
+  { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
 ]
 
 function Brand({ collapsed }: { collapsed: boolean }) {
@@ -73,13 +79,16 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function NavSection({ items, label, collapsed, onNavigate }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void }) {
+function NavSection({ items, label, collapsed, onNavigate, workspace }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void; workspace: WorkspaceContext | null }) {
+  const availableItems = workspace
+    ? items.filter((item) => workspace.capabilities.includes(item.area))
+    : items.filter((item) => item.area !== 'products')
   return (
     <nav className="nav-list" aria-label={label}>
-      {items.map(({ label, path, icon: Icon }) => (
+      {availableItems.map(({ label, path, area, icon: Icon }) => (
         <AppLink
-          key={path}
-          to={path}
+          key={area}
+          to={workspace ? organizationWorkspacePath(workspace, area) : path}
           onClick={onNavigate}
           className="nav-link"
           title={collapsed ? label : undefined}
@@ -92,22 +101,20 @@ function NavSection({ items, label, collapsed, onNavigate }: { items: Navigation
   )
 }
 
-function workspaceInitials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'TD'
-}
-
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, workspaceName, workspaceLabel, workspaceLoading }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
   onMobileClose: () => void
-  workspaceName: string
-  workspaceLabel: string
+  tenant: AuthenticatedContext['tenant']
+  workspace: WorkspaceContext | null
+  activeArea: WorkspaceArea
+  workspaceClient: WorkspaceClient
   workspaceLoading: boolean
+  organizationRoute: boolean
 }) {
   return (
     <>
-      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label="Close navigation" />}
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-topline">
           <Brand collapsed={collapsed} />
@@ -117,17 +124,16 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, workspaceNa
           <button className="icon-button mobile-close" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button>
         </div>
 
-        <button className="tenant-switcher" type="button" title={collapsed ? workspaceName : undefined} disabled={workspaceLoading}>
-          <span className="tenant-initials">{workspaceInitials(workspaceName)}</span>
-          {!collapsed && <><span className="tenant-copy"><strong>{workspaceLoading ? 'Loading workspace…' : workspaceName}</strong><span>{workspaceLabel}</span></span><ChevronDown size={15} /></>}
-        </button>
+        <WorkspaceSwitcher tenant={tenant} activeWorkspace={workspace} activeArea={activeArea} client={workspaceClient} collapsed={collapsed} workspaceLoading={workspaceLoading} onNavigate={onMobileClose} />
 
         <div className="sidebar-scroll">
-          <NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} />
-          <div className="nav-divider" />
-          <NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} />
+          {organizationRoute && !workspace
+            ? <p className="workspace-navigation-state">{workspaceLoading ? 'Loading navigation…' : 'Workspace unavailable'}</p>
+            : <><NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} />
+              {(!workspace || governanceNavigation.some((item) => workspace.capabilities.includes(item.area))) && <><div className="nav-divider" /><NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} /></>}</>}
         </div>
       </aside>
+      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label="Close navigation" />}
     </>
   )
 }
@@ -202,9 +208,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.3 adds routable organization workspaces and verified scope boundaries." />
+      <PageHeader title="Overview" description="TekDocs 0.1.4 adds bounded workspace discovery and URL-scoped navigation." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.3</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.4</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -251,6 +257,32 @@ function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceSta
   return <WorkspaceOverview workspace={state.workspace} />
 }
 
+const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
+  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
+  people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
+  assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
+  products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
+  networks: { title: 'Networks', description: 'Network records scoped to this organization.', release: '0.4.1' },
+  credentials: { title: 'Credentials', description: 'Protected credential records scoped to this organization.', release: '0.3.1' },
+}
+
+function OrganizationAreaRoute({ state, area }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability }) {
+  if (area === 'overview') return <OrganizationWorkspaceRoute state={state} />
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
+  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} />
+  if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
+    return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
+  }
+  const details = organizationAreaDetails[area]
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to={organizationWorkspacePath(state.workspace, 'overview')}>{state.workspace.name}</Link><span aria-hidden="true">/</span><span aria-current="page">{details.title}</span></nav>
+      <PageHeader title={details.title} description={details.description} />
+      <section className="content-section"><div className="section-heading"><h2>Planned for {details.release}</h2><span>{classificationSummary(state.workspace.classifications)} workspace</span></div><p className="workspace-area-note">The route and ownership context are established. The domain records arrive in their scheduled slice.</p></section>
+    </>
+  )
+}
+
 export function ApplicationShell({ authContext, authClient, workspaceClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
@@ -269,27 +301,29 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, onS
 
   useEffect(() => {
     if (!organizationId) return
-    let active = true
-    workspaceClient.loadOrganization(organizationId)
-      .then((workspace) => { if (active) setOrganizationWorkspace({ phase: 'ready', organizationId, workspace }) })
-      .catch((error: unknown) => { if (active) setOrganizationWorkspace({ phase: 'error', organizationId, message: workspaceErrorMessage(error) }) })
-    return () => { active = false }
+    const controller = new AbortController()
+    workspaceClient.loadOrganization(organizationId, controller.signal)
+      .then((workspace) => { if (!controller.signal.aborted) setOrganizationWorkspace({ phase: 'ready', organizationId, workspace }) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setOrganizationWorkspace({ phase: 'error', organizationId, message: workspaceErrorMessage(error) }) })
+    return () => controller.abort()
   }, [organizationId, workspaceClient])
 
-  const visibleWorkspaceState = organizationId && (organizationWorkspace.phase === 'idle' || organizationWorkspace.organizationId !== organizationId)
-    ? { phase: 'loading' as const }
-    : organizationWorkspace
+  const visibleWorkspaceState = !organizationId
+    ? { phase: 'idle' as const }
+    : organizationWorkspace.phase === 'idle' || organizationWorkspace.organizationId !== organizationId
+      ? { phase: 'loading' as const }
+      : organizationWorkspace
   const selectedWorkspace = visibleWorkspaceState.phase === 'ready' ? visibleWorkspaceState.workspace : null
-  const workspaceName = organizationId ? selectedWorkspace?.name ?? shellContext.tenant.name : shellContext.tenant.name
-  const workspaceLabel = organizationId
-    ? selectedWorkspace
-      ? `${selectedWorkspace.classifications.join(' · ')} workspace`
-      : 'Organization workspace'
-    : 'MSP workspace'
+  const activeArea = workspaceAreaFromPath(location.pathname)
+
+  useEffect(() => {
+    const areaLabel = activeArea.charAt(0).toUpperCase() + activeArea.slice(1)
+    document.title = `${selectedWorkspace?.name ?? shellContext.tenant.name} · ${areaLabel} · TekDocs`
+  }, [activeArea, selectedWorkspace?.name, shellContext.tenant.name])
 
   return (
     <div className="app-shell">
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} workspaceName={workspaceName} workspaceLabel={workspaceLabel} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
@@ -307,6 +341,7 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, onS
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>

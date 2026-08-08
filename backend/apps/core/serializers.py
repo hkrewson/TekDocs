@@ -58,3 +58,23 @@ class WorkspaceContextSerializer(serializers.Serializer):
     classifications = serializers.ListField(child=serializers.ChoiceField(choices=OrganizationKind.choices))
     capabilities = serializers.ListField(child=serializers.CharField())
     organization = OrganizationSerializer(allow_null=True)
+
+
+class WorkspaceSearchQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+    page = serializers.IntegerField(min_value=1, max_value=100, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=25, required=False, default=15)
+
+
+class WorkspaceOptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    classifications = serializers.ListField(child=serializers.ChoiceField(choices=OrganizationKind.choices))
+    capabilities = serializers.ListField(child=serializers.CharField())
+
+
+class WorkspaceSearchResultSerializer(serializers.Serializer):
+    results = WorkspaceOptionSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()

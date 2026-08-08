@@ -53,10 +53,10 @@ test-compose:
 	./scripts/check-compose-provenance.sh
 
 test-e2e:
-	npm --prefix frontend run test:e2e
+	./scripts/rehearse-browser-e2e.sh chromium
 
 test-e2e-all:
-	npm --prefix frontend run test:e2e:all
+	./scripts/rehearse-browser-e2e.sh all
 
 test-e2e-live:
 	./scripts/rehearse-live-workspace-e2e.sh

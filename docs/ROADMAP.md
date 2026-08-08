@@ -179,7 +179,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.1` | Complete | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
 | `0.1.2` | Complete | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
 | `0.1.3` | Complete | Routable organization profile and workspace-context API contract with explicit MSP/organization scope, deep links, safe creation defaults, and closure of `TD-RISK-003`, `005`, `011`, and `016`; document the `TD-RISK-004` and `007` deployment plans. |
-| `0.1.4` | Planned | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
+| `0.1.4` | Complete | Searchable, bounded workspace switcher, MSP return, classification-aware navigation, independent-tab history, stale-data isolation, and `TD-RISK-012`. |
 | `0.1.5` | Planned | People plus employment/contact associations in MSP and organization workspaces. |
 | `0.1.6` | Planned | Sites and locations with organization ownership and workspace-aware navigation. |
 | `0.1.7` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
@@ -236,12 +236,14 @@ Evidence: `docs/releases/0.1.3.md`.
 
 ### `0.1.4` acceptance criteria
 
-- [ ] The shell workspace control opens a keyboard-accessible searchable list of authorized client, vendor, manufacturer, and partner organizations plus a persistent MSP-workspace entry.
-- [ ] Selecting an organization from its record or switcher updates the workspace name, all applicable classification labels, navigation capabilities, page title/breadcrumb context, and URL; multi-classified organizations receive the authorized union of capabilities.
-- [ ] Navigation preserves the active workspace when moving among available areas, while returning to the MSP workspace preserves the equivalent top-level route when one exists.
-- [ ] Switching clears prior-workspace content before loading, ignores late responses from the old context, and never stores organization selection as authorization-bearing session state.
-- [ ] Browser history, bookmarks, refreshes, mobile navigation, and separate tabs remain independent and deterministic.
-- [ ] Component and browser tests cover search, empty/no-access states, keyboard behavior, direct organization drill-in, MSP return, stale-response isolation, cross-workspace denial, and accessibility.
+- [x] The shell workspace control opens a keyboard-accessible searchable list of authorized client, vendor, manufacturer, and partner organizations plus a persistent MSP-workspace entry.
+- [x] Selecting an organization from its record or switcher updates the workspace name, all applicable classification labels, navigation capabilities, page title/breadcrumb context, and URL; multi-classified organizations receive the authorized union of capabilities.
+- [x] Navigation preserves the active workspace when moving among available areas, while returning to the MSP workspace preserves the equivalent top-level route when one exists.
+- [x] Switching clears prior-workspace content before loading, ignores late responses from the old context, and never stores organization selection as authorization-bearing session state.
+- [x] Browser history, bookmarks, refreshes, mobile navigation, and separate tabs remain independent and deterministic.
+- [x] Component and browser tests cover search, empty/no-access states, keyboard behavior, direct organization drill-in, MSP return, stale-response isolation, cross-workspace denial, and accessibility.
+
+Evidence: `docs/releases/0.1.4.md`.
 
 ## Reusable documentation: `0.2.x` → `0.3.0`
 

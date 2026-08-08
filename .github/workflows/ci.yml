@@ -86,6 +86,13 @@ jobs:
           path: compose.log
           retention-days: 7
 
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Three-engine browser suite
+        run: ./scripts/rehearse-browser-e2e.sh all
+
   live-workspace:
     runs-on: ubuntu-latest
     steps:

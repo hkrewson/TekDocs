@@ -31,6 +31,20 @@ describe('browserWorkspaceClient', () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/v1/workspaces/organizations/${workspace.id}`, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
+      signal: undefined,
+    })
+  })
+
+  it('encodes bounded workspace search parameters', async () => {
+    const result = { results: [], page: 2, page_size: 15, has_more: false }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserWorkspaceClient.searchOrganizations('Acme & Sons', 2)).resolves.toEqual(result)
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workspaces/organizations?q=Acme+%26+Sons&page=2&page_size=15', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal: undefined,
     })
   })
 

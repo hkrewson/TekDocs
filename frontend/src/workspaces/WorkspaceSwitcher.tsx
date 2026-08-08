@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Building2, Check, ChevronDown, Search } from 'lucide-react'
+import { Building2, Check, ChevronDown, CornerLeftUp, Search } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { WorkspaceClient, WorkspaceContext, WorkspaceOption } from './api'
 import { classificationSummary, mspWorkspacePath, organizationWorkspacePath } from './navigation'
@@ -41,6 +41,8 @@ export function WorkspaceSwitcher({
   const navigate = useNavigate()
   const workspaceName = activeWorkspace?.name ?? tenant.name
   const workspaceLabel = activeWorkspace ? `${classificationSummary(activeWorkspace.classifications)} workspace` : 'MSP workspace'
+  const searchClassification = activeWorkspace?.classifications.includes('client') ? 'client' : undefined
+  const searchLabel = searchClassification ? 'Find a client' : 'Find an organization'
 
   useEffect(() => {
     if (!open) return
@@ -57,7 +59,7 @@ export function WorkspaceSwitcher({
     const requestId = ++requestRef.current
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
-      client.searchOrganizations(query, 1, controller.signal)
+      client.searchOrganizations(query, 1, controller.signal, searchClassification)
         .then((response) => {
           if (requestRef.current !== requestId) return
           setResults(response.results)
@@ -74,14 +76,14 @@ export function WorkspaceSwitcher({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [client, open, query])
+  }, [client, open, query, searchClassification])
 
   async function loadMore() {
     const nextPage = page + 1
     const requestId = ++requestRef.current
     setLoadingMore(true)
     try {
-      const response = await client.searchOrganizations(query, nextPage)
+      const response = await client.searchOrganizations(query, nextPage, undefined, searchClassification)
       if (requestRef.current !== requestId) return
       setResults((current) => [...current, ...response.results])
       setPage(response.page)
@@ -137,26 +139,26 @@ export function WorkspaceSwitcher({
         <div className="workspace-switcher-popover" role="dialog" aria-label="Switch workspace">
           <label className="workspace-switcher-search">
             <Search size={15} aria-hidden="true" />
-            <span className="sr-only">Find a workspace</span>
+            <span className="sr-only">{searchLabel}</span>
             <input
               ref={searchRef}
               value={query}
               onChange={(event) => { setQuery(event.target.value); beginSearch() }}
               onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); firstOptionRef.current?.focus() } }}
-              placeholder="Find a workspace"
+              placeholder={searchLabel}
               autoComplete="off"
             />
           </label>
           <div className="workspace-options" aria-live="polite">
-            <button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={`${tenant.name}. MSP workspace`} aria-current={activeWorkspace ? undefined : 'true'}>
-              <Building2 size={17} aria-hidden="true" />
-              <span><strong>{tenant.name}</strong><span>MSP workspace</span></span>
+            <button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={activeWorkspace ? `Back to ${tenant.name}. MSP workspace` : `${tenant.name}. MSP workspace`} aria-current={activeWorkspace ? undefined : 'true'}>
+              {activeWorkspace ? <CornerLeftUp size={17} aria-hidden="true" /> : <Building2 size={17} aria-hidden="true" />}
+              <span><strong>{activeWorkspace ? `Back to ${tenant.name}` : tenant.name}</strong><span>MSP workspace</span></span>
               {!activeWorkspace && <Check size={15} aria-label="Current workspace" />}
             </button>
             <div className="workspace-option-divider" />
             {phase === 'loading' && <p className="workspace-switcher-state">Searching…</p>}
             {phase === 'error' && <p className="workspace-switcher-state" role="alert">Workspaces could not be loaded.</p>}
-            {phase === 'ready' && results.length === 0 && <p className="workspace-switcher-state">No matching workspaces.</p>}
+            {phase === 'ready' && results.length === 0 && <p className="workspace-switcher-state">{searchClassification ? 'No matching clients.' : 'No matching organizations.'}</p>}
             {results.map((workspace) => (
               <button key={workspace.id} type="button" className="workspace-option" onClick={() => selectOrganization(workspace)} aria-label={`${workspace.name}. ${classificationSummary(workspace.classifications)}`} aria-current={workspace.id === activeWorkspace?.id ? 'true' : undefined}>
                 <span className="workspace-option-initials" aria-hidden="true">{initials(workspace.name)}</span>

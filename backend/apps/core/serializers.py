@@ -62,6 +62,12 @@ class WorkspaceContextSerializer(serializers.Serializer):
 
 class WorkspaceSearchQuerySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+    classification = serializers.ChoiceField(
+        choices=OrganizationKind.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
     page = serializers.IntegerField(min_value=1, max_value=100, required=False, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=25, required=False, default=15)
 

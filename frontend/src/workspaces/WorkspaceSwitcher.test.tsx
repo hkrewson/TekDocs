@@ -10,15 +10,15 @@ const acme: WorkspaceContext = {
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'documentation', 'people', 'assets', 'networks', 'credentials'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
   organization: null,
 }
 
 const northwind: WorkspaceOption = {
   id: '00000000-0000-4000-8000-000000000011',
-  name: 'Northwind Supply',
-  classifications: ['vendor', 'manufacturer'],
-  capabilities: ['overview', 'documentation', 'people', 'products'],
+  name: 'Northwind Clinic',
+  classifications: ['client', 'vendor'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors', 'products'],
 }
 
 function Location() {
@@ -41,11 +41,11 @@ describe('WorkspaceSwitcher', () => {
     renderSwitcher({ searchOrganizations } as unknown as WorkspaceClient)
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
-    const search = screen.getByRole('textbox', { name: 'Find a workspace' })
+    const search = screen.getByRole('textbox', { name: 'Find a client' })
     await user.type(search, 'north')
-    expect(await screen.findByRole('button', { name: 'Northwind Supply. Vendor · Manufacturer' })).toBeInTheDocument()
-    await waitFor(() => expect(searchOrganizations).toHaveBeenLastCalledWith('north', 1, expect.any(AbortSignal)))
-    await user.click(screen.getByRole('button', { name: 'Northwind Supply. Vendor · Manufacturer' }))
+    expect(await screen.findByRole('button', { name: 'Northwind Clinic. Client · Vendor' })).toBeInTheDocument()
+    await waitFor(() => expect(searchOrganizations).toHaveBeenLastCalledWith('north', 1, expect.any(AbortSignal), 'client'))
+    await user.click(screen.getByRole('button', { name: 'Northwind Clinic. Client · Vendor' }))
 
     expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent(`/workspaces/organizations/${northwind.id}/documentation`)
   })
@@ -55,14 +55,14 @@ describe('WorkspaceSwitcher', () => {
     renderSwitcher({ searchOrganizations: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 15, has_more: false }) } as unknown as WorkspaceClient)
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
-    const search = screen.getByRole('textbox', { name: 'Find a workspace' })
+    const search = screen.getByRole('textbox', { name: 'Find a client' })
     await user.type(search, '{ArrowDown}')
-    expect(screen.getByRole('button', { name: 'Example MSP. MSP workspace' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' })).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Switch workspace' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
-    await user.click(screen.getByRole('button', { name: 'Example MSP. MSP workspace' }))
+    await user.click(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' }))
     expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent('/documentation')
   })
 
@@ -75,8 +75,8 @@ describe('WorkspaceSwitcher', () => {
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Workspaces could not be loaded.')
-    await user.type(screen.getByRole('textbox', { name: 'Find a workspace' }), 'none')
-    expect(await screen.findByText('No matching workspaces.')).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Find a client' }), 'none')
+    expect(await screen.findByText('No matching clients.')).toBeInTheDocument()
     expect(screen.queryByText('private response details')).not.toBeInTheDocument()
   })
 
@@ -91,11 +91,11 @@ describe('WorkspaceSwitcher', () => {
     renderSwitcher({ searchOrganizations } as unknown as WorkspaceClient)
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
-    await waitFor(() => expect(searchOrganizations).toHaveBeenCalledWith('', 1, expect.any(AbortSignal)))
-    await user.type(screen.getByRole('textbox', { name: 'Find a workspace' }), 'north')
-    await waitFor(() => expect(searchOrganizations).toHaveBeenCalledWith('north', 1, expect.any(AbortSignal)))
+    await waitFor(() => expect(searchOrganizations).toHaveBeenCalledWith('', 1, expect.any(AbortSignal), 'client'))
+    await user.type(screen.getByRole('textbox', { name: 'Find a client' }), 'north')
+    await waitFor(() => expect(searchOrganizations).toHaveBeenCalledWith('north', 1, expect.any(AbortSignal), 'client'))
     resolveNew({ results: [northwind], page: 1, page_size: 15, has_more: false })
-    expect(await screen.findByText('Northwind Supply')).toBeInTheDocument()
+    expect(await screen.findByText('Northwind Clinic')).toBeInTheDocument()
     resolveOld({ results: [oldResult], page: 1, page_size: 15, has_more: false })
     await waitFor(() => expect(screen.queryByText('Old Result')).not.toBeInTheDocument())
   })

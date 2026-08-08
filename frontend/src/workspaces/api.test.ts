@@ -40,8 +40,8 @@ describe('browserWorkspaceClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(browserWorkspaceClient.searchOrganizations('Acme & Sons', 2)).resolves.toEqual(result)
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workspaces/organizations?q=Acme+%26+Sons&page=2&page_size=15', {
+    await expect(browserWorkspaceClient.searchOrganizations('Acme & Sons', 2, undefined, 'client')).resolves.toEqual(result)
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workspaces/organizations?q=Acme+%26+Sons&page=2&page_size=15&classification=client', {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: undefined,

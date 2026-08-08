@@ -463,6 +463,22 @@ paths:
       operationId: workspaces_organizations_search
       parameters:
       - in: query
+        name: classification
+        schema:
+          enum:
+          - client
+          - vendor
+          - manufacturer
+          - partner
+          - ''
+          type: string
+          default: ''
+        description: |-
+          * `client` - Client
+          * `vendor` - Vendor
+          * `manufacturer` - Manufacturer
+          * `partner` - Partner
+      - in: query
         name: page
         schema:
           type: integer

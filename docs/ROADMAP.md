@@ -245,6 +245,8 @@ Evidence: `docs/releases/0.1.3.md`.
 
 Evidence: `docs/releases/0.1.4.md`.
 
+The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMATION_ARCHITECTURE.md`. Areas shown before their domain milestone are explicit scope-aware placeholders, not implemented record stores. Ticketing and accounting remain post-`1.0` even though their eventual context is reserved in the navigation contract.
+
 ## Reusable documentation: `0.2.x` → `0.3.0`
 
 | Release | Slice and exit condition |

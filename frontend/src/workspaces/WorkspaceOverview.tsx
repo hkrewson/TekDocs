@@ -12,14 +12,23 @@ const classificationLabels = {
 const capabilityLabels = {
   overview: 'Overview',
   documentation: 'Documentation',
+  files: 'Files',
   organizations: 'Organizations',
   people: 'People',
   assets: 'Assets',
+  licenses: 'Licenses',
   networks: 'Networks',
+  domains: 'Domains',
+  certificates: 'Certificates',
   credentials: 'Credentials',
+  services: 'Services',
+  tickets: 'Tickets',
+  vendors: 'Vendors',
   products: 'Products',
   compliance: 'Compliance',
   activity: 'Activity',
+  integrations: 'Integrations',
+  accounting: 'Accounting',
 }
 
 export function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {

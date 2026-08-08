@@ -6,7 +6,7 @@ const supplier: WorkspaceOption = {
   id: '00000000-0000-4000-8000-000000000012',
   name: 'Northwind Supply',
   classifications: ['vendor', 'manufacturer'],
-  capabilities: ['overview', 'documentation', 'people', 'products'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'products'],
 }
 
 describe('workspace navigation', () => {
@@ -19,6 +19,6 @@ describe('workspace navigation', () => {
 
   it('falls back to overview when the destination lacks the current area', () => {
     expect(organizationWorkspacePath(supplier, 'networks')).toBe(`/workspaces/organizations/${supplier.id}/overview`)
-    expect(mspWorkspacePath('products')).toBe('/overview')
+    expect(mspWorkspacePath('products')).toBe('/products')
   })
 })

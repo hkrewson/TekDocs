@@ -68,6 +68,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .sidebar-scroll { overflow-y: auto; padding: 4px 8px 16px; }
 .workspace-navigation-state { margin: 8px 10px; color: #a6a7a0; font-size: 12px; }
 .nav-list { display: flex; flex-direction: column; gap: 2px; }
+.nav-section-label { padding: 0 10px 5px; color: #85877f; font-size: 11px; }
 .nav-link { min-height: 40px; display: flex; align-items: center; gap: 11px; padding: 0 10px; color: #b9bab4; border-radius: 7px; font-size: 14px; text-decoration: none; transition: color 120ms ease, background 120ms ease; }
 .nav-link:hover { color: #f2f1ed; background: rgba(255,255,255,.055); }
 .nav-link.active { color: #f2dfc6; background: #313029; }

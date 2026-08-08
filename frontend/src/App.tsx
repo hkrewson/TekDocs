@@ -3,14 +3,20 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
 import {
   Activity,
+  BadgeCheck,
+  BadgeDollarSign,
   BookOpenText,
   Boxes,
+  BriefcaseBusiness,
   Building2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
+  File,
   FileCheck2,
+  Globe2,
+  Handshake,
   KeyRound,
   LogOut,
   Menu,
@@ -20,6 +26,8 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  ScrollText,
+  TicketCheck,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -46,6 +54,11 @@ type NavigationItem = {
   icon: typeof BookOpenText
 }
 
+type NavigationSection = {
+  label: string
+  items: NavigationItem[]
+}
+
 function AppLink({ to, className, children, ...props }: {
   to: string
   className?: string
@@ -54,20 +67,36 @@ function AppLink({ to, className, children, ...props }: {
   return <NavLink {...props} to={to} className={({ isActive }) => `${className ?? ''}${isActive ? ' active' : ''}`}>{children}</NavLink>
 }
 
-const workspaceNavigation: NavigationItem[] = [
-  { label: 'Overview', path: '/overview', area: 'overview', icon: Activity },
-  { label: 'Documentation', path: '/documentation', area: 'documentation', icon: BookOpenText },
-  { label: 'Organizations', path: '/organizations', area: 'organizations', icon: Building2 },
-  { label: 'People', path: '/people', area: 'people', icon: UsersRound },
-  { label: 'Assets', path: '/assets', area: 'assets', icon: Boxes },
-  { label: 'Products', path: '/overview', area: 'products', icon: Package },
-  { label: 'Networks', path: '/networks', area: 'networks', icon: Network },
-  { label: 'Credentials', path: '/credentials', area: 'credentials', icon: KeyRound },
-]
-
-const governanceNavigation: NavigationItem[] = [
-  { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
-  { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
+const navigationSections: NavigationSection[] = [
+  { label: 'Workspace', items: [
+    { label: 'Overview', path: '/overview', area: 'overview', icon: Activity },
+    { label: 'Organizations', path: '/organizations', area: 'organizations', icon: Building2 },
+    { label: 'People', path: '/people', area: 'people', icon: UsersRound },
+    { label: 'Documentation', path: '/documentation', area: 'documentation', icon: BookOpenText },
+    { label: 'Files', path: '/files', area: 'files', icon: File },
+  ] },
+  { label: 'Infrastructure', items: [
+    { label: 'Assets', path: '/assets', area: 'assets', icon: Boxes },
+    { label: 'Licenses', path: '/licenses', area: 'licenses', icon: ScrollText },
+    { label: 'Networks', path: '/networks', area: 'networks', icon: Network },
+    { label: 'Domains', path: '/domains', area: 'domains', icon: Globe2 },
+    { label: 'Certificates', path: '/certificates', area: 'certificates', icon: BadgeCheck },
+    { label: 'Credentials', path: '/credentials', area: 'credentials', icon: KeyRound },
+    { label: 'Services', path: '/services', area: 'services', icon: BriefcaseBusiness },
+  ] },
+  { label: 'Relationships', items: [
+    { label: 'Vendors', path: '/vendors', area: 'vendors', icon: Handshake },
+    { label: 'Products', path: '/products', area: 'products', icon: Package },
+    { label: 'Tickets', path: '/tickets', area: 'tickets', icon: TicketCheck },
+  ] },
+  { label: 'Business', items: [
+    { label: 'Accounting', path: '/accounting', area: 'accounting', icon: BadgeDollarSign },
+  ] },
+  { label: 'Governance', items: [
+    { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
+    { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
+    { label: 'Integrations', path: '/integrations', area: 'integrations', icon: Plug },
+  ] },
 ]
 
 function Brand({ collapsed }: { collapsed: boolean }) {
@@ -80,12 +109,10 @@ function Brand({ collapsed }: { collapsed: boolean }) {
 }
 
 function NavSection({ items, label, collapsed, onNavigate, workspace }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void; workspace: WorkspaceContext | null }) {
-  const availableItems = workspace
-    ? items.filter((item) => workspace.capabilities.includes(item.area))
-    : items.filter((item) => item.area !== 'products')
   return (
     <nav className="nav-list" aria-label={label}>
-      {availableItems.map(({ label, path, area, icon: Icon }) => (
+      {!collapsed && <span className="nav-section-label">{label}</span>}
+      {items.map(({ label, path, area, icon: Icon }) => (
         <AppLink
           key={area}
           to={workspace ? organizationWorkspacePath(workspace, area) : path}
@@ -113,6 +140,12 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   workspaceLoading: boolean
   organizationRoute: boolean
 }) {
+  const availableSections = navigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !workspace || workspace.capabilities.includes(item.area)),
+    }))
+    .filter((section) => section.items.length > 0)
   return (
     <>
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
@@ -129,8 +162,12 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
         <div className="sidebar-scroll">
           {organizationRoute && !workspace
             ? <p className="workspace-navigation-state">{workspaceLoading ? 'Loading navigation…' : 'Workspace unavailable'}</p>
-            : <><NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} />
-              {(!workspace || governanceNavigation.some((item) => workspace.capabilities.includes(item.area))) && <><div className="nav-divider" /><NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} /></>}</>}
+            : availableSections.map((section, index) => (
+              <div key={section.label}>
+                {index > 0 && <div className="nav-divider" />}
+                <NavSection items={section.items} label={section.label} collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} />
+              </div>
+            ))}
         </div>
       </aside>
       {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label="Close navigation" />}
@@ -165,7 +202,6 @@ function ProfileMenu({ user, onSignOut, signingOut }: {
       {open && (
         <div className="profile-popover" role="menu">
           <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
-          <AppLink to="/integrations" role="menuitem" onClick={() => setOpen(false)}><Plug size={17} />Integrations</AppLink>
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
@@ -183,10 +219,19 @@ function PageHeader({ title, description, action }: { title: string; description
 }
 
 const plannedAreas: Record<string, { title: string; description: string; release: string; capabilities: string[] }> = {
-  '/people': { title: 'People', description: 'MSP staff, client employees, contacts, and access associations.', release: '0.2.0', capabilities: ['Contact records', 'Organization membership', 'Portal access boundary'] },
-  '/assets': { title: 'Assets', description: 'Hardware, software, licensing, warranty, and cost records.', release: '0.4.0', capabilities: ['Hardware inventory', 'Software and licenses', 'Cost visibility controls'] },
+  '/people': { title: 'People', description: 'MSP staff, client employees, contacts, and access associations.', release: '0.1.5', capabilities: ['Contact records', 'Organization membership', 'Portal access boundary'] },
+  '/files': { title: 'Files', description: 'Managed files and attachments with explicit ownership and references.', release: '0.3.8', capabilities: ['Safe uploads', 'Ownership scope', 'Permission-aware references'] },
+  '/assets': { title: 'Assets', description: 'Hardware, software, licensing, warranty, and cost records.', release: '0.3.5', capabilities: ['Hardware inventory', 'Software and licenses', 'Cost visibility controls'] },
+  '/licenses': { title: 'Licenses', description: 'Software entitlements, seats, renewals, and client assignments.', release: '0.3.6', capabilities: ['License inventory', 'Seat assignments', 'Renewal dates'] },
   '/networks': { title: 'Networks', description: 'Sites, VLANs, subnets, addresses, interfaces, and circuits.', release: '0.5.0', capabilities: ['Address management', 'Device relationships', 'NetBox-compatible identifiers'] },
-  '/credentials': { title: 'Credentials', description: 'Encrypted secrets with explicit reveal and audit boundaries.', release: '0.4.0', capabilities: ['Envelope encryption', 'Reauthentication', 'Key rotation'] },
+  '/domains': { title: 'Domains', description: 'Domain registration, DNS ownership, and expiration monitoring.', release: '0.7.8', capabilities: ['Registration records', 'DNS monitoring', 'Expiry notifications'] },
+  '/certificates': { title: 'Certificates', description: 'TLS endpoints, certificate chains, and expiry monitoring.', release: '0.7.9', capabilities: ['Endpoint inventory', 'Chain evidence', 'Expiry notifications'] },
+  '/credentials': { title: 'Credentials', description: 'Encrypted secrets with explicit reveal and audit boundaries.', release: '0.3.1', capabilities: ['Envelope encryption', 'Reauthentication', 'Key rotation'] },
+  '/services': { title: 'Services', description: 'Services, contracts, providers, and operational dependencies.', release: '0.3.7', capabilities: ['Service inventory', 'Provider relationships', 'Renewal tracking'] },
+  '/vendors': { title: 'Vendors', description: 'Organizations supplying products or services to this workspace.', release: '0.3.4', capabilities: ['Relationship-derived list', 'Supplier provenance', 'Related contacts'] },
+  '/products': { title: 'Products', description: 'Reusable supplier product and model definitions.', release: '0.3.3', capabilities: ['Product templates', 'Model specifications', 'Client asset provenance'] },
+  '/tickets': { title: 'Tickets', description: 'Service requests associated with the active workspace.', release: 'Post-1.0', capabilities: ['Client requests', 'Object relationships', 'Portal visibility'] },
+  '/accounting': { title: 'Accounting', description: 'MSP business records for billing, purchasing, and financial operations.', release: 'Post-1.0', capabilities: ['Invoices and payments', 'Quotes and recurring billing', 'Expenses and trips'] },
   '/compliance': { title: 'Compliance', description: 'Control ownership, evidence, reviews, and immutable evidence bundles.', release: '0.8.0', capabilities: ['Frameworks and controls', 'Evidence links', 'Review reminders'] },
   '/activity': { title: 'Activity', description: 'Append-only security and business change history.', release: '0.1.0', capabilities: ['Request correlation', 'Permission-aware history', 'Exportable evidence'] },
   '/integrations': { title: 'Integrations', description: 'Secure provider connections, jobs, webhooks, and reconciliation.', release: '0.7.0', capabilities: ['Provider contracts', 'Scheduled jobs', 'Conflict review'] },
@@ -258,12 +303,19 @@ function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceSta
 }
 
 const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
-  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
   people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
+  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
+  files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
   assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
-  products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
+  licenses: { title: 'Licenses', description: 'Software entitlements and assignments scoped to this organization.', release: '0.3.6' },
   networks: { title: 'Networks', description: 'Network records scoped to this organization.', release: '0.4.1' },
+  domains: { title: 'Domains', description: 'Domain registration and DNS records scoped to this organization.', release: '0.7.8' },
+  certificates: { title: 'Certificates', description: 'TLS endpoints and certificate evidence scoped to this organization.', release: '0.7.9' },
   credentials: { title: 'Credentials', description: 'Protected credential records scoped to this organization.', release: '0.3.1' },
+  services: { title: 'Services', description: 'Services, providers, contracts, and dependencies scoped to this organization.', release: '0.3.7' },
+  vendors: { title: 'Vendors', description: 'Suppliers related to this organization through products, assets, or services.', release: '0.3.4' },
+  products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
+  tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
 }
 
 function OrganizationAreaRoute({ state, area }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability }) {

@@ -66,14 +66,24 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "classifications": [],
         "capabilities": [
             "overview",
-            "documentation",
             "organizations",
             "people",
+            "documentation",
+            "files",
             "assets",
+            "licenses",
             "networks",
+            "domains",
+            "certificates",
             "credentials",
+            "services",
+            "tickets",
+            "vendors",
+            "products",
             "compliance",
             "activity",
+            "integrations",
+            "accounting",
         ],
         "organization": None,
     }
@@ -84,11 +94,18 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
     assert selected.json()["classifications"] == ["client", "vendor"]
     assert selected.json()["capabilities"] == [
         "overview",
-        "documentation",
         "people",
+        "documentation",
+        "files",
         "assets",
+        "licenses",
         "networks",
+        "domains",
+        "certificates",
         "credentials",
+        "services",
+        "tickets",
+        "vendors",
         "products",
     ]
     assert selected.json()["organization"]["legal_name"] == "Acme Workspace, LLC"
@@ -168,9 +185,26 @@ def test_workspace_search_is_ordered_searchable_and_page_bounded(owner_client, i
             "id": str(Entity.objects.get(display_name="Supplier Alias").id),
             "name": "Supplier Alias",
             "classifications": ["manufacturer"],
-            "capabilities": ["overview", "documentation", "people", "products"],
+            "capabilities": ["overview", "people", "documentation", "files", "products"],
         }
     ]
+
+
+@pytest.mark.django_db
+def test_workspace_search_can_limit_results_to_client_context(owner_client, installation):
+    client_only = create_organization(installation.tenant, name="Alpha Client", classifications=("client",))
+    both = create_organization(installation.tenant, name="Beta Client Vendor", classifications=("client", "vendor"))
+    create_organization(installation.tenant, name="Supplier Only", classifications=("vendor",))
+
+    response = owner_client.get(reverse("workspace-organization-search"), {"classification": "client"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["results"]] == [str(client_only.entity_id), str(both.entity_id)]
+    assert all("client" in item["classifications"] for item in response.json()["results"])
+    assert owner_client.get(
+        reverse("workspace-organization-search"),
+        {"classification": "unsupported"},
+    ).status_code == 400
 
 
 @pytest.mark.django_db

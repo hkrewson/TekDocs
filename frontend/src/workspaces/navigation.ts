@@ -1,19 +1,27 @@
 import type { WorkspaceCapability, WorkspaceOption } from './api'
 
-export type WorkspaceArea = WorkspaceCapability | 'integrations' | 'settings'
+export type WorkspaceArea = WorkspaceCapability | 'settings'
 
 const recognizedAreas = new Set<WorkspaceArea>([
   'overview',
   'documentation',
   'organizations',
   'people',
+  'files',
   'assets',
+  'licenses',
   'networks',
+  'domains',
+  'certificates',
   'credentials',
+  'services',
+  'tickets',
+  'vendors',
   'products',
   'compliance',
   'activity',
   'integrations',
+  'accounting',
   'settings',
 ])
 
@@ -22,12 +30,21 @@ const mspAreas = new Set<WorkspaceArea>([
   'documentation',
   'organizations',
   'people',
+  'files',
   'assets',
+  'licenses',
   'networks',
+  'domains',
+  'certificates',
   'credentials',
+  'services',
+  'tickets',
+  'vendors',
+  'products',
   'compliance',
   'activity',
   'integrations',
+  'accounting',
   'settings',
 ])
 

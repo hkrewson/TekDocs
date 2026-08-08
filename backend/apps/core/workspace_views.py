@@ -50,6 +50,7 @@ class OrganizationWorkspaceSearchView(APIView):
         results, has_more = search_organization_workspaces(
             request.user,
             query=values["q"],
+            classification=values["classification"],
             page=values["page"],
             page_size=values["page_size"],
         )

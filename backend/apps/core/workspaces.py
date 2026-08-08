@@ -14,21 +14,45 @@ from .scoping import DataScope
 
 MSP_CAPABILITIES = (
     "overview",
-    "documentation",
     "organizations",
     "people",
+    "documentation",
+    "files",
     "assets",
+    "licenses",
     "networks",
+    "domains",
+    "certificates",
     "credentials",
+    "services",
+    "tickets",
+    "vendors",
+    "products",
     "compliance",
     "activity",
+    "integrations",
+    "accounting",
 )
 
 CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
-    "client": ("overview", "documentation", "people", "assets", "networks", "credentials"),
-    "vendor": ("overview", "documentation", "people", "products"),
-    "manufacturer": ("overview", "documentation", "people", "products"),
-    "partner": ("overview", "documentation", "people", "products"),
+    "client": (
+        "overview",
+        "people",
+        "documentation",
+        "files",
+        "assets",
+        "licenses",
+        "networks",
+        "domains",
+        "certificates",
+        "credentials",
+        "services",
+        "tickets",
+        "vendors",
+    ),
+    "vendor": ("overview", "people", "documentation", "files", "products"),
+    "manufacturer": ("overview", "people", "documentation", "files", "products"),
+    "partner": ("overview", "people", "documentation", "files", "products"),
 }
 
 
@@ -77,11 +101,14 @@ def search_organization_workspaces(
     user: User,
     *,
     query: str,
+    classification: str,
     page: int,
     page_size: int,
 ) -> tuple[list[dict[str, object]], bool]:
     member = require_installation_owner(user)
     organizations = active_organizations_for_member(member)
+    if classification:
+        organizations = organizations.filter(classifications__kind=classification)
     if query:
         organizations = organizations.filter(
             Q(entity__display_name__icontains=query) | Q(legal_name__icontains=query)

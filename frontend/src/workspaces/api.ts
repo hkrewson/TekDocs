@@ -3,15 +3,24 @@ import type { Organization, OrganizationClassification } from '../organizations/
 
 export type WorkspaceCapability =
   | 'overview'
-  | 'documentation'
   | 'organizations'
   | 'people'
+  | 'documentation'
+  | 'files'
   | 'assets'
+  | 'licenses'
   | 'networks'
+  | 'domains'
+  | 'certificates'
   | 'credentials'
+  | 'services'
+  | 'tickets'
+  | 'vendors'
   | 'products'
   | 'compliance'
   | 'activity'
+  | 'integrations'
+  | 'accounting'
 
 export type WorkspaceContext = {
   kind: 'msp' | 'organization'
@@ -34,7 +43,7 @@ export type WorkspaceSearchResult = {
 export interface WorkspaceClient {
   loadMsp(): Promise<WorkspaceContext>
   loadOrganization(id: string, signal?: AbortSignal): Promise<WorkspaceContext>
-  searchOrganizations(query: string, page?: number, signal?: AbortSignal): Promise<WorkspaceSearchResult>
+  searchOrganizations(query: string, page?: number, signal?: AbortSignal, classification?: OrganizationClassification): Promise<WorkspaceSearchResult>
 }
 
 async function load<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -61,8 +70,9 @@ async function load<T>(path: string, signal?: AbortSignal): Promise<T> {
 export const browserWorkspaceClient: WorkspaceClient = {
   loadMsp: () => load<WorkspaceContext>('/api/v1/workspaces/msp'),
   loadOrganization: (id, signal) => load<WorkspaceContext>(`/api/v1/workspaces/organizations/${encodeURIComponent(id)}`, signal),
-  searchOrganizations: (query, page = 1, signal) => {
+  searchOrganizations: (query, page = 1, signal, classification) => {
     const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '15' })
+    if (classification) parameters.set('classification', classification)
     return load<WorkspaceSearchResult>(`/api/v1/workspaces/organizations?${parameters}`, signal)
   },
 }

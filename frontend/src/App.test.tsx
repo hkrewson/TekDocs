@@ -20,7 +20,7 @@ const loadOrganization = vi.fn().mockResolvedValue({
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'documentation', 'people', 'assets', 'networks', 'credentials'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
   organization: {
     id: '00000000-0000-4000-8000-000000000010',
     name: 'Acme Dental',
@@ -47,6 +47,7 @@ describe('application shell', () => {
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Compliance' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
   })
 
   it('provides profile routes through the account menu', async () => {
@@ -55,7 +56,7 @@ describe('application shell', () => {
 
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('menuitem', { name: 'Integrations' })).toHaveAttribute('href', '/integrations')
+    expect(screen.queryByRole('menuitem', { name: 'Integrations' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
@@ -82,10 +83,16 @@ describe('application shell', () => {
   it('shows only the selected organization capability union in navigation', async () => {
     render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/overview'))
 
-    const navigation = within(await screen.findByRole('navigation', { name: 'Workspace' }))
-    expect(navigation.getByRole('link', { name: 'Assets' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
-    expect(navigation.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
-    expect(navigation.queryByRole('link', { name: 'Products' })).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Acme Dental' })
+    const sidebar = within(screen.getByRole('complementary'))
+    expect(sidebar.getByRole('link', { name: 'Assets' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
+    expect(sidebar.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/certificates')
+    expect(sidebar.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
+    expect(sidebar.queryByRole('link', { name: 'Products' })).not.toBeInTheDocument()
+    expect(sidebar.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
+    for (const link of sidebar.getAllByRole('link')) {
+      expect(link.getAttribute('href')).toMatch(/^\/workspaces\/organizations\/00000000-0000-4000-8000-000000000010\//)
+    }
     expect(screen.queryByRole('navigation', { name: 'Governance' })).not.toBeInTheDocument()
   })
 
@@ -95,10 +102,14 @@ describe('application shell', () => {
 
     await screen.findByRole('heading', { name: 'Acme Dental' })
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
-    await user.click(screen.getByRole('button', { name: 'Example MSP. MSP workspace' }))
+    await user.click(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' }))
 
     expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Current workspace: Example MSP/ })).toBeInTheDocument()
     expect(document.title).toBe('Example MSP · Overview · TekDocs')
+    const sidebar = within(screen.getByRole('complementary'))
+    expect(sidebar.getByRole('link', { name: 'Organizations' })).toHaveAttribute('href', '/organizations')
+    expect(sidebar.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+    for (const link of sidebar.getAllByRole('link')) expect(link.getAttribute('href')).not.toMatch(/^\/workspaces\/organizations\//)
   })
 })

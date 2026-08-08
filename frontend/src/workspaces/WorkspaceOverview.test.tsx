@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { WorkspaceOverview } from './WorkspaceOverview'
+import type { RelationshipsClient } from '../relationships/api'
 import type { WorkspaceContext } from './api'
 
 const workspace: WorkspaceContext = {
@@ -20,12 +21,22 @@ const workspace: WorkspaceContext = {
   },
 }
 
-it('identifies organization scope and the areas that will inherit it', () => {
-  render(<MemoryRouter><WorkspaceOverview workspace={workspace} /></MemoryRouter>)
+const relationshipsClient: RelationshipsClient = {
+  linkTypes: () => Promise.resolve([]),
+  search: () => Promise.resolve({ results: [], page: 1, page_size: 15, count: 0, has_more: false }),
+  list: () => Promise.resolve([]),
+  create: () => Promise.reject(new Error('not used')),
+  archive: () => Promise.resolve(),
+}
+
+it('identifies organization scope and the areas that will inherit it', async () => {
+  render(<MemoryRouter><WorkspaceOverview workspace={workspace} relationshipsClient={relationshipsClient} /></MemoryRouter>)
 
   expect(screen.getByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
   expect(screen.getByText('Client · Vendor workspace')).toBeInTheDocument()
   expect(screen.getByText('Acme Dental Associates, LLC')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Return to MSP organizations' })).toHaveAttribute('href', '/organizations')
   expect(screen.getByText('Products')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Organization relationships' })).toBeInTheDocument()
+  expect(await screen.findByText('No relationships have been added.')).toBeInTheDocument()
 })

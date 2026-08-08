@@ -30,6 +30,15 @@ from apps.core.people_views import (
     OrganizationPeopleListCreateView,
     OrganizationPersonDetailView,
 )
+from apps.core.relationship_views import (
+    EntityLinkTypeCatalogView,
+    MSPEntityRelationshipDetailView,
+    MSPEntityRelationshipListCreateView,
+    MSPEntitySearchView,
+    OrganizationEntityRelationshipDetailView,
+    OrganizationEntityRelationshipListCreateView,
+    OrganizationEntitySearchView,
+)
 from apps.core.site_views import (
     MSPLocationDetailView,
     MSPLocationListCreateView,
@@ -61,6 +70,18 @@ urlpatterns = [
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
+    path("api/v1/entity-link-types", EntityLinkTypeCatalogView.as_view(), name="entity-link-type-catalog"),
+    path("api/v1/entities/search", MSPEntitySearchView.as_view(), name="msp-entity-search"),
+    path(
+        "api/v1/entities/<uuid:entity_id>/links",
+        MSPEntityRelationshipListCreateView.as_view(),
+        name="msp-entity-relationship-list-create",
+    ),
+    path(
+        "api/v1/entities/<uuid:entity_id>/links/<uuid:link_id>",
+        MSPEntityRelationshipDetailView.as_view(),
+        name="msp-entity-relationship-detail",
+    ),
     path("api/v1/people", MSPPeopleListCreateView.as_view(), name="msp-people-list-create"),
     path("api/v1/people/<uuid:person_entity_id>", MSPPersonDetailView.as_view(), name="msp-person-detail"),
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
@@ -110,6 +131,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/search",
+        OrganizationEntitySearchView.as_view(),
+        name="organization-entity-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/<uuid:entity_id>/links",
+        OrganizationEntityRelationshipListCreateView.as_view(),
+        name="organization-entity-relationship-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/<uuid:entity_id>/links/<uuid:link_id>",
+        OrganizationEntityRelationshipDetailView.as_view(),
+        name="organization-entity-relationship-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people/<uuid:person_entity_id>",

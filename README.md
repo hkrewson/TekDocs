@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.7`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.8`.
 
 ## Start locally
 
@@ -60,7 +60,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
-- Organizations, People, Sites, Locations, and their versioned custom fields are entity-backed CRUD domains. Other entity/link families remain foundation-only until their scheduled slices.
+- Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
 
 ## License

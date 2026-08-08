@@ -64,13 +64,39 @@ const customFieldVersion = {
 const customFieldDefinition = {
   id: crypto.randomUUID(), key: 'door_code', entity_type: 'site', owner: 'organization', organization_id: clientWorkspace.id, inherited: false, archived: false, current_version: customFieldVersion, versions: [customFieldVersion],
 }
+const relationship = {
+  id: crypto.randomUUID(),
+  link_type: 'supplied_by',
+  label: 'Supplied by',
+  direction: 'outgoing',
+  source_id: clientWorkspace.id,
+  target_id: supplierWorkspace.id,
+  related_entity: { id: supplierWorkspace.id, display_name: supplierWorkspace.name, entity_type: 'organization', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] },
+  created_at: '2026-08-08T12:00:00Z',
+}
 
 async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
+  await page.route('**/api/v1/entity-link-types', (route) => route.fulfill({ json: [
+    { value: 'related_to', forward_label: 'Related to', inverse_label: 'Related to', symmetric: true, target_types: [] },
+    { value: 'supplied_by', forward_label: 'Supplied by', inverse_label: 'Supplies', symmetric: false, target_types: ['organization'] },
+  ] }))
   await page.route('**/api/v1/workspaces/organizations**', (route) => {
     const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/entities/search')) {
+      const query = url.searchParams.get('q')?.toLowerCase() ?? ''
+      const results = [supplierWorkspace]
+        .filter((workspace) => workspace.name.toLowerCase().includes(query))
+        .map((workspace) => ({ id: workspace.id, display_name: workspace.name, entity_type: 'organization', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] }))
+      return route.fulfill({ json: { results, page: 1, page_size: 15, count: results.length, has_more: false } })
+    }
+    if (url.pathname.endsWith('/links')) {
+      if (route.request().method() === 'POST') return route.fulfill({ status: 201, json: relationship })
+      return route.fulfill({ json: { relationships: [] } })
+    }
+    if (/\/links\/[^/]+$/.test(url.pathname) && route.request().method() === 'DELETE') return route.fulfill({ status: 204 })
     if (url.pathname.endsWith('/custom-field-definitions')) {
       return route.fulfill({ json: { results: [customFieldDefinition], count: 1 } })
     }
@@ -219,6 +245,25 @@ test('client custom-field definitions and Site values remain workspace scoped an
   await page.getByLabel('Door code').fill('9912')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByLabel('Door code')).toHaveValue('9912')
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})
+
+test('client overview searches and creates a typed organization relationship accessibly', async ({ page, baseURL }) => {
+  if (!baseURL) throw new Error('Browser test base URL is unavailable.')
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/overview`)
+
+  await expect(page.getByRole('heading', { name: 'Organization relationships' })).toBeVisible()
+  await expect(page.getByText('No relationships have been added.')).toBeVisible()
+  await page.getByRole('button', { name: 'Add relationship' }).click()
+  await page.getByLabel('Relationship type').selectOption('supplied_by')
+  await page.getByRole('searchbox', { name: 'Related organization' }).fill('Northwind')
+  await page.getByRole('radio', { name: /Northwind Supply/ }).check()
+  await page.getByRole('button', { name: 'Add supplied by' }).click()
+
+  await expect(page.getByText('Relationship added.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Northwind Supply' })).toHaveAttribute('href', `/workspaces/organizations/${supplierWorkspace.id}/overview`)
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

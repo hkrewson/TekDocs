@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.7
+  version: 0.1.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -300,6 +300,171 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/entities/{entity_id}/links:
+    get:
+      operationId: msp_entity_relationships_list
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityRelationshipResult'
+          description: ''
+        '403':
+          description: Workspace access required
+        '404':
+          description: Entity not found in workspace
+    post:
+      operationId: msp_entity_relationships_create
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityRelationship'
+          description: ''
+        '400':
+          description: Invalid or duplicate relationship
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Entity not found in workspace
+  /api/v1/entities/{entity_id}/links/{link_id}:
+    delete:
+      operationId: msp_entity_relationships_archive
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: link_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - entities
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Relationship archived
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Relationship not found in workspace
+  /api/v1/entities/search:
+    get:
+      operationId: msp_entities_search
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - ''
+          type: string
+          default: ''
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      tags:
+      - entities
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitySearchResult'
+          description: ''
+        '400':
+          description: Invalid search parameters
+        '403':
+          description: Workspace access required
+        '404':
+          description: Organization workspace not found
+  /api/v1/entity-link-types:
+    get:
+      operationId: entity_link_types_list
+      tags:
+      - entity-link-types
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EntityLinkType'
+          description: ''
+        '403':
+          description: Installation membership required
   /api/v1/health/live:
     get:
       operationId: health_live_retrieve
@@ -1270,6 +1435,177 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/links:
+    get:
+      operationId: organization_entity_relationships_list
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityRelationshipResult'
+          description: ''
+        '403':
+          description: Workspace access required
+        '404':
+          description: Entity not found in workspace
+    post:
+      operationId: organization_entity_relationships_create
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EntityLinkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityRelationship'
+          description: ''
+        '400':
+          description: Invalid or duplicate relationship
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Entity not found in workspace
+  /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/links/{link_id}:
+    delete:
+      operationId: organization_entity_relationships_archive
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: link_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Relationship archived
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Relationship not found in workspace
+  /api/v1/workspaces/organizations/{organization_entity_id}/entities/search:
+    get:
+      operationId: organization_entities_search
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - ''
+          type: string
+          default: ''
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitySearchResult'
+          description: ''
+        '400':
+          description: Invalid search parameters
+        '403':
+          description: Workspace access required
+        '404':
+          description: Organization workspace not found
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
       operationId: people_organization_list
@@ -1891,6 +2227,14 @@ components:
       - required
       - schema
       - version
+    DirectionEnum:
+      enum:
+      - outgoing
+      - incoming
+      type: string
+      description: |-
+        * `outgoing` - outgoing
+        * `incoming` - incoming
     EntityCustomField:
       type: object
       properties:
@@ -1935,6 +2279,144 @@ components:
       - entity_id
       - entity_type
       - fields
+    EntityLinkType:
+      type: object
+      properties:
+        value:
+          $ref: '#/components/schemas/EntityLinkTypeEnum'
+        forward_label:
+          type: string
+        inverse_label:
+          type: string
+        symmetric:
+          type: boolean
+        target_types:
+          type: array
+          items:
+            type: string
+      required:
+      - forward_label
+      - inverse_label
+      - symmetric
+      - target_types
+      - value
+    EntityLinkTypeEnum:
+      enum:
+      - related_to
+      - depends_on
+      - managed_by
+      - supplied_by
+      - manufactured_by
+      - partnered_with
+      - located_at
+      - assigned_to
+      - references
+      type: string
+      description: |-
+        * `related_to` - Related to
+        * `depends_on` - Depends on
+        * `managed_by` - Managed by
+        * `supplied_by` - Supplied by
+        * `manufactured_by` - Manufactured by
+        * `partnered_with` - Partnered with
+        * `located_at` - Located at
+        * `assigned_to` - Assigned to
+        * `references` - References
+    EntityLinkWrite:
+      type: object
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        link_type:
+          $ref: '#/components/schemas/EntityLinkTypeEnum'
+      required:
+      - link_type
+      - target_id
+    EntityReference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+        workspace_label:
+          type: string
+        eligible_link_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityLinkTypeEnum'
+      required:
+      - display_name
+      - eligible_link_types
+      - entity_type
+      - id
+      - workspace_label
+    EntityRelationship:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        link_type:
+          $ref: '#/components/schemas/EntityLinkTypeEnum'
+        label:
+          type: string
+        direction:
+          $ref: '#/components/schemas/DirectionEnum'
+        source_id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
+        related_entity:
+          $ref: '#/components/schemas/EntityReference'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - direction
+      - id
+      - label
+      - link_type
+      - related_entity
+      - source_id
+      - target_id
+    EntityRelationshipResult:
+      type: object
+      properties:
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRelationship'
+      required:
+      - relationships
+    EntitySearchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityReference'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     EntityTypeEnum:
       enum:
       - organization

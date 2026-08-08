@@ -183,7 +183,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.5` | Complete | People plus employment/contact associations in MSP and organization workspaces. |
 | `0.1.6` | Complete | Sites and hierarchical locations with MSP/organization ownership, structured People placement, workspace-aware navigation, and PostgreSQL integrity guards. |
 | `0.1.7` | Complete | Versioned MSP-wide and organization-specific custom-field definitions with JSON Schema validation, migration-safe values, and Site/Location value entry. |
-| `0.1.8` | Planned | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
+| `0.1.8` | Complete | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
 | `0.1.9` | Planned | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
 | `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped user assignments, per-client MSP employee assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
 | `0.1.11` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
@@ -259,6 +259,21 @@ Evidence: `docs/releases/0.1.6.md`.
 ADR 0010 defines definition ownership, immutable versions, inherited applicability, and version-pinned Entity value envelopes.
 
 Evidence: `docs/releases/0.1.7.md`.
+
+### `0.1.8` acceptance criteria
+
+- [x] Entity links use a maintained, bounded type catalog with explicit forward/inverse labels and symmetric-link behavior. Arbitrary relationship types, self-links, duplicate links, caller-supplied ownership, and caller-supplied metadata are rejected.
+- [x] Link endpoints retain stable Entity identities and exact tenant ownership. PostgreSQL guards reject cross-tenant endpoints and immutable identity changes even if application scoping is bypassed.
+- [x] A route-derived link API lists outgoing relationships and incoming backlinks for one authorized Entity, creates a permitted relationship, and archives it without disclosing inaccessible endpoint existence or relationship metadata.
+- [x] Bounded entity search is resolved through one workspace-aware visibility service before filtering or pagination. MSP scope returns only MSP-owned records; organization scope returns that organization's records, its own anchor, and explicitly eligible active organization anchors for organization relationships.
+- [x] Search results disclose only stable ID, display name, Entity type, owning-workspace label, and relationship eligibility. Archived, foreign-tenant, sibling organization-owned, malformed, over-broad, and unauthorized searches fail or remain absent.
+- [x] Organization records expose their typed relationships and reverse backlinks. The first UI supports searching eligible organizations, adding a bounded relationship, following an authorized organization target, and archiving a relationship with responsive, keyboard, loading, empty, error, denial, and stale-workspace states.
+- [x] Relationship mutations remain installation-owner-plus-MFA operations until `0.1.9`–`0.1.10`; audit events are value-free, and search/link APIs share the workspace resolver rather than inferring authorization from submitted Entity IDs.
+- [x] Migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, clean-install, preserved-data upgrade, security, and real browser-to-database evidence agree at `0.1.8`.
+
+ADR 0011 defines the typed-link catalog, direction, visibility, backlink, archival, and scoped-search contracts.
+
+Evidence: `docs/releases/0.1.8.md`.
 
 ### `0.1.3` acceptance criteria
 

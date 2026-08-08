@@ -49,7 +49,7 @@ docker run --rm \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
 live_compose exec -T backend python manage.py shell -c '
-from apps.core.models import CustomFieldDefinition, CustomFieldDefinitionVersion, Location, Organization, PersonAssociation, Site
+from apps.core.models import CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
@@ -79,6 +79,10 @@ assert envelope == {
     "version": 1,
     "value": "Priority",
 }
+vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
+link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
+assert link.archived_at is None
+assert link.metadata == {}
 print("Live workspace database fixture verified")
 '
 echo "Real browser-to-Django-to-PostgreSQL workspace journey passed"

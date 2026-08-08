@@ -249,6 +249,35 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .entity-custom-field fieldset legend { margin-bottom: 7px; }
 .entity-custom-field p { margin: 6px 0 0; line-height: 1.45; }
 .entity-custom-field .field-version-warning { color: #7a531c; }
+.relationship-section { margin-bottom: 18px; }
+.relationship-heading { align-items: flex-start; }
+.relationship-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.relationship-form { display: grid; grid-template-columns: minmax(160px, .6fr) minmax(240px, 1fr); gap: 14px 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.relationship-form > label { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: 13px; font-weight: 600; }
+.relationship-form select, .relationship-form input[type='search'] { width: 100%; min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.relationship-search-control { position: relative; display: block; }
+.relationship-search-control svg { position: absolute; top: 11px; left: 10px; color: var(--quiet); }
+.relationship-form .relationship-search-control input { padding-left: 33px; }
+.relationship-candidates { grid-column: 1 / -1; max-height: 220px; margin: 0; padding: 9px 12px; overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; }
+.relationship-candidates legend { padding: 0 4px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.relationship-candidates > p { margin: 4px 0; color: var(--muted); font-size: 12px; }
+.relationship-candidates > label { display: flex; align-items: center; gap: 10px; padding: 8px 3px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.relationship-candidates > label:last-child { border-bottom: 0; }
+.relationship-candidates input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.relationship-candidates label > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.relationship-candidates strong { font-size: 13px; }
+.relationship-candidates label span span { color: var(--muted); font-size: 11px; }
+.relationship-form .form-actions { grid-column: 1 / -1; }
+.relationship-state { margin: 0; padding: 18px 2px 2px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+.relationship-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.relationship-list li { display: grid; grid-template-columns: 18px minmax(90px, .55fr) minmax(140px, 1fr) auto auto; align-items: center; gap: 10px; min-height: 48px; padding: 8px 2px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.relationship-list li > svg { color: var(--muted); }
+.relationship-list a { color: var(--accent); text-decoration: none; }
+.relationship-list a:hover { text-decoration: underline; }
+.relationship-label { color: var(--muted); }
+.relationship-scope { color: var(--muted); font-size: 11px; font-weight: 600; }
+.relationship-archive { display: inline-flex; align-items: center; gap: 5px; }
+.relationship-confirm { display: flex; align-items: center; gap: 3px; }
 .editor-toolbar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 12px 9px 16px; border-bottom: 1px solid var(--border); }
 .editor-toolbar > div:first-child { display: flex; flex-direction: column; }
 .editor-toolbar strong { font-size: 13px; }
@@ -364,11 +393,17 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .security-row { align-items: flex-start; flex-direction: column; gap: 14px; }
   .organization-form { grid-template-columns: 1fr; }
   .people-form { grid-template-columns: 1fr; }
-  .site-form, .location-form, .custom-field-form { grid-template-columns: 1fr; }
+  .site-form, .location-form, .custom-field-form, .relationship-form { grid-template-columns: 1fr; }
   .site-form-wide, .location-form .form-actions, .custom-field-form-wide { grid-column: auto; }
   .site-row-heading, .location-tree li { align-items: flex-start; flex-direction: column; }
   .location-tree li { gap: 7px; }
   .custom-field-row { grid-template-columns: 1fr; gap: 7px; }
+  .relationship-candidates, .relationship-form .form-actions { grid-column: auto; }
+  .relationship-list li { grid-template-columns: 18px 1fr auto; gap: 7px 10px; }
+  .relationship-list li .relationship-label { grid-column: 2; }
+  .relationship-list li a, .relationship-list li > span:not(.relationship-label):not(.relationship-scope) { grid-column: 2; }
+  .relationship-list li .relationship-scope { grid-column: 3; grid-row: 1; }
+  .relationship-list li .relationship-archive, .relationship-list li .relationship-confirm { grid-column: 3; grid-row: 2 / span 2; }
   .custom-field-row.header { display: none; }
   .entity-custom-field { grid-template-columns: 1fr; gap: 10px; }
   .people-form-wide { grid-column: auto; }

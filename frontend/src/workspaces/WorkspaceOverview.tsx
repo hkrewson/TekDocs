@@ -1,5 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import { Link } from 'react-router'
+import { EntityRelationships } from '../relationships/EntityRelationships'
+import type { RelationshipsClient } from '../relationships/api'
 import type { WorkspaceContext } from './api'
 
 const classificationLabels = {
@@ -33,7 +35,7 @@ const capabilityLabels = {
   accounting: 'Accounting',
 }
 
-export function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
+export function WorkspaceOverview({ workspace, relationshipsClient }: { workspace: WorkspaceContext; relationshipsClient?: RelationshipsClient }) {
   const organization = workspace.organization
   return (
     <>
@@ -56,6 +58,7 @@ export function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }
           <div><dt>Website</dt><dd>{organization?.website ? <a href={organization.website} target="_blank" rel="noreferrer">{organization.website}<ExternalLink size={13} aria-hidden="true" /></a> : 'Not provided'}</dd></div>
         </dl>
       </section>
+      <EntityRelationships organizationId={workspace.id} organizationName={workspace.name} client={relationshipsClient} />
       <section className="content-section" aria-labelledby="workspace-areas-heading">
         <div className="section-heading"><div><h2 id="workspace-areas-heading">Workspace areas</h2><p>Records created in these areas will belong to {workspace.name}. Individual data modules arrive in their scheduled milestones.</p></div></div>
         <ul className="workspace-capability-list">

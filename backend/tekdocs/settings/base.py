@@ -209,6 +209,7 @@ SPECTACULAR_SETTINGS = {
         "OrganizationKindEnum": "apps.core.models.OrganizationKind",
         "PersonAssociationKindEnum": "apps.core.models.PersonAssociationKind",
         "LocationKindEnum": "apps.core.models.LocationKind",
+        "EntityLinkTypeEnum": "apps.core.models.EntityLinkType",
     },
 }
 

@@ -502,23 +502,48 @@ class PersonAssociation(TimestampedModel):
                 raise ValidationError("Person association location must use its workspace scope")
 
 
+class EntityLinkType(models.TextChoices):
+    RELATED_TO = "related_to", "Related to"
+    DEPENDS_ON = "depends_on", "Depends on"
+    MANAGED_BY = "managed_by", "Managed by"
+    SUPPLIED_BY = "supplied_by", "Supplied by"
+    MANUFACTURED_BY = "manufactured_by", "Manufactured by"
+    PARTNERED_WITH = "partnered_with", "Partnered with"
+    LOCATED_AT = "located_at", "Located at"
+    ASSIGNED_TO = "assigned_to", "Assigned to"
+    REFERENCES = "references", "References"
+
+
 class EntityLink(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entity_links")
     source = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="outgoing_links")
     target = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="incoming_links")
-    link_type = models.CharField(max_length=80)
+    link_type = models.CharField(max_length=80, choices=EntityLinkType.choices)
     metadata = models.JSONField(default=dict, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
     scoped = TenantScopedManager()
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["source", "target", "link_type"], name="unique_typed_entity_link"),
+            models.UniqueConstraint(
+                fields=["source", "target", "link_type"],
+                condition=models.Q(archived_at__isnull=True),
+                name="unique_active_typed_entity_link",
+            ),
             models.CheckConstraint(condition=~models.Q(source=models.F("target")), name="entity_link_not_self"),
+            models.CheckConstraint(
+                condition=models.Q(link_type__in=EntityLinkType.values),
+                name="entity_link_type_supported",
+            ),
         ]
-        indexes = [models.Index(fields=["tenant", "link_type"])]
+        indexes = [
+            models.Index(fields=["tenant", "link_type", "archived_at"], name="entity_link_type_active_idx"),
+            models.Index(fields=["tenant", "source", "archived_at"], name="entity_link_source_active_idx"),
+            models.Index(fields=["tenant", "target", "archived_at"], name="entity_link_target_active_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.source_id} {self.link_type} {self.target_id}"
@@ -528,6 +553,8 @@ class EntityLink(TimestampedModel):
             raise ValidationError("Source entity must belong to the link tenant")
         if self.target_id and self.tenant_id != self.target.tenant_id:
             raise ValidationError("Target entity must belong to the link tenant")
+        if self.metadata != {}:
+            raise ValidationError("Entity-link metadata is not accepted by this release")
 
 
 class AuditEvent(models.Model):

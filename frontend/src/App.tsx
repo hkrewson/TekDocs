@@ -44,6 +44,8 @@ import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
+import { browserRelationshipsClient } from './relationships/api'
+import type { RelationshipsClient } from './relationships/api'
 import { Sites } from './sites/Sites'
 import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
@@ -265,9 +267,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.7 adds versioned custom fields for addressable records." />
+      <PageHeader title="Overview" description="TekDocs 0.1.8 adds typed links and permission-aware backlinks between addressable records." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.7</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.8</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -275,6 +277,7 @@ function Overview() {
             ['Tenant and organization isolation', 'Available'],
             ['Organization records and classifications', 'Available'],
             ['Versioned custom-field definitions', 'Available'],
+            ['Typed entity links and backlinks', 'Available'],
             ['Owner authentication', 'Available'],
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],
@@ -307,12 +310,12 @@ function workspaceErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'The workspace could not be loaded.'
 }
 
-function OrganizationWorkspaceRoute({ state }: { state: OrganizationWorkspaceState | { phase: 'loading' } }) {
+function OrganizationWorkspaceRoute({ state, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient }) {
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') {
     return <section className="content-section workspace-error" role="alert"><h1>Workspace unavailable</h1><p>{state.message}</p><Link className="secondary-button" to="/organizations">Return to organizations</Link></section>
   }
-  return <WorkspaceOverview workspace={state.workspace} />
+  return <WorkspaceOverview workspace={state.workspace} relationshipsClient={relationshipsClient} />
 }
 
 const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
@@ -333,10 +336,10 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient }) {
-  if (area === 'overview') return <OrganizationWorkspaceRoute state={state} />
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient }) {
+  if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
-  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} />
+  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
     return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
   }
@@ -353,13 +356,14 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   workspaceClient: WorkspaceClient
   peopleClient: PeopleClient
   sitesClient: SitesClient
   customFieldsClient: CustomFieldsClient
+  relationshipsClient: RelationshipsClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -416,8 +420,8 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
-            <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} />} />)}
+            <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
@@ -426,13 +430,14 @@ export function ApplicationShell({ authContext, authClient, workspaceClient, peo
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   workspaceClient?: WorkspaceClient
   peopleClient?: PeopleClient
   sitesClient?: SitesClient
   customFieldsClient?: CustomFieldsClient
+  relationshipsClient?: RelationshipsClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -445,6 +450,7 @@ export function App({ initialPath, authClient = browserAuthClient, workspaceClie
           peopleClient={peopleClient}
           sitesClient={sitesClient}
           customFieldsClient={customFieldsClient}
+          relationshipsClient={relationshipsClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

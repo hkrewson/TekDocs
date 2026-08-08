@@ -175,7 +175,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | Release | Status | Slice and exit condition |
 | --- | --- | --- |
 | `0.1.1` | Complete | Tenant-scoped model/query primitives, organization scope contract, RLS strategy, and negative isolation harness. |
-| `0.1.2` | Planned | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
+| `0.1.2` | Complete | Client/vendor/manufacturer/partner organizations with classifications and CRUD contracts. |
 | `0.1.3` | Planned | People, employment/contact associations, sites, and locations. |
 | `0.1.4` | Planned | Versioned custom-field definitions with JSON Schema validation and migration-safe values. |
 | `0.1.5` | Planned | Typed entity links, backlinks, and permission-filtered search foundation. |
@@ -195,6 +195,17 @@ Evidence: `docs/releases/0.1.0.md`.
 - [x] `make test-isolation` and the Compose CI job run the PostgreSQL negative-isolation harness; migration, static, unit, runtime, and version gates agree at `0.1.1`.
 
 Evidence: `docs/releases/0.1.1.md`.
+
+### `0.1.2` acceptance criteria
+
+- [x] Every organization remains attached to one stable MSP-scoped Entity and may hold any unique combination of client, vendor, manufacturer, and partner classifications.
+- [x] The tenant-scoped API lists and reads active organizations and transactionally creates, updates, and archives them without accepting tenant or entity ownership from the browser.
+- [x] Organization administration is restricted through the existing owner/MFA policy boundary until the permission catalog and role assignments arrive; anonymous, non-owner, missing-MFA, CSRF, and cross-tenant cases fail safely.
+- [x] PostgreSQL rejects cross-tenant classification writes, while organization changes produce value-free append-only audit events.
+- [x] The Organizations page provides responsive loading, empty, filtered, create, edit, archive-confirmation, denial, and accessibility states using the established TekDocs shell.
+- [x] Version, migration, OpenAPI, static, unit, PostgreSQL/Compose, browser, clean-install, upgrade, and security evidence agree at `0.1.2`.
+
+Evidence: `docs/releases/0.1.2.md`.
 
 ## Reusable documentation: `0.2.x` → `0.3.0`
 

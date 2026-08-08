@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.1
+  version: 0.1.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -311,6 +311,135 @@ paths:
           description: Sign out before accepting an invitation
         '410':
           description: Invitation unavailable
+  /api/v1/organizations:
+    get:
+      operationId: organizations_list
+      tags:
+      - organizations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Organization'
+          description: ''
+        '403':
+          description: Installation owner with MFA required
+    post:
+      operationId: organizations_create
+      tags:
+      - organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+        '400':
+          description: Invalid organization details
+        '403':
+          description: Installation owner with MFA required
+  /api/v1/organizations/{entity_id}:
+    get:
+      operationId: organizations_retrieve
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - organizations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Organization not found
+    patch:
+      operationId: organizations_partial_update
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+        '400':
+          description: Invalid organization details
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Organization not found
+    delete:
+      operationId: organizations_destroy
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - organizations
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Organization archived
+        '403':
+          description: Installation owner with MFA required
+        '404':
+          description: Organization not found
 components:
   schemas:
     AuthenticatedContext:
@@ -367,6 +496,18 @@ components:
       required:
       - id
       - name
+    ClassificationsEnum:
+      enum:
+      - client
+      - vendor
+      - manufacturer
+      - partner
+      type: string
+      description: |-
+        * `client` - Client
+        * `vendor` - Vendor
+        * `manufacturer` - Manufacturer
+        * `partner` - Partner
     Invitation:
       type: object
       properties:
@@ -466,6 +607,61 @@ components:
             $ref: '#/components/schemas/OidcProvider'
       required:
       - providers
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        legal_name:
+          type: string
+        website:
+          type: string
+          format: uri
+        classifications:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - classifications
+      - created_at
+      - id
+      - legal_name
+      - name
+      - updated_at
+      - website
+    OrganizationWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        legal_name:
+          type: string
+          maxLength: 240
+        website:
+          type: string
+          format: uri
+          maxLength: 500
+        classifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassificationsEnum'
+          maxItems: 4
+          minItems: 1
+      required:
+      - classifications
+      - name
     OwnerBootstrap:
       type: object
       properties:
@@ -498,6 +694,26 @@ components:
       required:
       - owner
       - tenant
+    PatchedOrganizationWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+          minLength: 1
+        legal_name:
+          type: string
+          maxLength: 240
+        website:
+          type: string
+          format: uri
+          maxLength: 500
+        classifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassificationsEnum'
+          maxItems: 4
+          minItems: 1
     PatchedProfileUpdate:
       type: object
       properties:

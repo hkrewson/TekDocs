@@ -13,6 +13,7 @@ from apps.accounts.views import (
     OwnerBootstrapView,
     ProfileView,
 )
+from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 
 urlpatterns = [
@@ -27,6 +28,8 @@ urlpatterns = [
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
+    path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
+    path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path(
         "api/v1/invitations/<uuid:invitation_id>/revoke",
         InvitationRevokeView.as_view(),

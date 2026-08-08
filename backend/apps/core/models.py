@@ -105,11 +105,13 @@ class Entity(TimestampedModel):
 
 
 class Organization(TimestampedModel):
-    """The stable organization scope anchor; classifications arrive in 0.1.2."""
+    """A tenant-owned business organization anchored to one universal entity."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="organizations")
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="organization_record")
+    legal_name = models.CharField(max_length=240, blank=True)
+    website = models.URLField(max_length=500, blank=True)
 
     objects = models.Manager()
     scoped = TenantScopedManager()
@@ -125,6 +127,39 @@ class Organization(TimestampedModel):
             raise ValidationError("Organization entity must belong to the organization tenant")
         if self.entity_id and self.entity.organization_id is not None:
             raise ValidationError("An organization anchor cannot itself be organization-scoped")
+
+
+class OrganizationKind(models.TextChoices):
+    CLIENT = "client", "Client"
+    VENDOR = "vendor", "Vendor"
+    MANUFACTURER = "manufacturer", "Manufacturer"
+    PARTNER = "partner", "Partner"
+
+
+class OrganizationClassification(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="organization_classifications")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="classifications")
+    kind = models.CharField(max_length=32, choices=OrganizationKind.choices)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "kind"],
+                name="unique_organization_classification",
+            )
+        ]
+        indexes = [models.Index(fields=["tenant", "kind", "organization"])]
+
+    def __str__(self) -> str:
+        return f"{self.organization_id} {self.kind}"
+
+    def clean(self) -> None:
+        if self.organization_id and self.tenant_id != self.organization.tenant_id:
+            raise ValidationError("Organization classification must belong to its tenant")
 
 
 class EntityLink(TimestampedModel):

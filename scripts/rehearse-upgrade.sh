@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-1ee3b7d}
+baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-a7ec106}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -39,8 +39,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.1.0" ]; then
-  echo "Upgrade rehearsal expected baseline 0.1.0, found $baseline_version" >&2
+if [ "$baseline_version" != "0.1.1" ]; then
+  echo "Upgrade rehearsal expected baseline 0.1.1, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" = "$baseline_version" ]; then
@@ -59,7 +59,7 @@ from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.mfa_storage import encrypt_mfa_value
-from apps.core.models import AuditEvent
+from apps.core.models import AuditEvent, Entity, Organization
 
 result = bootstrap_owner(
     tenant_name="Upgrade Rehearsal MSP",
@@ -78,6 +78,12 @@ AuditEvent.objects.create(
     action="upgrade.fixture_created",
     metadata={},
 )
+anchor = Entity.objects.create(
+    tenant=result.tenant,
+    entity_type="organization",
+    display_name="Preserved Client",
+)
+Organization.objects.create(tenant=result.tenant, entity=anchor)
 print("Baseline identity fixture created")
 '
 
@@ -94,7 +100,7 @@ from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from apps.accounts.mfa_storage import PREFIX, decrypt_mfa_value
 from apps.accounts.models import TenantMembership, User
-from apps.core.models import AuditEvent, InstallationState, Tenant
+from apps.core.models import AuditEvent, InstallationState, Organization, OrganizationClassification, Tenant
 
 email = os.environ["UPGRADE_TEST_EMAIL"]
 owner = User.objects.get(email=email)
@@ -113,15 +119,27 @@ assert encrypted_secret.startswith(PREFIX)
 assert decrypt_mfa_value(encrypted_secret)
 assert AuditEvent.objects.filter(action="installation.owner_bootstrapped", actor=owner).count() == 1
 assert AuditEvent.objects.filter(action="upgrade.fixture_created", actor=owner, metadata={}).count() == 1
+preserved_organization = Organization.scoped.for_tenant(state.tenant).get(entity__display_name="Preserved Client")
+assert preserved_organization.legal_name == ""
+assert preserved_organization.website == ""
+OrganizationClassification.objects.create(
+    tenant=state.tenant,
+    organization=preserved_organization,
+    kind="client",
+)
+assert OrganizationClassification.scoped.for_tenant(state.tenant).filter(
+    organization=preserved_organization,
+    kind="client",
+).count() == 1
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute(
         "SELECT to_regclass(%s), to_regprocedure(%s)",
-        ["core_organization", "tekdocs_scope_matches(uuid,uuid)"],
+        ["core_organizationclassification", "tekdocs_validate_organization_classification_scope()"],
     )
-    organization_table, scope_function = cursor.fetchone()
-assert organization_table == "core_organization"
-assert scope_function == "tekdocs_scope_matches(uuid,uuid)"
+    classification_table, guard_function = cursor.fetchone()
+assert classification_table == "core_organizationclassification"
+assert guard_function == "tekdocs_validate_organization_classification_scope()"
 print("Upgraded identity and authentication invariants verified")
 '
 current_compose exec -T backend python manage.py check

@@ -25,6 +25,7 @@ import { AuthGate } from './auth/AuthGate'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
+import { Organizations } from './organizations/Organizations'
 const EditorSpike = lazy(async () => {
   const module = await import('./editor/EditorSpike')
   return { default: module.EditorSpike }
@@ -186,7 +187,6 @@ function PageHeader({ title, description, action }: { title: string; description
 }
 
 const plannedAreas: Record<string, { title: string; description: string; release: string; capabilities: string[] }> = {
-  '/organizations': { title: 'Organizations', description: 'Clients, vendors, manufacturers, and business relationships.', release: '0.2.0', capabilities: ['Client and vendor records', 'People and employment', 'Scoped custom fields'] },
   '/people': { title: 'People', description: 'MSP staff, client employees, contacts, and access associations.', release: '0.2.0', capabilities: ['Contact records', 'Organization membership', 'Portal access boundary'] },
   '/assets': { title: 'Assets', description: 'Hardware, software, licensing, warranty, and cost records.', release: '0.4.0', capabilities: ['Hardware inventory', 'Software and licenses', 'Cost visibility controls'] },
   '/networks': { title: 'Networks', description: 'Sites, VLANs, subnets, addresses, interfaces, and circuits.', release: '0.5.0', capabilities: ['Address management', 'Device relationships', 'NetBox-compatible identifiers'] },
@@ -212,14 +212,15 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.1 adds the tenant and organization isolation foundation." />
+      <PageHeader title="Overview" description="TekDocs 0.1.2 adds classified organization records and administration." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.1</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.2</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
             ['Tenant and entity primitives', 'Available'],
             ['Tenant and organization isolation', 'Available'],
+            ['Organization records and classifications', 'Available'],
             ['Owner authentication', 'Available'],
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],
@@ -268,7 +269,7 @@ export function ApplicationShell({ initialPath, authContext, authClient, onSignO
     setCurrentPath(path)
   }
 
-  const routedPath = currentPath === '/' || (currentPath !== '/overview' && currentPath !== '/documentation' && currentPath !== '/settings' && !plannedAreas[currentPath])
+  const routedPath = currentPath === '/' || (currentPath !== '/overview' && currentPath !== '/documentation' && currentPath !== '/organizations' && currentPath !== '/settings' && !plannedAreas[currentPath])
     ? '/overview'
     : currentPath
 
@@ -276,6 +277,8 @@ export function ApplicationShell({ initialPath, authContext, authClient, onSignO
     ? <Overview />
     : routedPath === '/documentation'
       ? <Documentation />
+      : routedPath === '/organizations'
+        ? <Organizations />
       : routedPath === '/settings'
         ? <SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />
         : <PlannedPage path={routedPath} />

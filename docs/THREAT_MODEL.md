@@ -8,7 +8,7 @@ Client documentation, credentials, personal/contact information, asset and netwo
 
 | Threat | Initial controls |
 | --- | --- |
-| Cross-client or cross-tenant access | Explicit ownership columns, fail-closed scoped query APIs, same-tenant database triggers, staged transaction-local RLS contract, central policy service, and a blocking negative-isolation/IDOR matrix. RLS table policies are not yet active. |
+| Cross-client or cross-tenant access | Explicit ownership columns, fail-closed scoped query APIs, same-tenant database triggers including organization classifications, staged transaction-local RLS contract, central policy service, and a blocking negative-isolation/IDOR matrix. Organization URLs use stable entity identifiers but always resolve through the authenticated tenant. RLS table policies are not yet active. |
 | Account takeover | Maintained authentication library, invite-only onboarding, MFA, rate limits, session inventory/revocation, secure recovery. |
 | Email disclosure or delivery interception | Central templates, header validation, bounded SMTP timeout, TLS-by-default production validation, paired credentials, loopback-only development inbox, and no message contents in command output. |
 | Invitation theft, replay, or enumeration | Owner-only issuance, 256-bit random tokens, digest-only storage, constant-time matching, fragment-based delivery links and immediate browser scrubbing, CSRF-protected transactional acceptance, expiry, resend rotation, revocation, generic unavailable/delivery failures, and value-free audit events. |

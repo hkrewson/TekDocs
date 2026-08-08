@@ -47,6 +47,24 @@ describe('browser authentication client', () => {
     expect(JSON.parse(options.body as string)).toEqual({ email: 'owner@example.com', password })
   })
 
+  it('recognizes and completes a pending two-factor sign-in flow', async () => {
+    const csrf = crypto.randomUUID()
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: { flows: [{ id: 'mfa_authenticate', is_pending: true }] } }, 401))
+      .mockResolvedValueOnce(jsonResponse({ meta: { is_authenticated: true } }))
+      .mockResolvedValueOnce(jsonResponse(context))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.login('owner@example.com', 'password')).resolves.toEqual({ mfaRequired: true })
+    await expect(browserAuthClient.completeMfaLogin('recovery-code')).resolves.toEqual(context)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/_allauth/browser/v1/auth/2fa/authenticate', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ code: 'recovery-code' }),
+    }))
+  })
+
   it('sends the deployment token only in the bootstrap header', async () => {
     const deploymentToken = crypto.randomUUID()
     const password = `${crypto.randomUUID()}Aa7!`
@@ -170,6 +188,35 @@ describe('browser authentication client', () => {
     expect(revokeOptions.method).toBe('DELETE')
     expect(revokeOptions.body).toBe(JSON.stringify({ sessions: [42] }))
     expect(revokeOptions.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
+  })
+
+  it('keeps authenticator secrets in protected request bodies and reads recovery codes once', async () => {
+    const csrf = crypto.randomUUID()
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const secret = 'JBSWY3DPEHPK3PXP'
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: [] }))
+      .mockResolvedValueOnce(jsonResponse({ meta: { secret, totp_url: `otpauth://totp/TekDocs?secret=${secret}` } }, 404))
+      .mockResolvedValueOnce(jsonResponse({ data: { type: 'totp' } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { unused_codes: ['one', 'two'] } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { unused_codes: ['three', 'four'] } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { reauthenticated: true } }))
+      .mockResolvedValueOnce(jsonResponse({ data: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.loadMfa()).resolves.toEqual({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 })
+    await expect(browserAuthClient.beginTotp()).resolves.toEqual({ secret, totpUrl: `otpauth://totp/TekDocs?secret=${secret}` })
+    await expect(browserAuthClient.activateTotp('123456')).resolves.toEqual(['one', 'two'])
+    await expect(browserAuthClient.regenerateRecoveryCodes()).resolves.toEqual(['three', 'four'])
+    await browserAuthClient.reauthenticate('current-password')
+    await browserAuthClient.disableTotp()
+
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
+    expect(calls[2][0]).toBe('/_allauth/browser/v1/account/authenticators/totp')
+    expect(calls[2][1].body).toBe(JSON.stringify({ code: '123456' }))
+    expect(calls[5][1].body).toBe(JSON.stringify({ password: 'current-password' }))
+    expect(calls[6][1].method).toBe('DELETE')
+    expect(calls[6][1].headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
   })
 
   it('turns authentication rate limits into safe wait-and-retry messages', async () => {

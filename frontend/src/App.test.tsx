@@ -12,6 +12,7 @@ const authContext: AuthenticatedContext = {
 
 const authClient = {
   listSessions: vi.fn().mockResolvedValue([]),
+  loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
 } as unknown as AuthClient
 const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} />
 

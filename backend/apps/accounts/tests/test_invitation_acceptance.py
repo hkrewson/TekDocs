@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 from allauth.account.models import EmailAddress
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core import mail
 from django.db import connection
 from django.test import Client
@@ -21,12 +22,14 @@ SESSION_URL = "/_allauth/browser/v1/auth/session"
 @pytest.fixture
 def installation(db):
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
-    return bootstrap_owner(
+    result = bootstrap_owner(
         tenant_name="Example MSP",
         owner_email="owner@example.com",
         owner_display_name="Primary Owner",
         password=f"{secrets.token_urlsafe(24)}Aa7!",
     )
+    TOTP.activate(result.owner, generate_totp_secret())
+    return result
 
 
 def issue_token(installation) -> tuple[Invitation, str]:  # type: ignore[no-untyped-def]

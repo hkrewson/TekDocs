@@ -33,16 +33,36 @@ export type AuthSession = {
   isCurrent: boolean
 }
 
+export type MfaChallenge = { mfaRequired: true }
+
+export type MfaStatus = {
+  totpEnabled: boolean
+  recoveryCodeTotal: number
+  recoveryCodeUnused: number
+}
+
+export type TotpSetup = {
+  secret: string
+  totpUrl: string
+}
+
 export interface AuthClient {
   load(): Promise<{ bootstrapRequired: boolean; context: AuthenticatedContext | null }>
   bootstrapAndLogin(details: BootstrapDetails): Promise<AuthenticatedContext>
-  login(email: string, password: string): Promise<AuthenticatedContext>
+  login(email: string, password: string): Promise<AuthenticatedContext | MfaChallenge>
+  completeMfaLogin(code: string): Promise<AuthenticatedContext>
   acceptInvitation(details: InvitationAcceptance): Promise<AuthenticatedContext>
   requestPasswordReset(email: string): Promise<void>
   validatePasswordReset(key: string): Promise<void>
   completePasswordReset(key: string, password: string): Promise<void>
   listSessions(): Promise<AuthSession[]>
   revokeSession(id: number): Promise<AuthSession[]>
+  loadMfa(): Promise<MfaStatus>
+  beginTotp(): Promise<TotpSetup>
+  activateTotp(code: string): Promise<string[]>
+  regenerateRecoveryCodes(): Promise<string[]>
+  disableTotp(): Promise<void>
+  reauthenticate(password: string): Promise<void>
   logout(): Promise<void>
 }
 
@@ -60,6 +80,12 @@ type AllauthUserSession = {
 }
 
 type AllauthSessionsResponse = { data?: AllauthUserSession[] }
+
+type AllauthFlowResponse = { data?: { flows?: Array<{ id?: string; is_pending?: boolean }> } }
+type AllauthAuthenticatorsResponse = { data?: Array<{ type?: string }> }
+type AllauthRecoveryResponse = {
+  data?: { total_code_count?: number; unused_code_count?: number; unused_codes?: string[] }
+}
 
 export class AuthRequestError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -120,8 +146,14 @@ async function mutation(path: string, method: 'POST' | 'DELETE', body?: object):
   })
 }
 
-async function login(email: string, password: string): Promise<AuthenticatedContext> {
+async function login(email: string, password: string): Promise<AuthenticatedContext | MfaChallenge> {
   const response = await mutation('/_allauth/browser/v1/auth/login', 'POST', { email, password })
+  if (response.status === 401) {
+    const payload = await responseJson<AllauthFlowResponse>(response)
+    if (payload.data?.flows?.some((flow) => flow.id === 'mfa_authenticate' && flow.is_pending)) {
+      return { mfaRequired: true }
+    }
+  }
   if (!response.ok) {
     throw new AuthRequestError(
       response.status === 400
@@ -133,6 +165,11 @@ async function login(email: string, password: string): Promise<AuthenticatedCont
     )
   }
   return context()
+}
+
+async function recoveryCodes(response: Response): Promise<string[]> {
+  const payload = await responseJson<AllauthRecoveryResponse>(response)
+  return payload.data?.unused_codes ?? []
 }
 
 function authSessions(payload: AllauthSessionsResponse): AuthSession[] {
@@ -204,10 +241,27 @@ export const browserAuthClient: AuthClient = {
       }
       throw new AuthRequestError(messages[response.status] ?? 'Setup was not completed.', response.status)
     }
-    return login(details.ownerEmail, details.password)
+    const result = await login(details.ownerEmail, details.password)
+    if ('mfaRequired' in result) throw new AuthRequestError('Setup sign in requires an unexpected second factor.')
+    return result
   },
 
   login,
+
+  async completeMfaLogin(code) {
+    const response = await mutation('/_allauth/browser/v1/auth/2fa/authenticate', 'POST', { code })
+    if (!response.ok) {
+      throw new AuthRequestError(
+        response.status === 400
+          ? 'That authentication or recovery code was not accepted.'
+          : response.status === 429
+            ? 'Too many code attempts. Wait a few minutes and try again.'
+            : 'Two-factor sign in was not completed.',
+        response.status,
+      )
+    }
+    return context()
+  },
 
   async acceptInvitation(details) {
     const response = await mutation('/api/v1/invitations/accept', 'POST', {
@@ -271,6 +325,67 @@ export const browserAuthClient: AuthClient = {
     const response = await mutation('/_allauth/browser/v1/auth/sessions', 'DELETE', { sessions: [id] })
     if (!response.ok) throw new AuthRequestError('The session could not be revoked.', response.status)
     return authSessions(await responseJson<AllauthSessionsResponse>(response))
+  },
+
+  async loadMfa() {
+    const response = await fetch('/_allauth/browser/v1/account/authenticators', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new AuthRequestError('Two-factor settings could not be loaded.', response.status)
+    const payload = await responseJson<AllauthAuthenticatorsResponse>(response)
+    const totpEnabled = payload.data?.some((item) => item.type === 'totp') ?? false
+    if (!totpEnabled) return { totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }
+    const recoveryResponse = await fetch('/_allauth/browser/v1/account/authenticators/recovery-codes', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!recoveryResponse.ok) throw new AuthRequestError('Recovery-code status could not be loaded.', recoveryResponse.status)
+    const recovery = await responseJson<AllauthRecoveryResponse>(recoveryResponse)
+    return {
+      totpEnabled: true,
+      recoveryCodeTotal: recovery.data?.total_code_count ?? 0,
+      recoveryCodeUnused: recovery.data?.unused_code_count ?? 0,
+    }
+  },
+
+  async beginTotp() {
+    const response = await fetch('/_allauth/browser/v1/account/authenticators/totp', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    const payload = await responseJson<{ meta?: { secret?: string; totp_url?: string } }>(response)
+    if (response.status !== 404 || !payload.meta?.secret || !payload.meta.totp_url) {
+      throw new AuthRequestError('Authenticator setup could not be started.', response.status)
+    }
+    return { secret: payload.meta.secret, totpUrl: payload.meta.totp_url }
+  },
+
+  async activateTotp(code) {
+    const response = await mutation('/_allauth/browser/v1/account/authenticators/totp', 'POST', { code })
+    if (!response.ok) throw new AuthRequestError('That authenticator code was not accepted.', response.status)
+    const recoveryResponse = await fetch('/_allauth/browser/v1/account/authenticators/recovery-codes', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!recoveryResponse.ok) throw new AuthRequestError('Recovery codes could not be displayed.', recoveryResponse.status)
+    return recoveryCodes(recoveryResponse)
+  },
+
+  async regenerateRecoveryCodes() {
+    const response = await mutation('/_allauth/browser/v1/account/authenticators/recovery-codes', 'POST', {})
+    if (!response.ok) throw new AuthRequestError('Recovery codes could not be replaced.', response.status)
+    return recoveryCodes(response)
+  },
+
+  async disableTotp() {
+    const response = await mutation('/_allauth/browser/v1/account/authenticators/totp', 'DELETE')
+    if (!response.ok) throw new AuthRequestError('Two-factor authentication could not be disabled.', response.status)
+  },
+
+  async reauthenticate(password) {
+    const response = await mutation('/_allauth/browser/v1/auth/reauthenticate', 'POST', { password })
+    if (!response.ok) throw new AuthRequestError('The current password was not accepted.', response.status)
   },
 
   async logout() {

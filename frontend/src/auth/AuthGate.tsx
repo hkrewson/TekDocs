@@ -8,6 +8,7 @@ type AuthState =
   | { phase: 'loading' }
   | { phase: 'bootstrap' }
   | { phase: 'sign-in' }
+  | { phase: 'mfa-challenge' }
   | { phase: 'invitation'; token: string }
   | { phase: 'invitation-unavailable' }
   | { phase: 'password-reset-request' }
@@ -137,6 +138,42 @@ function SignInForm({ submit, forgotPassword }: {
         <button className="auth-text-button" type="button" onClick={forgotPassword}>Forgot password?</button>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
+      </form>
+    </AuthFrame>
+  )
+}
+
+function MfaChallengeForm({ submit, cancel }: {
+  submit: (code: string) => Promise<void>
+  cancel: () => void
+}) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    const submittedCode = code
+    setCode('')
+    setSubmitting(true)
+    try {
+      await submit(submittedCode)
+    } catch (submitError) {
+      setError(message(submitError))
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <h1>Two-factor authentication</h1>
+      <p className="auth-intro">Enter the current code from your authenticator app, or use one recovery code.</p>
+      <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
+        <label>Authentication code<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="text" spellCheck={false} required autoFocus /></label>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Verifying…' : 'Verify code'}</button>
+        <button className="auth-text-button auth-cancel-button" type="button" onClick={cancel}>Return to sign in</button>
       </form>
     </AuthFrame>
   )
@@ -367,8 +404,10 @@ export function AuthGate({ client, initialContext, children }: {
   }
 
   const login = async (email: string, password: string) => {
-    const authenticated = await client.login(email, password)
-    setState({ phase: 'authenticated', context: authenticated })
+    const result = await client.login(email, password)
+    setState('mfaRequired' in result
+      ? { phase: 'mfa-challenge' }
+      : { phase: 'authenticated', context: result })
   }
 
   const acceptInvitation = async (details: InvitationAcceptance) => {
@@ -392,6 +431,7 @@ export function AuthGate({ client, initialContext, children }: {
   if (state.phase === 'loading') return <LoadingState />
   if (state.phase === 'bootstrap') return <BootstrapForm submit={bootstrap} />
   if (state.phase === 'sign-in') return <SignInForm submit={login} forgotPassword={() => setState({ phase: 'password-reset-request' })} />
+  if (state.phase === 'mfa-challenge') return <MfaChallengeForm submit={async (code) => { setState({ phase: 'authenticated', context: await client.completeMfaLogin(code) }) }} cancel={() => setState({ phase: 'sign-in' })} />
   if (state.phase === 'password-reset-request') return <PasswordResetRequestForm submit={async (email) => { await client.requestPasswordReset(email); setState({ phase: 'password-reset-sent' }) }} />
   if (state.phase === 'password-reset-sent') return <PasswordResetSentState />
   if (state.phase === 'password-reset-validating') return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />Checking reset link…</div></AuthFrame>

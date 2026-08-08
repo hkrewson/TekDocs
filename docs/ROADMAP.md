@@ -32,8 +32,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.6` | Complete | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
 | `0.0.7` | Complete | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
 | `0.0.8` | Complete | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
-| `0.0.9` | Next | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
-| `0.0.10` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
+| `0.0.9` | Complete | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
+| `0.0.10` | Next | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
 | `0.0.11` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
 | `0.1.0` | Planned stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
 
@@ -125,6 +125,17 @@ Evidence: `docs/releases/0.0.7.md`.
 - [x] Migration, OpenAPI, Docker/PostgreSQL, accessibility, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.8`.
 
 Evidence: `docs/releases/0.0.8.md`.
+
+### `0.0.9` acceptance criteria
+
+- [x] Authenticated users can enroll a TOTP authenticator from a responsive Settings workflow, complete password login with TOTP or a single-use recovery code, and disable TOTP after recent password reauthentication.
+- [x] TOTP secrets and recovery-code seeds use TekDocs envelope encryption before storage; the deployment master key remains outside PostgreSQL and a data migration encrypts legacy allauth MFA material.
+- [x] Recovery codes are shown only at enrollment or replacement, disappear from browser state when acknowledged, are never included in email/audit metadata, and cannot be reused after successful authentication.
+- [x] Recovery-code replacement and authenticator removal require recent allauth reauthentication; owner-only administrative APIs deny owners without an enrolled TOTP factor.
+- [x] Enrollment, removal, reauthentication, MFA success/failure, and recovery reset create value-free append-only audit events and controlled security-notification email.
+- [x] Unit, migration, Docker/PostgreSQL, Chromium, accessibility, CSRF, denial, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.9`.
+
+Evidence: `docs/releases/0.0.9.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

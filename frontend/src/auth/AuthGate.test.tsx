@@ -15,12 +15,19 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     load: vi.fn().mockResolvedValue({ bootstrapRequired: false, context }),
     bootstrapAndLogin: vi.fn().mockResolvedValue(context),
     login: vi.fn().mockResolvedValue(context),
+    completeMfaLogin: vi.fn().mockResolvedValue(context),
     acceptInvitation: vi.fn().mockResolvedValue(context),
     requestPasswordReset: vi.fn().mockResolvedValue(undefined),
     validatePasswordReset: vi.fn().mockResolvedValue(undefined),
     completePasswordReset: vi.fn().mockResolvedValue(undefined),
     listSessions: vi.fn().mockResolvedValue([]),
     revokeSession: vi.fn().mockResolvedValue([]),
+    loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
+    beginTotp: vi.fn(),
+    activateTotp: vi.fn(),
+    regenerateRecoveryCodes: vi.fn(),
+    disableTotp: vi.fn(),
+    reauthenticate: vi.fn(),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
@@ -88,6 +95,29 @@ describe('authentication boundary', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('email address or password is incorrect')
     expect(password).toHaveValue('')
     expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+
+  it('completes the pending two-factor challenge without retaining the code', async () => {
+    const user = userEvent.setup()
+    const completeMfaLogin = vi.fn().mockResolvedValue(context)
+    render(<App authClient={client({
+      load: vi.fn().mockResolvedValue({ bootstrapRequired: false, context: null }),
+      login: vi.fn().mockResolvedValue({ mfaRequired: true }),
+      completeMfaLogin,
+    })} />)
+
+    await user.type(await screen.findByLabelText('Email address'), 'owner@example.com')
+    await user.type(screen.getByLabelText('Password'), `${crypto.randomUUID()}Aa7!`)
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByRole('heading', { name: 'Two-factor authentication' })
+    const code = `recovery-${crypto.randomUUID()}`
+    const codeInput = screen.getByLabelText('Authentication code')
+    await user.type(codeInput, code)
+    await user.click(screen.getByRole('button', { name: 'Verify code' }))
+
+    await screen.findByRole('heading', { name: 'Overview' })
+    expect(completeMfaLogin).toHaveBeenCalledWith(code)
+    expect(screen.queryByDisplayValue(code)).not.toBeInTheDocument()
   })
 
   it('rejects mismatched setup passwords before sending them', async () => {

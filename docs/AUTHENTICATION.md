@@ -19,9 +19,19 @@ A successful bootstrap creates the tenant, first owner, and owner membership; re
 - Logout: `DELETE /_allauth/browser/v1/auth/session` with same-origin credentials and `X-CSRFToken`.
 - Shell context: `GET /api/v1/auth/context`; it requires an authenticated session and an explicit membership in the installation tenant.
 
-The shell renders only after the allauth session and TekDocs context both succeed. The owner and accounts created from accepted invitations receive tenant membership; unrelated identities remain denied. Invitation administration continues to require installation ownership until scoped roles are implemented.
+The shell renders only after the allauth session and TekDocs context both succeed. The owner and accounts created from accepted invitations receive tenant membership; unrelated identities remain denied. Invitation administration continues to require installation ownership until scoped roles are implemented. Beginning with `0.0.9`, the owner must also have an active TOTP authenticator before using privileged invitation administration.
 
 `0.0.8` enables allauth’s maintained user-session inventory with activity tracking. `GET /_allauth/browser/v1/auth/sessions` returns only the authenticated user’s browsers. The Settings page identifies the current browser and exposes CSRF-protected revocation of another session through `DELETE` on the same endpoint. The server scopes submitted IDs to the requesting user before ending the underlying Django session. A password change continues to invalidate every password-bound session regardless of whether an inventory row exists.
+
+## Two-factor authentication
+
+`0.0.9` enables allauth’s TOTP and recovery-code browser flows. Settings → Security can start TOTP enrollment, confirm the first code, display the resulting recovery codes once, report the remaining count, replace all codes, or disable the factor. The browser keeps setup and recovery material only in component memory and clears it after acknowledgment; it never writes those values to browser storage.
+
+After enrollment, a successful password step returns a pending `mfa_authenticate` flow. The browser accepts either the current TOTP value or one unused recovery code and opens the workspace only after the second step succeeds. Recovery codes are consumed atomically by allauth and a used value is rejected on replay.
+
+Replacing recovery codes and disabling TOTP require a recent password reauthentication through allauth’s `reauthenticate` flow. The server independently enforces that boundary even when the browser workflow is bypassed. Privileged owner policy also requires an active TOTP authenticator; ordinary workspace access remains available so an owner can enroll or recover their security configuration.
+
+Allauth’s MFA adapter is replaced only at its documented encryption hooks. TOTP secrets and recovery seeds are encrypted with TekDocs envelope encryption and the deployment master key before allauth persists them. Recovery codes are shown only on generation and are excluded from API lists, email, logs, and audit metadata. MFA audit events record action, actor, tenant, request correlation, and no factor or code values.
 
 `0.0.6` adds controlled invitation acceptance. The browser reads the token from the URL fragment, removes the fragment immediately, and submits the token with account details only in a CSRF-protected request body. Successful acceptance creates one active user, verified primary allauth email, and tenant membership before consuming the invitation and establishing a normal Django session. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
 

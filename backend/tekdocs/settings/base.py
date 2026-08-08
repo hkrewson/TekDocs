@@ -27,6 +27,7 @@ def env_int(name: str, default: int) -> int:
 
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
+TEKDOCS_MASTER_KEY = os.getenv("TEKDOCS_MASTER_KEY", "")
 TEKDOCS_BOOTSTRAP_TOKEN = os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", "")
 TEKDOCS_PUBLIC_URL = os.getenv("TEKDOCS_PUBLIC_URL", "http://localhost:3200").rstrip("/")
 TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL", False)
@@ -133,6 +134,7 @@ ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_ADAPTER = "apps.accounts.adapters.InviteOnlyAccountAdapter"
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
+ACCOUNT_REAUTHENTICATION_TIMEOUT = 300
 ACCOUNT_RATE_LIMITS = {
     "login": "20/m/ip",
     "login_failed": "10/m/ip,5/10m/key",
@@ -147,6 +149,9 @@ HEADLESS_FRONTEND_URLS = {
     "account_signup": "/auth/register",
 }
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
+MFA_ADAPTER = "apps.accounts.adapters.EncryptedMFAAdapter"
+MFA_RECOVERY_CODES_SHOW_ONCE = True
+MFA_TOTP_ISSUER = "TekDocs"
 MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
 USERSESSIONS_ADAPTER = "apps.accounts.adapters.AuditedUserSessionsAdapter"
@@ -167,7 +172,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.8",
+    "VERSION": "0.0.9",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

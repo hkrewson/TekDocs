@@ -212,9 +212,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.8 adds visible browser-session security controls." />
+      <PageHeader title="Overview" description="TekDocs 0.0.9 adds two-factor authentication and recovery controls." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.8</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.9</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],

@@ -13,6 +13,7 @@ test('account settings lists and revokes another active browser', async ({ page,
     json: { status: 200, meta: { is_authenticated: true }, data: { user: context.user } },
   }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
+  await page.route('**/_allauth/browser/v1/account/authenticators', (route) => route.fulfill({ json: { data: [] } }))
   await page.route('**/_allauth/browser/v1/auth/sessions', async (route) => {
     if (route.request().method() === 'DELETE') {
       expect(route.request().postDataJSON()).toEqual({ sessions: [2] })

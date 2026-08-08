@@ -5,6 +5,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core import mail
 from django.db import connection
 from django.test import Client
@@ -19,12 +20,14 @@ from apps.core.models import AuditEvent, InstallationState, Tenant
 @pytest.fixture
 def installation(db):
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
-    return bootstrap_owner(
+    result = bootstrap_owner(
         tenant_name="Example MSP",
         owner_email="owner@example.com",
         owner_display_name="Primary Owner",
         password=f"{secrets.token_urlsafe(24)}Aa7!",
     )
+    TOTP.activate(result.owner, generate_totp_secret())
+    return result
 
 
 @pytest.fixture
@@ -74,6 +77,16 @@ def test_owner_issues_and_lists_digest_only_invitation(owner_client, installatio
     assert [event.action for event in events] == ["invitation.issued", "invitation.delivered"]
     assert all(event.metadata == {} for event in events)
     assert token not in str(list(events.values("action", "metadata")))
+
+
+@pytest.mark.django_db
+def test_owner_without_totp_cannot_use_privileged_invitation_actions(owner_client, installation):
+    installation.owner.authenticator_set.filter(type="totp").delete()
+
+    response = owner_client.get(reverse("invitation-list-create"))
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "privileged_mfa_required"
 
 
 @pytest.mark.django_db

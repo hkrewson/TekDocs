@@ -17,6 +17,7 @@ class TransactionalTemplate(StrEnum):
     RECOVERY_REQUEST = "password_reset"
     RECOVERY_UNAVAILABLE = "password_reset_unavailable"
     CREDENTIAL_CHANGED = "password_changed"
+    MFA_CHANGED = "mfa_changed"
 
 
 def send_transactional_email(
@@ -95,4 +96,22 @@ def send_password_reset_unavailable_email(*, recipient: str) -> int:
         template=TransactionalTemplate.RECOVERY_UNAVAILABLE,
         subject="TekDocs password reset request",
         recipient=recipient,
+    )
+
+
+def send_mfa_security_email(*, recipient: str, change: str) -> int:
+    messages = {
+        "enabled": "Two-factor authentication was enabled.",
+        "disabled": "Two-factor authentication was disabled.",
+        "recovery_codes_replaced": "Your two-factor recovery codes were replaced.",
+    }
+    try:
+        description = messages[change]
+    except KeyError as exc:
+        raise ValueError("Unsupported MFA notification change") from exc
+    return send_transactional_email(
+        template=TransactionalTemplate.MFA_CHANGED,
+        subject="Your TekDocs two-factor security changed",
+        recipient=recipient,
+        context={"change_description": description},
     )

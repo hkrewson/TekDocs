@@ -10,6 +10,7 @@ def api_exception_handler(exc, context):  # type: ignore[no-untyped-def]
     response.data = {
         "error": {
             "status": response.status_code,
+            "code": exc.get_codes() if hasattr(exc, "get_codes") else "error",
             "detail": response.data,
             "request_id": str(request_id) if request_id else None,
         }

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from allauth.mfa.models import Authenticator
 from rest_framework.exceptions import APIException, PermissionDenied
 
 from apps.core.models import InstallationState, Tenant
@@ -11,6 +12,11 @@ class InstallationContextUnavailable(APIException):
     status_code = 503
     default_detail = "The authenticated installation context is unavailable."
     default_code = "authentication_context_unavailable"
+
+
+class PrivilegedMFARequired(PermissionDenied):
+    default_detail = "Two-factor authentication is required for privileged actions."
+    default_code = "privileged_mfa_required"
 
 
 @dataclass(frozen=True)
@@ -42,4 +48,6 @@ def require_installation_owner(user: User) -> InstallationMemberContext:
     context = require_installation_member(user)
     if not context.is_owner:
         raise PermissionDenied("Installation ownership is required.")
+    if not Authenticator.objects.filter(user=user, type=Authenticator.Type.TOTP).exists():
+        raise PrivilegedMFARequired()
     return context

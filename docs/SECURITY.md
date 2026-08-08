@@ -13,7 +13,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - Invitation acceptance requires CSRF, consumes a locked invitation exactly once, creates identity and membership atomically, returns one unavailable state for invalid lifecycle conditions, and removes the browser URL fragment before account entry.
 - Password recovery returns the same request state for known and unknown addresses, uses expiring single-use Django tokens in scrubbed URL fragments, requires CSRF for mutations, does not auto-login, and invalidates existing password-bound sessions.
 - Active browser sessions use maintained allauth records, are listable only by their owner, and require CSRF for revocation. Login and recovery throttles share Valkey across web workers; authentication audits remain append-only and exclude credentials and client/session identifiers.
-- MFA for privileged roles and secret reveal.
+- TOTP is required for privileged owner actions. TOTP secrets and recovery seeds are envelope-encrypted with the deployment master key; recovery codes are shown only on generation, and sensitive MFA changes require recent password reauthentication. MFA values are excluded from logs, email, and append-only audit metadata.
 - Central policy authorization with cross-tenant and cross-client negative tests.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.
 - Envelope encryption for managed secrets with the wrapping key supplied outside the database.

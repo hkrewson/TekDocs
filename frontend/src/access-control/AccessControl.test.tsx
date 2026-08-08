@@ -6,7 +6,7 @@ import type { AccessControlClient } from './api'
 
 const owner = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner' as const, is_owner: true, joined_at: '2026-08-08T12:00:00Z' }
 const technician = { id: 'member', display_name: 'Morgan Ellis', email: 'morgan@example.com', role: 'read_only' as const, is_owner: false, joined_at: '2026-08-08T13:00:00Z' }
-const clientOrganization = { id: 'organization', name: 'Acme Dental', access_mode: 'all_authorized' as const }
+const clientOrganization = { id: 'organization', name: 'Acme Dental', access_mode: 'all_authorized' as const, assigned_staff: [] }
 const catalog = {
   permissions: [{ key: 'people.view', label: 'View people', category: 'People', requires_mfa: false }],
   roles: [
@@ -27,6 +27,8 @@ function client(overrides: Partial<AccessControlClient> = {}): AccessControlClie
     organizations: vi.fn().mockResolvedValue([clientOrganization]),
     assignRole: vi.fn().mockResolvedValue({ ...technician, role: 'technician' }),
     changeAccessMode: vi.fn().mockResolvedValue({ ...clientOrganization, access_mode: 'assigned_only' }),
+    assignStaff: vi.fn().mockResolvedValue({ ...clientOrganization, assigned_staff: [{ id: technician.id, display_name: technician.display_name, email: technician.email, role: technician.role }] }),
+    removeStaff: vi.fn().mockResolvedValue(clientOrganization),
     ...overrides,
   }
 }
@@ -50,18 +52,36 @@ describe('access control', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Morgan Ellis's role was updated")
   })
 
-  it('warns that assigned-only remains owner-only before changing the mode', async () => {
+  it('explains the assignment boundary before changing the mode', async () => {
     const user = userEvent.setup()
     const changeAccessMode = vi.fn().mockResolvedValue({ ...clientOrganization, access_mode: 'assigned_only' })
     render(<AccessControl client={client({ changeAccessMode })} />)
 
-    await screen.findByText('Acme Dental')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Access mode for Acme Dental' }), 'assigned_only')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Access mode for Acme Dental' }), 'assigned_only')
     await user.click(screen.getAllByRole('button', { name: 'Review change' })[1])
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Only the owner will retain access')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('explicitly assigned MSP staff')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(changeAccessMode).toHaveBeenCalledWith('organization', 'assigned_only'))
+  })
+
+  it('reviews staff assignment and removal without changing the tenant role', async () => {
+    const user = userEvent.setup()
+    const assignedOrganization = { ...clientOrganization, assigned_staff: [{ id: technician.id, display_name: technician.display_name, email: technician.email, role: technician.role }] }
+    const assignStaff = vi.fn().mockResolvedValue(assignedOrganization)
+    const removeStaff = vi.fn().mockResolvedValue(clientOrganization)
+    render(<AccessControl client={client({ assignStaff, removeStaff })} />)
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Staff member for Acme Dental' }), technician.id)
+    await user.click(screen.getByRole('button', { name: 'Review assignment' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Their MSP role still determines what they can do')
+    await user.click(screen.getByRole('button', { name: 'Confirm change' }))
+    await waitFor(() => expect(assignStaff).toHaveBeenCalledWith(clientOrganization.id, technician.id))
+
+    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('They will lose access if this organization is assigned-only')
+    await user.click(screen.getByRole('button', { name: 'Confirm change' }))
+    await waitFor(() => expect(removeStaff).toHaveBeenCalledWith(clientOrganization.id, technician.id))
   })
 
   it('shows one denial state without retaining stale rows', async () => {

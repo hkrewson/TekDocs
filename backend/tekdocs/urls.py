@@ -8,6 +8,8 @@ from apps.accounts.access_views import (
     MemberRoleView,
     OrganizationAccessDetailView,
     OrganizationAccessListView,
+    OrganizationStaffAssignmentDetailView,
+    OrganizationStaffAssignmentView,
 )
 from apps.accounts.views import (
     AuthenticatedContextView,
@@ -89,6 +91,16 @@ urlpatterns = [
         "api/v1/access-control/organizations/<uuid:organization_entity_id>",
         OrganizationAccessDetailView.as_view(),
         name="access-control-organization-detail",
+    ),
+    path(
+        "api/v1/access-control/organizations/<uuid:organization_entity_id>/staff",
+        OrganizationStaffAssignmentView.as_view(),
+        name="access-control-organization-staff",
+    ),
+    path(
+        "api/v1/access-control/organizations/<uuid:organization_entity_id>/staff/<uuid:user_id>",
+        OrganizationStaffAssignmentDetailView.as_view(),
+        name="access-control-organization-staff-detail",
     ),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),

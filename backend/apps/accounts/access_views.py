@@ -7,8 +7,10 @@ from apps.core.models import OrganizationAccessMode
 from .access_control import (
     access_mode_organizations,
     assign_membership_role,
+    assign_organization_staff,
     change_organization_access_mode,
     members_for_context,
+    remove_organization_staff,
 )
 from .access_serializers import (
     AccessControlCatalogSerializer,
@@ -16,6 +18,7 @@ from .access_serializers import (
     MemberSerializer,
     OrganizationAccessSerializer,
     OrganizationAccessWriteSerializer,
+    OrganizationStaffWriteSerializer,
 )
 from .models import BuiltInRole
 from .policy import PermissionKey, permission_catalog, require_permission, role_catalog
@@ -108,5 +111,44 @@ class OrganizationAccessDetailView(APIView):
             actor=request.user,
             organization_entity_id=organization_entity_id,
             access_mode=OrganizationAccessMode(serializer.validated_data["access_mode"]),
+        )
+        return Response(OrganizationAccessSerializer(organization).data)
+
+
+class OrganizationStaffAssignmentView(APIView):
+    @extend_schema(
+        request=OrganizationStaffWriteSerializer,
+        responses={
+            200: OrganizationAccessSerializer,
+            201: OrganizationAccessSerializer,
+            400: OpenApiResponse(description="The owner cannot be assigned explicitly"),
+            403: OpenApiResponse(description="Staff assignment permission and MFA required"),
+            404: OpenApiResponse(description="Organization or tenant member not found"),
+        },
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        serializer = OrganizationStaffWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        organization, created = assign_organization_staff(
+            actor=request.user,
+            organization_entity_id=organization_entity_id,
+            member_user_id=serializer.validated_data["user_id"],
+        )
+        return Response(OrganizationAccessSerializer(organization).data, status=201 if created else 200)
+
+
+class OrganizationStaffAssignmentDetailView(APIView):
+    @extend_schema(
+        responses={
+            200: OrganizationAccessSerializer,
+            403: OpenApiResponse(description="Staff assignment permission and MFA required"),
+            404: OpenApiResponse(description="Organization not found"),
+        },
+    )
+    def delete(self, request, organization_entity_id, user_id):  # type: ignore[no-untyped-def]
+        organization = remove_organization_staff(
+            actor=request.user,
+            organization_entity_id=organization_entity_id,
+            member_user_id=user_id,
         )
         return Response(OrganizationAccessSerializer(organization).data)

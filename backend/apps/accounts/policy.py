@@ -5,13 +5,19 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from allauth.mfa.models import Authenticator
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from rest_framework.exceptions import APIException, PermissionDenied
 
 from apps.core.models import InstallationState, Organization, OrganizationAccessMode, Tenant
 from apps.core.scoping import DataScope
 
-from .models import TENANT_ASSIGNABLE_ROLES, BuiltInRole, TenantMembership, User
+from .models import (
+    TENANT_ASSIGNABLE_ROLES,
+    BuiltInRole,
+    OrganizationAccessAssignment,
+    TenantMembership,
+    User,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -36,6 +42,7 @@ class PermissionKey(StrEnum):
     ORGANIZATIONS_EDIT = "organizations.edit"
     ORGANIZATIONS_ARCHIVE = "organizations.archive"
     ORGANIZATIONS_MANAGE_ACCESS = "organizations.manage_access"
+    ORGANIZATIONS_ASSIGN_STAFF = "organizations.assign_staff"
     PEOPLE_VIEW = "people.view"
     PEOPLE_CREATE = "people.create"
     PEOPLE_EDIT = "people.edit"
@@ -101,6 +108,12 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.ORGANIZATIONS_ARCHIVE, "Archive organizations", "Organizations", mfa=True),
     _permission(
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS, "Manage organization access modes", "Organizations", mfa=True
+    ),
+    _permission(
+        PermissionKey.ORGANIZATIONS_ASSIGN_STAFF,
+        "Assign MSP staff to organizations",
+        "Organizations",
+        mfa=True,
     ),
     _permission(PermissionKey.PEOPLE_VIEW, "View people", "People"),
     _permission(PermissionKey.PEOPLE_CREATE, "Create people", "People", mfa=True),
@@ -178,6 +191,7 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
     not in {
         PermissionKey.INSTALLATION_MANAGE,
         PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,
+        PermissionKey.ORGANIZATIONS_ASSIGN_STAFF,
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,
         PermissionKey.SECRETS_REVEAL,
     }
@@ -315,10 +329,12 @@ def _organization_allowed(context: InstallationMemberContext, organization: Orga
         return False
     if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED:
         return True
-    # Explicit user-to-organization assignments arrive in 0.1.10. Until then,
-    # assigned-only is deliberately owner-only instead of silently treating a
-    # tenant-wide role as an assignment.
-    return context.is_owner
+    if context.is_owner:
+        return True
+    return OrganizationAccessAssignment.scoped.for_tenant(context.tenant).filter(
+        organization=organization,
+        membership__user=context.user,
+    ).exists()
 
 
 def context_has_permission(
@@ -360,7 +376,10 @@ def accessible_organizations(
         return Organization.scoped.for_tenant(context.tenant).none()
     organizations = Organization.scoped.for_tenant(context.tenant).filter(entity__archived_at__isnull=True)
     if not context.is_owner:
-        organizations = organizations.filter(access_mode=OrganizationAccessMode.ALL_AUTHORIZED)
+        organizations = organizations.filter(
+            Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED)
+            | Q(access_assignments__membership__user=context.user)
+        ).distinct()
     return organizations
 
 

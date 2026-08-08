@@ -4,7 +4,8 @@ TekDocs is a self-hosted, documentation-first MSP knowledge and inventory platfo
 
 ## 1.0 success criteria
 
-- One MSP installation can securely organize client organizations, people, vendors, assets, software, networks, credentials, documentation, compliance evidence, and reminders.
+- One MSP installation can securely organize client organizations, people, vendors, assets, software, networks, domains, credentials, documentation, compliance evidence, and reminders.
+- Domains are addressable MSP- or client-owned records rather than a flat checklist. Registered domains retain renewal and expiration responsibility, managed subdomains retain hierarchy and provenance, and related TLS endpoints retain validation and certificate-expiry evidence.
 - An authorized MSP user can enter an organization workspace from its record, browse and create only data owned by that organization, search-switch among authorized organizations, and return to the MSP workspace without losing the active route.
 - Organization classifications describe capabilities rather than separate identities: a business may be a client, vendor, manufacturer, partner, or a combination, and its workspace exposes the union of applicable areas.
 - Live block reuse updates every authorized placement; pinned references and STATIC publications remain unchanged.

@@ -97,7 +97,7 @@ import os
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from apps.accounts.mfa_storage import PREFIX, decrypt_mfa_value
-from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Location, Organization, OrganizationAccessMode, OrganizationClassification, Site, Tenant
 
 email = os.environ["UPGRADE_TEST_EMAIL"]
@@ -136,10 +136,11 @@ assert Location.scoped.for_tenant(state.tenant).count() == 0
 assert CustomFieldDefinition.scoped.for_tenant(state.tenant).count() == 0
 assert CustomFieldDefinitionVersion.scoped.for_tenant(state.tenant).count() == 0
 assert EntityLink.scoped.for_tenant(state.tenant).count() == 0
+assert OrganizationAccessAssignment.scoped.for_tenant(state.tenant).count() == 0
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute(
-        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s)",
+        "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regclass(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), to_regprocedure(%s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s), EXISTS (SELECT 1 FROM pg_constraint WHERE conname = %s)",
         [
             "core_organizationclassification",
             "core_site",
@@ -147,25 +148,29 @@ with connection.cursor() as cursor:
             "core_customfielddefinition",
             "core_customfielddefinitionversion",
             "core_entitylink",
+            "accounts_organizationaccessassignment",
             "tekdocs_validate_organization_classification_scope()",
             "tekdocs_validate_location_scope()",
             "tekdocs_validate_entity_custom_fields()",
             "tekdocs_validate_entity_link_scope()",
+            "tekdocs_validate_organization_access_assignment()",
             "organization_access_mode_valid",
             "tenant_membership_role_valid",
         ],
     )
-    classification_table, site_table, location_table, definition_table, version_table, entity_link_table, guard_function, location_guard, custom_field_guard, entity_link_guard, access_mode_constraint, membership_role_constraint = cursor.fetchone()
+    classification_table, site_table, location_table, definition_table, version_table, entity_link_table, assignment_table, guard_function, location_guard, custom_field_guard, entity_link_guard, assignment_guard, access_mode_constraint, membership_role_constraint = cursor.fetchone()
 assert classification_table == "core_organizationclassification"
 assert site_table == "core_site"
 assert location_table == "core_location"
 assert definition_table == "core_customfielddefinition"
 assert version_table == "core_customfielddefinitionversion"
 assert entity_link_table == "core_entitylink"
+assert assignment_table == "accounts_organizationaccessassignment"
 assert guard_function == "tekdocs_validate_organization_classification_scope()"
 assert location_guard == "tekdocs_validate_location_scope()"
 assert custom_field_guard == "tekdocs_validate_entity_custom_fields()"
 assert entity_link_guard == "tekdocs_validate_entity_link_scope()"
+assert assignment_guard == "tekdocs_validate_organization_access_assignment()"
 assert access_mode_constraint
 assert membership_role_constraint
 print("Upgraded identity and authentication invariants verified")

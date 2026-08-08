@@ -42,7 +42,7 @@ curl --fail --silent "http://127.0.0.1:$mailpit_port/readyz" >/dev/null
 clean_compose exec -T backend python manage.py migrate --check
 clean_compose exec -T backend python manage.py makemigrations --check --dry-run
 clean_compose exec -T backend python manage.py shell -c '
-from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Organization, OrganizationAccessMode, Tenant
 
 state = InstallationState.objects.get(pk=InstallationState.SINGLETON_ID)
@@ -52,6 +52,7 @@ assert state.tenant_id is None
 assert Tenant.objects.count() == 0
 assert User.objects.count() == 0
 assert TenantMembership.objects.count() == 0
+assert OrganizationAccessAssignment.objects.count() == 0
 assert AuditEvent.objects.count() == 0
 assert CustomFieldDefinition.objects.count() == 0
 assert CustomFieldDefinitionVersion.objects.count() == 0

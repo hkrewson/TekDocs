@@ -38,11 +38,23 @@ class MemberRoleWriteSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=TENANT_ASSIGNABLE_ROLE_CHOICES)
 
 
+class AssignedStaffSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="membership.user_id")
+    display_name = serializers.CharField(source="membership.user.display_name")
+    email = serializers.EmailField(source="membership.user.email")
+    role = serializers.ChoiceField(source="membership.role", choices=TENANT_ASSIGNABLE_ROLE_CHOICES)
+
+
 class OrganizationAccessSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
     access_mode = serializers.ChoiceField(choices=OrganizationAccessMode.choices)
+    assigned_staff = AssignedStaffSerializer(source="access_assignments", many=True, read_only=True)
 
 
 class OrganizationAccessWriteSerializer(serializers.Serializer):
     access_mode = serializers.ChoiceField(choices=OrganizationAccessMode.choices)
+
+
+class OrganizationStaffWriteSerializer(serializers.Serializer):
+    user_id = serializers.UUIDField()

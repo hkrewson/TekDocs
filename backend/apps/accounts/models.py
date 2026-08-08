@@ -3,6 +3,7 @@ import secrets
 import uuid
 
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -159,3 +160,48 @@ class TenantMembership(models.Model):
 
     def __str__(self) -> str:
         return f"Membership {self.id}"
+
+
+class OrganizationAccessAssignment(models.Model):
+    """An explicit MSP staff assignment to one organization access boundary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="organization_access_assignments")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="access_assignments",
+    )
+    membership = models.ForeignKey(
+        TenantMembership,
+        on_delete=models.PROTECT,
+        related_name="organization_access_assignments",
+    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_organization_assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organization", "membership"),
+                name="unique_organization_staff_assignment",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "membership"),
+                name="accounts_org_staff_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Organization assignment {self.id}"
+
+    def clean(self) -> None:
+        if self.organization_id and self.tenant_id != self.organization.tenant_id:
+            raise ValidationError("Organization assignment must share the organization tenant")
+        if self.membership_id and self.tenant_id != self.membership.tenant_id:
+            raise ValidationError("Organization assignment must share the membership tenant")

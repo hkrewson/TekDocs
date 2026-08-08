@@ -6,7 +6,7 @@ const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
   role: 'owner',
-  permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
+  permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access', 'organizations.assign_staff'],
 }
 
 const accessMember = {
@@ -22,6 +22,7 @@ const accessCatalog = {
   permissions: [
     { key: 'memberships.assign_role', label: 'Assign tenant roles', category: 'Access control', requires_mfa: true },
     { key: 'organizations.manage_access', label: 'Manage organization access', category: 'Access control', requires_mfa: true },
+    { key: 'organizations.assign_staff', label: 'Assign MSP staff', category: 'Access control', requires_mfa: true },
   ],
   roles: [
     { value: 'owner', label: 'Owner', description: 'Installation owner.', assignable_scope: 'installation', permissions: ['memberships.assign_role'] },
@@ -113,12 +114,19 @@ async function mockWorkspaceApplication(page: Page) {
   ] }))
   await page.route('**/api/v1/access-control/members/*', (route) => route.fulfill({ json: { ...accessMember, role: 'technician' } }))
   await page.route('**/api/v1/access-control/organizations', (route) => route.fulfill({ json: [
-    { id: clientWorkspace.id, name: clientWorkspace.name, access_mode: 'all_authorized' },
+    { id: clientWorkspace.id, name: clientWorkspace.name, access_mode: 'all_authorized', assigned_staff: [] },
   ] }))
   await page.route('**/api/v1/access-control/organizations/*', (route) => route.fulfill({ json: {
+      id: clientWorkspace.id,
+      name: clientWorkspace.name,
+      access_mode: 'assigned_only',
+      assigned_staff: [],
+    } }))
+  await page.route('**/api/v1/access-control/organizations/*/staff**', (route) => route.fulfill({ json: {
     id: clientWorkspace.id,
     name: clientWorkspace.name,
     access_mode: 'assigned_only',
+    assigned_staff: route.request().method() === 'POST' ? [{ ...accessMember, role: 'technician' }] : [],
   } }))
   await page.route('**/api/v1/entity-link-types', (route) => route.fulfill({ json: [
     { value: 'related_to', forward_label: 'Related to', inverse_label: 'Related to', symmetric: true, target_types: [] },
@@ -164,7 +172,7 @@ async function mockWorkspaceApplication(page: Page) {
   })
 }
 
-test('owner reviews role and client access-mode changes through the policy interface', async ({ page, baseURL }) => {
+test('owner reviews role, client access-mode, and staff-assignment changes through the policy interface', async ({ page, baseURL }) => {
   if (!baseURL) throw new Error('Browser test base URL is unavailable.')
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await mockWorkspaceApplication(page)
@@ -182,9 +190,18 @@ test('owner reviews role and client access-mode changes through the policy inter
 
   await page.getByRole('combobox', { name: 'Access mode for Acme Dental' }).selectOption('assigned_only')
   await page.getByRole('button', { name: 'Review change' }).last().click()
-  await expect(page.getByRole('alertdialog')).toContainText('Only the owner will retain access')
+  await expect(page.getByRole('alertdialog')).toContainText('explicitly assigned MSP staff')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText("Acme Dental's access mode was updated")
+
+  await page.getByRole('combobox', { name: 'Staff member for Acme Dental' }).selectOption(accessMember.id)
+  await page.getByRole('button', { name: 'Review assignment' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('MSP role still determines what they can do')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText('Morgan Ellis was assigned to Acme Dental')
+  await page.getByRole('button', { name: 'Remove' }).click()
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText('Morgan Ellis was removed from Acme Dental')
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

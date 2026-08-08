@@ -1,8 +1,26 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import * as OTPAuth from 'otpauth'
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
-test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ page }) => {
+async function invitationTokenFromMailpit(page: Page) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const messagesResponse = await page.request.get('http://mailpit:8025/api/v1/messages')
+    expect(messagesResponse.ok()).toBe(true)
+    const messages = await messagesResponse.json() as { messages?: Array<{ ID?: string }> }
+    const messageId = messages.messages?.[0]?.ID
+    if (messageId) {
+      const messageResponse = await page.request.get(`http://mailpit:8025/api/v1/message/${messageId}`)
+      expect(messageResponse.ok()).toBe(true)
+      const match = JSON.stringify(await messageResponse.json()).match(/#token=([A-Za-z0-9_-]+)/)
+      if (match) return match[1]
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error('The staff invitation did not arrive in Mailpit.')
+}
+
+test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
   const deploymentToken = process.env.TEKDOCS_E2E_BOOTSTRAP_TOKEN
   if (!deploymentToken) throw new Error('The isolated live test requires TEKDOCS_E2E_BOOTSTRAP_TOKEN.')
 
@@ -55,14 +73,49 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Save organization' }).click()
   await expect(page.getByRole('status')).toHaveText('Organization added.')
 
+  const clientLink = page.getByRole('link', { name: 'Live Acme Client' })
+  const clientHref = await clientLink.getAttribute('href')
+  const clientId = clientHref?.match(/organizations\/([0-9a-f-]+)/)?.[1]
+  if (!clientId) throw new Error('The created client did not expose its stable organization identifier.')
+
+  const staffEmail = `live-technician-${suffix}@example.invalid`
+  const csrfCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+  if (!csrfCookie) throw new Error('The owner session did not expose a CSRF cookie.')
+  const invitationResponse = await page.request.post('/api/v1/invitations', {
+    data: { email: staffEmail },
+    headers: { 'X-CSRFToken': csrfCookie.value },
+  })
+  expect(invitationResponse.status()).toBe(201)
+  const invitationToken = await invitationTokenFromMailpit(page)
+
+  const staffContext = await browser.newContext()
+  const staffPage = await staffContext.newPage()
+  const staffPassword = `${randomBytes(24).toString('base64url')}Bb8!`
+  await staffPage.goto(`/auth/invitations/accept#token=${invitationToken}`)
+  await staffPage.getByLabel('Your name').fill('Live Assigned Technician')
+  await staffPage.getByLabel('Password', { exact: true }).fill(staffPassword)
+  await staffPage.getByLabel('Confirm password').fill(staffPassword)
+  await staffPage.getByRole('button', { name: 'Activate account' }).click()
+  await expect(staffPage.getByRole('heading', { name: 'Overview' })).toBeVisible()
+
   await page.getByRole('button', { name: /Account menu for Live Workspace Owner/ }).click()
   await page.getByRole('menuitem', { name: 'Access control' }).click()
   await expect(page.getByRole('heading', { name: 'Access control' })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Staff member for Live Acme Client' }).selectOption({ label: 'Live Assigned Technician · Read-only' })
+  await page.getByRole('button', { name: 'Review assignment' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('Their MSP role still determines what they can do')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText('Live Assigned Technician was assigned to Live Acme Client')
   await page.getByRole('combobox', { name: 'Access mode for Live Acme Client' }).selectOption('assigned_only')
-  await page.getByRole('button', { name: 'Review change' }).click()
-  await expect(page.getByRole('alertdialog')).toContainText('Only the owner will retain access')
+  await page.getByRole('table', { name: 'Organization access modes' }).getByRole('button', { name: 'Review change' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('The owner retains break-glass access')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText("Live Acme Client's access mode was updated")
+
+  const assignedWorkspace = await staffPage.request.get(`/api/v1/workspaces/organizations/${clientId}`)
+  expect(assignedWorkspace.status()).toBe(200)
+  await staffPage.goto(clientHref)
+  await expect(staffPage.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
 
   await page.goto('/organizations')
 
@@ -171,4 +224,5 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('cell', { name: 'Live Morgan Ellis', exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('cell', { name: 'Live Morgan Ellis', exact: true })).toBeVisible()
+  await staffContext.close()
 })

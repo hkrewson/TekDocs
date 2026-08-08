@@ -11,7 +11,7 @@ This document defines which navigation families belong to the MSP and organizati
 - The MSP-context switcher may search all authorized organization classifications so an operator can enter client or supplier workspaces.
 - Vendor, manufacturer, and partner classifications remain capabilities on one organization identity. They are not separate tables or tenant boundaries.
 - Access Control is an MSP-administration route available only when the authenticated policy context includes member-role administration. It lists built-in role definitions, tenant members, and each organization's MSP-staff access mode. It is not carried into an organization sidebar.
-- `assigned_only` organizations are intentionally owner-only in `0.1.9`; the staff-assignment UI and organization-scoped client roles arrive in `0.1.10`.
+- `assigned_only` organizations are owner-only in `0.1.9`; explicit MSP staff assignments arrive in `0.1.10`. Organization-scoped client roles and custom role composition remain later RBAC slices.
 
 ## Navigation matrix
 
@@ -23,14 +23,14 @@ This document defines which navigation families belong to the MSP and organizati
 | Sites | MSP offices and nested locations | Client sites, buildings, floors, rooms, offices, and desks | Supplier sites and offices | records available (`0.1.6`) |
 | Custom fields | MSP-wide definitions and values on MSP records | Inherited MSP definitions plus client-local Site/Location definitions | Inherited MSP definitions plus supplier-local Site/Location definitions | definitions and Site/Location values available (`0.1.7`) |
 | Relationships | Typed links and backlinks among visible MSP records | Client-owned records plus explicit links to eligible organization anchors | Supplier-owned records plus explicit links to eligible organization anchors | organization relationship UI and scoped search available (`0.1.8`) |
-| Access control | Built-in tenant roles and organization staff-access modes | — | — | owner administration available (`0.1.9`); assignments in `0.1.10` |
+| Access control | Built-in tenant roles, organization staff-access modes, and explicit per-client MSP staff assignments | — | — | role/mode administration available (`0.1.9`); staff assignments in `0.1.10` |
 | Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |
 | Licenses | MSP entitlements | Client entitlements and seats | — | `0.3.6` |
 | Networks | MSP networks | Client networks | — | `0.5.x` |
-| Domains | MSP registrations and monitoring | Client registrations and monitoring | — | `0.7.8` |
-| Certificates | MSP TLS endpoints | Client TLS endpoints | — | `0.7.9` |
+| Domains | MSP-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | Client-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | — | inventory `0.7.8`; hierarchy/renewals/monitoring `0.7.9`–`0.7.11` |
+| Certificates | MSP TLS endpoints and validation history related to managed domains/hostnames | Client TLS endpoints and validation history related to managed domains/hostnames | — | `0.7.12`–`0.7.13` |
 | Credentials | MSP-protected secrets | Client-protected secrets | — | `0.3.1`–`0.3.2` |
 | Services | MSP services and contracts | Client services, providers, and dependencies | — | relationship seam in `0.3.7` |
 | Vendors | MSP supplier directory/relationships | Vendors related to the client through assets or services | — | `0.3.4` |

@@ -377,6 +377,21 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .access-row select { width: min(260px, 100%); min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
 .access-row .secondary-button { min-height: 34px; padding: 7px 10px; }
 .access-row .secondary-button:disabled { color: var(--quiet); cursor: default; }
+.staff-assignment-list { border-top: 1px solid var(--border); }
+.staff-assignment-group { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.2fr) minmax(260px, 1fr); gap: 20px; padding: 16px 2px; border-bottom: 1px solid var(--border); }
+.staff-assignment-group h3 { margin: 0; font-size: 14px; }
+.staff-assignment-group p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.staff-assignment-group ul { margin: 0; padding: 0; list-style: none; }
+.staff-assignment-group li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.staff-assignment-group li:first-child { padding-top: 0; }
+.staff-assignment-group li:last-child { border-bottom: 0; }
+.staff-assignment-group li > span { display: grid; min-width: 0; gap: 2px; }
+.staff-assignment-group li > span > span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.staff-assignment-group .settings-state { padding: 0; border: 0; }
+.staff-assignment-form { display: grid; align-content: start; gap: 9px; }
+.staff-assignment-form label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
+.staff-assignment-form select { min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.staff-assignment-form .secondary-button { justify-self: start; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -447,4 +462,5 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .access-row > span:not(:first-child)::before { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 600; }
   .access-row > span:nth-child(2)::before { content: 'Role or access mode'; }
   .access-row > span:nth-child(3)::before { content: 'Action'; }
+  .staff-assignment-group { grid-template-columns: 1fr; gap: 12px; }
 }

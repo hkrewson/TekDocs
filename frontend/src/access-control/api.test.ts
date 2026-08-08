@@ -30,15 +30,19 @@ describe('access-control API', () => {
     ])
   })
 
-  it('sends role and access-mode changes with same-origin CSRF', async () => {
+  it('sends role, access-mode, and staff-assignment changes with same-origin CSRF', async () => {
     document.cookie = 'csrftoken=policy-token; path=/'
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response({ id: 'member-1', role: 'technician' }))
       .mockResolvedValueOnce(response({ id: 'org-1', access_mode: 'assigned_only' }))
+      .mockResolvedValueOnce(response({ id: 'org-1', assigned_staff: [{ id: 'member-1' }] }, 201))
+      .mockResolvedValueOnce(response({ id: 'org-1', assigned_staff: [] }))
     vi.stubGlobal('fetch', fetchMock)
 
     await browserAccessControlClient.assignRole('member-1', 'technician')
     await browserAccessControlClient.changeAccessMode('org-1', 'assigned_only')
+    await browserAccessControlClient.assignStaff('org-1', 'member-1')
+    await browserAccessControlClient.removeStaff('org-1', 'member-1')
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/access-control/members/member-1', expect.objectContaining({
       method: 'PATCH',
@@ -49,6 +53,14 @@ describe('access-control API', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/access-control/organizations/org-1', expect.objectContaining({
       method: 'PATCH',
       body: JSON.stringify({ access_mode: 'assigned_only' }),
+    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/access-control/organizations/org-1/staff', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ user_id: 'member-1' }),
+    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/access-control/organizations/org-1/staff/member-1', expect.objectContaining({
+      method: 'DELETE',
+      body: undefined,
     }))
   })
 })

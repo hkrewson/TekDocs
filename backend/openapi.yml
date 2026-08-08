@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.9
+  version: 0.1.10
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -144,6 +144,82 @@ paths:
           description: Invalid access mode
         '403':
           description: Organization access administration permission and MFA required
+        '404':
+          description: Organization not found
+  /api/v1/access-control/organizations/{organization_entity_id}/staff:
+    post:
+      operationId: access_control_organizations_staff_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationStaffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationStaffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationStaffWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationAccess'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationAccess'
+          description: ''
+        '400':
+          description: The owner cannot be assigned explicitly
+        '403':
+          description: Staff assignment permission and MFA required
+        '404':
+          description: Organization or tenant member not found
+  /api/v1/access-control/organizations/{organization_entity_id}/staff/{user_id}:
+    delete:
+      operationId: access_control_organizations_staff_destroy
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationAccess'
+          description: ''
+        '403':
+          description: Staff assignment permission and MFA required
         '404':
           description: Organization not found
   /api/v1/auth/context:
@@ -2190,6 +2266,24 @@ components:
         * `installation` - installation
         * `tenant` - tenant
         * `organization` - organization
+    AssignedStaff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/TenantAssignableRoleEnum'
+      required:
+      - display_name
+      - email
+      - id
+      - role
     AuthenticatedContext:
       type: object
       properties:
@@ -2883,8 +2977,14 @@ components:
           type: string
         access_mode:
           $ref: '#/components/schemas/OrganizationAccessModeEnum'
+        assigned_staff:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignedStaff'
+          readOnly: true
       required:
       - access_mode
+      - assigned_staff
       - id
       - name
     OrganizationAccessModeEnum:
@@ -2907,6 +3007,14 @@ components:
         * `vendor` - Vendor
         * `manufacturer` - Manufacturer
         * `partner` - Partner
+    OrganizationStaffWrite:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+      required:
+      - user_id
     OrganizationWrite:
       type: object
       properties:

@@ -3,12 +3,12 @@ import uuid
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.accounts.policy import PERMISSION_CATALOG, ROLE_DEFINITIONS, PermissionKey
 from apps.core.models import AuditEvent, Entity, InstallationState, Organization, OrganizationClassification, Tenant
 
@@ -194,6 +194,138 @@ def test_assigned_only_mode_is_additional_fail_closed_constraint_across_discover
     assert technician_client.get(restricted_people).status_code == 404
     assert technician_client.get(restricted_entities).status_code == 404
     assert owner_client.get(restricted_workspace).status_code == 200
+
+
+@pytest.mark.django_db
+def test_explicit_staff_assignment_unlocks_only_the_assigned_organization_without_granting_permissions(
+    owner_client,
+    installation,
+):
+    assigned = organization(installation.tenant, "Assigned Client", access_mode="assigned_only")
+    sibling = organization(installation.tenant, "Sibling Client", access_mode="assigned_only")
+    technician, _, technician_client = member(installation, role=BuiltInRole.TECHNICIAN)
+    reader, _, reader_client = member(installation, role=BuiltInRole.READ_ONLY, email="assigned-reader@example.com")
+    assignment_url = reverse(
+        "access-control-organization-staff",
+        kwargs={"organization_entity_id": assigned.entity_id},
+    )
+
+    created = owner_client.post(assignment_url, {"user_id": technician.id}, content_type="application/json")
+    repeated = owner_client.post(assignment_url, {"user_id": technician.id}, content_type="application/json")
+    owner_client.post(assignment_url, {"user_id": reader.id}, content_type="application/json")
+
+    assert created.status_code == 201
+    assert repeated.status_code == 200
+    assert {item["id"] for item in created.json()["assigned_staff"]} == {str(technician.id)}
+    assert OrganizationAccessAssignment.objects.filter(organization=assigned).count() == 2
+    assert AuditEvent.objects.filter(action="organization.staff_assigned", entity_id=assigned.entity_id).count() == 2
+    assert technician_client.get(
+        reverse("workspace-organization", kwargs={"entity_id": assigned.entity_id})
+    ).status_code == 200
+    assert technician_client.get(
+        reverse("workspace-organization", kwargs={"entity_id": sibling.entity_id})
+    ).status_code == 404
+    people_url = reverse(
+        "organization-people-list-create",
+        kwargs={"organization_entity_id": assigned.entity_id},
+    )
+    assert reader_client.get(people_url).status_code == 200
+    assert reader_client.post(
+        people_url,
+        {"full_name": "Not authorized", "kind": "employee"},
+        content_type="application/json",
+    ).status_code == 403
+
+
+@pytest.mark.django_db
+def test_staff_assignment_removal_is_idempotent_and_immediately_revokes_discovery(
+    owner_client,
+    installation,
+):
+    restricted = organization(installation.tenant, "Removal Client", access_mode="assigned_only")
+    target, _, target_client = member(installation, role=BuiltInRole.READ_ONLY)
+    collection_url = reverse(
+        "access-control-organization-staff",
+        kwargs={"organization_entity_id": restricted.entity_id},
+    )
+    detail_url = reverse(
+        "access-control-organization-staff-detail",
+        kwargs={"organization_entity_id": restricted.entity_id, "user_id": target.id},
+    )
+    owner_client.post(collection_url, {"user_id": target.id}, content_type="application/json")
+
+    removed = owner_client.delete(detail_url)
+    repeated = owner_client.delete(detail_url)
+
+    assert removed.status_code == 200
+    assert repeated.status_code == 200
+    assert removed.json()["assigned_staff"] == []
+    assert not OrganizationAccessAssignment.objects.filter(organization=restricted).exists()
+    assert (
+        AuditEvent.objects.filter(action="organization.staff_unassigned", entity_id=restricted.entity_id).count() == 1
+    )
+    assert target_client.get(reverse("workspace-organization-search")).json()["results"] == []
+    assert target_client.get(
+        reverse("workspace-organization", kwargs={"entity_id": restricted.entity_id})
+    ).status_code == 404
+
+
+@pytest.mark.django_db
+def test_staff_assignment_rejects_owner_foreign_members_and_unprivileged_or_unprotected_requests(
+    owner_client,
+    installation,
+):
+    restricted = organization(installation.tenant, "Protected Client", access_mode="assigned_only")
+    target, _, administrator = member(installation, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(target, generate_totp_secret())
+    url = reverse("access-control-organization-staff", kwargs={"organization_entity_id": restricted.entity_id})
+    assert owner_client.post(
+        url,
+        {"user_id": installation.owner.id},
+        content_type="application/json",
+    ).status_code == 400
+    assert administrator.post(url, {"user_id": target.id}, content_type="application/json").status_code == 403
+
+    foreign_tenant = Tenant.objects.create(name="Foreign", slug="foreign-assignment")
+    foreign_user = User.objects.create_user(email="foreign-assignment@example.com", display_name="Foreign")
+    TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.TECHNICIAN)
+    assert owner_client.post(url, {"user_id": foreign_user.id}, content_type="application/json").status_code == 404
+
+    installation.owner.authenticator_set.filter(type="totp").delete()
+    assert owner_client.post(url, {"user_id": target.id}, content_type="application/json").status_code == 403
+    TOTP.activate(installation.owner, generate_totp_secret())
+    csrf_client = Client(enforce_csrf_checks=True)
+    csrf_client.force_login(installation.owner)
+    assert csrf_client.post(url, {"user_id": target.id}, content_type="application/json").status_code == 403
+
+
+@pytest.mark.django_db
+def test_postgresql_rejects_cross_tenant_or_mutated_staff_assignments(installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("PostgreSQL trigger contract")
+    target, membership, _ = member(installation, role=BuiltInRole.TECHNICIAN)
+    client_organization = organization(installation.tenant, "Guarded assignment")
+    assignment = OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=client_organization,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    foreign_tenant = Tenant.objects.create(name="Foreign guard", slug="foreign-assignment-guard")
+    foreign_organization = organization(foreign_tenant, "Foreign guarded assignment")
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        OrganizationAccessAssignment.objects.create(
+            tenant=installation.tenant,
+            organization=foreign_organization,
+            membership=membership,
+            created_by=installation.owner,
+        )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        OrganizationAccessAssignment.objects.filter(pk=assignment.pk).update(organization=foreign_organization)
+    assignment.refresh_from_db()
+    assert assignment.membership.user_id == target.id
+    assert assignment.organization_id == client_organization.id
 
 
 @pytest.mark.django_db

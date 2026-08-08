@@ -49,6 +49,9 @@ docker run --rm \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
 live_compose exec -T backend python manage.py shell -c '
+from django.test import Client
+from django.urls import reverse
+from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.models import CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -56,6 +59,21 @@ assert organization.tenant.name == "Live Workspace MSP"
 assert organization.classifications.filter(kind="client").exists()
 assert organization.classifications.filter(kind="vendor").exists()
 assert organization.access_mode == "assigned_only"
+technician = User.objects.get(display_name="Live Assigned Technician")
+assignment = OrganizationAccessAssignment.objects.select_related("membership").get(
+    organization=organization,
+    membership__user=technician,
+)
+assert assignment.tenant == organization.tenant
+assert assignment.membership.tenant == organization.tenant
+staff_client = Client()
+staff_client.force_login(technician)
+workspace_response = staff_client.get(
+    reverse("workspace-organization", kwargs={"entity_id": organization.entity_id}),
+    HTTP_HOST="localhost",
+)
+assert workspace_response.status_code == 200
+assert workspace_response.json()["name"] == "Live Acme Client"
 association = PersonAssociation.objects.select_related("person__entity", "organization").get(
     person__entity__display_name="Live Morgan Ellis"
 )

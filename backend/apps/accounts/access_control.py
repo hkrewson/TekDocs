@@ -5,12 +5,19 @@ from datetime import datetime
 from uuid import UUID
 
 from django.db import transaction
+from django.db.models import Prefetch, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.core.models import AuditEvent, Organization, OrganizationAccessMode
 
-from .models import TENANT_ASSIGNABLE_ROLES, BuiltInRole, TenantMembership, User
+from .models import (
+    TENANT_ASSIGNABLE_ROLES,
+    BuiltInRole,
+    OrganizationAccessAssignment,
+    TenantMembership,
+    User,
+)
 from .policy import InstallationMemberContext, PermissionKey, require_permission
 
 
@@ -91,13 +98,28 @@ def assign_membership_role(
     return membership
 
 
-def access_mode_organizations(context: InstallationMemberContext):  # type: ignore[no-untyped-def]
+def access_mode_organizations(context: InstallationMemberContext) -> QuerySet[Organization]:
     return (
         Organization.scoped.for_tenant(context.tenant)
         .filter(entity__archived_at__isnull=True)
         .select_related("entity")
+        .prefetch_related(
+            Prefetch(
+                "access_assignments",
+                queryset=OrganizationAccessAssignment.scoped.for_tenant(context.tenant)
+                .select_related("membership__user")
+                .order_by("membership__user__display_name", "membership__user_id"),
+            )
+        )
         .order_by("entity__display_name", "entity_id")
     )
+
+
+def _organization_access_record(context: InstallationMemberContext, organization_entity_id: UUID) -> Organization:
+    try:
+        return access_mode_organizations(context).get(entity_id=organization_entity_id)
+    except Organization.DoesNotExist as exc:
+        raise NotFound("The organization is not available.") from exc
 
 
 @transaction.atomic
@@ -109,11 +131,9 @@ def change_organization_access_mode(
 ) -> Organization:
     context = require_permission(actor, PermissionKey.ORGANIZATIONS_MANAGE_ACCESS)
     try:
-        organization = (
-            Organization.scoped.for_tenant(context.tenant)
-            .select_for_update()
-            .select_related("entity")
-            .get(entity_id=organization_entity_id, entity__archived_at__isnull=True)
+        organization = Organization.scoped.for_tenant(context.tenant).select_for_update().get(
+            entity_id=organization_entity_id,
+            entity__archived_at__isnull=True,
         )
     except Organization.DoesNotExist as exc:
         raise NotFound("The organization is not available.") from exc
@@ -129,4 +149,63 @@ def change_organization_access_mode(
         entity_id=organization.entity_id,
         metadata={},
     )
-    return organization
+    return _organization_access_record(context, organization_entity_id)
+
+
+@transaction.atomic
+def assign_organization_staff(
+    *,
+    actor: User,
+    organization_entity_id: UUID,
+    member_user_id: UUID,
+) -> tuple[Organization, bool]:
+    context = require_permission(actor, PermissionKey.ORGANIZATIONS_ASSIGN_STAFF)
+    organization = _organization_access_record(context, organization_entity_id)
+    if context.state.owner_id == member_user_id:
+        raise ValidationError({"user_id": "The installation owner already has break-glass access."})
+    try:
+        membership = TenantMembership.scoped.for_tenant(context.tenant).select_for_update().get(user_id=member_user_id)
+    except TenantMembership.DoesNotExist as exc:
+        raise NotFound("The tenant member is not available.") from exc
+    assignment, created = OrganizationAccessAssignment.objects.get_or_create(
+        tenant=context.tenant,
+        organization=organization,
+        membership=membership,
+        defaults={"created_by": actor},
+    )
+    if created:
+        AuditEvent.objects.create(
+            tenant=context.tenant,
+            actor=actor,
+            action="organization.staff_assigned",
+            entity_id=assignment.organization.entity_id,
+            metadata={},
+        )
+    return _organization_access_record(context, organization_entity_id), created
+
+
+@transaction.atomic
+def remove_organization_staff(
+    *,
+    actor: User,
+    organization_entity_id: UUID,
+    member_user_id: UUID,
+) -> Organization:
+    context = require_permission(actor, PermissionKey.ORGANIZATIONS_ASSIGN_STAFF)
+    organization = _organization_access_record(context, organization_entity_id)
+    assignment = (
+        OrganizationAccessAssignment.scoped.for_tenant(context.tenant)
+        .select_for_update()
+        .filter(organization=organization, membership__user_id=member_user_id)
+        .first()
+    )
+    if assignment is not None:
+        assignment.delete()
+        AuditEvent.objects.create(
+            tenant=context.tenant,
+            actor=actor,
+            action="organization.staff_unassigned",
+            entity_id=organization.entity_id,
+            metadata={},
+        )
+    return _organization_access_record(context, organization_entity_id)

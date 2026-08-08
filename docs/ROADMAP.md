@@ -18,7 +18,7 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 | `0.5.0` | Network inventory and relationship-derived views. |
 | `0.6.0` | Controlled client portal, publication workflow, and notifications. |
 | `0.7.0` | Stable integration API, provider runtime, webhooks, and reconciliation. |
-| `0.8.0` | Compliance evidence plus safe domain and certificate monitoring. |
+| `0.8.0` | Compliance evidence plus domain inventory, renewal tracking, DNS observations, and safe certificate monitoring. |
 | `0.9.0` | Feature-complete public beta and operational hardening. |
 | `1.0.0` | Supported public release with final security and supply-chain evidence. |
 
@@ -185,9 +185,12 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.7` | Complete | Versioned MSP-wide and organization-specific custom-field definitions with JSON Schema validation, migration-safe values, and Site/Location value entry. |
 | `0.1.8` | Complete | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
 | `0.1.9` | Complete | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
-| `0.1.10` | Planned | Custom roles and tenant/client/collection-scoped user assignments, per-client MSP employee assignments, MSP-private hard constraints, and completion of `TD-RISK-001`. |
-| `0.1.11` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), field-level cost visibility seam, and comprehensive IDOR/permission matrix. |
-| `0.1.12` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), hosted-automation evidence when authorized (`TD-RISK-010`), reference performance, migration, accessibility, workspace, and isolation remediation. |
+| `0.1.10` | Complete | Explicit per-client MSP staff assignments, assigned-only policy composition, assignment administration, and the next bounded portion of `TD-RISK-001`. |
+| `0.1.11` | Planned | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
+| `0.1.12` | Planned | Collection-scoped assignments, MSP-private hard constraints, field-level cost visibility seam, and completion of `TD-RISK-001`. |
+| `0.1.13` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
+| `0.1.14` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and hosted-automation evidence when authorized (`TD-RISK-010`). |
+| `0.1.15` | Planned | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
 
 ### `0.1.1` acceptance criteria
@@ -289,6 +292,21 @@ Evidence: `docs/releases/0.1.8.md`.
 ADR 0012 defines the permission catalog, policy decision contract, built-in-role boundary, MFA enforcement, and staged organization assignment model.
 
 Evidence: `docs/releases/0.1.9.md`.
+
+### `0.1.10` acceptance criteria
+
+- [x] A tenant-scoped organization staff assignment joins exactly one active tenant membership to exactly one organization; duplicate, owner, cross-tenant, missing-member, and malformed assignments fail safely.
+- [x] PostgreSQL guards enforce that assignment, membership, and organization share one tenant even when application services are bypassed. Assignment identity and ownership are immutable; removal is explicit and auditable.
+- [x] The central policy service treats assignment as an additional access-mode condition, never as a permission grant. A member still needs the relevant tenant-role permission and MFA where required.
+- [x] `assigned_only` organizations are visible and routable to explicitly assigned MSP staff across lists, switcher search, direct workspace resolution, domain APIs, entity search, and relationship backlinks. Unassigned sibling and foreign-tenant records remain non-disclosing.
+- [x] Owner-plus-MFA APIs list, add, and remove organization staff assignments using stable user and organization identifiers, scoped lookups, value-free audit events, CSRF protection, and idempotent retry behavior.
+- [x] The Access Control interface manages assigned staff without implying that assignment changes a tenant role. It includes responsive, keyboard, loading, empty, error, denial, confirmation, and stale-response behavior.
+- [x] Client Administrator and Client User remain cataloged organization-scoped roles but are not assigned to MSP tenant members in this slice. Custom roles and broader scoped role composition remain `0.1.11`–`0.1.12`.
+- [x] Allow/deny, permission-plus-assignment composition, missing-MFA, CSRF, cross-tenant, cross-client, guessed-ID, database-guard, migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, clean-install, preserved-data upgrade, security, and real browser-to-database evidence agree at `0.1.10`.
+
+ADR 0013 defines explicit MSP staff assignments, policy composition, retained owner break-glass access, and the staged custom-role boundary.
+
+Evidence: `docs/releases/0.1.10.md`.
 
 ### `0.1.3` acceptance criteria
 
@@ -403,9 +421,12 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.7.5` | Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
-| `0.7.8` | Domain RDAP/DNS monitoring and expiration/change notifications. |
-| `0.7.9` | TLS certificate endpoint monitoring, chain/expiry evidence, and safe failure handling. |
-| `0.7.10` | Compliance/monitoring stabilization, evidence integrity, accessibility, scale, and upgrade evidence. |
+| `0.7.8` | Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
+| `0.7.9` | Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
+| `0.7.10` | Renewal/expiration schedules, review state, reminder events, notification/calendar integration, and stale or conflicting source handling. |
+| `0.7.11` | Safe RDAP and authoritative-DNS collection through the approved egress service, with observed-vs-entered reconciliation and expiration/change notifications. |
+| `0.7.12` | TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
+| `0.7.13` | Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
 | `0.8.0` | Stabilize and certify compliance evidence and safe monitoring. |
 
 ## Public beta hardening: `0.8.x` → `0.9.0`

@@ -21,7 +21,8 @@ export type RoleDefinition = {
 
 export type AccessCatalog = { permissions: PermissionDefinition[]; roles: RoleDefinition[] }
 export type Member = { id: string; display_name: string; email: string; role: BuiltInRole; is_owner: boolean; joined_at: string | null }
-export type OrganizationAccess = { id: string; name: string; access_mode: OrganizationAccessMode }
+export type AssignedStaff = { id: string; display_name: string; email: string; role: TenantRole }
+export type OrganizationAccess = { id: string; name: string; access_mode: OrganizationAccessMode; assigned_staff: AssignedStaff[] }
 
 export interface AccessControlClient {
   catalog(signal?: AbortSignal): Promise<AccessCatalog>
@@ -29,6 +30,8 @@ export interface AccessControlClient {
   organizations(signal?: AbortSignal): Promise<OrganizationAccess[]>
   assignRole(userId: string, role: TenantRole): Promise<Member>
   changeAccessMode(organizationId: string, accessMode: OrganizationAccessMode): Promise<OrganizationAccess>
+  assignStaff(organizationId: string, userId: string): Promise<OrganizationAccess>
+  removeStaff(organizationId: string, userId: string): Promise<OrganizationAccess>
 }
 
 async function payload<T>(response: Response): Promise<T> {
@@ -59,6 +62,10 @@ async function load<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function patch<T>(path: string, body: object): Promise<T> {
+  return mutate<T>('PATCH', path, body)
+}
+
+async function mutate<T>(method: 'PATCH' | 'POST' | 'DELETE', path: string, body?: object): Promise<T> {
   let token = browserCsrfToken()
   if (!token) {
     await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
@@ -66,10 +73,10 @@ async function patch<T>(path: string, body: object): Promise<T> {
   }
   if (!token) throw new AuthRequestError('The browser security token is unavailable. Refresh and try again.')
   const response = await fetch(path, {
-    method: 'PATCH',
+    method,
     credentials: 'same-origin',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': token },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) throw requestError(response)
   return payload<T>(response)
@@ -83,5 +90,14 @@ export const browserAccessControlClient: AccessControlClient = {
   changeAccessMode: (organizationId, accessMode) => patch<OrganizationAccess>(
     `/api/v1/access-control/organizations/${encodeURIComponent(organizationId)}`,
     { access_mode: accessMode },
+  ),
+  assignStaff: (organizationId, userId) => mutate<OrganizationAccess>(
+    'POST',
+    `/api/v1/access-control/organizations/${encodeURIComponent(organizationId)}/staff`,
+    { user_id: userId },
+  ),
+  removeStaff: (organizationId, userId) => mutate<OrganizationAccess>(
+    'DELETE',
+    `/api/v1/access-control/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(userId)}`,
   ),
 }

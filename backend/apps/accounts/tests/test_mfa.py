@@ -2,6 +2,7 @@ import importlib
 import json
 import secrets
 import time
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
@@ -64,7 +65,10 @@ def enroll_totp(client: Client) -> tuple[str, list[str]]:
     started = client.get(TOTP_URL)
     assert started.status_code == 404
     secret = started.json()["meta"]["secret"]
-    activated = post(client, TOTP_URL, {"code": current_code(secret)})
+    totp_url = started.json()["meta"]["totp_url"]
+    qr_secret = parse_qs(urlsplit(totp_url).query)["secret"][0]
+    assert qr_secret == secret
+    activated = post(client, TOTP_URL, {"code": current_code(qr_secret)})
     assert activated.status_code == 200
     recovery = client.get(RECOVERY_URL)
     assert recovery.status_code == 200

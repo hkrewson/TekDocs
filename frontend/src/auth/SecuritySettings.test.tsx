@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { SecuritySettings } from './SecuritySettings'
+import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession } from './api'
 
 const context: AuthenticatedContext = {
@@ -130,6 +131,39 @@ describe('security settings', () => {
     expect(reauthenticate).toHaveBeenCalledWith(password)
     expect(regenerateRecoveryCodes).toHaveBeenCalledOnce()
     expect(passwordInput).toHaveValue('')
+    expect(await screen.findByText('new-one')).toBeInTheDocument()
+  })
+
+  it('reauthenticates an expired enrollment without replacing the scanned secret', async () => {
+    const user = userEvent.setup()
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+    const secret = Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => alphabet[value % alphabet.length]).join('')
+    const setup = { secret, totpUrl: `otpauth://totp/TekDocs:owner?secret=${secret}` }
+    const beginTotp = vi.fn().mockResolvedValue(setup)
+    const activateTotp = vi.fn()
+      .mockRejectedValueOnce(new AuthRequestError('Password confirmation required.', 401))
+      .mockResolvedValueOnce(['new-one', 'new-two'])
+    const reauthenticate = vi.fn().mockResolvedValue(undefined)
+    render(settings(client({ beginTotp, activateTotp, reauthenticate })))
+
+    await user.click(await screen.findByRole('button', { name: 'Set up authenticator' }))
+    await user.type(screen.getByLabelText('Authentication code'), '111111')
+    await user.click(screen.getByRole('button', { name: 'Enable two-factor authentication' }))
+
+    expect(await screen.findByText(/password confirmation expired/i)).toBeInTheDocument()
+    expect(document.querySelector('.mfa-qr-code svg')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Current password'), 'temporary-password')
+    await user.click(screen.getByRole('button', { name: 'Confirm change' }))
+
+    expect(reauthenticate).toHaveBeenCalledWith('temporary-password')
+    expect(await screen.findByRole('status')).toHaveTextContent('Enter the current code')
+    expect(document.querySelector('.mfa-qr-code svg')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Authentication code'), '222222')
+    await user.click(screen.getByRole('button', { name: 'Enable two-factor authentication' }))
+
+    expect(beginTotp).toHaveBeenCalledOnce()
+    expect(activateTotp).toHaveBeenNthCalledWith(1, '111111')
+    expect(activateTotp).toHaveBeenNthCalledWith(2, '222222')
     expect(await screen.findByText('new-one')).toBeInTheDocument()
   })
 

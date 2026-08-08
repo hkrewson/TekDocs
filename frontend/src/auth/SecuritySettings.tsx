@@ -19,7 +19,7 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
-type SensitiveAction = 'enroll' | 'replace-codes' | 'disable'
+type SensitiveAction = 'enroll' | 'activate' | 'replace-codes' | 'disable'
 
 export function SecuritySettings({ client, context, onProfileUpdated }: {
   client: AuthClient
@@ -37,6 +37,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction | null>(null)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [mfaMessage, setMfaMessage] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [revoking, setRevoking] = useState<number | null>(null)
 
@@ -66,6 +67,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
 
   const beginSetup = async () => {
     setError(null)
+    setMfaMessage(null)
     setWorking(true)
     try {
       setSetup(await client.beginTotp())
@@ -83,6 +85,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   const activate = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
+    setMfaMessage(null)
     setWorking(true)
     const submittedCode = activationCode
     setActivationCode('')
@@ -92,7 +95,11 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       setRecoveryCodes(codes)
       setMfa({ totpEnabled: true, recoveryCodeTotal: codes.length, recoveryCodeUnused: codes.length })
     } catch (activationError) {
-      setError(errorMessage(activationError, 'That authenticator code was not accepted.'))
+      if (activationError instanceof AuthRequestError && activationError.status === 401) {
+        setSensitiveAction('activate')
+      } else {
+        setError(errorMessage(activationError, 'That authenticator code was not accepted.'))
+      }
     } finally {
       setWorking(false)
     }
@@ -109,6 +116,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       await client.reauthenticate(submittedPassword)
       if (sensitiveAction === 'enroll') {
         setSetup(await client.beginTotp())
+      } else if (sensitiveAction === 'activate') {
+        setMfaMessage('Password confirmed. Enter the current code from your authenticator app.')
       } else if (sensitiveAction === 'replace-codes') {
         const codes = await client.regenerateRecoveryCodes()
         setRecoveryCodes(codes)
@@ -186,7 +195,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             <button className="primary-button" type="button" disabled={working} onClick={() => { void beginSetup() }}>{working ? 'Starting…' : 'Set up authenticator'}</button>
           </div>
         )}
-        {setup && (
+        {mfaMessage && <p className="settings-success" role="status">{mfaMessage}</p>}
+        {setup && sensitiveAction !== 'activate' && (
           <form className="mfa-setup" onSubmit={(event) => { void activate(event) }}>
             <div><strong>Add TekDocs to your authenticator</strong><p>Scan the QR code with your authenticator app, then enter the current code.</p></div>
             <div className="mfa-enrollment">
@@ -229,7 +239,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
         {sensitiveAction && (
           <form className="reauth-form" onSubmit={(event) => { void confirmSensitiveAction(event) }}>
             <KeyRound size={19} aria-hidden="true" />
-            <div><strong>Confirm your password</strong><p>{sensitiveAction === 'disable' ? 'Disabling two-factor authentication also invalidates existing recovery codes.' : sensitiveAction === 'replace-codes' ? 'Replacing recovery codes invalidates every previous code.' : 'Authenticator enrollment requires a recent password check.'}</p></div>
+            <div><strong>Confirm your password</strong><p>{sensitiveAction === 'disable' ? 'Disabling two-factor authentication also invalidates existing recovery codes.' : sensitiveAction === 'replace-codes' ? 'Replacing recovery codes invalidates every previous code.' : sensitiveAction === 'activate' ? 'Your password confirmation expired while setup was open. Confirm it again, then enter a fresh authenticator code.' : 'Authenticator enrollment requires a recent password check.'}</p></div>
             <label>Current password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
             <div className="settings-actions">
               <button className="primary-button" type="submit" disabled={working}>{working ? 'Confirming…' : 'Confirm change'}</button>

@@ -41,9 +41,15 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/_allauth/browser/v1/auth/sessions', (route) => route.fulfill({ json: { data: [] } }))
   await page.route('**/_allauth/browser/v1/account/authenticators', (route) => route.fulfill({ json: { data: [] } }))
+  let activationAttempts = 0
   await page.route('**/_allauth/browser/v1/account/authenticators/totp', async (route) => {
     if (route.request().method() === 'POST') {
-      expect(route.request().postDataJSON()).toEqual({ code: '123456' })
+      activationAttempts += 1
+      expect(route.request().postDataJSON()).toEqual({ code: activationAttempts === 1 ? '123456' : '654321' })
+      if (activationAttempts === 1) {
+        await route.fulfill({ status: 401, json: { data: { flows: [{ id: 'reauthenticate', is_pending: true }] } } })
+        return
+      }
       await route.fulfill({ json: { data: { type: 'totp' } } })
       return
     }
@@ -52,6 +58,10 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await page.route('**/_allauth/browser/v1/account/authenticators/recovery-codes', (route) => route.fulfill({
     json: { data: { total_code_count: 2, unused_code_count: 2, unused_codes: ['alpha-bravo', 'charlie-delta'] } },
   }))
+  await page.route('**/_allauth/browser/v1/auth/reauthenticate', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ password: 'temporary-password' })
+    await route.fulfill({ json: { data: { user: context.user } } })
+  })
 
   await page.goto('/overview')
   await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
@@ -62,6 +72,12 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await expect(page.getByText(secret, { exact: true })).toBeVisible()
   await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
   await page.getByLabel('Authentication code').fill('123456')
+  await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
+  await expect(page.getByText(/password confirmation expired/i)).toBeVisible()
+  await page.getByLabel('Current password').fill('temporary-password')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText('Enter the current code')
+  await page.getByLabel('Authentication code').fill('654321')
   await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
   await expect(page.getByText('alpha-bravo')).toBeVisible()
   await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })

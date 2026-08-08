@@ -1,6 +1,6 @@
 # Authentication operator runbook
 
-This runbook covers the authentication operations available through TekDocs `0.0.11`. It does not create an emergency authentication bypass. Perform changes from an encrypted administrative workstation, keep deployment secrets outside the repository, and preserve the append-only audit trail.
+This runbook covers the authentication operations certified in TekDocs `0.1.0`. It does not create an emergency authentication bypass. Perform changes from an encrypted administrative workstation, keep deployment secrets outside the repository, and preserve the append-only audit trail.
 
 ## Before enabling access
 
@@ -34,7 +34,7 @@ Owners must enroll TOTP before privileged invitation administration. Scan the lo
 
 An owner with an unused recovery code can use it at the MFA challenge, reauthenticate with the password, and replace all recovery codes. Replacing codes invalidates the prior set. Disabling TOTP also requires recent password reauthentication and removes both the authenticator and recovery-code seed.
 
-There is no operator bypass or administrative MFA reset in `0.0.11`. If the sole owner loses the authenticator and every recovery code, stop making account changes, preserve the database and master key, and recover a known-good backup or escalate for a reviewed recovery procedure. Direct database edits are unsupported because they bypass policy and audit guarantees.
+There is no operator bypass or administrative MFA reset in `0.1.0`. If the sole owner loses the authenticator and every recovery code, stop making account changes, preserve the database and master key, and recover a known-good backup or escalate for a reviewed recovery procedure. Direct database edits are unsupported because they bypass policy and audit guarantees.
 
 ## OIDC rollout and rollback
 
@@ -51,7 +51,7 @@ To roll back, remove all five OIDC settings and recreate the application contain
 
 ## Upgrade rehearsal
 
-Run `make upgrade-rehearsal` before releasing or applying a new minor version. The command exports the supported `0.0.10` source into a temporary directory, starts an isolated Compose project, creates representative owner, membership, password, verified-email, encrypted-TOTP, and audit data, then starts the current source against the same PostgreSQL volume and verifies those invariants. Its project name, ports, directory, and volumes are isolated; cleanup removes only those disposable resources.
+Run `make clean-install-rehearsal` and `make upgrade-rehearsal` before releasing or applying a new minor version. The clean-install command starts every service with isolated volumes, verifies readiness, migration state, and an untouched bootstrap database, then removes only those disposable resources. The upgrade command exports the supported `0.0.11` source into a temporary directory, starts an isolated Compose project, creates representative owner, membership, password, verified-email, encrypted-TOTP, and audit data, then starts the current source against the same PostgreSQL volume and verifies those invariants. Both commands isolate their project names, ports, directories, and volumes.
 
 Override `TEKDOCS_UPGRADE_FROM_REF` only when deliberately rehearsing another reviewed baseline commit. A passing rehearsal supplements—never replaces—a current encrypted backup and a restore test on representative deployment data.
 
@@ -60,6 +60,6 @@ Override `TEKDOCS_UPGRADE_FROM_REF` only when deliberately rehearsing another re
 - `make test-auth-abuse`: authentication enumeration, session rotation/invalidation, CSRF, closed signup, invitation boundary, and disabled-provider behavior.
 - `make test-e2e-all`: critical browser and axe accessibility journeys in Chromium, Firefox, and WebKit.
 - `make test-compose`: production-shaped PostgreSQL, Valkey, SMTP, migration, and application checks.
-- `make release-gate`: the complete local release contract, including the upgrade rehearsal.
+- `make release-gate`: the complete local release contract, including clean-install and upgrade rehearsals.
 
 See `docs/AUTHENTICATION.md`, `docs/INVITATIONS.md`, `docs/EMAIL.md`, `docs/SECURITY.md`, and `docs/THREAT_MODEL.md` for the normative browser and deployment contracts.

@@ -1,12 +1,14 @@
 import pytest
 from django.urls import reverse
 
+from tekdocs.version import VERSION
+
 
 @pytest.mark.django_db
 def test_liveness_contract(client):
     response = client.get(reverse("health-live"))
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "backend", "version": "0.0.11"}
+    assert response.json() == {"status": "ok", "service": "backend", "version": VERSION}
     assert response.headers["X-Request-ID"]
     assert response.headers["Content-Security-Policy"]
 

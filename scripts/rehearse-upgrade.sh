@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-4ce3f92d4d16fbfcd629dfe407052e8c2fca6481}
+baseline_ref=${TEKDOCS_UPGRADE_FROM_REF:-24b6f8d84996b5a03f56256394a1aaf65c9cbaf2}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -39,8 +39,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.0.10" ]; then
-  echo "Upgrade rehearsal expected baseline 0.0.10, found $baseline_version" >&2
+if [ "$baseline_version" != "0.0.11" ]; then
+  echo "Upgrade rehearsal expected baseline 0.0.11, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" = "$baseline_version" ]; then

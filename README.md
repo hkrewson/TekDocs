@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.11`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.0`.
 
 ## Start locally
 
@@ -42,6 +42,7 @@ make test
 make test-compose
 make test-e2e
 make test-e2e-all
+make clean-install-rehearsal
 make upgrade-rehearsal
 make security
 ```

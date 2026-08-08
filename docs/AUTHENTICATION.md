@@ -2,6 +2,12 @@
 
 TekDocs uses `django-allauth` headless browser APIs with Django’s server-side session and CSRF middleware. The React application does not mint tokens, store passwords, or treat hidden UI as authorization.
 
+## `0.1.x` compatibility boundary
+
+TekDocs `0.1.0` freezes the identity and authentication behavior documented here for the `0.1.x` release line. Patch releases may correct security, accessibility, or interoperability defects, but will not reopen public registration, weaken MFA or recent-reauthentication requirements, change tenant membership semantics, or introduce a new identity feature family.
+
+The TekDocs endpoints under `/api/v1` and their OpenAPI contracts are supported application interfaces. Routes under `/_allauth/browser/v1` are a same-origin browser implementation boundary owned by the pinned `django-allauth` dependency; external integrations must not treat their payloads as TekDocs’ public API. A change to that dependency requires the authentication abuse suite and all-browser journeys to pass before release.
+
 ## Initial state
 
 The browser requests both:

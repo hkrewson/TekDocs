@@ -35,7 +35,7 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.9` | Complete | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.10` | Complete | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
 | `0.0.11` | Complete | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
-| `0.1.0` | Next stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
+| `0.1.0` | Complete | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
 
 ### `0.0.1` acceptance evidence
 
@@ -158,6 +158,17 @@ Evidence: `docs/releases/0.0.10.md`.
 - [x] Version, roadmap, OpenAPI, unit, PostgreSQL/Compose, three-engine browser, accessibility, upgrade, dependency, static-analysis, secret-scanning, and container evidence agree at `0.0.11`.
 
 Evidence: `docs/releases/0.0.11.md`.
+
+### `0.1.0` acceptance criteria
+
+- [x] The documented bootstrap, invitation, password recovery, session, profile, MFA, audit, and OIDC boundaries are the frozen identity contract for the `0.1.x` line; the stabilization slice adds no new identity feature family.
+- [x] MFA enrollment remains valid after recent reauthentication, exposes a locally generated QR code plus manual fallback, and loads safe recovery-code counts after refresh without invoking a protected code-reveal endpoint.
+- [x] A disposable clean-install rehearsal starts every production-shaped service with new volumes, applies all migrations, reports the release version, and verifies the untouched one-time bootstrap state before removing only its isolated resources.
+- [x] A disposable upgrade rehearsal preserves representative identity, membership, verified-email, password, encrypted-TOTP, and append-only audit data while upgrading the final `0.0.11` source to `0.1.0`.
+- [x] Release metadata has a checked synchronization contract, while backend health and OpenAPI derive their version from installed package metadata rather than separate literals.
+- [x] Roadmap, operator documentation, OpenAPI, unit, PostgreSQL/Compose, three-engine browser, accessibility, clean-install, upgrade, dependency, static-analysis, secret-scanning, and container evidence agree at `0.1.0`.
+
+Evidence: `docs/releases/0.1.0.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

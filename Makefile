@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-compose test-e2e test-e2e-all security release-gate schema migrations mail-test upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-compose test-e2e test-e2e-all security release-gate schema migrations mail-test clean-install-rehearsal upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -20,6 +20,7 @@ logs:
 	docker compose logs --tail=150
 
 check:
+	./scripts/check-version.sh
 	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend ruff check .
 	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend mypy apps tekdocs
 	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations --check --dry-run
@@ -59,7 +60,10 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-e2e-all security upgrade-rehearsal
+release-gate: check test test-auth-abuse test-compose test-e2e-all security clean-install-rehearsal upgrade-rehearsal
+
+clean-install-rehearsal:
+	./scripts/rehearse-clean-install.sh
 
 upgrade-rehearsal:
 	./scripts/rehearse-upgrade.sh

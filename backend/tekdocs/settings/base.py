@@ -5,6 +5,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from tekdocs.version import VERSION
+
 from .validation import oidc_provider_from_environment
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -200,7 +202,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.11",
+    "VERSION": VERSION,
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

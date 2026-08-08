@@ -6,13 +6,15 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from tekdocs.version import VERSION
+
 
 class ApiRootView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(responses={200: dict})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return Response({"name": "TekDocs API", "version": "0.0.11", "status": "pre-alpha"})
+        return Response({"name": "TekDocs API", "version": VERSION, "status": "pre-alpha"})
 
 
 class LiveHealthView(APIView):
@@ -21,7 +23,7 @@ class LiveHealthView(APIView):
 
     @extend_schema(responses={200: dict})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return Response({"status": "ok", "service": "backend", "version": "0.0.11"})
+        return Response({"status": "ok", "service": "backend", "version": VERSION})
 
 
 class ReadyHealthView(APIView):
@@ -36,4 +38,4 @@ class ReadyHealthView(APIView):
                 cursor.fetchone()
         except Exception:  # noqa: BLE001
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
-        return Response({"status": "ok", "database": "ready", "version": "0.0.11"})
+        return Response({"status": "ok", "database": "ready", "version": VERSION})

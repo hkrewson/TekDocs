@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { browserAuthClient, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
+import { AuthRequestError, browserAuthClient, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
 
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -141,5 +141,46 @@ describe('browser authentication client', () => {
       method: 'POST',
       body: JSON.stringify({ key, password }),
     }))
+  })
+
+  it('lists and revokes only selected browser sessions through CSRF-protected requests', async () => {
+    const csrf = crypto.randomUUID()
+    document.cookie = `csrftoken=${csrf}; path=/`
+    const response = {
+      data: [{ id: 42, user_agent: 'Test browser', ip: '192.0.2.1', created_at: 10, last_seen_at: 20, is_current: false }],
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(response))
+      .mockResolvedValueOnce(jsonResponse({ data: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.listSessions()).resolves.toEqual([{
+      id: 42,
+      userAgent: 'Test browser',
+      ip: '192.0.2.1',
+      createdAt: 10,
+      lastSeenAt: 20,
+      isCurrent: false,
+    }])
+    await expect(browserAuthClient.revokeSession(42)).resolves.toEqual([])
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/_allauth/browser/v1/auth/sessions', expect.objectContaining({ credentials: 'same-origin' }))
+    const [revokePath, revokeOptions] = fetchMock.mock.calls[1] as unknown as [string, RequestInit]
+    expect(revokePath).toBe('/_allauth/browser/v1/auth/sessions')
+    expect(revokeOptions.method).toBe('DELETE')
+    expect(revokeOptions.body).toBe(JSON.stringify({ sessions: [42] }))
+    expect(revokeOptions.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': csrf }))
+  })
+
+  it('turns authentication rate limits into safe wait-and-retry messages', async () => {
+    document.cookie = `csrftoken=${crypto.randomUUID()}; path=/`
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 429 }, 429)))
+
+    await expect(browserAuthClient.login('owner@example.com', 'not-a-real-password')).rejects.toEqual(
+      new AuthRequestError('Too many sign-in attempts. Wait a few minutes and try again.', 429),
+    )
+    await expect(browserAuthClient.requestPasswordReset('owner@example.com')).rejects.toEqual(
+      new AuthRequestError('Too many reset requests. Wait before trying again.', 429),
+    )
   })
 })

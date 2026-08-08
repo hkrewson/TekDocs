@@ -24,6 +24,7 @@ import {
 import { AuthGate } from './auth/AuthGate'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
+import { SecuritySettings } from './auth/SecuritySettings'
 const EditorSpike = lazy(async () => {
   const module = await import('./editor/EditorSpike')
   return { default: module.EditorSpike }
@@ -77,9 +78,9 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function NavSection({ items, collapsed, onNavigate, currentPath, navigate }: { items: NavigationItem[]; collapsed: boolean; onNavigate: () => void; currentPath: string; navigate: Navigate }) {
+function NavSection({ items, label, collapsed, onNavigate, currentPath, navigate }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void; currentPath: string; navigate: Navigate }) {
   return (
-    <nav className="nav-list">
+    <nav className="nav-list" aria-label={label}>
       {items.map(({ label, path, icon: Icon }) => (
         <AppLink
           key={path}
@@ -129,9 +130,9 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, currentPath
         </button>
 
         <div className="sidebar-scroll">
-          <NavSection items={workspaceNavigation} collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
+          <NavSection items={workspaceNavigation} label="Workspace" collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
           <div className="nav-divider" />
-          <NavSection items={governanceNavigation} collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
+          <NavSection items={governanceNavigation} label="Governance" collapsed={collapsed} onNavigate={onMobileClose} currentPath={currentPath} navigate={navigate} />
         </div>
       </aside>
     </>
@@ -192,7 +193,6 @@ const plannedAreas: Record<string, { title: string; description: string; release
   '/credentials': { title: 'Credentials', description: 'Encrypted secrets with explicit reveal and audit boundaries.', release: '0.4.0', capabilities: ['Envelope encryption', 'Reauthentication', 'Key rotation'] },
   '/compliance': { title: 'Compliance', description: 'Control ownership, evidence, reviews, and immutable evidence bundles.', release: '0.8.0', capabilities: ['Frameworks and controls', 'Evidence links', 'Review reminders'] },
   '/activity': { title: 'Activity', description: 'Append-only security and business change history.', release: '0.1.0', capabilities: ['Request correlation', 'Permission-aware history', 'Exportable evidence'] },
-  '/settings': { title: 'Settings', description: 'Tenant, identity, security, storage, and notification configuration.', release: '0.1.0', capabilities: ['Tenant identity', 'Authentication policy', 'Storage configuration'] },
   '/integrations': { title: 'Integrations', description: 'Secure provider connections, jobs, webhooks, and reconciliation.', release: '0.7.0', capabilities: ['Provider contracts', 'Scheduled jobs', 'Conflict review'] },
 }
 
@@ -212,9 +212,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.7 adds secure, self-service password recovery." />
+      <PageHeader title="Overview" description="TekDocs 0.0.8 adds visible browser-session security controls." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.7</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.8</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -224,6 +224,7 @@ function Overview() {
             ['Invitation issuance API', 'Available'],
             ['Invitation account activation', 'Available'],
             ['Password recovery', 'Available'],
+            ['Session security', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
@@ -241,9 +242,10 @@ function Documentation() {
   )
 }
 
-export function ApplicationShell({ initialPath, authContext, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ initialPath, authContext, authClient, onSignOut, signingOut = false, signOutError = null }: {
   initialPath?: string
   authContext: AuthenticatedContext
+  authClient: AuthClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -264,7 +266,7 @@ export function ApplicationShell({ initialPath, authContext, onSignOut, signingO
     setCurrentPath(path)
   }
 
-  const routedPath = currentPath === '/' || (currentPath !== '/overview' && currentPath !== '/documentation' && !plannedAreas[currentPath])
+  const routedPath = currentPath === '/' || (currentPath !== '/overview' && currentPath !== '/documentation' && currentPath !== '/settings' && !plannedAreas[currentPath])
     ? '/overview'
     : currentPath
 
@@ -272,17 +274,19 @@ export function ApplicationShell({ initialPath, authContext, onSignOut, signingO
     ? <Overview />
     : routedPath === '/documentation'
       ? <Documentation />
-      : <PlannedPage path={routedPath} />
+      : routedPath === '/settings'
+        ? <SecuritySettings client={authClient} />
+        : <PlannedPage path={routedPath} />
 
   return (
     <div className="app-shell">
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} currentPath={routedPath} navigate={navigate} workspaceName={authContext.tenant.name} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
-        <div className="topbar">
+        <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
           <ProfileMenu currentPath={routedPath} navigate={navigate} user={authContext.user} onSignOut={onSignOut} signingOut={signingOut} />
-        </div>
+        </header>
         <main className="main-content" key={routedPath}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
           {page}
@@ -303,6 +307,7 @@ export function App({ initialPath, authClient = browserAuthClient, initialAuthCo
         <ApplicationShell
           initialPath={initialPath}
           authContext={context}
+          authClient={authClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

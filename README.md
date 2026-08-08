@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.7`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.8`.
 
 ## Start locally
 
@@ -16,6 +16,8 @@ Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with ge
 Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
 
 Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
+
+Authenticated users can open **Profile → Settings** to review active browser sessions and revoke any session other than the one currently in use.
 
 ### First-owner bootstrap
 

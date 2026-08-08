@@ -24,6 +24,15 @@ export type InvitationAcceptance = {
   password: string
 }
 
+export type AuthSession = {
+  id: number
+  userAgent: string
+  ip: string
+  createdAt: number
+  lastSeenAt: number
+  isCurrent: boolean
+}
+
 export interface AuthClient {
   load(): Promise<{ bootstrapRequired: boolean; context: AuthenticatedContext | null }>
   bootstrapAndLogin(details: BootstrapDetails): Promise<AuthenticatedContext>
@@ -32,12 +41,25 @@ export interface AuthClient {
   requestPasswordReset(email: string): Promise<void>
   validatePasswordReset(key: string): Promise<void>
   completePasswordReset(key: string, password: string): Promise<void>
+  listSessions(): Promise<AuthSession[]>
+  revokeSession(id: number): Promise<AuthSession[]>
   logout(): Promise<void>
 }
 
 type AllauthSessionResponse = {
   meta?: { is_authenticated?: boolean }
 }
+
+type AllauthUserSession = {
+  id: number
+  user_agent: string
+  ip: string
+  created_at: number
+  last_seen_at?: number
+  is_current: boolean
+}
+
+type AllauthSessionsResponse = { data?: AllauthUserSession[] }
 
 export class AuthRequestError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -102,11 +124,26 @@ async function login(email: string, password: string): Promise<AuthenticatedCont
   const response = await mutation('/_allauth/browser/v1/auth/login', 'POST', { email, password })
   if (!response.ok) {
     throw new AuthRequestError(
-      response.status === 400 ? 'The email address or password is incorrect.' : 'Sign in was not completed.',
+      response.status === 400
+        ? 'The email address or password is incorrect.'
+        : response.status === 429
+          ? 'Too many sign-in attempts. Wait a few minutes and try again.'
+          : 'Sign in was not completed.',
       response.status,
     )
   }
   return context()
+}
+
+function authSessions(payload: AllauthSessionsResponse): AuthSession[] {
+  return (payload.data ?? []).map((item) => ({
+    id: item.id,
+    userAgent: item.user_agent,
+    ip: item.ip,
+    createdAt: item.created_at,
+    lastSeenAt: item.last_seen_at ?? item.created_at,
+    isCurrent: item.is_current,
+  }))
 }
 
 export function takeInvitationFromLocation(): { isInvitationPath: boolean; token: string | null } {
@@ -193,7 +230,11 @@ export const browserAuthClient: AuthClient = {
     const response = await mutation('/_allauth/browser/v1/auth/password/request', 'POST', { email })
     if (!response.ok) {
       throw new AuthRequestError(
-        response.status === 400 ? 'Enter a valid email address.' : 'The reset request was not completed.',
+        response.status === 400
+          ? 'Enter a valid email address.'
+          : response.status === 429
+            ? 'Too many reset requests. Wait before trying again.'
+            : 'The reset request was not completed.',
         response.status,
       )
     }
@@ -215,6 +256,21 @@ export const browserAuthClient: AuthClient = {
         response.status,
       )
     }
+  },
+
+  async listSessions() {
+    const response = await fetch('/_allauth/browser/v1/auth/sessions', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new AuthRequestError('Active sessions could not be loaded.', response.status)
+    return authSessions(await responseJson<AllauthSessionsResponse>(response))
+  },
+
+  async revokeSession(id) {
+    const response = await mutation('/_allauth/browser/v1/auth/sessions', 'DELETE', { sessions: [id] })
+    if (!response.ok) throw new AuthRequestError('The session could not be revoked.', response.status)
+    return authSessions(await responseJson<AllauthSessionsResponse>(response))
   },
 
   async logout() {

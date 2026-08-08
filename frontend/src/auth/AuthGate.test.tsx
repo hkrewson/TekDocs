@@ -19,6 +19,8 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     requestPasswordReset: vi.fn().mockResolvedValue(undefined),
     validatePasswordReset: vi.fn().mockResolvedValue(undefined),
     completePasswordReset: vi.fn().mockResolvedValue(undefined),
+    listSessions: vi.fn().mockResolvedValue([]),
+    revokeSession: vi.fn().mockResolvedValue([]),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }

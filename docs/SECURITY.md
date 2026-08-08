@@ -12,6 +12,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - Invitation management is installation-owner-only. Raw invitation tokens use maintained high-entropy randomness, are delivered in URL fragments, stored only as digests, rotated on resend, cleared on expiry/revocation, and excluded from API responses and audit metadata.
 - Invitation acceptance requires CSRF, consumes a locked invitation exactly once, creates identity and membership atomically, returns one unavailable state for invalid lifecycle conditions, and removes the browser URL fragment before account entry.
 - Password recovery returns the same request state for known and unknown addresses, uses expiring single-use Django tokens in scrubbed URL fragments, requires CSRF for mutations, does not auto-login, and invalidates existing password-bound sessions.
+- Active browser sessions use maintained allauth records, are listable only by their owner, and require CSRF for revocation. Login and recovery throttles share Valkey across web workers; authentication audits remain append-only and exclude credentials and client/session identifiers.
 - MFA for privileged roles and secret reveal.
 - Central policy authorization with cross-tenant and cross-client negative tests.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.

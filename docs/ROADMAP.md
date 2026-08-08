@@ -31,8 +31,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.5` | Complete | Invitation issuance, delivery, expiration, revocation, resend, and single-use token security. |
 | `0.0.6` | Complete | Invitation acceptance, browser account activation, verified email, and safe invalid/expired states. |
 | `0.0.7` | Complete | Enumeration-safe password-reset request and completion with expiring tokens and session policy. |
-| `0.0.8` | Next | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
-| `0.0.9` | Planned | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
+| `0.0.8` | Complete | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
+| `0.0.9` | Next | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.10` | Planned | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
 | `0.0.11` | Planned | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
 | `0.1.0` | Planned stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
@@ -114,6 +114,17 @@ Evidence: `docs/releases/0.0.6.md`.
 - [x] Unit, Docker/PostgreSQL, Chromium, accessibility, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.7`.
 
 Evidence: `docs/releases/0.0.7.md`.
+
+### `0.0.8` acceptance criteria
+
+- [x] Authenticated users can open a visible, responsive Settings page to list their active browsers, identify the current session, refresh activity state, and revoke another session.
+- [x] Session inventory and revocation use maintained allauth models and headless endpoints; records are restricted to the authenticated user, mutations require CSRF, and cross-user session IDs are denied.
+- [x] Login success/failure, logout, password reset, session-client change, and explicit revocation produce append-only, tenant-associated authentication events without credentials or client/session identifiers in metadata.
+- [x] Explicit login, failed-login, password-request, and reset-completion limits use a shared Valkey cache so policy remains consistent across web workers.
+- [x] Unit and browser tests cover inventory, revocation, server denial, retry, CSRF, cross-user isolation, audit redaction, and rate-limit responses.
+- [x] Migration, OpenAPI, Docker/PostgreSQL, accessibility, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.8`.
+
+Evidence: `docs/releases/0.0.8.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

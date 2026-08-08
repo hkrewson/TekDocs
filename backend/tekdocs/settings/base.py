@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.headless",
     "allauth.mfa",
+    "allauth.usersessions",
     "apps.accounts",
     "apps.core",
 ]
@@ -66,6 +67,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "allauth.usersessions.middleware.UserSessionsMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.RequestContextMiddleware",
@@ -104,6 +106,13 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("DJANGO_CACHE_URL", "redis://valkey:6379/2"),
+    }
+}
+
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -124,6 +133,12 @@ ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_ADAPTER = "apps.accounts.adapters.InviteOnlyAccountAdapter"
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
+ACCOUNT_RATE_LIMITS = {
+    "login": "20/m/ip",
+    "login_failed": "10/m/ip,5/10m/key",
+    "reset_password": "10/h/ip,3/h/key",
+    "reset_password_from_key": "10/h/ip",
+}
 HEADLESS_ONLY = True
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": "/auth/verify-email/{key}",
@@ -134,6 +149,8 @@ HEADLESS_FRONTEND_URLS = {
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
+USERSESSIONS_ADAPTER = "apps.accounts.adapters.AuditedUserSessionsAdapter"
+USERSESSIONS_TRACK_ACTIVITY = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -150,7 +167,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.7",
+    "VERSION": "0.0.8",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

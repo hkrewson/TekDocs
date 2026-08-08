@@ -4,9 +4,11 @@ import secrets
 
 import pytest
 from django.core import mail
+from django.core.cache import cache
 from django.test import Client, override_settings
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.models import AuditEvent
 
 REQUEST_URL = "/_allauth/browser/v1/auth/password/request"
 RESET_URL = "/_allauth/browser/v1/auth/password/reset"
@@ -21,6 +23,11 @@ def owner(db):
         owner_display_name="Primary Owner",
         password=f"{secrets.token_urlsafe(24)}Aa7!",
     ).owner
+
+
+@pytest.fixture(autouse=True)
+def clear_rate_limit_cache():
+    cache.clear()
 
 
 def anonymous_client() -> tuple[Client, str]:
@@ -96,6 +103,9 @@ def test_password_reset_is_single_use_and_invalidates_existing_sessions(owner):
     assert second_session.get("/api/v1/auth/context").status_code == 403
     assert reset_client.get(SESSION_URL).status_code == 401
     assert reset_client.get(RESET_URL, headers={"X-Password-Reset-Key": key}).status_code == 400
+    event = AuditEvent.objects.get(action="auth.password_reset")
+    assert event.actor == owner
+    assert event.metadata == {}
 
 
 def test_expired_and_malformed_reset_keys_share_invalid_response(owner):
@@ -146,3 +156,15 @@ def test_weak_password_is_rejected_without_consuming_reset_key(owner):
 
     assert rejected.status_code == 400
     assert client.get(RESET_URL, headers={"X-Password-Reset-Key": key}).status_code == 200
+
+
+@override_settings(ACCOUNT_RATE_LIMITS={"reset_password": "1/h/ip"})
+def test_password_reset_requests_are_rate_limited_without_account_details(owner):
+    cache.clear()
+    client, csrf = anonymous_client()
+    first = request_reset(client, csrf, owner.email)
+    limited = request_reset(client, csrf, "unknown@example.com")
+
+    assert first.status_code == 200
+    assert limited.status_code == 429
+    assert owner.email not in str(limited.json())

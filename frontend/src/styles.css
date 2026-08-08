@@ -117,6 +117,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auth-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
 .spin { animation: spin 900ms linear infinite; }
 .shell-alert { margin-bottom: 18px; }
+.settings-heading { align-items: flex-start; }
+.settings-heading > div { min-width: 0; }
+.settings-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.refresh-button { display: inline-flex; align-items: center; gap: 7px; flex: none; }
+.settings-error { margin-bottom: 14px; }
+.settings-state { margin: 0; padding: 16px 2px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+.session-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.session-list li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 16px 2px; border-bottom: 1px solid var(--border); }
+.session-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.session-list li > svg { margin-top: 2px; color: var(--muted); }
+.session-details { min-width: 0; }
+.session-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.session-title strong { font-size: 14px; }
+.session-title span { color: #45613c; font-size: 12px; font-weight: 600; }
+.session-details p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.revoke-button { min-height: 32px; padding-inline: 11px; font-size: 13px; }
+.revoke-button:disabled { color: var(--quiet); cursor: wait; }
+.current-session-note { max-width: 150px; padding-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.35; text-align: right; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -143,4 +161,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .milkdown-host, .markdown-source { padding: 18px; }
   .auth-page { align-items: start; padding: 20px 12px; }
   .auth-panel { padding: 22px 18px; }
+  .session-list li { grid-template-columns: 24px minmax(0, 1fr); }
+  .session-list .revoke-button, .current-session-note { grid-column: 2; justify-self: start; max-width: none; text-align: left; }
 }

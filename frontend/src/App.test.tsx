@@ -1,14 +1,19 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import { App } from './App'
 import type { AuthenticatedContext } from './auth/api'
+import type { AuthClient } from './auth/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: '00000000-0000-4000-8000-000000000002', name: 'Example MSP' },
 }
 
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} />
+const authClient = {
+  listSessions: vi.fn().mockResolvedValue([]),
+} as unknown as AuthClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} />
 
 describe('application shell', () => {
   it('renders sectioned navigation and the active route', () => {

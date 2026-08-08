@@ -21,6 +21,8 @@ A successful bootstrap creates the tenant, first owner, and owner membership; re
 
 The shell renders only after the allauth session and TekDocs context both succeed. The owner and accounts created from accepted invitations receive tenant membership; unrelated identities remain denied. Invitation administration continues to require installation ownership until scoped roles are implemented.
 
+`0.0.8` enables allauth’s maintained user-session inventory with activity tracking. `GET /_allauth/browser/v1/auth/sessions` returns only the authenticated user’s browsers. The Settings page identifies the current browser and exposes CSRF-protected revocation of another session through `DELETE` on the same endpoint. The server scopes submitted IDs to the requesting user before ending the underlying Django session. A password change continues to invalidate every password-bound session regardless of whether an inventory row exists.
+
 `0.0.6` adds controlled invitation acceptance. The browser reads the token from the URL fragment, removes the fragment immediately, and submits the token with account details only in a CSRF-protected request body. Successful acceptance creates one active user, verified primary allauth email, and tenant membership before consuming the invitation and establishing a normal Django session. See `docs/INVITATIONS.md` for the lifecycle and deployment contract.
 
 Login errors shown by TekDocs do not distinguish an unknown address from a wrong password.
@@ -31,4 +33,10 @@ Login errors shown by TekDocs do not distinguish an unknown address from a wrong
 
 The reset email points to `TEKDOCS_PUBLIC_URL` with the opaque key in the URL fragment. The browser removes that fragment immediately, validates the key through the allauth header contract, and submits it only in a CSRF-protected request body. The key is not stored in local storage, session storage, cookies, application logs, or API URLs.
 
-A completed reset does not sign the user in. Changing the password invalidates the key and Django’s password-derived session authentication hash, so every existing session is rejected on its next request. The user returns to sign-in with the new password. Authentication audit expansion, explicit session inventory/revocation, login throttles, and recovery-rate policy remain scoped to `0.0.8`; allauth’s maintained rate-limit paths remain enabled in the interim.
+A completed reset does not sign the user in. Changing the password invalidates the key and Django’s password-derived session authentication hash, so every existing session is rejected on its next request. The user returns to sign-in with the new password.
+
+## Abuse limits and authentication audit
+
+Rate-limit counters use the shared `DJANGO_CACHE_URL` Valkey database rather than worker-local memory. Current policy permits 20 login requests per minute per IP; failed logins are limited to 10 per minute per IP and five per ten minutes per account key. Password-reset requests are limited to 10 per hour per IP and three per hour per account key; reset-key completion is limited to 10 per hour per IP. Rate-limit responses never include account existence details.
+
+Append-only audit actions cover successful and failed login, logout, completed password reset, session client changes, and explicit session revocation. Events associate the installation tenant and an authorized actor when known, plus the request correlation ID. Audit metadata is empty: email addresses, submitted credentials, IP addresses, user agents, session keys, and inventory IDs are deliberately excluded.

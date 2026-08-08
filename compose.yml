@@ -63,6 +63,7 @@ services:
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://valkey:6379/0
       CELERY_RESULT_BACKEND: redis://valkey:6379/1
+      DJANGO_CACHE_URL: redis://valkey:6379/2
       TEKDOCS_MASTER_KEY: ${TEKDOCS_MASTER_KEY:?Run make bootstrap}
       TEKDOCS_PUBLICATION_SIGNING_KEY: ${TEKDOCS_PUBLICATION_SIGNING_KEY:?Run make bootstrap}
       TEKDOCS_BOOTSTRAP_TOKEN: ${TEKDOCS_BOOTSTRAP_TOKEN:?Run make bootstrap}

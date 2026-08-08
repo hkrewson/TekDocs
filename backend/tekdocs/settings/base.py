@@ -174,6 +174,7 @@ HEADLESS_FRONTEND_URLS = {
     "account_reset_password": "/auth/reset-password",
     "account_reset_password_from_key": "/auth/reset-password/{key}",
     "account_signup": "/auth/register",
+    "socialaccount_login_error": "/",
 }
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_ADAPTER = "apps.accounts.adapters.EncryptedMFAAdapter"
@@ -199,7 +200,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "TekDocs API",
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
-    "VERSION": "0.0.10",
+    "VERSION": "0.0.11",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
 }

@@ -34,8 +34,8 @@ Most patch slices should fit one to three focused engineering sessions. A slice 
 | `0.0.8` | Complete | Session inventory/revocation, authentication audit events, login throttles, and recovery rate limits. |
 | `0.0.9` | Complete | TOTP, recovery codes, recent reauthentication, privileged-role MFA enforcement, and secret-safe recovery flows. |
 | `0.0.10` | Complete | Profile/security administration, secure production validation, and a tested OIDC provider boundary. |
-| `0.0.11` | Next | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
-| `0.1.0` | Planned stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
+| `0.0.11` | Complete | Authentication abuse suite, accessibility/browser remediation, operator documentation, and upgrade rehearsal. |
+| `0.1.0` | Next stabilization | Freeze the identity contract; close all authentication blockers and certify clean install/upgrade behavior. |
 
 ### `0.0.1` acceptance evidence
 
@@ -147,6 +147,17 @@ Evidence: `docs/releases/0.0.9.md`.
 - [x] OpenAPI, unit, Docker/PostgreSQL, Chromium, accessibility, CSRF, denial, configuration-redaction, dependency, static-analysis, secret-scanning, and container gates pass at `0.0.10`.
 
 Evidence: `docs/releases/0.0.10.md`.
+
+### `0.0.11` acceptance criteria
+
+- [x] A blocking authentication abuse suite covers account enumeration, CSRF bypass, invitation/reset/recovery replay, session isolation, MFA downgrade, audit redaction, and closed-signup/OIDC boundaries.
+- [x] Critical bootstrap, invitation, password recovery, MFA, session, profile, OIDC, and sign-out browser journeys pass in Chromium, Firefox, and WebKit without detectable axe violations.
+- [x] Pull requests retain a fast Chromium browser gate while scheduled and manually dispatched GitHub workflows run all three browser engines and retain per-engine failure artifacts.
+- [x] An operator runbook documents initial authentication setup, invitation and recovery operations, MFA recovery, OIDC rollout, session response, protected secret handling, and safe troubleshooting.
+- [x] A disposable, automated upgrade rehearsal starts from the supported `0.0.10` source, preserves representative identity/authentication data, applies current migrations, verifies invariants, and removes only its isolated resources.
+- [x] Version, roadmap, OpenAPI, unit, PostgreSQL/Compose, three-engine browser, accessibility, upgrade, dependency, static-analysis, secret-scanning, and container evidence agree at `0.0.11`.
+
+Evidence: `docs/releases/0.0.11.md`.
 
 ## Entity and authorization foundation: `0.1.x` → `0.2.0`
 

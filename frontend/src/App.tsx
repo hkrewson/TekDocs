@@ -212,9 +212,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.0.10 adds profile administration and an optional OpenID Connect boundary." />
+      <PageHeader title="Overview" description="TekDocs 0.0.11 hardens authentication and verifies critical workflows across supported browsers." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.10</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.0.11</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],

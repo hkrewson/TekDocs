@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.10`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.0.11`.
 
 ## Start locally
 
@@ -41,10 +41,12 @@ make check
 make test
 make test-compose
 make test-e2e
+make test-e2e-all
+make upgrade-rehearsal
 make security
 ```
 
-The running Docker stack is authoritative for runtime claims. See `docs/PRODUCT_CHARTER.md`, `docs/ROADMAP.md`, and `AGENTS.md` before substantive work.
+The running Docker stack is authoritative for runtime claims. Authentication operations are documented in `docs/OPERATOR_AUTHENTICATION.md`. See `docs/PRODUCT_CHARTER.md`, `docs/ROADMAP.md`, and `AGENTS.md` before substantive work.
 
 ## Current boundaries
 

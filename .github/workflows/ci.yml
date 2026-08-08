@@ -35,6 +35,9 @@ jobs:
       - name: Backend tests
         working-directory: backend
         run: pytest --cov
+      - name: Authentication abuse suite
+        working-directory: backend
+        run: pytest apps/accounts/tests -q
 
   frontend:
     runs-on: ubuntu-latest

@@ -392,6 +392,31 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .staff-assignment-form label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
 .staff-assignment-form select { min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
 .staff-assignment-form .secondary-button { justify-self: start; }
+.custom-role-form { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(160px, .45fr); gap: 14px 18px; padding: 16px 0 20px; border-top: 1px solid var(--border); }
+.custom-role-form > label, .scoped-role-form label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
+.custom-role-form input, .custom-role-form select, .scoped-role-form select { min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.custom-role-description, .permission-picker, .custom-role-form .form-actions { grid-column: 1 / -1; }
+.permission-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px 24px; margin: 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--border); }
+.permission-picker legend { padding: 0 0 10px; font-size: 12px; font-weight: 600; }
+.permission-picker > div { display: grid; align-content: start; gap: 7px; }
+.permission-picker strong { font-size: 11px; }
+.permission-picker label { display: grid; grid-template-columns: 16px 1fr; gap: 7px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.permission-picker input { min-height: auto; margin: 1px 0 0; }
+.custom-role-list { border-top: 1px solid var(--border); }
+.custom-role-row { display: grid; grid-template-columns: minmax(190px, 1fr) 110px 90px 90px minmax(150px, auto); align-items: center; gap: 14px; min-height: 50px; padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.custom-role-row.header { min-height: 36px; color: var(--muted); font-size: 10px; font-weight: 600; }
+.custom-role-row > span:first-child { display: grid; gap: 3px; }
+.custom-role-row > span:first-child span { color: var(--muted); font-size: 10px; }
+.custom-role-row > span:last-child { display: flex; flex-wrap: wrap; gap: 7px; }
+.custom-role-row .secondary-button { min-height: 31px; padding: 5px 9px; }
+.custom-assignment-heading { margin-top: 24px; }
+.custom-assignment-heading h3 { margin: 0; font-size: 15px; }
+.scoped-role-form { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.scoped-role-form label { min-width: 190px; flex: 1; }
+.scoped-assignment-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.scoped-assignment-list li { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(180px, 1fr) auto; align-items: center; gap: 16px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.scoped-assignment-list li > span { display: grid; gap: 2px; font-size: 12px; }
+.scoped-assignment-list li > span span { color: var(--muted); font-size: 10px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -463,4 +488,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .access-row > span:nth-child(2)::before { content: 'Role or access mode'; }
   .access-row > span:nth-child(3)::before { content: 'Action'; }
   .staff-assignment-group { grid-template-columns: 1fr; gap: 12px; }
+  .custom-role-form { grid-template-columns: 1fr; }
+  .custom-role-description, .permission-picker, .custom-role-form .form-actions { grid-column: auto; }
+  .custom-role-row { grid-template-columns: 1fr; gap: 6px; padding-block: 12px; }
+  .custom-role-row.header { display: none; }
+  .scoped-role-form { align-items: stretch; flex-direction: column; }
+  .scoped-assignment-list li { grid-template-columns: 1fr auto; }
+  .scoped-assignment-list li > span:nth-child(2) { grid-column: 1; }
+  .scoped-assignment-list li button { grid-column: 2; grid-row: 1 / span 2; }
 }

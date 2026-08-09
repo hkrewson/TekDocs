@@ -11,7 +11,7 @@ This document defines which navigation families belong to the MSP and organizati
 - The MSP-context switcher may search all authorized organization classifications so an operator can enter client or supplier workspaces.
 - Vendor, manufacturer, and partner classifications remain capabilities on one organization identity. They are not separate tables or tenant boundaries.
 - Access Control is an MSP-administration route available only when the authenticated policy context includes member-role administration. It lists built-in role definitions, tenant members, and each organization's MSP-staff access mode. It is not carried into an organization sidebar.
-- `assigned_only` organizations are owner-only in `0.1.9`; explicit MSP staff assignments arrive in `0.1.10`. Organization-scoped client roles and custom role composition remain later RBAC slices.
+- `assigned_only` organizations require explicit MSP staff assignments. Additive custom tenant and organization roles are composed by the central policy service, but never create or bypass that staff-access edge. Collection scope and hard MSP-private constraints remain `0.1.12`.
 
 ## Navigation matrix
 
@@ -23,7 +23,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Sites | MSP offices and nested locations | Client sites, buildings, floors, rooms, offices, and desks | Supplier sites and offices | records available (`0.1.6`) |
 | Custom fields | MSP-wide definitions and values on MSP records | Inherited MSP definitions plus client-local Site/Location definitions | Inherited MSP definitions plus supplier-local Site/Location definitions | definitions and Site/Location values available (`0.1.7`) |
 | Relationships | Typed links and backlinks among visible MSP records | Client-owned records plus explicit links to eligible organization anchors | Supplier-owned records plus explicit links to eligible organization anchors | organization relationship UI and scoped search available (`0.1.8`) |
-| Access control | Built-in tenant roles, organization staff-access modes, and explicit per-client MSP staff assignments | — | — | role/mode administration available (`0.1.9`); staff assignments in `0.1.10` |
+| Access control | Built-in roles, custom tenant/organization roles, staff-access modes, and explicit per-client MSP staff assignments | — | — | custom role and scoped assignment administration available (`0.1.11`) |
 | Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |

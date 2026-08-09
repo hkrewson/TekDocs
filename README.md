@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.10`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.11`.
 
 ## Start locally
 

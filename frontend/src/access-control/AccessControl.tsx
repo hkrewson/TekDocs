@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AccessCatalog, AccessControlClient, AssignedStaff, BuiltInRole, Member, OrganizationAccess, OrganizationAccessMode, TenantRole } from './api'
 import { browserAccessControlClient } from './api'
+import { CustomRolesPanel } from './CustomRolesPanel'
 
 const tenantRoles: TenantRole[] = ['administrator', 'technician', 'contributor', 'read_only']
 
@@ -77,7 +78,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
   const loading = catalog === null || members === null || organizations === null
   return (
     <section className="content-section access-control-page" aria-labelledby="access-control-heading" aria-busy={loading}>
-      <div className="section-heading"><div><h1 id="access-control-heading">Access control</h1><p>Built-in roles and MSP staff access to client workspaces.</p></div></div>
+      <div className="section-heading"><div><h1 id="access-control-heading">Access control</h1><p>Built-in roles, additive custom roles, and MSP staff access to client workspaces.</p></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="form-success" role="status">{message}</div>}
       {loading && !error && <p role="status">Loading access control…</p>}
@@ -89,6 +90,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
               {catalog.roles.map((role) => <li key={role.value}><strong>{role.label}</strong><span>{role.description}</span><small>{role.assignable_scope === 'installation' ? 'Installation identity' : role.assignable_scope === 'tenant' ? 'MSP-wide role' : 'Organization-scoped role'}</small></li>)}
             </ul>
           </section>
+          <CustomRolesPanel client={client} catalog={catalog} members={members} organizations={organizations} />
           <section className="access-section" aria-labelledby="members-heading">
             <div className="section-heading"><div><h2 id="members-heading">MSP members</h2><p>Tenant roles apply only where the organization access mode also allows the member.</p></div></div>
             {members.length === 0 && <p>No members are available.</p>}

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from allauth.mfa.models import Authenticator
 from django.db.models import Q, QuerySet
@@ -15,6 +16,7 @@ from .models import (
     TENANT_ASSIGNABLE_ROLES,
     BuiltInRole,
     OrganizationAccessAssignment,
+    ScopedRoleAssignment,
     TenantMembership,
     User,
 )
@@ -63,6 +65,9 @@ class PermissionKey(StrEnum):
     INVITATIONS_RESEND = "invitations.resend"
     MEMBERSHIPS_VIEW = "memberships.view"
     MEMBERSHIPS_ASSIGN_ROLE = "memberships.assign_role"
+    CUSTOM_ROLES_VIEW = "custom_roles.view"
+    CUSTOM_ROLES_MANAGE = "custom_roles.manage"
+    CUSTOM_ROLES_ASSIGN = "custom_roles.assign"
     DOCUMENTS_VIEW = "documents.view"
     DOCUMENTS_EDIT = "documents.edit"
     DOCUMENTS_PUBLISH = "documents.publish"
@@ -135,6 +140,9 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.INVITATIONS_RESEND, "Resend invitations", "Administration", mfa=True),
     _permission(PermissionKey.MEMBERSHIPS_VIEW, "View tenant members and built-in roles", "Administration"),
     _permission(PermissionKey.MEMBERSHIPS_ASSIGN_ROLE, "Assign tenant member roles", "Administration", mfa=True),
+    _permission(PermissionKey.CUSTOM_ROLES_VIEW, "View custom roles and assignments", "Administration"),
+    _permission(PermissionKey.CUSTOM_ROLES_MANAGE, "Manage custom role definitions", "Administration", mfa=True),
+    _permission(PermissionKey.CUSTOM_ROLES_ASSIGN, "Assign custom roles", "Administration", mfa=True),
     _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),
     _permission(PermissionKey.DOCUMENTS_EDIT, "Edit documentation", "Documentation", mfa=True),
     _permission(PermissionKey.DOCUMENTS_PUBLISH, "Publish documentation", "Documentation", mfa=True),
@@ -191,9 +199,25 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
     not in {
         PermissionKey.INSTALLATION_MANAGE,
         PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,
+        PermissionKey.CUSTOM_ROLES_MANAGE,
+        PermissionKey.CUSTOM_ROLES_ASSIGN,
         PermissionKey.ORGANIZATIONS_ASSIGN_STAFF,
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,
         PermissionKey.SECRETS_REVEAL,
+    }
+)
+
+# This explicit allowlist is the privilege ceiling for custom roles. Sensitive
+# field policy and access-control administration cannot be delegated in 0.1.11.
+CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
+    IMPLEMENTED_READS
+    | TECHNICIAN_MUTATIONS
+    | {
+        PermissionKey.ORGANIZATIONS_CREATE,
+        PermissionKey.ORGANIZATIONS_EDIT,
+        PermissionKey.ORGANIZATIONS_ARCHIVE,
+        PermissionKey.CUSTOM_FIELDS_MANAGE,
+        PermissionKey.DOCUMENTS_PUBLISH,
     }
 )
 
@@ -277,6 +301,7 @@ class InstallationMemberContext:
     user: User
     role: BuiltInRole
     is_owner: bool
+    membership_id: UUID | None = None
 
     @property
     def data_scope(self) -> DataScope:
@@ -310,7 +335,7 @@ def require_installation_member(user: User) -> InstallationMemberContext:
     is_owner = state.owner_id == user.pk
     if is_owner:
         return InstallationMemberContext(
-            state=state, tenant=state.tenant, user=user, role=BuiltInRole.OWNER, is_owner=True
+            state=state, tenant=state.tenant, user=user, role=BuiltInRole.OWNER, is_owner=True, membership_id=None
         )
     membership = TenantMembership.scoped.for_tenant(state.tenant).filter(user=user).first()
     if membership is None:
@@ -321,6 +346,7 @@ def require_installation_member(user: User) -> InstallationMemberContext:
         user=user,
         role=BuiltInRole(membership.role),
         is_owner=False,
+        membership_id=membership.id,
     )
 
 
@@ -343,7 +369,7 @@ def context_has_permission(
     *,
     organization: Organization | None = None,
 ) -> bool:
-    if permission not in context.permissions:
+    if not _permission_granted(context, permission, organization=organization):
         return False
     return organization is None or _organization_allowed(context, organization)
 
@@ -372,15 +398,58 @@ def accessible_organizations(
     context: InstallationMemberContext,
     permission: PermissionKey = PermissionKey.ORGANIZATIONS_VIEW,
 ) -> QuerySet[Organization]:
-    if permission not in context.permissions:
-        return Organization.scoped.for_tenant(context.tenant).none()
     organizations = Organization.scoped.for_tenant(context.tenant).filter(entity__archived_at__isnull=True)
+    tenant_grant = permission in context.permissions or _custom_permission_exists(context, permission)
+    if not tenant_grant:
+        if context.membership_id is None:
+            return organizations.none()
+        organizations = organizations.filter(
+            scoped_role_assignments__membership_id=context.membership_id,
+            scoped_role_assignments__role__archived_at__isnull=True,
+            scoped_role_assignments__role__permission_rows__permission=permission.value,
+        )
     if not context.is_owner:
         organizations = organizations.filter(
             Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED)
             | Q(access_assignments__membership__user=context.user)
         ).distinct()
     return organizations
+
+
+def _custom_permission_exists(
+    context: InstallationMemberContext,
+    permission: PermissionKey,
+    organization: Organization | None = None,
+) -> bool:
+    if context.membership_id is None:
+        return False
+    assignments = ScopedRoleAssignment.scoped.for_tenant(context.tenant).filter(
+        membership_id=context.membership_id,
+        role__archived_at__isnull=True,
+        role__permission_rows__permission=permission.value,
+    )
+    if organization is None:
+        assignments = assignments.filter(organization__isnull=True)
+    else:
+        assignments = assignments.filter(Q(organization__isnull=True) | Q(organization=organization))
+    return assignments.exists()
+
+
+def _permission_granted(
+    context: InstallationMemberContext,
+    permission: PermissionKey,
+    *,
+    organization: Organization | None = None,
+) -> bool:
+    return permission in context.permissions or _custom_permission_exists(context, permission, organization)
+
+
+def custom_assignable_permission_catalog() -> list[dict[str, object]]:
+    return [
+        definition.as_dict()
+        for definition in PERMISSION_CATALOG
+        if definition.key in CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS
+    ]
 
 
 def require_installation_owner(user: User) -> InstallationMemberContext:

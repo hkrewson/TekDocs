@@ -24,6 +24,9 @@ const accessCatalog = {
     { key: 'organizations.manage_access', label: 'Manage organization access', category: 'Access control', requires_mfa: true },
     { key: 'organizations.assign_staff', label: 'Assign MSP staff', category: 'Access control', requires_mfa: true },
   ],
+  custom_assignable_permissions: [
+    { key: 'documents.edit', label: 'Edit documentation', category: 'Documentation', requires_mfa: true },
+  ],
   roles: [
     { value: 'owner', label: 'Owner', description: 'Installation owner.', assignable_scope: 'installation', permissions: ['memberships.assign_role'] },
     { value: 'administrator', label: 'Administrator', description: 'Tenant administrator.', assignable_scope: 'tenant', permissions: ['memberships.assign_role'] },
@@ -104,10 +107,13 @@ const relationship = {
 }
 
 async function mockWorkspaceApplication(page: Page) {
+  const customRole = { id: crypto.randomUUID(), name: 'Documentation lead', description: '', scope: 'tenant', permissions: ['documents.edit'], assignment_count: 0, archived_at: null, created_at: '2026-08-08T13:00:00Z', updated_at: '2026-08-08T13:00:00Z' }
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/api/v1/access-control/catalog', (route) => route.fulfill({ json: accessCatalog }))
+  await page.route('**/api/v1/access-control/custom-roles**', (route) => route.fulfill({ status: route.request().method() === 'POST' ? 201 : 200, json: route.request().method() === 'GET' ? [] : customRole }))
+  await page.route('**/api/v1/access-control/role-assignments**', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/v1/access-control/members', (route) => route.fulfill({ json: [
     { ...context.user, role: 'owner', is_owner: true, joined_at: '2026-08-08T12:00:00Z' },
     accessMember,
@@ -202,6 +208,12 @@ test('owner reviews role, client access-mode, and staff-assignment changes throu
   await page.getByRole('button', { name: 'Remove' }).click()
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText('Morgan Ellis was removed from Acme Dental')
+  await page.getByRole('textbox', { name: 'Role name' }).fill('Documentation lead')
+  await page.getByRole('checkbox', { name: /Edit documentation/ }).check()
+  await page.getByRole('button', { name: 'Review role' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('grants nothing until assigned')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByText('Documentation lead was created.')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

@@ -212,6 +212,7 @@ SPECTACULAR_SETTINGS = {
         "EntityLinkTypeEnum": "apps.core.models.EntityLinkType",
         "BuiltInRoleEnum": "apps.accounts.models.BuiltInRole",
         "TenantAssignableRoleEnum": "apps.accounts.models.TENANT_ASSIGNABLE_ROLE_CHOICES",
+        "CustomRoleScopeEnum": "apps.accounts.models.CustomRoleScope",
         "OrganizationAccessModeEnum": "apps.core.models.OrganizationAccessMode",
     },
 }

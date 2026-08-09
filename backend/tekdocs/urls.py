@@ -4,12 +4,16 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.accounts.access_views import (
     AccessControlCatalogView,
+    CustomRoleDetailView,
+    CustomRoleListCreateView,
     MemberListView,
     MemberRoleView,
     OrganizationAccessDetailView,
     OrganizationAccessListView,
     OrganizationStaffAssignmentDetailView,
     OrganizationStaffAssignmentView,
+    ScopedRoleAssignmentDetailView,
+    ScopedRoleAssignmentListCreateView,
 )
 from apps.accounts.views import (
     AuthenticatedContextView,
@@ -76,6 +80,20 @@ urlpatterns = [
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),
+    path("api/v1/access-control/custom-roles", CustomRoleListCreateView.as_view(), name="custom-role-list-create"),
+    path(
+        "api/v1/access-control/custom-roles/<uuid:role_id>", CustomRoleDetailView.as_view(), name="custom-role-detail"
+    ),
+    path(
+        "api/v1/access-control/role-assignments",
+        ScopedRoleAssignmentListCreateView.as_view(),
+        name="scoped-role-assignment-list-create",
+    ),
+    path(
+        "api/v1/access-control/role-assignments/<uuid:assignment_id>",
+        ScopedRoleAssignmentDetailView.as_view(),
+        name="scoped-role-assignment-detail",
+    ),
     path("api/v1/access-control/members", MemberListView.as_view(), name="access-control-members"),
     path(
         "api/v1/access-control/members/<uuid:user_id>",

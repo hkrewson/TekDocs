@@ -13,7 +13,9 @@ afterEach(() => {
 describe('access-control API', () => {
   it('loads each bounded administration resource', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ permissions: [], roles: [] }))
+      .mockResolvedValueOnce(response({ permissions: [], roles: [], custom_assignable_permissions: [] }))
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([]))
     vi.stubGlobal('fetch', fetchMock)
@@ -21,12 +23,16 @@ describe('access-control API', () => {
     await browserAccessControlClient.catalog()
     await browserAccessControlClient.members()
     await browserAccessControlClient.organizations()
+    await browserAccessControlClient.customRoles()
+    await browserAccessControlClient.scopedAssignments()
 
     const paths = fetchMock.mock.calls.map((call) => (call as [string, RequestInit?])[0])
     expect(paths).toEqual([
       '/api/v1/access-control/catalog',
       '/api/v1/access-control/members',
       '/api/v1/access-control/organizations',
+      '/api/v1/access-control/custom-roles',
+      '/api/v1/access-control/role-assignments',
     ])
   })
 

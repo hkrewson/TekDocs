@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.10
+  version: 0.1.11
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -34,6 +34,99 @@ paths:
           description: ''
         '403':
           description: Member administration permission required
+  /api/v1/access-control/custom-roles:
+    get:
+      operationId: access_control_custom_roles_list
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomRole'
+          description: ''
+    post:
+      operationId: access_control_custom_roles_create
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomRoleCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomRoleCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomRoleCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomRole'
+          description: ''
+  /api/v1/access-control/custom-roles/{role_id}:
+    patch:
+      operationId: access_control_custom_roles_partial_update
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomRoleUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomRoleUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomRoleUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomRole'
+          description: ''
+    delete:
+      operationId: access_control_custom_roles_destroy
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomRole'
+          description: ''
   /api/v1/access-control/members:
     get:
       operationId: access_control_members_list
@@ -222,6 +315,64 @@ paths:
           description: Staff assignment permission and MFA required
         '404':
           description: Organization not found
+  /api/v1/access-control/role-assignments:
+    get:
+      operationId: access_control_role_assignments_list
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScopedRoleAssignment'
+          description: ''
+    post:
+      operationId: access_control_role_assignments_create
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopedRoleAssignmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScopedRoleAssignmentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScopedRoleAssignmentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopedRoleAssignment'
+          description: ''
+  /api/v1/access-control/role-assignments/{assignment_id}:
+    delete:
+      operationId: access_control_role_assignments_destroy
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/auth/context:
     get:
       operationId: auth_context_retrieve
@@ -2253,7 +2404,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RoleDefinition'
+        custom_assignable_permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDefinition'
       required:
+      - custom_assignable_permissions
       - permissions
       - roles
     AssignableScopeEnum:
@@ -2499,6 +2655,74 @@ components:
       - required
       - schema
       - version
+    CustomRole:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          $ref: '#/components/schemas/CustomRoleScopeEnum'
+        permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        assignment_count:
+          type: integer
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - archived_at
+      - assignment_count
+      - created_at
+      - description
+      - id
+      - name
+      - permissions
+      - scope
+      - updated_at
+    CustomRoleCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        scope:
+          $ref: '#/components/schemas/CustomRoleScopeEnum'
+        permissions:
+          type: array
+          items:
+            type: string
+            maxLength: 80
+      required:
+      - name
+      - permissions
+      - scope
+    CustomRoleScopeEnum:
+      enum:
+      - tenant
+      - organization
+      type: string
+      description: |-
+        * `tenant` - Tenant
+        * `organization` - Organization
     DirectionEnum:
       enum:
       - outgoing
@@ -3101,6 +3325,21 @@ components:
             maxLength: 160
             minLength: 1
           maxItems: 50
+    PatchedCustomRoleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        permissions:
+          type: array
+          items:
+            type: string
+            maxLength: 80
     PatchedLocationWrite:
       type: object
       properties:
@@ -3399,6 +3638,66 @@ components:
       - label
       - permissions
       - value
+    ScopedRoleAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        member_name:
+          type: string
+        member_email:
+          type: string
+          format: email
+        role_id:
+          type: string
+          format: uuid
+        role_name:
+          type: string
+        role_scope:
+          $ref: '#/components/schemas/CustomRoleScopeEnum'
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        organization_name:
+          type: string
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - id
+      - member_email
+      - member_id
+      - member_name
+      - organization_id
+      - organization_name
+      - role_id
+      - role_name
+      - role_scope
+    ScopedRoleAssignmentWrite:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - role_id
+      - user_id
     Site:
       type: object
       properties:

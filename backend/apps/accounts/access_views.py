@@ -14,14 +14,34 @@ from .access_control import (
 )
 from .access_serializers import (
     AccessControlCatalogSerializer,
+    CustomRoleCreateSerializer,
+    CustomRoleSerializer,
+    CustomRoleUpdateSerializer,
     MemberRoleWriteSerializer,
     MemberSerializer,
     OrganizationAccessSerializer,
     OrganizationAccessWriteSerializer,
     OrganizationStaffWriteSerializer,
+    ScopedRoleAssignmentSerializer,
+    ScopedRoleAssignmentWriteSerializer,
 )
-from .models import BuiltInRole
-from .policy import PermissionKey, permission_catalog, require_permission, role_catalog
+from .custom_roles import (
+    archive_custom_role,
+    create_custom_role,
+    create_scoped_assignment,
+    custom_roles_for_context,
+    remove_scoped_assignment,
+    scoped_assignments_for_context,
+    update_custom_role,
+)
+from .models import BuiltInRole, CustomRoleScope
+from .policy import (
+    PermissionKey,
+    custom_assignable_permission_catalog,
+    permission_catalog,
+    require_permission,
+    role_catalog,
+)
 
 
 class AccessControlCatalogView(APIView):
@@ -34,8 +54,79 @@ class AccessControlCatalogView(APIView):
     def get(self, request):  # type: ignore[no-untyped-def]
         require_permission(request.user, PermissionKey.MEMBERSHIPS_VIEW)
         return Response(
-            AccessControlCatalogSerializer({"permissions": permission_catalog(), "roles": role_catalog()}).data
+            AccessControlCatalogSerializer(
+                {
+                    "permissions": permission_catalog(),
+                    "roles": role_catalog(),
+                    "custom_assignable_permissions": custom_assignable_permission_catalog(),
+                }
+            ).data
         )
+
+
+class CustomRoleListCreateView(APIView):
+    @extend_schema(responses={200: CustomRoleSerializer(many=True)})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        context = require_permission(request.user, PermissionKey.CUSTOM_ROLES_VIEW)
+        return Response(CustomRoleSerializer(custom_roles_for_context(context), many=True).data)
+
+    @extend_schema(request=CustomRoleCreateSerializer, responses={201: CustomRoleSerializer})
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = CustomRoleCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        role = create_custom_role(
+            actor=request.user,
+            name=serializer.validated_data["name"],
+            description=serializer.validated_data["description"],
+            scope=CustomRoleScope(serializer.validated_data["scope"]),
+            permissions=serializer.validated_data["permissions"],
+        )
+        return Response(CustomRoleSerializer(role).data, status=201)
+
+
+class CustomRoleDetailView(APIView):
+    @extend_schema(request=CustomRoleUpdateSerializer, responses={200: CustomRoleSerializer})
+    def patch(self, request, role_id):  # type: ignore[no-untyped-def]
+        serializer = CustomRoleUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        role = update_custom_role(
+            actor=request.user,
+            role_id=role_id,
+            name=serializer.validated_data["name"],
+            description=serializer.validated_data["description"],
+            permissions=serializer.validated_data["permissions"],
+        )
+        return Response(CustomRoleSerializer(role).data)
+
+    @extend_schema(responses={200: CustomRoleSerializer})
+    def delete(self, request, role_id):  # type: ignore[no-untyped-def]
+        return Response(CustomRoleSerializer(archive_custom_role(actor=request.user, role_id=role_id)).data)
+
+
+class ScopedRoleAssignmentListCreateView(APIView):
+    @extend_schema(responses={200: ScopedRoleAssignmentSerializer(many=True)})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        context = require_permission(request.user, PermissionKey.CUSTOM_ROLES_VIEW)
+        return Response(ScopedRoleAssignmentSerializer(scoped_assignments_for_context(context), many=True).data)
+
+    @extend_schema(request=ScopedRoleAssignmentWriteSerializer, responses={201: ScopedRoleAssignmentSerializer})
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = ScopedRoleAssignmentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        assignment, created = create_scoped_assignment(
+            actor=request.user,
+            member_user_id=serializer.validated_data["user_id"],
+            role_id=serializer.validated_data["role_id"],
+            organization_entity_id=serializer.validated_data["organization_id"],
+        )
+        return Response(ScopedRoleAssignmentSerializer(assignment).data, status=201 if created else 200)
+
+
+class ScopedRoleAssignmentDetailView(APIView):
+    @extend_schema(responses={204: None})
+    def delete(self, request, assignment_id):  # type: ignore[no-untyped-def]
+        remove_scoped_assignment(actor=request.user, assignment_id=assignment_id)
+        return Response(status=204)
 
 
 class MemberListView(APIView):

@@ -186,7 +186,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.8` | Complete | Typed entity links, backlinks, organization relationships, and permission-filtered search foundation. |
 | `0.1.9` | Complete | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
 | `0.1.10` | Complete | Explicit per-client MSP staff assignments, assigned-only policy composition, assignment administration, and the next bounded portion of `TD-RISK-001`. |
-| `0.1.11` | Planned | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
+| `0.1.11` | Complete | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
 | `0.1.12` | Planned | Collection-scoped assignments, MSP-private hard constraints, field-level cost visibility seam, and completion of `TD-RISK-001`. |
 | `0.1.13` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
 | `0.1.14` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and hosted-automation evidence when authorized (`TD-RISK-010`). |
@@ -307,6 +307,20 @@ Evidence: `docs/releases/0.1.9.md`.
 ADR 0013 defines explicit MSP staff assignments, policy composition, retained owner break-glass access, and the staged custom-role boundary.
 
 Evidence: `docs/releases/0.1.10.md`.
+
+### `0.1.11` acceptance criteria
+
+- [x] Tenant-owned custom roles have stable identity, one immutable tenant or organization assignment scope, a unique bounded name, description, normalized maintained-catalog permissions, and archival rather than destructive deletion.
+- [x] Custom permissions are additive to one built-in tenant role. Tenant assignments apply throughout already-reachable workspaces; organization assignments apply only to the exact organization and never create or bypass an organization staff assignment.
+- [x] A centralized custom-assignable permission allowlist excludes ownership, access-control administration, secret access, and cost visibility. Catalog MFA requirements apply identically to built-in and custom grants.
+- [x] Owner-plus-MFA APIs create, edit, list, and archive custom roles and add, list, and remove tenant/organization assignments using scoped lookups, explicit confirmation, value-free audit events, and non-disclosing errors.
+- [x] PostgreSQL guards reject cross-tenant role permissions and assignments, scope/organization mismatches, owner assignments, arbitrary permission keys, duplicate assignments, and immutable identity changes when application services are bypassed.
+- [x] The Access Control interface exposes restrained role-definition and scoped-assignment workflows with responsive, keyboard, loading, empty, validation, denial, confirmation, and stale-response states.
+- [x] Built-in-only behavior remains unchanged when no custom assignments exist. Allow/deny, additive composition, access-mode separation, missing-MFA, CSRF, cross-tenant, cross-client, guessed-ID, migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, clean-install, preserved-data upgrade, and security evidence agree at `0.1.11`.
+
+ADR 0014 defines additive custom roles, scope composition, custom-assignable permissions, and the independent organization-reachability boundary.
+
+Evidence: `docs/releases/0.1.11.md`.
 
 ### `0.1.3` acceptance criteria
 

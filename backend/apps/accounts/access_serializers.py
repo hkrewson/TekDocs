@@ -1,8 +1,17 @@
+from uuid import UUID
+
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.core.models import OrganizationAccessMode
 
-from .models import TENANT_ASSIGNABLE_ROLE_CHOICES, BuiltInRole
+from .models import (
+    TENANT_ASSIGNABLE_ROLE_CHOICES,
+    BuiltInRole,
+    CustomRole,
+    CustomRoleScope,
+    ScopedRoleAssignment,
+)
 
 
 class PermissionDefinitionSerializer(serializers.Serializer):
@@ -23,6 +32,7 @@ class RoleDefinitionSerializer(serializers.Serializer):
 class AccessControlCatalogSerializer(serializers.Serializer):
     permissions = PermissionDefinitionSerializer(many=True)
     roles = RoleDefinitionSerializer(many=True)
+    custom_assignable_permissions = PermissionDefinitionSerializer(many=True)
 
 
 class MemberSerializer(serializers.Serializer):
@@ -58,3 +68,59 @@ class OrganizationAccessWriteSerializer(serializers.Serializer):
 
 class OrganizationStaffWriteSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
+
+
+class CustomRoleSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    description = serializers.CharField()
+    scope = serializers.ChoiceField(choices=CustomRoleScope.choices)
+    permissions = serializers.SerializerMethodField()
+    assignment_count = serializers.IntegerField()
+    archived_at = serializers.DateTimeField(allow_null=True)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_permissions(self, obj: CustomRole) -> list[str]:
+        return [row.permission for row in obj.permission_rows.all()]
+
+
+class CustomRoleCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=80, trim_whitespace=True)
+    description = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+    scope = serializers.ChoiceField(choices=CustomRoleScope.choices)
+    permissions = serializers.ListField(child=serializers.CharField(max_length=80), allow_empty=False)
+
+
+class CustomRoleUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=80, trim_whitespace=True)
+    description = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+    permissions = serializers.ListField(child=serializers.CharField(max_length=80), allow_empty=False)
+
+
+class ScopedRoleAssignmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    member_id = serializers.UUIDField(source="membership.user_id")
+    member_name = serializers.CharField(source="membership.user.display_name")
+    member_email = serializers.EmailField(source="membership.user.email")
+    role_id = serializers.UUIDField()
+    role_name = serializers.CharField(source="role.name")
+    role_scope = serializers.ChoiceField(source="role.scope", choices=CustomRoleScope.choices)
+    organization_id = serializers.SerializerMethodField()
+    organization_name = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField()
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_organization_id(self, obj: ScopedRoleAssignment) -> UUID | None:
+        return obj.organization.entity_id if obj.organization is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_organization_name(self, obj: ScopedRoleAssignment) -> str | None:
+        return obj.organization.entity.display_name if obj.organization is not None else None
+
+
+class ScopedRoleAssignmentWriteSerializer(serializers.Serializer):
+    user_id = serializers.UUIDField()
+    role_id = serializers.UUIDField()
+    organization_id = serializers.UUIDField(required=False, allow_null=True, default=None)

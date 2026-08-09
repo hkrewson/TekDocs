@@ -205,3 +205,121 @@ class OrganizationAccessAssignment(models.Model):
             raise ValidationError("Organization assignment must share the organization tenant")
         if self.membership_id and self.tenant_id != self.membership.tenant_id:
             raise ValidationError("Organization assignment must share the membership tenant")
+
+
+class CustomRoleScope(models.TextChoices):
+    TENANT = "tenant", "Tenant"
+    ORGANIZATION = "organization", "Organization"
+
+
+class CustomRole(models.Model):
+    """A tenant-owned additive role whose permission rows are centrally validated."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="custom_roles")
+    name = models.CharField(max_length=80)
+    name_key = models.CharField(max_length=80, editable=False)
+    description = models.CharField(max_length=500, blank=True)
+    scope = models.CharField(max_length=16, choices=CustomRoleScope.choices)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_custom_roles")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name_key", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "scope", "name_key"), name="unique_custom_role_name_scope"),
+        ]
+        indexes = [models.Index(fields=("tenant", "scope", "archived_at"), name="accounts_role_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        self.name = " ".join(self.name.split())
+        self.name_key = self.name.casefold()
+        super().save(*args, **kwargs)
+
+
+class CustomRolePermission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="custom_role_permissions")
+    role = models.ForeignKey(CustomRole, on_delete=models.PROTECT, related_name="permission_rows")
+    permission = models.CharField(max_length=80)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("permission", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("role", "permission"), name="unique_custom_role_permission"),
+        ]
+        indexes = [models.Index(fields=("tenant", "permission", "role"), name="accounts_role_perm_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.role_id}: {self.permission}"
+
+    def clean(self) -> None:
+        if self.role_id and self.tenant_id != self.role.tenant_id:
+            raise ValidationError("Custom role permission must share the role tenant")
+
+
+class ScopedRoleAssignment(models.Model):
+    """An additive custom-role grant at tenant or exact-organization scope."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="scoped_role_assignments")
+    membership = models.ForeignKey(TenantMembership, on_delete=models.PROTECT, related_name="scoped_role_assignments")
+    role = models.ForeignKey(CustomRole, on_delete=models.PROTECT, related_name="assignments")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="scoped_role_assignments",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_scoped_role_assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("membership", "role"),
+                condition=models.Q(organization__isnull=True),
+                name="unique_tenant_role_assignment",
+            ),
+            models.UniqueConstraint(
+                fields=("membership", "role", "organization"),
+                condition=models.Q(organization__isnull=False),
+                name="unique_organization_role_assignment",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "membership", "organization"), name="accounts_scoped_role_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Scoped role assignment {self.id}"
+
+    def clean(self) -> None:
+        if self.membership_id and self.tenant_id != self.membership.tenant_id:
+            raise ValidationError("Scoped role assignment must share the membership tenant")
+        if self.role_id and self.tenant_id != self.role.tenant_id:
+            raise ValidationError("Scoped role assignment must share the role tenant")
+        if self.organization_id:
+            organization = self.organization
+            if organization is not None and self.tenant_id != organization.tenant_id:
+                raise ValidationError("Scoped role assignment must share the organization tenant")
+        if self.role_id:
+            expected_organization = self.role.scope == CustomRoleScope.ORGANIZATION
+            if expected_organization != bool(self.organization_id):
+                raise ValidationError("Scoped role assignment must match the role scope")

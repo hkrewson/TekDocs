@@ -35,7 +35,7 @@ test-auth-abuse:
 	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q
 
 test-policy:
-	docker compose exec -T backend pytest apps/accounts/tests/test_access_control.py apps/core/tests/test_scoping.py -q
+	docker compose exec -T backend pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py -q
 
 test-isolation:
 	docker compose exec -T backend pytest apps/core/tests/test_scoping.py -q

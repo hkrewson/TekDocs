@@ -79,6 +79,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-document-revision-detail": ("document_entity_id", "revision_id"),
         "msp-document-placement-list-create": ("document_entity_id",),
         "msp-document-placement-detail": ("document_entity_id", "placement_id"),
+        "msp-document-placement-reuse": ("document_entity_id", "placement_id"),
+        "msp-document-placement-detach": ("document_entity_id", "placement_id"),
         "msp-document-reference-list-create": ("document_entity_id",),
         "msp-document-reference-detail": ("document_entity_id", "reference_id"),
         "msp-location-list-create": ("site_entity_id",),
@@ -104,6 +106,17 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "document_entity_id",
             "placement_id",
         ),
+        "organization-document-placement-reuse": (
+            "organization_entity_id",
+            "document_entity_id",
+            "placement_id",
+        ),
+        "organization-document-placement-detach": (
+            "organization_entity_id",
+            "document_entity_id",
+            "placement_id",
+        ),
+        "organization-document-mention-search": ("organization_entity_id",),
         "organization-site-detail": ("organization_entity_id", "site_entity_id"),
         "organization-location-list-create": ("organization_entity_id", "site_entity_id"),
         "organization-location-detail": (
@@ -196,11 +209,7 @@ def test_every_cataloged_mutation_method_denies_read_only_members(contract, meth
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "contract",
-    tuple(
-        contract
-        for contract in AUTHENTICATED_ROUTE_PERMISSIONS
-        if any(_kwargs_for(contract.route_name).values())
-    ),
+    tuple(contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS if any(_kwargs_for(contract.route_name).values())),
     ids=lambda item: item.route_name,
 )
 def test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view(contract, installation):  # type: ignore[no-untyped-def]
@@ -216,9 +225,7 @@ def test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view(c
 @pytest.mark.parametrize(
     "contract",
     tuple(
-        contract
-        for contract in AUTHENTICATED_ROUTE_PERMISSIONS
-        if any(method != "GET" for method in contract.methods)
+        contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS if any(method != "GET" for method in contract.methods)
     ),
     ids=lambda item: item.route_name,
 )

@@ -424,7 +424,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.2` | **Complete:** workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
 | `0.2.3` | **Complete:** immutable block revisions, SHA-256 checksums, parent chains, optimistic concurrency, permission-aware history, and line diffs. |
 | `0.2.4` | **Complete:** live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
-| `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
+| `0.2.5` | **Complete:** backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
 | `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
@@ -481,6 +481,19 @@ Evidence: `docs/releases/0.2.3.md`.
 - [x] OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.4`.
 
 Evidence: `docs/releases/0.2.4.md` after certification.
+
+### `0.2.5` acceptance criteria
+
+- [x] Every block exposes permission-filtered backlinks and a bounded reuse-impact projection that distinguishes source, live, pinned, and client-listing audiences without disclosing hidden clients or documents.
+- [x] Editing a shared block authorizes against the block owner's MSP or organization scope, requires the exact base revision, appends through the immutable revision service, and returns the existing structured stale-write conflict.
+- [x] A user who may edit the containing document but not its shared source can atomically detach a non-primary placement into a new destination-owned block at the currently resolved revision; subsequent source edits do not change the detached copy.
+- [x] Detach preserves placement identity, order, and descendants while PostgreSQL scope guards validate the replacement block. Primary blocks cannot detach through the placement workflow.
+- [x] Entity mentions serialize only as stable `tekdocs://entity/{uuid}` Markdown links. Mention search is workspace- and permission-scoped, and preview replaces authored labels with server-authorized reference cards or one non-disclosing unavailable state.
+- [x] Shared-edit, detach, backlink, impact, and mention endpoints use the central policy service, normal CSRF/MFA rules, route inventory, and allow/deny/sibling/cross-tenant IDOR coverage.
+- [x] The Documentation interface exposes reuse review before a shared save, clearly distinguishes live and pinned effects, offers detach when canonical editing is unavailable, and inserts entity references without making editor HTML authoritative.
+- [x] OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.5`.
+
+Evidence: `docs/releases/0.2.5.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

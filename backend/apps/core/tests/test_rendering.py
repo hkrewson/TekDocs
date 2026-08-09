@@ -28,10 +28,26 @@ def test_markdown_renderer_disables_raw_html_and_unsafe_urls() -> None:
     assert 'href="javascript:' not in rendered
 
 
-def test_markdown_renderer_preserves_stable_entity_links() -> None:
+def test_markdown_renderer_resolves_entity_links_from_server_projections() -> None:
     rendered = render_markdown("[Router](tekdocs://entity/00000000-0000-4000-8000-000000000001)")
+    assert 'class="entity-reference entity-reference-unavailable"' in rendered
+    assert "Unavailable reference" in rendered
+    assert "Router" not in rendered
 
-    assert 'href="tekdocs://entity/00000000-0000-4000-8000-000000000001"' in rendered
+    rendered = render_markdown(
+        "[Authored name](tekdocs://entity/00000000-0000-4000-8000-000000000001)",
+        entity_mentions={
+            "00000000-0000-4000-8000-000000000001": {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "display_name": "Core Router",
+                "entity_type": "hardware_asset",
+                "workspace_label": "Acme",
+            }
+        },
+    )
+    assert "Core Router · hardware asset · Acme" in rendered
+    assert "Authored name" not in rendered
+    assert 'href="tekdocs:' not in rendered
 
 
 def test_markdown_renderer_supports_the_tekdocs_dialect() -> None:
@@ -62,12 +78,12 @@ def test_markdown_renderer_supports_the_tekdocs_dialect() -> None:
         '<script>alert("stored")</script>',
         '<img src=x onerror="alert(1)">',
         '<svg><a xlink:href="javascript:alert(1)">unsafe</a></svg>',
-        '[unsafe](javascript:alert(1))',
-        '[unsafe](data:text/html;base64,PHNjcmlwdD4=)',
-        '<style>body { display: none }</style>',
+        "[unsafe](javascript:alert(1))",
+        "[unsafe](data:text/html;base64,PHNjcmlwdD4=)",
+        "<style>body { display: none }</style>",
         '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
         '<div style="position:fixed;inset:0">spoof</div>',
-        'export const run = () => alert(1)\n\n<Component />',
+        "export const run = () => alert(1)\n\n<Component />",
     ),
 )
 def test_markdown_renderer_malicious_corpus_cannot_emit_executable_or_authored_html(payload: str) -> None:
@@ -117,9 +133,7 @@ def test_authenticated_document_reader_can_request_a_sanitized_preview(client) -
 
 @pytest.mark.django_db
 def test_markdown_preview_rejects_anonymous_and_oversized_requests(client) -> None:  # type: ignore[no-untyped-def]
-    anonymous_response = client.post(
-        reverse("markdown-render"), {"markdown": "safe"}, content_type="application/json"
-    )
+    anonymous_response = client.post(reverse("markdown-render"), {"markdown": "safe"}, content_type="application/json")
     assert anonymous_response.status_code == 403
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)

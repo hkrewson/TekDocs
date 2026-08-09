@@ -66,6 +66,38 @@ export type PlacementUpdateInput = {
   resolution_mode: PlacementResolutionMode
   pinned_revision_id?: string | null
 }
+export type ReuseAudience = {
+  relationship: 'source' | 'placement' | 'listing'
+  document_id: string
+  document_title: string
+  workspace_kind: 'msp' | 'organization'
+  workspace_id: string
+  workspace_name: string
+  resolution_mode: PlacementResolutionMode | null
+  will_update: boolean
+}
+export type ReuseImpact = {
+  block_id: string
+  block_name: string
+  revision_id: string
+  revision_number: number
+  checksum: string
+  markdown: string
+  audiences: ReuseAudience[]
+  live_audience_count: number
+  pinned_audience_count: number
+  can_edit_shared: boolean
+  can_detach: boolean
+  requires_mfa: boolean
+  truncated: boolean
+}
+export type EntityMentionOption = {
+  id: string
+  entity_type: string
+  display_name: string
+  workspace_label: string
+}
+export type EntityMentionResult = { results: EntityMentionOption[]; count: number; has_more: boolean }
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -83,6 +115,10 @@ export interface DocumentsClient {
   addPlacement(scope: DocumentScope, id: string, input: PlacementInput): Promise<DocumentRecord>
   updatePlacement(scope: DocumentScope, id: string, placementId: string, input: PlacementUpdateInput): Promise<DocumentRecord>
   removePlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
+  getReuseImpact(scope: DocumentScope, id: string, placementId: string): Promise<ReuseImpact>
+  updateSharedBlock(scope: DocumentScope, id: string, placementId: string, markdown: string, baseRevisionId: string): Promise<DocumentRecord>
+  detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
+  searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
   archive(scope: DocumentScope, id: string): Promise<void>
   addReference(documentId: string, organizationId: string): Promise<void>
 }
@@ -146,6 +182,14 @@ export const browserDocumentsClient: DocumentsClient = {
   addPlacement: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements`, 'POST', input),
   updatePlacement: (scope, id, placementId, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}`, 'PATCH', input),
   removePlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}`, 'DELETE'),
+  async getReuseImpact(scope, id, placementId) {
+    return parse<ReuseImpact>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/reuse`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  updateSharedBlock: (scope, id, placementId, markdown, baseRevisionId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/reuse`, 'PUT', { markdown, base_revision_id: baseRevisionId }),
+  detachPlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/detach`, 'POST'),
+  async searchMentionEntities(scope, query, signal) {
+    return parse<EntityMentionResult>(await fetch(`${collectionPath(scope)}/mention-entities?q=${encodeURIComponent(query)}&page_size=20`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),
   addReference: (documentId, organizationId) => mutate<void>(`/api/v1/documents/${encodeURIComponent(documentId)}/references`, 'POST', { organization_id: organizationId }),
 }

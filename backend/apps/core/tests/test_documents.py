@@ -9,6 +9,15 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import (
+    BuiltInRole,
+    CustomRole,
+    CustomRolePermission,
+    CustomRoleScope,
+    ScopedRoleAssignment,
+    TenantMembership,
+    User,
+)
 from apps.core.models import (
     Block,
     BlockRevision,
@@ -104,9 +113,7 @@ def test_msp_document_reference_cross_lists_without_copying_or_lateral_disclosur
         content_type="application/json",
     ).json()
     references_url = reverse("msp-document-reference-list-create", kwargs={"document_entity_id": created["id"]})
-    added = owner_client.post(
-        references_url, {"organization_id": str(acme.entity_id)}, content_type="application/json"
-    )
+    added = owner_client.post(references_url, {"organization_id": str(acme.entity_id)}, content_type="application/json")
     assert added.status_code == 201
     assert Document.objects.count() == 1
     assert Block.objects.count() == 1
@@ -141,11 +148,14 @@ def test_document_route_scope_returns_not_found_for_another_client(owner_client,
         kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": created["id"]},
     )
     assert owner_client.get(beta_detail).status_code == 404
-    assert owner_client.put(
-        beta_detail,
-        {"title": "Changed", "markdown": "Bad", "base_revision_id": created["current_revision_id"]},
-        content_type="application/json",
-    ).status_code == 404
+    assert (
+        owner_client.put(
+            beta_detail,
+            {"title": "Changed", "markdown": "Bad", "base_revision_id": created["current_revision_id"]},
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db
@@ -294,9 +304,7 @@ def test_nested_transclusion_is_depth_first_and_rejects_ancestor_cycle(owner_cli
     ).json()
     source_b = owner_client.post(collection, {"title": "B", "markdown": "B"}, content_type="application/json").json()
     source_c = owner_client.post(collection, {"title": "C", "markdown": "C"}, content_type="application/json").json()
-    placements_url = reverse(
-        "msp-document-placement-list-create", kwargs={"document_entity_id": destination["id"]}
-    )
+    placements_url = reverse("msp-document-placement-list-create", kwargs={"document_entity_id": destination["id"]})
     added_b = owner_client.post(
         placements_url,
         {"source_document_id": source_b["id"], "resolution_mode": "live"},
@@ -334,12 +342,8 @@ def test_nested_transclusion_is_depth_first_and_rejects_ancestor_cycle(owner_cli
 def test_transclusion_source_must_be_visible_in_destination_workspace(owner_client, installation):
     acme = organization(installation.tenant, "Acme")
     beta = organization(installation.tenant, "Beta")
-    acme_collection = reverse(
-        "organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}
-    )
-    beta_collection = reverse(
-        "organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}
-    )
+    acme_collection = reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id})
+    beta_collection = reverse("organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id})
     destination = owner_client.post(
         acme_collection, {"title": "Acme composition", "markdown": "Acme"}, content_type="application/json"
     ).json()
@@ -358,9 +362,7 @@ def test_transclusion_source_must_be_visible_in_destination_workspace(owner_clie
 
 
 @pytest.mark.django_db
-def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(
-    owner_client, installation
-):
+def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(owner_client, installation):
     acme = organization(installation.tenant, "Acme")
     source = owner_client.post(
         reverse("msp-document-list-create"),
@@ -396,9 +398,7 @@ def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked
     )
     assert revoked.status_code == 409
     assert revoked.json()["code"] == "placement_conflict"
-    archived = owner_client.delete(
-        reverse("msp-document-detail", kwargs={"document_entity_id": source["id"]})
-    )
+    archived = owner_client.delete(reverse("msp-document-detail", kwargs={"document_entity_id": source["id"]}))
     assert archived.status_code == 409
     assert Document.objects.get(entity_id=source["id"]).archived_at is None
 
@@ -453,3 +453,200 @@ def test_postgresql_rejects_raw_placement_cycle_and_cross_client_block(owner_cli
         )
     with pytest.raises(DatabaseError), transaction.atomic():
         DocumentPlacement.objects.filter(id=root.id).delete()
+
+
+@pytest.mark.django_db
+def test_reuse_impact_shared_update_and_detach_preserve_live_and_local_semantics(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    source = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Shared standard", "markdown": "Revision one"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse("msp-document-reference-list-create", kwargs={"document_entity_id": source["id"]}),
+        {"organization_id": str(acme.entity_id)},
+        content_type="application/json",
+    )
+    destination = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme runbook", "markdown": "Introduction"},
+        content_type="application/json",
+    ).json()
+    composed = owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"source_document_id": source["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    ).json()
+    placement = composed["placements"][1]
+    reuse_url = reverse(
+        "organization-document-placement-reuse",
+        kwargs={
+            "organization_entity_id": acme.entity_id,
+            "document_entity_id": destination["id"],
+            "placement_id": placement["id"],
+        },
+    )
+
+    impact = owner_client.get(reuse_url)
+    assert impact.status_code == 200
+    assert impact.json()["can_edit_shared"] is True
+    assert impact.json()["can_detach"] is True
+    assert impact.json()["live_audience_count"] == 3
+    assert {item["relationship"] for item in impact.json()["audiences"]} == {"source", "listing", "placement"}
+
+    updated = owner_client.put(
+        reuse_url,
+        {"markdown": "Revision two", "base_revision_id": source["current_revision_id"]},
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    assert updated.json()["resolved_markdown"].endswith("Revision two\n")
+    assert BlockRevision.objects.filter(block__entity_id=source["block_id"]).count() == 2
+
+    detached = owner_client.post(
+        reverse(
+            "organization-document-placement-detach",
+            kwargs={
+                "organization_entity_id": acme.entity_id,
+                "document_entity_id": destination["id"],
+                "placement_id": placement["id"],
+            },
+        )
+    )
+    assert detached.status_code == 200
+    assert detached.json()["placements"][1]["block_id"] != source["block_id"]
+
+    owner_client.put(
+        reverse("msp-document-detail", kwargs={"document_entity_id": source["id"]}),
+        {
+            "title": source["title"],
+            "markdown": "Revision three",
+            "base_revision_id": updated.json()["placements"][1]["resolved_revision_id"],
+        },
+        content_type="application/json",
+    )
+    reloaded = owner_client.get(
+        reverse(
+            "organization-document-detail",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        )
+    ).json()
+    assert reloaded["resolved_markdown"].endswith("Revision two\n")
+
+
+@pytest.mark.django_db
+def test_entity_mentions_search_and_render_are_workspace_scoped(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    beta = organization(installation.tenant, "Beta")
+    acme_router = Entity.objects.create(
+        tenant=installation.tenant,
+        organization=acme,
+        entity_type="hardware_asset",
+        display_name="Acme Core Router",
+        visibility="client_visible",
+    )
+    beta_router = Entity.objects.create(
+        tenant=installation.tenant,
+        organization=beta,
+        entity_type="hardware_asset",
+        display_name="Beta Core Router",
+        visibility="client_visible",
+    )
+    search = owner_client.get(
+        reverse("organization-document-mention-search", kwargs={"organization_entity_id": acme.entity_id}),
+        {"q": "Core Router"},
+    )
+    assert search.status_code == 200
+    assert [item["id"] for item in search.json()["results"]] == [str(acme_router.id)]
+
+    markdown = (
+        f"[authored](tekdocs://entity/{acme_router.id}) [secret authored label](tekdocs://entity/{beta_router.id})"
+    )
+    preview = owner_client.post(
+        reverse("markdown-render"),
+        {"markdown": markdown, "organization_id": str(acme.entity_id)},
+        content_type="application/json",
+    )
+    assert preview.status_code == 200
+    assert "Acme Core Router · hardware asset · Acme" in preview.json()["html"]
+    assert "Unavailable reference" in preview.json()["html"]
+    assert "secret authored label" not in preview.json()["html"]
+
+
+@pytest.mark.django_db
+def test_client_editor_cannot_change_msp_shared_block_but_can_detach(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    source = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "MSP standard", "markdown": "Canonical"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse("msp-document-reference-list-create", kwargs={"document_entity_id": source["id"]}),
+        {"organization_id": str(acme.entity_id)},
+        content_type="application/json",
+    )
+    destination = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Client guide", "markdown": "Local"},
+        content_type="application/json",
+    ).json()
+    composed = owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"source_document_id": source["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    ).json()
+    placement = composed["placements"][1]
+
+    editor = User.objects.create_user(email="client-editor@example.com", display_name="Client Editor")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=editor,
+        role=BuiltInRole.READ_ONLY,
+    )
+    role = CustomRole.objects.create(
+        tenant=installation.tenant,
+        name="Client document editor",
+        scope=CustomRoleScope.ORGANIZATION,
+        created_by=installation.owner,
+    )
+    CustomRolePermission.objects.create(
+        tenant=installation.tenant,
+        role=role,
+        permission="documents.edit",
+    )
+    ScopedRoleAssignment.objects.create(
+        tenant=installation.tenant,
+        membership=membership,
+        role=role,
+        organization=acme,
+        created_by=installation.owner,
+    )
+    TOTP.activate(editor, generate_totp_secret())
+    editor_client = Client()
+    editor_client.force_login(editor)
+    route_kwargs = {
+        "organization_entity_id": acme.entity_id,
+        "document_entity_id": destination["id"],
+        "placement_id": placement["id"],
+    }
+    reuse_url = reverse("organization-document-placement-reuse", kwargs=route_kwargs)
+    impact = editor_client.get(reuse_url)
+    assert impact.status_code == 200
+    assert impact.json()["can_edit_shared"] is False
+    assert impact.json()["can_detach"] is True
+    denied = editor_client.put(
+        reuse_url,
+        {"markdown": "Unauthorized", "base_revision_id": source["current_revision_id"]},
+        content_type="application/json",
+    )
+    assert denied.status_code == 403
+    assert BlockRevision.objects.filter(block__entity_id=source["block_id"]).count() == 1
+    assert editor_client.post(reverse("organization-document-placement-detach", kwargs=route_kwargs)).status_code == 200

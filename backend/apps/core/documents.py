@@ -60,6 +60,34 @@ def markdown_checksum(markdown: str) -> str:
     return hashlib.sha256(markdown.encode("utf-8")).hexdigest()
 
 
+def _append_block_revision(*, block: Block, actor_id: UUID, markdown: str, base_revision_id: UUID) -> BlockRevision:
+    if block.current_revision_id is None:
+        raise RuntimeError("Document block has no current revision")
+    current_revision = BlockRevision.objects.select_related("parent").get(pk=block.current_revision_id)
+    if current_revision.id != base_revision_id:
+        base_revision = BlockRevision.objects.filter(block=block, id=base_revision_id).first()
+        raise RevisionConflict(
+            submitted_base_revision_id=base_revision_id,
+            current_revision=current_revision,
+            base_revision=base_revision,
+        )
+    if markdown == current_revision.markdown:
+        return current_revision
+    resulting_revision = BlockRevision.objects.create(
+        tenant=block.tenant,
+        organization=block.organization,
+        block=block,
+        parent=current_revision,
+        revision_number=current_revision.revision_number + 1,
+        markdown=markdown,
+        checksum=markdown_checksum(markdown),
+        created_by_id=actor_id,
+    )
+    block.current_revision = resulting_revision
+    block.save(update_fields=("current_revision", "updated_at"))
+    return resulting_revision
+
+
 def revision_diff(before: BlockRevision | None, after: BlockRevision) -> str:
     before_markdown = before.markdown if before is not None else ""
     before_label = f"revision-{before.revision_number}" if before is not None else "empty"
@@ -195,35 +223,14 @@ def update_document(
     *, document: Document, actor_id: UUID, title: str, markdown: str, base_revision_id: UUID
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
-    placement = locked_document.placements.select_related("block", "block__entity").get(
-        parent__isnull=True, position=0
-    )
+    placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
     block = Block.objects.select_for_update().get(pk=placement.block_id)
-    if block.current_revision_id is None:
-        raise RuntimeError("Document block has no current revision")
-    current_revision = BlockRevision.objects.select_related("parent").get(pk=block.current_revision_id)
-    if current_revision.id != base_revision_id:
-        base_revision = BlockRevision.objects.filter(block=block, id=base_revision_id).first()
-        raise RevisionConflict(
-            submitted_base_revision_id=base_revision_id,
-            current_revision=current_revision,
-            base_revision=base_revision,
-        )
-
-    resulting_revision = current_revision
-    if markdown != current_revision.markdown:
-        resulting_revision = BlockRevision.objects.create(
-            tenant=locked_document.tenant,
-            organization=locked_document.organization,
-            block=block,
-            parent=current_revision,
-            revision_number=current_revision.revision_number + 1,
-            markdown=markdown,
-            checksum=markdown_checksum(markdown),
-            created_by_id=actor_id,
-        )
-        block.current_revision = resulting_revision
-        block.save(update_fields=("current_revision", "updated_at"))
+    resulting_revision = _append_block_revision(
+        block=block,
+        actor_id=actor_id,
+        markdown=markdown,
+        base_revision_id=base_revision_id,
+    )
 
     locked_document.entity.display_name = title
     locked_document.entity.save(update_fields=("display_name", "updated_at"))
@@ -238,6 +245,83 @@ def update_document(
         metadata={},
     )
     return resulting_revision
+
+
+@transaction.atomic
+def update_shared_block(
+    *, placement: DocumentPlacement, actor_id: UUID, markdown: str, base_revision_id: UUID
+) -> BlockRevision:
+    locked = DocumentPlacement.objects.select_for_update().select_related("block").get(pk=placement.pk)
+    block = Block.objects.select_for_update().get(pk=locked.block_id)
+    revision = _append_block_revision(
+        block=block,
+        actor_id=actor_id,
+        markdown=markdown,
+        base_revision_id=base_revision_id,
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.shared_block_updated",
+        entity_id=locked.document.entity_id,
+        metadata={},
+    )
+    return revision
+
+
+@transaction.atomic
+def detach_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -> DocumentPlacement:
+    locked = (
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .select_related(
+            "document", "document__entity", "block", "block__entity", "block__current_revision", "pinned_revision"
+        )
+        .get(pk=placement.pk)
+    )
+    if locked.parent_id is None and locked.position == 0:
+        raise PlacementConflict("The primary document block cannot be detached.")
+    revision = (
+        locked.block.current_revision
+        if locked.resolution_mode == PlacementResolutionMode.LIVE
+        else locked.pinned_revision
+    )
+    if revision is None:
+        raise PlacementConflict("The selected placement does not resolve to a revision.")
+    source_name = locked.block.entity.display_name.removesuffix(" — content")
+    entity = Entity.objects.create(
+        tenant=locked.tenant,
+        organization=locked.document.organization,
+        entity_type="document_block",
+        display_name=f"{source_name} — detached content",
+    )
+    block = Block.objects.create(
+        tenant=locked.tenant,
+        organization=locked.document.organization,
+        entity=entity,
+    )
+    detached_revision = BlockRevision.objects.create(
+        tenant=locked.tenant,
+        organization=locked.document.organization,
+        block=block,
+        revision_number=1,
+        markdown=revision.markdown,
+        checksum=markdown_checksum(revision.markdown),
+        created_by_id=actor_id,
+    )
+    block.current_revision = detached_revision
+    block.save(update_fields=("current_revision", "updated_at"))
+    locked.block = block
+    locked.resolution_mode = PlacementResolutionMode.LIVE
+    locked.pinned_revision = None
+    locked.save(update_fields=("block", "resolution_mode", "pinned_revision", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.placement_detached",
+        entity_id=locked.document.entity_id,
+        metadata={},
+    )
+    return locked
 
 
 def revisions_for_document(document: Document) -> QuerySet[BlockRevision]:
@@ -374,9 +458,7 @@ def archive_document(*, document: Document, actor_id: UUID) -> None:
     placement.block.save(update_fields=("archived_at", "updated_at"))
     placement.block.entity.archived_at = archived_at
     placement.block.entity.save(update_fields=("archived_at", "updated_at"))
-    document.listing_references.filter(archived_at__isnull=True).update(
-        archived_at=archived_at, updated_at=archived_at
-    )
+    document.listing_references.filter(archived_at__isnull=True).update(archived_at=archived_at, updated_at=archived_at)
     document.archived_at = archived_at
     document.save(update_fields=("archived_at", "updated_at"))
     document.entity.archived_at = archived_at

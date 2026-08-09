@@ -285,9 +285,7 @@ class PeopleResultSerializer(serializers.Serializer):
 
 class DocumentCreateSerializer(serializers.Serializer):
     title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
-    markdown = serializers.CharField(
-        required=False, allow_blank=True, max_length=1_000_000, trim_whitespace=False
-    )
+    markdown = serializers.CharField(required=False, allow_blank=True, max_length=1_000_000, trim_whitespace=False)
 
 
 class DocumentUpdateSerializer(DocumentCreateSerializer):
@@ -304,6 +302,60 @@ class DocumentPlacementWriteSerializer(serializers.Serializer):
 class DocumentPlacementUpdateSerializer(serializers.Serializer):
     resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SharedBlockUpdateSerializer(serializers.Serializer):
+    markdown = serializers.CharField(allow_blank=True, max_length=1_000_000, trim_whitespace=False)
+    base_revision_id = serializers.UUIDField()
+
+
+class ReuseAudienceSerializer(serializers.Serializer):
+    document_id = serializers.UUIDField()
+    document_title = serializers.CharField()
+    workspace_kind = serializers.ChoiceField(choices=("msp", "organization"))
+    workspace_id = serializers.UUIDField(allow_null=True)
+    workspace_name = serializers.CharField()
+    relationship = serializers.ChoiceField(choices=("source", "placement", "listing"))
+    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
+    will_update = serializers.BooleanField()
+
+
+class ReuseImpactSerializer(serializers.Serializer):
+    block_id = serializers.UUIDField()
+    block_name = serializers.CharField()
+    revision_id = serializers.UUIDField()
+    revision_number = serializers.IntegerField()
+    checksum = serializers.CharField()
+    markdown = serializers.CharField(allow_blank=True)
+    can_edit_shared = serializers.BooleanField()
+    can_detach = serializers.BooleanField()
+    requires_mfa = serializers.BooleanField()
+    audiences = ReuseAudienceSerializer(many=True)
+    live_audience_count = serializers.IntegerField()
+    pinned_audience_count = serializers.IntegerField()
+    truncated = serializers.BooleanField()
+
+
+class EntityMentionSearchQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+    entity_type = serializers.CharField(max_length=80, required=False, allow_blank=True, default="")
+    page = serializers.IntegerField(min_value=1, max_value=1000, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=20, required=False, default=15)
+
+
+class EntityMentionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    display_name = serializers.CharField()
+    entity_type = serializers.CharField()
+    workspace_label = serializers.CharField()
+
+
+class EntityMentionResultSerializer(serializers.Serializer):
+    results = EntityMentionSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
 
 
 class DocumentPlacementSerializer(serializers.Serializer):

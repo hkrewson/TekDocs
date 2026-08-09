@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.4
+  version: 0.2.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -886,6 +886,106 @@ paths:
           description: ''
         '409':
           description: Placement conflict
+  /api/v1/documents/{document_entity_id}/placements/{placement_id}/detach:
+    post:
+      operationId: document_placement_msp_detach
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+  /api/v1/documents/{document_entity_id}/placements/{placement_id}/reuse:
+    get:
+      operationId: document_placement_reuse_msp_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReuseImpact'
+          description: ''
+    put:
+      operationId: document_placement_shared_block_msp_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflict'
+          description: ''
   /api/v1/documents/{document_entity_id}/references:
     get:
       operationId: document_references_list
@@ -1013,6 +1113,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockRevisionDetail'
+          description: ''
+  /api/v1/documents/mention-entities:
+    get:
+      operationId: document_mentions_msp_search
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityMentionResult'
           description: ''
   /api/v1/entities/{entity_id}/custom-fields:
     get:
@@ -2516,6 +2657,124 @@ paths:
           description: ''
         '409':
           description: Placement conflict
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements/{placement_id}/detach:
+    post:
+      operationId: document_placement_organization_detach
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements/{placement_id}/reuse:
+    get:
+      operationId: document_placement_reuse_organization_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReuseImpact'
+          description: ''
+    put:
+      operationId: document_placement_shared_block_organization_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SharedBlockUpdate'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflict'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -2575,6 +2834,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockRevisionDetail'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/mention-entities:
+    get:
+      operationId: document_mentions_organization_search
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityMentionResult'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields:
     get:
@@ -4181,6 +4487,44 @@ components:
       required:
       - link_type
       - target_id
+    EntityMention:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        entity_type:
+          type: string
+        workspace_label:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - id
+      - workspace_label
+    EntityMentionResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityMention'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     EntityReference:
       type: object
       properties:
@@ -4467,6 +4811,10 @@ components:
         markdown:
           type: string
           maxLength: 1000000
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
       required:
       - markdown
     MarkdownRenderResponse:
@@ -5089,6 +5437,16 @@ components:
       - page
       - page_size
       - results
+    RelationshipEnum:
+      enum:
+      - source
+      - placement
+      - listing
+      type: string
+      description: |-
+        * `source` - source
+        * `placement` - placement
+        * `listing` - listing
     ResolutionModeEnum:
       enum:
       - live
@@ -5097,6 +5455,84 @@ components:
       description: |-
         * `live` - Live
         * `pinned` - Pinned
+    ReuseAudience:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        document_title:
+          type: string
+        workspace_kind:
+          $ref: '#/components/schemas/WorkspaceKindEnum'
+        workspace_id:
+          type: string
+          format: uuid
+          nullable: true
+        workspace_name:
+          type: string
+        relationship:
+          $ref: '#/components/schemas/RelationshipEnum'
+        resolution_mode:
+          $ref: '#/components/schemas/ResolutionModeEnum'
+        will_update:
+          type: boolean
+      required:
+      - document_id
+      - document_title
+      - relationship
+      - resolution_mode
+      - will_update
+      - workspace_id
+      - workspace_kind
+      - workspace_name
+    ReuseImpact:
+      type: object
+      properties:
+        block_id:
+          type: string
+          format: uuid
+        block_name:
+          type: string
+        revision_id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+        checksum:
+          type: string
+        markdown:
+          type: string
+        can_edit_shared:
+          type: boolean
+        can_detach:
+          type: boolean
+        requires_mfa:
+          type: boolean
+        audiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReuseAudience'
+        live_audience_count:
+          type: integer
+        pinned_audience_count:
+          type: integer
+        truncated:
+          type: boolean
+      required:
+      - audiences
+      - block_id
+      - block_name
+      - can_detach
+      - can_edit_shared
+      - checksum
+      - live_audience_count
+      - markdown
+      - pinned_audience_count
+      - requires_mfa
+      - revision_id
+      - revision_number
+      - truncated
     RevisionConflict:
       type: object
       properties:
@@ -5211,6 +5647,18 @@ components:
       required:
       - role_id
       - user_id
+    SharedBlockUpdate:
+      type: object
+      properties:
+        markdown:
+          type: string
+          maxLength: 1000000
+        base_revision_id:
+          type: string
+          format: uuid
+      required:
+      - base_revision_id
+      - markdown
     Site:
       type: object
       properties:

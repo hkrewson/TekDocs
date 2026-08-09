@@ -11,7 +11,7 @@ import { configureTekDocsMarkdown, extendSelectionToolbar, normalizeTekDocsMarkd
 type EditorMode = 'wysiwyg' | 'markdown' | 'preview' | 'help'
 type PreviewState = { phase: 'idle' | 'loading' } | { phase: 'ready'; html: string } | { phase: 'error'; message: string }
 
-export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewall replacement', description = 'Canonical Markdown editor', onMarkdownChange }: { initialMarkdown?: string; title?: string; description?: string; onMarkdownChange?: (markdown: string) => void }) {
+export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewall replacement', description = 'Canonical Markdown editor', organizationId, onMarkdownChange }: { initialMarkdown?: string; title?: string; description?: string; organizationId?: string; onMarkdownChange?: (markdown: string) => void }) {
   const editorRoot = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<Crepe | null>(null)
   const [mode, setMode] = useState<EditorMode>('wysiwyg')
@@ -57,7 +57,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
   useEffect(() => {
     if (mode !== 'preview') return
     const controller = new AbortController()
-    void renderMarkdownPreview(markdown, controller.signal)
+    void renderMarkdownPreview(markdown, organizationId, controller.signal)
       .then((html) => setPreview({ phase: 'ready', html }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -65,7 +65,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
         }
       })
     return () => controller.abort()
-  }, [markdown, mode])
+  }, [markdown, mode, organizationId])
 
   const showEditor = () => {
     setEditorSeed(markdown)

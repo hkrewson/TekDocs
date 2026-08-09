@@ -52,6 +52,11 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
     ),
     route(
+        "msp-document-placement-reuse", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW, (PermissionKey.DOCUMENTS_EDIT,)
+    ),
+    route("msp-document-placement-detach", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-mention-search", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
@@ -250,6 +255,25 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-document-placement-detail",
         ("PATCH", "DELETE"),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-placement-reuse",
+        ("GET", "PUT"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-placement-detach",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-mention-search",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,
     ),
     route(

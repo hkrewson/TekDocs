@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
+from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
     RevisionConflict,
@@ -15,6 +16,7 @@ from .documents import (
     add_listing_reference,
     archive_document,
     create_document,
+    detach_document_placement,
     documents_for_scope,
     remove_document_placement,
     remove_listing_reference,
@@ -22,8 +24,10 @@ from .documents import (
     revisions_for_document,
     update_document,
     update_document_placement,
+    update_shared_block,
 )
 from .models import DocumentationListingReference
+from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
     BlockRevisionDetailSerializer,
@@ -36,7 +40,11 @@ from .serializers import (
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentUpdateSerializer,
+    EntityMentionResultSerializer,
+    EntityMentionSearchQuerySerializer,
+    ReuseImpactSerializer,
     RevisionConflictSerializer,
+    SharedBlockUpdateSerializer,
 )
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
 
@@ -101,23 +109,7 @@ def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> 
     try:
         update_document(document=document, actor_id=request.user.pk, **serializer.validated_data)
     except RevisionConflict as conflict:
-        current = conflict.current_revision
-        return Response(
-            {
-                "code": "revision_conflict",
-                "detail": str(conflict),
-                "submitted_base_revision_id": conflict.submitted_base_revision_id,
-                "current_revision": BlockRevisionDetailSerializer(
-                    current,
-                    context={
-                        "current_revision_id": current.id,
-                        "diff_from_parent": revision_diff(current.parent, current),
-                    },
-                ).data,
-                "diff": revision_diff(conflict.base_revision, current),
-            },
-            status=409,
-        )
+        return _revision_conflict_response(conflict)
     return _retrieve(workspace, document_entity_id)
 
 
@@ -156,6 +148,102 @@ def _archive(workspace: ResolvedWorkspace, document_entity_id: UUID, request) ->
 
 def _placement_conflict(conflict: PlacementConflict) -> Response:
     return Response({"code": "placement_conflict", "detail": str(conflict)}, status=409)
+
+
+def _revision_conflict_response(conflict: RevisionConflict) -> Response:
+    current = conflict.current_revision
+    return Response(
+        {
+            "code": "revision_conflict",
+            "detail": str(conflict),
+            "submitted_base_revision_id": conflict.submitted_base_revision_id,
+            "current_revision": BlockRevisionDetailSerializer(
+                current,
+                context={
+                    "current_revision_id": current.id,
+                    "diff_from_parent": revision_diff(current.parent, current),
+                },
+            ).data,
+            "diff": revision_diff(conflict.base_revision, current),
+        },
+        status=409,
+    )
+
+
+def _document_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID):  # type: ignore[no-untyped-def]
+    document = _document(workspace, document_entity_id)
+    placement = get_object_or_404(
+        document.placements.select_related(
+            "document",
+            "document__entity",
+            "document__organization",
+            "document__organization__entity",
+            "block",
+            "block__entity",
+            "block__organization",
+            "block__organization__entity",
+            "block__current_revision",
+            "pinned_revision",
+        ),
+        id=placement_id,
+    )
+    return document, placement
+
+
+def _reuse_impact(workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID) -> Response:
+    _document_record, placement = _document_placement(workspace, document_entity_id, placement_id)
+    impact = reuse_impact_for_placement(context=workspace.member, placement=placement)
+    return Response(ReuseImpactSerializer(impact).data)
+
+
+def _update_shared_placement(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID, request: Request
+) -> Response:
+    _document_record, placement = _document_placement(workspace, document_entity_id, placement_id)
+    require_permission(request.user, PermissionKey.DOCUMENTS_EDIT, organization=placement.block.organization)
+    serializer = SharedBlockUpdateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        update_shared_block(placement=placement, actor_id=request.user.pk, **serializer.validated_data)
+    except RevisionConflict as conflict:
+        return _revision_conflict_response(conflict)
+    return _retrieve(workspace, document_entity_id)
+
+
+def _detach_placement(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID, request: Request
+) -> Response:
+    document, placement = _document_placement(workspace, document_entity_id, placement_id)
+    _mutate_workspace(request, workspace, document)
+    try:
+        detach_document_placement(placement=placement, actor_id=request.user.pk)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    return _retrieve(workspace, document_entity_id)
+
+
+def _mention_search(workspace: ResolvedWorkspace, request: Request) -> Response:
+    query = EntityMentionSearchQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    results, count, has_more = search_entities(
+        workspace=workspace,
+        query=values["q"],
+        entity_type=values["entity_type"],
+        page=values["page"],
+        page_size=min(values["page_size"], 20),
+    )
+    return Response(
+        EntityMentionResultSerializer(
+            {
+                "results": results,
+                "page": values["page"],
+                "page_size": min(values["page_size"], 20),
+                "count": count,
+                "has_more": has_more,
+            }
+        ).data
+    )
 
 
 def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
@@ -279,6 +367,44 @@ class MSPDocumentPlacementDetailView(APIView):
         )
 
 
+class MSPDocumentPlacementReuseView(APIView):
+    @extend_schema(operation_id="document_placement_reuse_msp_retrieve", responses={200: ReuseImpactSerializer})
+    def get(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _reuse_impact(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, placement_id)
+
+    @extend_schema(
+        operation_id="document_placement_shared_block_msp_update",
+        request=SharedBlockUpdateSerializer,
+        responses={200: DocumentSerializer, 409: RevisionConflictSerializer},
+    )
+    def put(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _update_shared_placement(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, placement_id, request
+        )
+
+
+class MSPDocumentPlacementDetachView(APIView):
+    @extend_schema(
+        operation_id="document_placement_msp_detach",
+        request=None,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def post(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _detach_placement(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, placement_id, request
+        )
+
+
+class MSPDocumentMentionSearchView(APIView):
+    @extend_schema(
+        operation_id="document_mentions_msp_search",
+        parameters=[EntityMentionSearchQuerySerializer],
+        responses={200: EntityMentionResultSerializer},
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _mention_search(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
+
+
 class OrganizationDocumentListCreateView(APIView):
     @extend_schema(operation_id="documents_organization_list", responses={200: DocumentResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
@@ -367,6 +493,59 @@ class OrganizationDocumentPlacementDetailView(APIView):
         )
 
 
+class OrganizationDocumentPlacementReuseView(APIView):
+    @extend_schema(
+        operation_id="document_placement_reuse_organization_retrieve",
+        responses={200: ReuseImpactSerializer},
+    )
+    def get(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _reuse_impact(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            placement_id,
+        )
+
+    @extend_schema(
+        operation_id="document_placement_shared_block_organization_update",
+        request=SharedBlockUpdateSerializer,
+        responses={200: DocumentSerializer, 409: RevisionConflictSerializer},
+    )
+    def put(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _update_shared_placement(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            placement_id,
+            request,
+        )
+
+
+class OrganizationDocumentPlacementDetachView(APIView):
+    @extend_schema(
+        operation_id="document_placement_organization_detach",
+        request=None,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def post(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _detach_placement(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            placement_id,
+            request,
+        )
+
+
+class OrganizationDocumentMentionSearchView(APIView):
+    @extend_schema(
+        operation_id="document_mentions_organization_search",
+        parameters=[EntityMentionSearchQuerySerializer],
+        responses={200: EntityMentionResultSerializer},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _mention_search(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        )
+
+
 class MSPDocumentRevisionListView(APIView):
     @extend_schema(operation_id="document_revisions_msp_list", responses={200: BlockRevisionResultSerializer})
     def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
@@ -376,9 +555,7 @@ class MSPDocumentRevisionListView(APIView):
 class MSPDocumentRevisionDetailView(APIView):
     @extend_schema(operation_id="document_revisions_msp_retrieve", responses={200: BlockRevisionDetailSerializer})
     def get(self, request, document_entity_id, revision_id):  # type: ignore[no-untyped-def]
-        return _revision_detail(
-            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, revision_id
-        )
+        return _revision_detail(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, revision_id)
 
 
 class OrganizationDocumentRevisionListView(APIView):

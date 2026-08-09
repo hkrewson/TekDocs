@@ -38,4 +38,23 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'PATCH' })
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' })
   })
+
+  it('reviews, updates, and detaches a shared block through destination-scoped routes', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
+
+    await browserDocumentsClient.getReuseImpact({ organizationId: 'org' }, 'doc', 'placement')
+    await browserDocumentsClient.updateSharedBlock({ organizationId: 'org' }, 'doc', 'placement', 'updated', 'revision')
+    await browserDocumentsClient.detachPlacement({ organizationId: 'org' }, 'doc', 'placement')
+    await browserDocumentsClient.searchMentionEntities({ organizationId: 'org' }, 'router')
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/workspaces/organizations/org/documents/doc/placements/placement/reuse',
+      '/api/v1/workspaces/organizations/org/documents/doc/placements/placement/reuse',
+      '/api/v1/workspaces/organizations/org/documents/doc/placements/placement/detach',
+      '/api/v1/workspaces/organizations/org/documents/mention-entities?q=router&page_size=20',
+    ])
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ markdown: 'updated', base_revision_id: 'revision' }))
+    expect(fetchMock.mock.calls[2]?.[1]?.method).toBe('POST')
+  })
 })

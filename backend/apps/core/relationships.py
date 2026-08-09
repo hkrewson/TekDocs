@@ -171,6 +171,16 @@ def search_entities(
     )
 
 
+def entities_for_mentions(*, workspace: ResolvedWorkspace, entity_ids: set[UUID]) -> list[Entity]:
+    if not entity_ids:
+        return []
+    return list(
+        _visible_entities(workspace=workspace, include_reference_organizations=True)
+        .filter(id__in=entity_ids)
+        .order_by("display_name", "id")[:200]
+    )
+
+
 def _validate_link_type_target(*, definition: LinkTypeDefinition, target: Entity) -> None:
     if definition.target_types and target.entity_type not in definition.target_types:
         raise EntityRelationshipError("The selected record type is not valid for this relationship.")

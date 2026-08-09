@@ -41,16 +41,22 @@ from apps.core.custom_field_views import (
 from apps.core.document_views import (
     MSPDocumentDetailView,
     MSPDocumentListCreateView,
+    MSPDocumentMentionSearchView,
+    MSPDocumentPlacementDetachView,
     MSPDocumentPlacementDetailView,
     MSPDocumentPlacementListCreateView,
+    MSPDocumentPlacementReuseView,
     MSPDocumentReferenceDetailView,
     MSPDocumentReferenceListCreateView,
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
     OrganizationDocumentDetailView,
     OrganizationDocumentListCreateView,
+    OrganizationDocumentMentionSearchView,
+    OrganizationDocumentPlacementDetachView,
     OrganizationDocumentPlacementDetailView,
     OrganizationDocumentPlacementListCreateView,
+    OrganizationDocumentPlacementReuseView,
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
 )
@@ -162,6 +168,9 @@ urlpatterns = [
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
     path(
+        "api/v1/documents/mention-entities", MSPDocumentMentionSearchView.as_view(), name="msp-document-mention-search"
+    ),
+    path(
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
@@ -175,6 +184,16 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>",
         MSPDocumentPlacementDetailView.as_view(),
         name="msp-document-placement-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>/reuse",
+        MSPDocumentPlacementReuseView.as_view(),
+        name="msp-document-placement-reuse",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>/detach",
+        MSPDocumentPlacementDetachView.as_view(),
+        name="msp-document-placement-detach",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/revisions",
@@ -270,6 +289,11 @@ urlpatterns = [
         name="organization-document-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/mention-entities",
+        OrganizationDocumentMentionSearchView.as_view(),
+        name="organization-document-mention-search",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
@@ -283,6 +307,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>",
         OrganizationDocumentPlacementDetailView.as_view(),
         name="organization-document-placement-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>/reuse",
+        OrganizationDocumentPlacementReuseView.as_view(),
+        name="organization-document-placement-reuse",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>/detach",
+        OrganizationDocumentPlacementDetachView.as_view(),
+        name="organization-document-placement-detach",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/revisions",

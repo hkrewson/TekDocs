@@ -106,10 +106,13 @@ assert link.metadata == {}
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block
-assert client_block.current_revision.markdown == "# Acme onboarding\n\nRevision two is retained."
+assert client_block.current_revision.markdown.endswith(
+    "[Live Main Campus](tekdocs://entity/" + str(organization.sites.get(entity__display_name="Live Main Campus").entity_id) + ")"
+)
 assert list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True)) == [
     "# Acme onboarding\n\nClient-owned canonical Markdown.",
     "# Acme onboarding\n\nRevision two is retained.",
+    client_block.current_revision.markdown,
 ]
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
@@ -123,9 +126,11 @@ assert list(shared_block.revisions.order_by("revision_number").values_list("mark
 assert DocumentationListingReference.objects.filter(
     document=shared_document, organization=organization, archived_at__isnull=True
 ).count() == 1
-reuse = client_document.placements.get(block=shared_block)
-assert reuse.resolution_mode == "pinned"
-assert reuse.pinned_revision.markdown == "MSP-owned block revision two."
+reuse = client_document.placements.exclude(parent__isnull=True, position=0).get()
+assert reuse.block != shared_block
+assert reuse.block.organization == organization
+assert reuse.resolution_mode == "live"
+assert reuse.block.current_revision.markdown == "MSP-owned block revision two."
 resolved = resolve_document(client_document).markdown
 assert "MSP-owned block revision two." in resolved
 assert "revision three" not in resolved

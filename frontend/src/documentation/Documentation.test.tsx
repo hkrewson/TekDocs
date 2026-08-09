@@ -24,6 +24,10 @@ function clients() {
   const addPlacement = vi.fn(() => Promise.resolve(composed))
   const updatePlacement = vi.fn(() => Promise.resolve({ ...composed, placements: [primaryPlacement, { ...reusedPlacement, resolution_mode: 'pinned' as const, pinned_revision_id: 'revision-source' }] }))
   const removePlacement = vi.fn(() => Promise.resolve(document))
+  const getReuseImpact = vi.fn().mockResolvedValue({ block_id: 'block-1', block_name: 'Firewall standard — content', revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', markdown: '# Firewall', audiences: [], live_audience_count: 1, pinned_audience_count: 0, can_edit_shared: true, can_detach: false, requires_mfa: true, truncated: false })
+  const updateSharedBlock = vi.fn().mockResolvedValue(document)
+  const detachPlacement = vi.fn().mockResolvedValue(document)
+  const searchMentionEntities = vi.fn().mockResolvedValue({ results: [], count: 0, has_more: false })
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
@@ -33,6 +37,10 @@ function clients() {
     addPlacement,
     updatePlacement,
     removePlacement,
+    getReuseImpact,
+    updateSharedBlock,
+    detachPlacement,
+    searchMentionEntities,
     archive: vi.fn().mockResolvedValue(undefined),
     addReference,
   }
@@ -40,7 +48,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities }
 }
 
 it('lists titles and persists edited Markdown', async () => {
@@ -110,4 +118,21 @@ it('adds a visible document block live and can pin its resolved revision', async
   expect(await screen.findByText(/Live · revision 1/)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Pin revision' }))
   expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused', { resolution_mode: 'pinned', pinned_revision_id: 'revision-source' })
+})
+
+it('reviews shared audiences and detaches a reused block', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, addPlacement, getReuseImpact, detachPlacement } = clients()
+  const reusedImpact = { block_id: 'block-source', block_name: 'Shared checklist — content', revision_id: 'revision-source', revision_number: 1, checksum: 'abc123', markdown: 'Shared content', audiences: [{ relationship: 'placement' as const, document_id: 'doc-1', document_title: 'Firewall standard', workspace_kind: 'msp' as const, workspace_id: 'tenant', workspace_name: 'TekDocs MSP', resolution_mode: 'live' as const, will_update: true }], live_audience_count: 1, pinned_audience_count: 0, can_edit_shared: false, can_detach: true, requires_mfa: true, truncated: false }
+  getReuseImpact.mockResolvedValue(reusedImpact)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.selectOptions(screen.getByLabelText('Document block'), 'doc-source')
+  await user.click(screen.getByRole('button', { name: 'Add block' }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalled())
+  await user.click(screen.getAllByRole('button', { name: 'Review reuse' })[1])
+  expect(await screen.findByRole('heading', { name: 'Reuse impact' })).toBeVisible()
+  expect(screen.getByText('Will update')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Detach into this workspace' }))
+  expect(detachPlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused')
 })

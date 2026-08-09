@@ -19,6 +19,7 @@ from .models import (
     DocumentAttachment,
     DocumentCategory,
     DocumentPlacement,
+    DocumentPublication,
     Entity,
     Organization,
     PlacementResolutionMode,
@@ -116,6 +117,9 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
         tenant_id=scope.tenant_id,
         archived_at__isnull=True,
     ).select_related("entity", "created_by")
+    publications = DocumentPublication.objects.filter(tenant_id=scope.tenant_id).select_related(
+        "entity", "document", "document__entity", "published_by"
+    )
     records = Document.objects.filter(tenant_id=scope.tenant_id, archived_at__isnull=True)
     if scope.organization_id is None:
         records = records.filter(organization__isnull=True)
@@ -132,6 +136,7 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
         records.select_related("entity", "organization", "organization__entity")
         .prefetch_related(Prefetch("placements", queryset=placements, to_attr="active_placements"))
         .prefetch_related(Prefetch("attachments", queryset=attachments, to_attr="active_attachments"))
+        .prefetch_related(Prefetch("publications", queryset=publications, to_attr="retained_publications"))
         .distinct()
     )
 

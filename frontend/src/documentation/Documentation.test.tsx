@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, attachments: [], attachment_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -32,6 +32,9 @@ function clients() {
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
   const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', created_at: '2026-08-09T00:00:00Z' })
   const archiveAttachment = vi.fn().mockResolvedValue(undefined)
+  const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v1' } }
+  const publish = vi.fn().mockResolvedValue(publication)
+  const getPublication = vi.fn().mockResolvedValue(publication)
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
@@ -49,6 +52,10 @@ function clients() {
     importMarkdown,
     uploadAttachment,
     archiveAttachment,
+    publish,
+    getPublication,
+    publicationMarkdownUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/markdown`,
+    publicationManifestUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/manifest`,
     exportUrl: (_scope, id) => `/documents/${id}/export`,
     attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
@@ -58,7 +65,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, getPublication }
 }
 
 it('lists titles and persists edited Markdown', async () => {
@@ -160,4 +167,18 @@ it('imports Markdown and manages a private attachment link', async () => {
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
   await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
   expect(archiveAttachment).toHaveBeenCalledWith({}, 'doc-imported', 'attachment-1')
+})
+
+it('publishes and opens an immutable verified STATIC version', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publish } = clients()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
+  await waitFor(() => expect(publish).toHaveBeenCalledWith({}, 'doc-1'))
+  expect(await screen.findByText('Signature verified')).toBeVisible()
+  expect(screen.getByText(`SHA-256 ${'a'.repeat(64)}`)).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Download Markdown' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/markdown')
+  expect(screen.queryByRole('textbox', { name: 'Document Markdown' })).not.toBeInTheDocument()
 })

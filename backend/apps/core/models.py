@@ -709,6 +709,93 @@ class DocumentAttachment(TimestampedModel):
             raise ValidationError("Attachment entity must use the attachment workspace scope")
 
 
+class DocumentPublication(models.Model):
+    """An append-only STATIC snapshot of one document and its resolved dependencies."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_publications")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="document_publications",
+        null=True,
+        blank=True,
+    )
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="publications")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_publication_record")
+    title = models.CharField(max_length=240)
+    category = models.CharField(max_length=20, choices=DocumentCategory.choices)
+    canonical_markdown = models.TextField(blank=True)
+    sanitized_html = models.TextField(blank=True)
+    manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    signature = models.TextField()
+    signature_algorithm = models.CharField(max_length=20, default="Ed25519")
+    public_key = models.TextField()
+    key_fingerprint = models.CharField(max_length=64)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="document_publications",
+        null=True,
+        blank=True,
+    )
+    published_at = models.DateTimeField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-published_at", "id")
+        indexes = [
+            models.Index(
+                fields=["tenant", "organization", "document", "published_at"],
+                name="core_docpub_scope_idx",
+            ),
+            models.Index(fields=["document", "content_digest"], name="core_docpub_digest_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} — {self.published_at.isoformat()}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Document publications are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Document publications are append-only")
+
+    def clean(self) -> None:
+        if self.document_id and (
+            self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
+        ):
+            raise ValidationError("Publication must use its source document workspace scope")
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Publication entity must use the publication workspace scope")
+        if self.entity_id and self.entity.entity_type != "document_publication":
+            raise ValidationError("Publication entity must use the document_publication type")
+        if not isinstance(self.manifest, dict) or self.manifest.get("format") != "tekdocs-static-publication/v1":
+            raise ValidationError("Publication manifest format is invalid")
+        expected_identity = {
+            "publication_id": str(self.id),
+            "publication_entity_id": str(self.entity_id),
+            "source_document_id": str(self.document.entity_id) if self.document_id else "",
+        }
+        if any(self.manifest.get(key) != value for key, value in expected_identity.items()):
+            raise ValidationError("Publication manifest identity does not match the publication")
+        workspace = self.manifest.get("workspace")
+        organization = self.organization if self.organization_id else None
+        expected_workspace = {
+            "kind": "organization" if self.organization_id else "msp",
+            "id": str(organization.entity_id) if organization is not None else None,
+        }
+        if workspace != expected_workspace:
+            raise ValidationError("Publication manifest workspace does not match the publication")
+
+
 class Block(TimestampedModel):
     """A stable addressable content block whose content is an immutable revision chain."""
 

@@ -32,6 +32,7 @@ def env_int(name: str, default: int) -> int:
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
 TEKDOCS_MASTER_KEY = os.getenv("TEKDOCS_MASTER_KEY", "")
+TEKDOCS_PUBLICATION_SIGNING_KEY = os.getenv("TEKDOCS_PUBLICATION_SIGNING_KEY", "")
 TEKDOCS_BOOTSTRAP_TOKEN = os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", "")
 TEKDOCS_DATABASE_ROLE = os.getenv("TEKDOCS_DATABASE_ROLE", "runtime")
 TEKDOCS_DATABASE_RUNTIME_ROLE = os.getenv("TEKDOCS_DATABASE_RUNTIME_ROLE", "tekdocs_runtime")

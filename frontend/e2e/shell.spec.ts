@@ -29,6 +29,8 @@ const document = {
   placement_count: 1,
   attachments: [],
   attachment_count: 0,
+  publications: [],
+  publication_count: 0,
   created_at: '2026-08-09T12:00:00Z',
   updated_at: '2026-08-09T12:00:00Z',
 }

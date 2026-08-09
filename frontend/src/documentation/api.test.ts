@@ -76,4 +76,19 @@ describe('documentation placement API client', () => {
     expect(browserDocumentsClient.exportUrl(scope, 'doc').endsWith('/documents/doc/export')).toBe(true)
     expect(browserDocumentsClient.attachmentDownloadUrl(scope, 'doc', 'attachment').endsWith('/attachments/attachment/download')).toBe(true)
   })
+
+  it('publishes and retrieves STATIC artifacts through workspace-scoped routes', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ verification: { valid: true } }), { status: 200 })))
+    const scope = { organizationId: 'org' }
+
+    await browserDocumentsClient.publish(scope, 'doc')
+    await browserDocumentsClient.getPublication(scope, 'doc', 'publication')
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications')
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications/publication')
+    expect(browserDocumentsClient.publicationMarkdownUrl(scope, 'doc', 'publication')).toContain('/publications/publication/markdown')
+    expect(browserDocumentsClient.publicationManifestUrl(scope, 'doc', 'publication')).toContain('/publications/publication/manifest')
+  })
 })

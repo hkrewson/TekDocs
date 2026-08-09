@@ -4,7 +4,7 @@ import re
 from collections.abc import Mapping
 from html import escape
 from io import BytesIO
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from uuid import UUID
 
 import nh3
@@ -39,7 +39,7 @@ class RenderedAttachment(TypedDict):
     id: str
     filename: str
     size: int
-    download_url: str
+    download_url: NotRequired[str]
 
 
 def _replace_inline_content(markdown: MarkdownIt, token: Token, value: str, env: dict[str, object]) -> None:
@@ -223,8 +223,16 @@ def _attachment_reference_cards(markdown: MarkdownIt):  # type: ignore[no-untype
                 if isinstance(projection, Mapping):
                     filename = str(projection.get("filename", "Managed attachment"))
                     size = int(projection.get("size", 0))
+                    download_url = str(projection.get("download_url", ""))
                     opening.attrs = {}
-                    opening.attrSet("href", str(projection.get("download_url", "")))
+                    if download_url:
+                        opening.attrSet("href", download_url)
+                    else:
+                        opening.type = "span_open"
+                        opening.tag = "span"
+                        closing = children[closing_index]
+                        closing.type = "span_close"
+                        closing.tag = "span"
                     opening.attrSet("class", "attachment-reference")
                     opening.attrSet("data-attachment-id", attachment_id)
                     opening.attrSet("aria-label", f"Download attachment: {filename}")

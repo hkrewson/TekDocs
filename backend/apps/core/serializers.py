@@ -12,6 +12,7 @@ from .models import (
     Document,
     DocumentCategory,
     DocumentPlacement,
+    DocumentPublication,
     LocationKind,
     Organization,
     OrganizationAccessMode,
@@ -340,6 +341,50 @@ class DocumentAttachmentSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
 
 
+class PublicationVerificationSerializer(serializers.Serializer):
+    valid = serializers.BooleanField()
+    digest_valid = serializers.BooleanField()
+    signature_valid = serializers.BooleanField()
+    key_fingerprint_valid = serializers.BooleanField()
+
+
+class DocumentPublicationSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    source_document_id = serializers.UUIDField(source="document.entity_id")
+    title = serializers.CharField()
+    category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    content_digest = serializers.CharField()
+    signature_algorithm = serializers.CharField()
+    signature = serializers.CharField()
+    public_key = serializers.CharField()
+    key_fingerprint = serializers.CharField()
+    published_by = serializers.SerializerMethodField()
+    published_at = serializers.DateTimeField()
+    verification = serializers.SerializerMethodField()
+
+    def get_published_by(self, obj: DocumentPublication) -> str | None:
+        if obj.published_by is None:
+            return None
+        return obj.published_by.get_full_name() or obj.published_by.get_username()
+
+    @extend_schema_field(PublicationVerificationSerializer)
+    def get_verification(self, obj: DocumentPublication) -> dict[str, bool]:
+        from .publications import verify_publication
+
+        return verify_publication(obj)
+
+
+class DocumentPublicationDetailSerializer(DocumentPublicationSerializer):
+    canonical_markdown = serializers.CharField(allow_blank=True)
+    sanitized_html = serializers.CharField(allow_blank=True)
+    manifest = serializers.JSONField()
+
+
+class DocumentPublicationResultSerializer(serializers.Serializer):
+    results = DocumentPublicationSerializer(many=True)
+    count = serializers.IntegerField()
+
+
 class DocumentPlacementWriteSerializer(serializers.Serializer):
     source_document_id = serializers.UUIDField()
     resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
@@ -479,6 +524,8 @@ class DocumentSerializer(serializers.Serializer):
     is_template = serializers.BooleanField()
     attachments = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
+    publications = serializers.SerializerMethodField()
+    publication_count = serializers.SerializerMethodField()
     markdown = serializers.SerializerMethodField()
     block_id = serializers.SerializerMethodField()
     current_revision_id = serializers.SerializerMethodField()
@@ -507,6 +554,17 @@ class DocumentSerializer(serializers.Serializer):
     def get_attachment_count(self, obj: Document) -> int:
         records = getattr(obj, "active_attachments", None)
         return len(records) if records is not None else obj.attachments.filter(archived_at__isnull=True).count()
+
+    @extend_schema_field(DocumentPublicationSerializer(many=True))
+    def get_publications(self, obj: Document) -> list[dict[str, object]]:
+        records = getattr(obj, "retained_publications", None)
+        if records is None:
+            records = obj.publications.select_related("entity", "published_by").order_by("-published_at", "id")
+        return cast(list[dict[str, object]], DocumentPublicationSerializer(records, many=True).data)
+
+    def get_publication_count(self, obj: Document) -> int:
+        records = getattr(obj, "retained_publications", None)
+        return len(records) if records is not None else obj.publications.count()
 
     def _placement(self, obj: Document) -> DocumentPlacement | None:
         placements = cast(tuple[DocumentPlacement, ...], getattr(obj, "active_placements", ()))

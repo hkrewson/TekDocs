@@ -1,3 +1,4 @@
+import base64
 import secrets
 
 import pytest
@@ -10,6 +11,7 @@ from tekdocs.settings.validation import (
     validate_production_email,
     validate_production_public_url,
     validate_production_security,
+    validate_publication_signing_key,
 )
 
 VALID_CONFIGURATION = {
@@ -27,6 +29,16 @@ VALID_CONFIGURATION = {
 
 def test_valid_production_email_configuration_is_accepted():
     validate_production_email(**VALID_CONFIGURATION)
+
+
+def test_valid_publication_signing_key_is_accepted():
+    validate_publication_signing_key(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii"))
+
+
+@pytest.mark.parametrize("value", ["", "too-short", "+" + "A" * 42 + "="])
+def test_invalid_publication_signing_key_is_rejected(value):
+    with pytest.raises(ImproperlyConfigured, match="PUBLICATION_SIGNING_KEY"):
+        validate_publication_signing_key(value)
 
 
 def test_non_integer_email_setting_is_rejected(monkeypatch):

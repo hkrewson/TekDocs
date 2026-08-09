@@ -1,3 +1,5 @@
+import base64
+import binascii
 import re
 from collections.abc import Mapping
 from email.utils import getaddresses
@@ -15,6 +17,17 @@ OIDC_ENVIRONMENT_KEYS = (
     "TEKDOCS_OIDC_CLIENT_SECRET",
 )
 OIDC_PROVIDER_ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+
+
+def validate_publication_signing_key(value: str) -> None:
+    if re.fullmatch(r"[A-Za-z0-9_-]{43}=", value) is None:
+        raise ImproperlyConfigured("TEKDOCS_PUBLICATION_SIGNING_KEY must be URL-safe base64 encoded")
+    try:
+        decoded = base64.b64decode(value.encode("ascii"), altchars=b"-_", validate=True)
+    except (UnicodeEncodeError, binascii.Error) as exc:
+        raise ImproperlyConfigured("TEKDOCS_PUBLICATION_SIGNING_KEY must be URL-safe base64 encoded") from exc
+    if len(decoded) != 32:
+        raise ImproperlyConfigured("TEKDOCS_PUBLICATION_SIGNING_KEY must encode exactly 32 bytes")
 
 
 def oidc_provider_from_environment(environment: Mapping[str, str]) -> dict[str, str] | None:

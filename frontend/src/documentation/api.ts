@@ -29,6 +29,8 @@ export type DocumentRecord = {
   is_template: boolean
   attachments: DocumentAttachment[]
   attachment_count: number
+  publications: DocumentPublication[]
+  publication_count: number
   markdown: string
   block_id: string
   current_revision_id: string
@@ -41,6 +43,26 @@ export type DocumentRecord = {
   updated_at: string
 }
 export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; created_at: string }
+export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
+export type DocumentPublication = {
+  id: string
+  source_document_id: string
+  title: string
+  category: DocumentCategory
+  content_digest: string
+  signature_algorithm: 'Ed25519'
+  signature: string
+  public_key: string
+  key_fingerprint: string
+  published_by: string | null
+  published_at: string
+  verification: PublicationVerification
+}
+export type DocumentPublicationDetail = DocumentPublication & {
+  canonical_markdown: string
+  sanitized_html: string
+  manifest: Record<string, unknown>
+}
 export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'>
 export type DocumentUpdateInput = DocumentInput & { base_revision_id: string }
 export type DocumentResult = { results: DocumentRecord[]; count: number }
@@ -63,6 +85,7 @@ export type RevisionConflictPayload = {
   diff: string
 }
 export type PlacementConflictPayload = { code: 'placement_conflict'; detail: string }
+export type PublicationConflictPayload = { code: 'publication_conflict'; detail: string }
 export type PlacementInput = {
   source_document_id: string
   resolution_mode: PlacementResolutionMode
@@ -130,6 +153,10 @@ export interface DocumentsClient {
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
+  publish(scope: DocumentScope, id: string): Promise<DocumentPublicationDetail>
+  getPublication(scope: DocumentScope, id: string, publicationId: string): Promise<DocumentPublicationDetail>
+  publicationMarkdownUrl(scope: DocumentScope, id: string, publicationId: string): string
+  publicationManifestUrl(scope: DocumentScope, id: string, publicationId: string): string
   exportUrl(scope: DocumentScope, id: string): string
   attachmentDownloadUrl(scope: DocumentScope, id: string, attachmentId: string): string
   archive(scope: DocumentScope, id: string): Promise<void>
@@ -155,9 +182,10 @@ async function csrfToken() {
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 409) {
-      const payload = await response.json() as RevisionConflictPayload | PlacementConflictPayload
+      const payload = await response.json() as RevisionConflictPayload | PlacementConflictPayload | PublicationConflictPayload
       if (payload.code === 'revision_conflict') throw new RevisionConflictError(payload)
       if (payload.code === 'placement_conflict') throw new AuthRequestError(payload.detail, 409)
+      if (payload.code === 'publication_conflict') throw new AuthRequestError(payload.detail, 409)
     }
     const message = response.status === 403
       ? 'Your account is not authorized to change documentation in this workspace.'
@@ -231,6 +259,12 @@ export const browserDocumentsClient: DocumentsClient = {
     return mutateForm<DocumentAttachment>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments`, form)
   },
   archiveAttachment: (scope, id, attachmentId) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
+  publish: (scope, id) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications`, 'POST'),
+  async getPublication(scope, id, publicationId) {
+    return parse<DocumentPublicationDetail>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  publicationMarkdownUrl: (scope, id, publicationId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/markdown`,
+  publicationManifestUrl: (scope, id, publicationId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/manifest`,
   exportUrl: (scope, id) => `${collectionPath(scope)}/${encodeURIComponent(id)}/export`,
   attachmentDownloadUrl: (scope, id, attachmentId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/download`,
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),

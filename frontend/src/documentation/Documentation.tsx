@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, BookOpenText, Copy, Download, ExternalLink, FileUp, History, Link2, Paperclip, Pin, Plus, Search, Share2, Trash2, Unlink, X } from 'lucide-react'
+import { Archive, BookOpenText, Copy, Download, ExternalLink, FileCheck2, FileUp, History, Link2, Paperclip, Pin, Plus, Search, Share2, ShieldCheck, Trash2, Unlink, X } from 'lucide-react'
+import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
 import { browserWorkspaceClient } from '../workspaces/api'
 import { browserDocumentsClient, RevisionConflictError } from './api'
-import type { BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentRecord, DocumentsClient, EntityMentionOption, ReuseImpact } from './api'
+import type { BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentsClient, EntityMentionOption, ReuseImpact } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 const categories: { value: DocumentCategory; label: string }[] = [
@@ -47,6 +48,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOptions, setMentionOptions] = useState<EntityMentionOption[]>([])
   const [editorGeneration, setEditorGeneration] = useState(0)
+  const [publicationView, setPublicationView] = useState<{ sourceId: string; phase: 'loading' | 'ready' | 'error'; record?: DocumentPublicationDetail } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
   const attachmentInput = useRef<HTMLInputElement>(null)
 
@@ -83,9 +85,14 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
   const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]) }
-  const open = (document: DocumentRecord) => { resetRevisionUi(); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
-  const create = () => { resetRevisionUi(); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
-  const close = () => { resetRevisionUi(); setSelected(null); setShareQuery(''); setShareOptions([]) }
+  const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
+  const create = () => { resetRevisionUi(); setPublicationView(null); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
+  const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setShareQuery(''); setShareOptions([]) }
+  const openPublication = async (document: DocumentRecord, publication: DocumentPublication) => {
+    resetRevisionUi(); setSelected(null); setPublicationView({ sourceId: document.id, phase: 'loading' }); setError(null); setMessage(null)
+    try { setPublicationView({ sourceId: document.id, phase: 'ready', record: await client.getPublication(scope, document.id, publication.id) }) }
+    catch (publicationError) { setPublicationView({ sourceId: document.id, phase: 'error' }); setError(errorMessage(publicationError)) }
+  }
   const save = async (skipImpactReview = false) => {
     if (!selected || !title.trim()) return
     setSaving(true); setError(null)
@@ -246,6 +253,19 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://attachment/${attachmentId})`)
     setEditorGeneration((value) => value + 1)
   }
+  const publishStatic = async () => {
+    if (!selected || selected === 'new') return
+    if (!window.confirm(`Publish an immutable STATIC version of “${selected.title}”? The retained version cannot be edited or deleted.`)) return
+    setSaving(true); setError(null)
+    try {
+      const publication = await client.publish(scope, selected.id)
+      const sourceId = selected.id
+      setLoaded((current) => current ? { ...current, results: current.results.map((document) => document.id === sourceId ? { ...document, publications: [publication, ...document.publications], publication_count: document.publication_count + 1 } : document) } : current)
+      setSelected(null)
+      setPublicationView({ sourceId, phase: 'ready', record: publication })
+      setMessage('Immutable STATIC publication created and signature verified.')
+    } catch (publicationError) { setError(errorMessage(publicationError)) } finally { setSaving(false) }
+  }
 
   return <>
     <header className="page-header"><div><h1>Documentation</h1><p>{workspace ? `Documents owned by or referenced into ${workspace.name}.` : 'MSP-owned procedures, policies, and reusable reference material.'}</p></div><div className="page-actions"><input ref={importInput} aria-label="Markdown file to import" className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} />Import Markdown</button><button className="primary-button" type="button" onClick={create}><Plus size={16} />New document</button></div></header>
@@ -257,14 +277,20 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       {visiblePhase === 'loading' && <p className="empty-state" role="status">Loading documents…</p>}
       {visiblePhase === 'error' && <p className="empty-state">Documents are unavailable.</p>}
       {visiblePhase === 'ready' && results.length === 0 && <p className="empty-state">No documents have been added to this workspace.</p>}
-      {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || 'Untitled document'}</strong><small>{categories.find((item) => item.value === document.category)?.label}{document.is_template ? ' · Template' : ''}{document.is_reference ? ' · MSP reference' : ''}</small></span></button></li>)}</ul>}
+      {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || 'Untitled document'}</strong><small>{categories.find((item) => item.value === document.category)?.label}{document.is_template ? ' · Template' : ''}{document.is_reference ? ' · MSP reference' : ''}{document.publication_count ? ` · ${document.publication_count} STATIC` : ''}</small></span></button>{document.publications.length > 0 && <ul className="static-publication-list">{document.publications.map((publication) => <li key={publication.id}><button type="button" onClick={() => { void openPublication(document, publication) }}><FileCheck2 size={15} /><span><strong>{publication.title}</strong><small>STATIC · {new Date(publication.published_at).toLocaleString()} · {publication.verification.valid ? 'Verified' : 'Verification failed'}</small></span></button></li>)}</ul>}</li>)}</ul>}
     </section>
+    {publicationView && <section className="document-workspace static-publication" aria-label="STATIC publication">
+      <div className="document-edit-heading"><div><h2>{publicationView.record?.title ?? 'STATIC publication'}</h2><p>Immutable retained version</p></div><button className="icon-button" type="button" aria-label="Close publication" onClick={close}><X size={19} /></button></div>
+      {publicationView.phase === 'loading' && <p className="empty-state" role="status">Loading STATIC publication…</p>}
+      {publicationView.phase === 'error' && <p className="empty-state">This STATIC publication is unavailable.</p>}
+      {publicationView.phase === 'ready' && publicationView.record && <><div className="publication-integrity"><ShieldCheck size={18} /><div><strong>{publicationView.record.verification.valid ? 'Signature verified' : 'Verification failed'}</strong><span>{publicationView.record.signature_algorithm} · published {new Date(publicationView.record.published_at).toLocaleString()} by {publicationView.record.published_by ?? 'System'}</span><code>SHA-256 {publicationView.record.content_digest}</code><code>Key {publicationView.record.key_fingerprint}</code></div></div><SanitizedMarkdown html={publicationView.record.sanitized_html} /><div className="document-actions"><a className="secondary-button" href={client.publicationMarkdownUrl(scope, publicationView.sourceId, publicationView.record.id)}><Download size={15} />Download Markdown</a><a className="secondary-button" href={client.publicationManifestUrl(scope, publicationView.sourceId, publicationView.record.id)}><Download size={15} />Download manifest</a></div></>}
+    </section>}
     {selected && <section className="document-workspace" aria-label={selected === 'new' ? 'New document' : `Edit ${selected.title}`}>
       <div className="document-edit-heading"><label>Document title<input autoFocus={selected === 'new'} maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
       <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`${selected === 'new' ? 'new' : selected.id}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="Canonical Markdown · changes save to PostgreSQL" organizationId={workspace?.id} documentId={selected === 'new' ? undefined : selected.id} onMarkdownChange={setMarkdown} /></Suspense>
       <div className="entity-mention-picker"><label><Search size={15} /><span>Reference an entity</span><input type="search" placeholder="Search people, sites, organizations…" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionQuery.trim() && mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div>
       {conflict && <div className="revision-conflict" role="alert"><strong>Newer revision detected</strong><p>Your draft remains in the editor. Review the server changes below and reconcile them into your draft.</p>{conflict.payload.diff && <pre>{conflict.payload.diff}</pre>}<button className="secondary-button" type="button" onClick={acknowledgeConflict}>I reconciled with revision {conflict.payload.current_revision.revision_number}</button></div>}
-      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void publishStatic() }}><FileCheck2 size={15} />Publish STATIC</button>}{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
       {selected !== 'new' && <section className="document-attachments" aria-labelledby="document-attachments-heading"><div className="section-heading"><div><h2 id="document-attachments-heading">Attachments</h2><p>Private managed files referenced by stable Markdown links.</p></div><div><input ref={attachmentInput} aria-label="Attachment file" className="sr-only" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => attachmentInput.current?.click()}><Paperclip size={15} />Add attachment</button></div></div>{selected.attachments.length === 0 ? <p className="empty-state">No files attached.</p> : <ul>{selected.attachments.map((attachment) => <li key={attachment.id}><a href={client.attachmentDownloadUrl(scope, selected.id, attachment.id)}><strong>{attachment.filename}</strong><small>{attachment.media_type} · {attachment.size.toLocaleString()} bytes</small></a><div><button className="secondary-button" type="button" onClick={() => insertAttachment(attachment.id, attachment.filename)}>Insert link</button><button className="icon-button" type="button" aria-label={`Remove ${attachment.filename}`} disabled={saving} onClick={() => { void removeAttachment(attachment.id) }}><Trash2 size={15} /></button></div></li>)}</ul>}</section>}
       {selected !== 'new' && <section className="document-composition" aria-labelledby="document-composition-heading">
         <div className="section-heading"><div><h2 id="document-composition-heading">Reusable blocks</h2><p>Live blocks follow new revisions. Pinned blocks retain the selected revision.</p></div><span>{selected.placement_count} block{selected.placement_count === 1 ? '' : 's'}</span></div>

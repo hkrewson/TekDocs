@@ -1,6 +1,7 @@
+from typing import cast
 from uuid import UUID
 
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -36,7 +37,8 @@ from .documents import (
     update_document_placement,
     update_shared_block,
 )
-from .models import Document, DocumentationListingReference, DocumentAttachment
+from .models import Document, DocumentationListingReference, DocumentAttachment, DocumentPublication
+from .publications import PublicationConflict, canonical_json, publish_document
 from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
@@ -50,6 +52,8 @@ from .serializers import (
     DocumentListQuerySerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
+    DocumentPublicationDetailSerializer,
+    DocumentPublicationResultSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentTemplateInstantiateSerializer,
@@ -249,6 +253,74 @@ def _archive_attachment(
     _mutate_workspace(request, workspace, document)
     archive_document_attachment(attachment=attachment, actor_id=request.user.pk)
     return Response(status=204)
+
+
+def _publication_records(document: Document):  # type: ignore[no-untyped-def]
+    return DocumentPublication.objects.filter(tenant=document.tenant, document=document).select_related(
+        "entity", "document", "document__entity", "published_by"
+    )
+
+
+def _publication(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, publication_entity_id: UUID
+) -> DocumentPublication:
+    document = _document(workspace, document_entity_id)
+    return cast(
+        DocumentPublication,
+        get_object_or_404(_publication_records(document), entity_id=publication_entity_id),
+    )
+
+
+def _list_publications(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
+    document = _document(workspace, document_entity_id)
+    records = list(_publication_records(document).order_by("-published_at", "id")[:200])
+    return Response(DocumentPublicationResultSerializer({"results": records, "count": len(records)}).data)
+
+
+def _publish(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    workspace_organization_id = workspace.organization.id if workspace.organization is not None else None
+    if document.organization_id != workspace_organization_id:
+        # A referenced MSP document is readable from a client workspace, but
+        # only its owning workspace may freeze dependency projections.
+        raise Http404
+    require_permission(request.user, PermissionKey.DOCUMENTS_PUBLISH, organization=document.organization)
+    try:
+        publication = publish_document(workspace=workspace, document=document, actor_id=request.user.pk)
+    except PublicationConflict as conflict:
+        return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
+    return Response(DocumentPublicationDetailSerializer(publication).data, status=201)
+
+
+def _retrieve_publication(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, publication_entity_id: UUID
+) -> Response:
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    return Response(DocumentPublicationDetailSerializer(publication).data)
+
+
+def _publication_markdown(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, publication_entity_id: UUID
+) -> HttpResponse:
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    filename = f"{slugify(publication.title) or 'publication'}-static.md"
+    response = HttpResponse(publication.canonical_markdown.encode("utf-8"), content_type="text/markdown; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _publication_manifest(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, publication_entity_id: UUID
+) -> HttpResponse:
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    filename = f"{slugify(publication.title) or 'publication'}-manifest.json"
+    response = HttpResponse(canonical_json(publication.manifest) + b"\n", content_type="application/json")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def _revision_list(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
@@ -529,6 +601,47 @@ class MSPDocumentAttachmentDownloadView(APIView):
         )
 
 
+class MSPDocumentPublicationListCreateView(APIView):
+    @extend_schema(operation_id="document_publications_msp_list", responses={200: DocumentPublicationResultSerializer})
+    def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _list_publications(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
+
+    @extend_schema(
+        operation_id="document_publications_msp_create",
+        request=None,
+        responses={201: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="Dependency conflict")},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _publish(_msp_workspace(request, PermissionKey.DOCUMENTS_PUBLISH), document_entity_id, request)
+
+
+class MSPDocumentPublicationDetailView(APIView):
+    @extend_schema(
+        operation_id="document_publications_msp_retrieve",
+        responses={200: DocumentPublicationDetailSerializer},
+    )
+    def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _retrieve_publication(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, publication_entity_id
+        )
+
+
+class MSPDocumentPublicationMarkdownView(APIView):
+    @extend_schema(operation_id="document_publications_msp_markdown", responses={(200, "text/markdown"): bytes})
+    def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_markdown(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, publication_entity_id
+        )
+
+
+class MSPDocumentPublicationManifestView(APIView):
+    @extend_schema(operation_id="document_publications_msp_manifest", responses={(200, "application/json"): bytes})
+    def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_manifest(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, publication_entity_id
+        )
+
+
 class MSPDocumentPlacementListCreateView(APIView):
     @extend_schema(
         operation_id="document_placements_msp_create",
@@ -718,6 +831,67 @@ class OrganizationDocumentAttachmentDownloadView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
             attachment_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationListCreateView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_list",
+        responses={200: DocumentPublicationResultSerializer},
+    )
+    def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _list_publications(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+        )
+
+    @extend_schema(
+        operation_id="document_publications_organization_create",
+        request=None,
+        responses={201: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="Dependency conflict")},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _publish(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentPublicationDetailView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_retrieve",
+        responses={200: DocumentPublicationDetailSerializer},
+    )
+    def get(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _retrieve_publication(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationMarkdownView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_markdown", responses={(200, "text/markdown"): bytes}
+    )
+    def get(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_markdown(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationManifestView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_manifest", responses={(200, "application/json"): bytes}
+    )
+    def get(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_manifest(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
         )
 
 

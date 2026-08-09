@@ -2,11 +2,20 @@
 set -eu
 
 target="${1:-.env}"
+
+generate_url_safe_32_byte_key() {
+  openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'
+}
+
 if [ -e "$target" ]; then
   umask 077
   changed=false
   if ! grep -q '^TEKDOCS_BOOTSTRAP_TOKEN=' "$target"; then
     echo "TEKDOCS_BOOTSTRAP_TOKEN=$(openssl rand -base64 32 | tr -d '\n')" >> "$target"
+    changed=true
+  fi
+  if ! grep -q '^TEKDOCS_PUBLICATION_SIGNING_KEY=' "$target"; then
+    echo "TEKDOCS_PUBLICATION_SIGNING_KEY=$(generate_url_safe_32_byte_key)" >> "$target"
     changed=true
   fi
   if ! grep -q '^POSTGRES_OWNER_USER=' "$target"; then
@@ -34,7 +43,7 @@ postgres_owner_password="$(openssl rand -hex 32)"
 postgres_runtime_password="$(openssl rand -hex 32)"
 django_secret="$(openssl rand -base64 48 | tr -d '\n')"
 master_key="$(openssl rand -base64 32 | tr -d '\n')"
-signing_key="$(openssl rand -base64 32 | tr -d '\n')"
+signing_key="$(generate_url_safe_32_byte_key)"
 bootstrap_token="$(openssl rand -base64 32 | tr -d '\n')"
 
 {

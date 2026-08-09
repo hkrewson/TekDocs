@@ -426,7 +426,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.4` | **Complete:** live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | **Complete:** backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | **Complete:** document categories, reusable templates, managed private attachments, and deterministic Markdown import/export. |
-| `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
+| `0.2.7` | **Complete:** immutable STATIC dependency resolution, canonical snapshot/manifest, content digest, and Ed25519 signing. |
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
 | `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
 | `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
@@ -508,6 +508,20 @@ Evidence: `docs/releases/0.2.5.md`.
 - [x] Migration, OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.6`.
 
 Evidence: `docs/releases/0.2.6.md`.
+
+### `0.2.7` acceptance criteria
+
+- [x] Publishing creates a separate immutable `DocumentPublication`; it never freezes or mutates the source document, and later source, block, entity, or attachment changes cannot alter retained publication content.
+- [x] Publication resolves the exact ordered block revisions, authorized entity projections, and active source-document attachment metadata referenced by canonical Markdown; unavailable or foreign dependencies fail atomically and non-disclosingly.
+- [x] The canonical manifest uses a versioned deterministic JSON contract containing publication/document/workspace identity, title/category, exact placement revisions, entity projections, attachment metadata, publisher, and publication timestamp.
+- [x] TekDocs stores canonical Markdown, sanitized self-contained HTML, the manifest, and a SHA-256 digest of an unambiguous canonical snapshot payload; recalculation detects any stored-content or manifest change.
+- [x] A maintained Ed25519 implementation signs the content digest with a deployment-supplied private key. The publication retains the algorithm, signature, public verification key, and key fingerprint, and exposes a verification result without returning private key material.
+- [x] Publication rows are append-only in Django and PostgreSQL. Update/delete attempts, cross-scope edges, malformed manifests, and duplicate publication identities fail below the view layer, while source records retain normal editing.
+- [x] List, detail, publish, Markdown-download, and manifest-download routes use the central `documents.view`/`documents.publish` policies, MFA/CSRF rules, forced private downloads, route inventory, forced RLS, and sibling/cross-tenant IDOR coverage.
+- [x] The Documentation interface clearly distinguishes editable source documents from retained STATIC publications and provides restrained publish, list, open, verification, and artifact-download states with keyboard, responsive, denial, and accessibility coverage.
+- [x] Migration, OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.7`.
+
+Evidence: `docs/releases/0.2.7.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

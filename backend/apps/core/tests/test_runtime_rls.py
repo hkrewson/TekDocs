@@ -14,6 +14,7 @@ from apps.core.models import (
     DocumentationListingReference,
     DocumentAttachment,
     DocumentPlacement,
+    DocumentPublication,
     Entity,
     Organization,
     Tenant,
@@ -148,9 +149,7 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     )
     block.current_revision = revision
     block.save(update_fields=("current_revision", "updated_at"))
-    placement = DocumentPlacement.objects.create(
-        tenant=tenant, document=document, block=block, position=0
-    )
+    placement = DocumentPlacement.objects.create(tenant=tenant, document=document, block=block, position=0)
     reference = DocumentationListingReference.objects.create(
         tenant=tenant, organization=selected_org, document=document
     )
@@ -169,6 +168,34 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         size=1,
         checksum=sha256(b"x").hexdigest(),
     )
+    publication_entity = Entity.objects.create(
+        tenant=tenant,
+        entity_type="document_publication",
+        display_name="Shared runbook STATIC",
+    )
+    publication_id = uuid.uuid4()
+    publication = DocumentPublication.objects.create(
+        id=publication_id,
+        tenant=tenant,
+        document=document,
+        entity=publication_entity,
+        title="Shared runbook",
+        category="reference",
+        canonical_markdown="Reference content\n",
+        sanitized_html="<p>Reference content</p>",
+        manifest={
+            "format": "tekdocs-static-publication/v1",
+            "publication_id": str(publication_id),
+            "publication_entity_id": str(publication_entity.id),
+            "source_document_id": str(document.entity_id),
+            "workspace": {"kind": "msp", "id": None},
+        },
+        content_digest="a" * 64,
+        signature="fixture",
+        public_key="fixture",
+        key_fingerprint="b" * 64,
+        published_at="2026-08-09T12:00:00Z",
+    )
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         _bind(cursor, tenant.id, "organization", selected_org.id)
@@ -184,6 +211,10 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         assert cursor.fetchall() == [(reference.id,)]
         cursor.execute("SELECT id FROM core_documentattachment")
         assert cursor.fetchall() == [(attachment.id,)]
+        cursor.execute("SELECT id FROM core_documentpublication")
+        assert cursor.fetchall() == [(publication.id,)]
+        cursor.execute("SELECT id FROM core_entity WHERE entity_type = 'document_publication'")
+        assert cursor.fetchall() == [(publication_entity.id,)]
         runtime.commit()
 
         _bind(cursor, tenant.id, "organization", sibling_org.id)
@@ -194,6 +225,7 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
             "core_documentplacement",
             "core_documentationlistingreference",
             "core_documentattachment",
+            "core_documentpublication",
         ):
             cursor.execute(f"SELECT count(*) FROM {table}")  # noqa: S608 - fixed test allowlist
             assert cursor.fetchone() == (0,)

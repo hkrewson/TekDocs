@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from hashlib import sha256
 
 import pytest
@@ -27,11 +28,13 @@ from apps.core.models import (
     DocumentationListingReference,
     DocumentAttachment,
     DocumentPlacement,
+    DocumentPublication,
     Entity,
     InstallationState,
     Organization,
     OrganizationClassification,
 )
+from apps.core.publications import canonical_json, verify_publication
 
 
 @pytest.fixture
@@ -125,9 +128,221 @@ def test_document_categories_templates_and_filters_persist(owner_client, install
 
 
 @pytest.mark.django_db
-def test_template_instantiation_copies_owned_attachments_and_rewrites_markdown(
+def test_static_publication_freezes_dependencies_and_verifies_after_source_changes(
     owner_client, installation, tmp_path
 ):
+    client_org = organization(installation.tenant, "Static Client")
+    collection = reverse("organization-document-list-create", kwargs={"organization_entity_id": client_org.entity_id})
+    with override_settings(MEDIA_ROOT=tmp_path):
+        created = owner_client.post(
+            collection,
+            {"title": "Access standard", "markdown": "Initial", "category": "policy"},
+            content_type="application/json",
+        ).json()
+        attachment = owner_client.post(
+            reverse(
+                "organization-document-attachment-list-create",
+                kwargs={"organization_entity_id": client_org.entity_id, "document_entity_id": created["id"]},
+            ),
+            {"file": SimpleUploadedFile("evidence.txt", b"retained evidence", content_type="text/html")},
+        ).json()
+        source_markdown = (
+            "# Access standard\n\n"
+            f"[Client](tekdocs://entity/{client_org.entity_id})\n\n"
+            f"[Evidence](tekdocs://attachment/{attachment['id']})"
+        )
+        detail_url = reverse(
+            "organization-document-detail",
+            kwargs={"organization_entity_id": client_org.entity_id, "document_entity_id": created["id"]},
+        )
+        updated = owner_client.put(
+            detail_url,
+            {
+                "title": "Access standard",
+                "markdown": source_markdown,
+                "base_revision_id": created["current_revision_id"],
+                "category": "policy",
+            },
+            content_type="application/json",
+        ).json()
+        publication_url = reverse(
+            "organization-document-publication-list-create",
+            kwargs={"organization_entity_id": client_org.entity_id, "document_entity_id": created["id"]},
+        )
+        response = owner_client.post(publication_url, content_type="application/json")
+
+        assert response.status_code == 201
+        publication_payload = response.json()
+        assert publication_payload["canonical_markdown"] == source_markdown + "\n"
+        assert publication_payload["verification"] == {
+            "valid": True,
+            "digest_valid": True,
+            "signature_valid": True,
+            "key_fingerprint_valid": True,
+        }
+        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v1"
+        assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
+        assert publication_payload["manifest"]["entities"][0]["display_name"] == "Static Client"
+        assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
+        assert "Access standard" in publication_payload["sanitized_html"]
+        assert 'href="tekdocs:' not in publication_payload["sanitized_html"]
+
+        source_changed = owner_client.put(
+            detail_url,
+            {
+                "title": "Changed source",
+                "markdown": "Replacement content",
+                "base_revision_id": updated["current_revision_id"],
+                "category": "guide",
+            },
+            content_type="application/json",
+        )
+        assert source_changed.status_code == 200
+        publication = DocumentPublication.objects.get(entity_id=publication_payload["id"])
+        assert publication.title == "Access standard"
+        assert publication.canonical_markdown == source_markdown + "\n"
+        assert verify_publication(publication)["valid"] is True
+        publication.canonical_markdown += "tampered"
+        assert verify_publication(publication) == {
+            "valid": False,
+            "digest_valid": False,
+            "signature_valid": False,
+            "key_fingerprint_valid": True,
+        }
+        publication.refresh_from_db()
+
+        publication_detail = reverse(
+            "organization-document-publication-detail",
+            kwargs={
+                "organization_entity_id": client_org.entity_id,
+                "document_entity_id": created["id"],
+                "publication_entity_id": publication.entity_id,
+            },
+        )
+        assert owner_client.get(publication_detail).json()["content_digest"] == publication.content_digest
+        markdown_download = owner_client.get(publication_detail + "/markdown")
+        manifest_download = owner_client.get(publication_detail + "/manifest")
+        assert markdown_download.content == publication.canonical_markdown.encode()
+        assert manifest_download.content == canonical_json(publication.manifest) + b"\n"
+        assert markdown_download["Cache-Control"] == "private, no-store"
+        assert manifest_download["X-Content-Type-Options"] == "nosniff"
+
+
+@pytest.mark.django_db
+def test_static_publication_fails_closed_for_unavailable_dependencies(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {
+            "title": "Broken dependency",
+            "markdown": f"[Missing](tekdocs://entity/{uuid.uuid4()})",
+        },
+        content_type="application/json",
+    ).json()
+    response = owner_client.post(
+        reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+        content_type="application/json",
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "publication_conflict"
+    assert DocumentPublication.objects.count() == 0
+    assert Entity.objects.filter(entity_type="document_publication").count() == 0
+
+
+@pytest.mark.django_db
+def test_static_publication_requires_owning_workspace_and_hides_cross_client_ids(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    beta = organization(installation.tenant, "Beta")
+    shared = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Shared standard", "markdown": "MSP-owned"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse("msp-document-reference-list-create", kwargs={"document_entity_id": shared["id"]}),
+        {"organization_id": str(acme.entity_id)},
+        content_type="application/json",
+    )
+    referenced_publish = owner_client.post(
+        reverse(
+            "organization-document-publication-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": shared["id"]},
+        ),
+        content_type="application/json",
+    )
+    assert referenced_publish.status_code == 404
+
+    acme_document = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme-only", "markdown": "Private"},
+        content_type="application/json",
+    ).json()
+    published = owner_client.post(
+        reverse(
+            "organization-document-publication-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": acme_document["id"]},
+        ),
+        content_type="application/json",
+    ).json()
+    cross_client = owner_client.get(
+        reverse(
+            "organization-document-publication-detail",
+            kwargs={
+                "organization_entity_id": beta.entity_id,
+                "document_entity_id": acme_document["id"],
+                "publication_entity_id": published["id"],
+            },
+        )
+    )
+    assert cross_client.status_code == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_static_publication_is_append_only_in_django_and_postgresql(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Immutable publication", "markdown": "Frozen"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+        content_type="application/json",
+    )
+    publication = DocumentPublication.objects.get()
+    publication.title = "Mutated"
+    with pytest.raises(ValidationError, match="append-only"):
+        publication.save()
+    with pytest.raises(ValidationError, match="append-only"):
+        publication.delete()
+    malformed = DocumentPublication(
+        tenant=publication.tenant,
+        document=publication.document,
+        entity=Entity.objects.create(
+            tenant=publication.tenant,
+            entity_type="document_publication",
+            display_name="Malformed publication",
+        ),
+        title="Malformed",
+        category="general",
+        manifest={},
+        content_digest="a" * 64,
+        signature="fixture",
+        public_key="fixture",
+        key_fingerprint="b" * 64,
+        published_at=publication.published_at,
+    )
+    with pytest.raises(ValidationError, match="manifest format"):
+        malformed.full_clean()
+    if connection.vendor == "postgresql":
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+            DocumentPublication.objects.filter(pk=publication.pk).update(title="Database mutation")
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+            DocumentPublication.objects.filter(pk=publication.pk).delete()
+        with pytest.raises(DatabaseError, match="publication"), transaction.atomic():
+            DocumentPublication.objects.bulk_create([malformed])
+
+
+@pytest.mark.django_db
+def test_template_instantiation_copies_owned_attachments_and_rewrites_markdown(owner_client, installation, tmp_path):
     with override_settings(MEDIA_ROOT=tmp_path):
         template = owner_client.post(
             reverse("msp-document-list-create"),

@@ -102,7 +102,7 @@ const relationship = {
   direction: 'outgoing',
   source_id: clientWorkspace.id,
   target_id: supplierWorkspace.id,
-  related_entity: { id: supplierWorkspace.id, display_name: supplierWorkspace.name, entity_type: 'organization', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] },
+  related_entity: { id: supplierWorkspace.id, display_name: supplierWorkspace.name, entity_type: 'organization', visibility: 'msp_private', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] },
   created_at: '2026-08-08T12:00:00Z',
 }
 
@@ -113,6 +113,7 @@ async function mockWorkspaceApplication(page: Page) {
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/api/v1/access-control/catalog', (route) => route.fulfill({ json: accessCatalog }))
   await page.route('**/api/v1/access-control/custom-roles**', (route) => route.fulfill({ status: route.request().method() === 'POST' ? 201 : 200, json: route.request().method() === 'GET' ? [] : customRole }))
+  await page.route('**/api/v1/access-control/collections**', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/v1/access-control/role-assignments**', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/v1/access-control/members', (route) => route.fulfill({ json: [
     { ...context.user, role: 'owner', is_owner: true, joined_at: '2026-08-08T12:00:00Z' },
@@ -144,7 +145,7 @@ async function mockWorkspaceApplication(page: Page) {
       const query = url.searchParams.get('q')?.toLowerCase() ?? ''
       const results = [supplierWorkspace]
         .filter((workspace) => workspace.name.toLowerCase().includes(query))
-        .map((workspace) => ({ id: workspace.id, display_name: workspace.name, entity_type: 'organization', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] }))
+        .map((workspace) => ({ id: workspace.id, display_name: workspace.name, entity_type: 'organization', visibility: 'msp_private', workspace_label: 'MSP organization directory', eligible_link_types: ['related_to', 'supplied_by', 'manufactured_by'] }))
       return route.fulfill({ json: { results, page: 1, page_size: 15, count: results.length, has_more: false } })
     }
     if (url.pathname.endsWith('/links')) {

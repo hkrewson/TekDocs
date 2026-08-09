@@ -187,7 +187,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.9` | Complete | Central policy service, permission catalog, built-in roles, organization access modes (`all authorized MSP staff` or `assigned staff only`), no inline role-name decisions, and the first half of `TD-RISK-001`. |
 | `0.1.10` | Complete | Explicit per-client MSP staff assignments, assigned-only policy composition, assignment administration, and the next bounded portion of `TD-RISK-001`. |
 | `0.1.11` | Complete | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
-| `0.1.12` | Planned | Collection-scoped assignments, MSP-private hard constraints, field-level cost visibility seam, and completion of `TD-RISK-001`. |
+| `0.1.12` | Complete | Organization access collections, collection-scoped custom-role assignments, MSP-private Entity constraints, and the field-level cost visibility seam that completes `TD-RISK-001` implementation. |
 | `0.1.13` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
 | `0.1.14` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and hosted-automation evidence when authorized (`TD-RISK-010`). |
 | `0.1.15` | Planned | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
@@ -321,6 +321,20 @@ Evidence: `docs/releases/0.1.10.md`.
 ADR 0014 defines additive custom roles, scope composition, custom-assignable permissions, and the independent organization-reachability boundary.
 
 Evidence: `docs/releases/0.1.11.md`.
+
+### `0.1.12` acceptance criteria
+
+- [x] Tenant-owned access collections group exact active organizations for authorization only; they have stable identity, normalized unique names, descriptions, explicit membership changes, archival, and no document-folder or generic-entity semantics.
+- [x] Collection-scoped custom roles add permissions only for active member organizations. They never create or bypass an `assigned_only` staff-access edge, and collection membership changes take effect immediately without rewriting assignments.
+- [x] Owner-plus-MFA and CSRF-protected APIs and UI manage collections, organization membership, collection-scoped role definitions, and assignments through scoped identifiers, confirmation, non-disclosing failures, and value-free audit events.
+- [x] Every Entity receives a deny-by-default `msp_private` or explicit `client_visible` classification. The central audience policy treats `msp_private` as a hard constraint that no role grant can override and requires exact organization scope for future client-portal projections.
+- [x] `costs.view` is enforced through a central field-policy projection seam, omitted rather than nulled when denied, and may be delegated through tenant, exact-organization, or collection custom roles without granting any unrelated sensitive field.
+- [x] PostgreSQL guards reject cross-tenant collection membership/assignments, scope-target mismatches, owner assignments, invalid visibility values, duplicate edges, archived targets, and immutable identity changes when application services are bypassed.
+- [x] Built-in-only and earlier tenant/organization role behavior remains unchanged. Allow/deny, collection composition, access-mode separation, MSP-private precedence, cost-field omission, MFA, CSRF, guessed-ID, cross-tenant/client, migration, OpenAPI, Docker/PostgreSQL, component, browser, clean-install, upgrade, and security evidence agree at `0.1.12`.
+
+ADR 0015 defines access-collection semantics, audience visibility precedence, and field-policy projection.
+
+Evidence: `docs/releases/0.1.12.md`.
 
 ### `0.1.3` acceptance criteria
 

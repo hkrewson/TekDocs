@@ -129,9 +129,13 @@ def active_organizations_for_member(member: InstallationMemberContext) -> QueryS
 def authorized_capabilities(
     member: InstallationMemberContext,
     capabilities: tuple[str, ...],
+    *,
+    organization: Organization | None = None,
 ) -> tuple[str, ...]:
     return tuple(
-        capability for capability in capabilities if context_has_permission(member, CAPABILITY_PERMISSIONS[capability])
+        capability
+        for capability in capabilities
+        if context_has_permission(member, CAPABILITY_PERMISSIONS[capability], organization=organization)
     )
 
 
@@ -183,7 +187,11 @@ def resolve_organization_workspace(user: User, *, entity_id: UUID) -> ResolvedWo
     member = require_permission(user, PermissionKey.WORKSPACES_VIEW)
     organization = get_object_or_404(active_organizations_for_member(member), entity_id=entity_id)
     classifications = tuple(sorted(classification.kind for classification in organization.classifications.all()))
-    capabilities = authorized_capabilities(member, capabilities_for_classifications(classifications))
+    capabilities = authorized_capabilities(
+        member,
+        capabilities_for_classifications(classifications),
+        organization=organization,
+    )
     return ResolvedWorkspace(
         member=member,
         kind="organization",

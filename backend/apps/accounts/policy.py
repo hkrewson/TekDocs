@@ -9,7 +9,7 @@ from allauth.mfa.models import Authenticator
 from django.db.models import Q, QuerySet
 from rest_framework.exceptions import APIException, PermissionDenied
 
-from apps.core.models import InstallationState, Organization, OrganizationAccessMode, Tenant
+from apps.core.models import Entity, EntityVisibility, InstallationState, Organization, OrganizationAccessMode, Tenant
 from apps.core.scoping import DataScope
 
 from .models import (
@@ -68,6 +68,8 @@ class PermissionKey(StrEnum):
     CUSTOM_ROLES_VIEW = "custom_roles.view"
     CUSTOM_ROLES_MANAGE = "custom_roles.manage"
     CUSTOM_ROLES_ASSIGN = "custom_roles.assign"
+    ACCESS_COLLECTIONS_VIEW = "access_collections.view"
+    ACCESS_COLLECTIONS_MANAGE = "access_collections.manage"
     DOCUMENTS_VIEW = "documents.view"
     DOCUMENTS_EDIT = "documents.edit"
     DOCUMENTS_PUBLISH = "documents.publish"
@@ -143,6 +145,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.CUSTOM_ROLES_VIEW, "View custom roles and assignments", "Administration"),
     _permission(PermissionKey.CUSTOM_ROLES_MANAGE, "Manage custom role definitions", "Administration", mfa=True),
     _permission(PermissionKey.CUSTOM_ROLES_ASSIGN, "Assign custom roles", "Administration", mfa=True),
+    _permission(PermissionKey.ACCESS_COLLECTIONS_VIEW, "View access collections", "Administration"),
+    _permission(PermissionKey.ACCESS_COLLECTIONS_MANAGE, "Manage access collections", "Administration", mfa=True),
     _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),
     _permission(PermissionKey.DOCUMENTS_EDIT, "Edit documentation", "Documentation", mfa=True),
     _permission(PermissionKey.DOCUMENTS_PUBLISH, "Publish documentation", "Documentation", mfa=True),
@@ -201,6 +205,7 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
         PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,
         PermissionKey.CUSTOM_ROLES_MANAGE,
         PermissionKey.CUSTOM_ROLES_ASSIGN,
+        PermissionKey.ACCESS_COLLECTIONS_MANAGE,
         PermissionKey.ORGANIZATIONS_ASSIGN_STAFF,
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,
         PermissionKey.SECRETS_REVEAL,
@@ -208,7 +213,8 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
 )
 
 # This explicit allowlist is the privilege ceiling for custom roles. Sensitive
-# field policy and access-control administration cannot be delegated in 0.1.11.
+# field policy deliberately permits only cost visibility; access-control and
+# secret administration remain outside the custom-role ceiling.
 CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
     IMPLEMENTED_READS
     | TECHNICIAN_MUTATIONS
@@ -218,8 +224,23 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.ORGANIZATIONS_ARCHIVE,
         PermissionKey.CUSTOM_FIELDS_MANAGE,
         PermissionKey.DOCUMENTS_PUBLISH,
+        PermissionKey.COSTS_VIEW,
     }
 )
+
+
+class DataAudience(StrEnum):
+    MSP_STAFF = "msp_staff"
+    CLIENT_PORTAL = "client_portal"
+
+
+class SensitiveField(StrEnum):
+    COST = "cost"
+
+
+SENSITIVE_FIELD_PERMISSIONS = {
+    SensitiveField.COST: PermissionKey.COSTS_VIEW,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,9 +425,19 @@ def accessible_organizations(
         if context.membership_id is None:
             return organizations.none()
         organizations = organizations.filter(
-            scoped_role_assignments__membership_id=context.membership_id,
-            scoped_role_assignments__role__archived_at__isnull=True,
-            scoped_role_assignments__role__permission_rows__permission=permission.value,
+            Q(
+                scoped_role_assignments__membership_id=context.membership_id,
+                scoped_role_assignments__role__scope="organization",
+                scoped_role_assignments__role__archived_at__isnull=True,
+                scoped_role_assignments__role__permission_rows__permission=permission.value,
+            )
+            | Q(
+                access_collection_edges__collection__scoped_role_assignments__membership_id=context.membership_id,
+                access_collection_edges__collection__scoped_role_assignments__role__scope="collection",
+                access_collection_edges__collection__scoped_role_assignments__role__archived_at__isnull=True,
+                access_collection_edges__collection__scoped_role_assignments__role__permission_rows__permission=permission.value,
+                access_collection_edges__collection__archived_at__isnull=True,
+            )
         )
     if not context.is_owner:
         organizations = organizations.filter(
@@ -429,9 +460,22 @@ def _custom_permission_exists(
         role__permission_rows__permission=permission.value,
     )
     if organization is None:
-        assignments = assignments.filter(organization__isnull=True)
+        assignments = assignments.filter(
+            role__scope="tenant",
+            organization__isnull=True,
+            collection__isnull=True,
+        )
     else:
-        assignments = assignments.filter(Q(organization__isnull=True) | Q(organization=organization))
+        assignments = assignments.filter(
+            Q(role__scope="tenant", organization__isnull=True, collection__isnull=True)
+            | Q(role__scope="organization", organization=organization, collection__isnull=True)
+            | Q(
+                role__scope="collection",
+                organization__isnull=True,
+                collection__archived_at__isnull=True,
+                collection__organization_edges__organization=organization,
+            )
+        )
     return assignments.exists()
 
 
@@ -450,6 +494,72 @@ def custom_assignable_permission_catalog() -> list[dict[str, object]]:
         for definition in PERMISSION_CATALOG
         if definition.key in CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS
     ]
+
+
+def entity_visible_to_audience(
+    context: InstallationMemberContext,
+    entity: Entity,
+    *,
+    audience: DataAudience,
+    organization: Organization | None = None,
+) -> bool:
+    if entity.tenant_id != context.tenant.id:
+        return False
+    if audience == DataAudience.MSP_STAFF:
+        return entity.organization_id is None or (
+            organization is not None
+            and entity.organization_id == organization.id
+            and _organization_allowed(context, organization)
+        )
+    return (
+        organization is not None
+        and entity.organization_id == organization.id
+        and entity.visibility == EntityVisibility.CLIENT_VISIBLE
+        and _organization_allowed(context, organization)
+    )
+
+
+def entities_visible_to_audience(
+    context: InstallationMemberContext,
+    entities: QuerySet[Entity],
+    *,
+    audience: DataAudience,
+    organization: Organization | None = None,
+) -> QuerySet[Entity]:
+    entities = entities.filter(tenant=context.tenant)
+    if audience == DataAudience.MSP_STAFF:
+        if organization is None:
+            return entities.filter(organization__isnull=True)
+        if not _organization_allowed(context, organization):
+            return entities.none()
+        return entities.filter(organization=organization)
+    if organization is None or not _organization_allowed(context, organization):
+        return entities.none()
+    return entities.filter(organization=organization, visibility=EntityVisibility.CLIENT_VISIBLE)
+
+
+def context_has_field_access(
+    context: InstallationMemberContext,
+    field: SensitiveField,
+    *,
+    organization: Organization | None = None,
+) -> bool:
+    return context_has_permission(context, SENSITIVE_FIELD_PERMISSIONS[field], organization=organization)
+
+
+def project_authorized_fields(
+    context: InstallationMemberContext,
+    values: dict[str, object],
+    classifications: dict[str, SensitiveField],
+    *,
+    organization: Organization | None = None,
+) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in values.items()
+        if key not in classifications
+        or context_has_field_access(context, classifications[key], organization=organization)
+    }
 
 
 def require_installation_owner(user: User) -> InstallationMemberContext:

@@ -11,6 +11,7 @@ const vendor: EntityReference = {
   id: vendorId,
   display_name: 'Northwind Supply',
   entity_type: 'organization' as const,
+  visibility: 'msp_private',
   workspace_label: 'Vendor organization',
   eligible_link_types: ['related_to', 'supplied_by'],
 }
@@ -46,8 +47,8 @@ describe('EntityRelationships', () => {
 
     expect(await screen.findByText('Supplied by')).toBeInTheDocument()
     expect(screen.getByText('Supplies')).toBeInTheDocument()
-    expect(screen.getByText('Outgoing')).toBeInTheDocument()
-    expect(screen.getByText('Backlink')).toBeInTheDocument()
+    expect(screen.getByText(/Outgoing · MSP private/)).toBeInTheDocument()
+    expect(screen.getByText(/Backlink · MSP private/)).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Northwind Supply' })[0]).toHaveAttribute('href', `/workspaces/organizations/${vendorId}/overview`)
   })
 

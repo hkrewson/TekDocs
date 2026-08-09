@@ -11,7 +11,7 @@ This document defines which navigation families belong to the MSP and organizati
 - The MSP-context switcher may search all authorized organization classifications so an operator can enter client or supplier workspaces.
 - Vendor, manufacturer, and partner classifications remain capabilities on one organization identity. They are not separate tables or tenant boundaries.
 - Access Control is an MSP-administration route available only when the authenticated policy context includes member-role administration. It lists built-in role definitions, tenant members, and each organization's MSP-staff access mode. It is not carried into an organization sidebar.
-- `assigned_only` organizations require explicit MSP staff assignments. Additive custom tenant and organization roles are composed by the central policy service, but never create or bypass that staff-access edge. Collection scope and hard MSP-private constraints remain `0.1.12`.
+- `assigned_only` organizations require explicit MSP staff assignments. Additive custom tenant, organization, and access-collection roles are composed by the central policy service, but never create or bypass that staff-access edge. Entity audience defaults to MSP private; client-visible projections require explicit classification and exact organization ownership. Sensitive cost fields are omitted unless `costs.view` is granted for the active scope.
 
 ## Navigation matrix
 

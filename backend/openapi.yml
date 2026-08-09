@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.11
+  version: 0.1.12
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -34,6 +34,99 @@ paths:
           description: ''
         '403':
           description: Member administration permission required
+  /api/v1/access-control/collections:
+    get:
+      operationId: access_control_collections_list
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccessCollection'
+          description: ''
+    post:
+      operationId: access_control_collections_create
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessCollectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AccessCollectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AccessCollectionWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessCollection'
+          description: ''
+  /api/v1/access-control/collections/{collection_id}:
+    patch:
+      operationId: access_control_collections_partial_update
+      parameters:
+      - in: path
+        name: collection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAccessCollectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAccessCollectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAccessCollectionWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessCollection'
+          description: ''
+    delete:
+      operationId: access_control_collections_destroy
+      parameters:
+      - in: path
+        name: collection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessCollection'
+          description: ''
   /api/v1/access-control/custom-roles:
     get:
       operationId: access_control_custom_roles_list
@@ -2393,6 +2486,70 @@ paths:
           description: No response body
 components:
   schemas:
+    AccessCollection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        organizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessCollectionOrganization'
+        assignment_count:
+          type: integer
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - archived_at
+      - assignment_count
+      - created_at
+      - description
+      - id
+      - name
+      - organizations
+      - updated_at
+    AccessCollectionOrganization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AccessCollectionWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        organization_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - name
+      - organization_ids
     AccessControlCatalog:
       type: object
       properties:
@@ -2719,10 +2876,12 @@ components:
       enum:
       - tenant
       - organization
+      - collection
       type: string
       description: |-
         * `tenant` - Tenant
         * `organization` - Organization
+        * `collection` - Collection
     DirectionEnum:
       enum:
       - outgoing
@@ -2839,6 +2998,8 @@ components:
           type: string
         entity_type:
           $ref: '#/components/schemas/EntityTypeEnum'
+        visibility:
+          $ref: '#/components/schemas/VisibilityEnum'
         workspace_label:
           type: string
         eligible_link_types:
@@ -2850,6 +3011,7 @@ components:
       - eligible_link_types
       - entity_type
       - id
+      - visibility
       - workspace_label
     EntityRelationship:
       type: object
@@ -3294,6 +3456,21 @@ components:
       required:
       - owner
       - tenant
+    PatchedAccessCollectionWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        organization_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
     PatchedCustomFieldValueWrite:
       type: object
       properties:
@@ -3668,10 +3845,19 @@ components:
           type: string
           nullable: true
           readOnly: true
+        collection_id:
+          type: string
+          format: uuid
+          nullable: true
+        collection_name:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
       required:
+      - collection_id
+      - collection_name
       - created_at
       - id
       - member_email
@@ -3692,6 +3878,10 @@ components:
           type: string
           format: uuid
         organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        collection_id:
           type: string
           format: uuid
           nullable: true
@@ -3828,6 +4018,14 @@ components:
         * `technician` - Technician
         * `contributor` - Contributor
         * `read_only` - Read-only
+    VisibilityEnum:
+      enum:
+      - msp_private
+      - client_visible
+      type: string
+      description: |-
+        * `msp_private` - MSP private
+        * `client_visible` - Client visible
     WorkspaceContext:
       type: object
       properties:

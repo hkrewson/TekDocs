@@ -18,6 +18,7 @@ describe('access-control API', () => {
       .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response([]))
     vi.stubGlobal('fetch', fetchMock)
 
     await browserAccessControlClient.catalog()
@@ -25,6 +26,7 @@ describe('access-control API', () => {
     await browserAccessControlClient.organizations()
     await browserAccessControlClient.customRoles()
     await browserAccessControlClient.scopedAssignments()
+    await browserAccessControlClient.accessCollections()
 
     const paths = fetchMock.mock.calls.map((call) => (call as [string, RequestInit?])[0])
     expect(paths).toEqual([
@@ -33,6 +35,7 @@ describe('access-control API', () => {
       '/api/v1/access-control/organizations',
       '/api/v1/access-control/custom-roles',
       '/api/v1/access-control/role-assignments',
+      '/api/v1/access-control/collections',
     ])
   })
 

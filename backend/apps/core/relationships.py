@@ -141,6 +141,7 @@ def entity_projection(entity: Entity, workspace: ResolvedWorkspace) -> dict[str,
         "id": entity.id,
         "display_name": entity.display_name,
         "entity_type": entity.entity_type,
+        "visibility": entity.visibility,
         "workspace_label": _workspace_label(entity, workspace),
         "eligible_link_types": _eligible_link_types(entity),
     }

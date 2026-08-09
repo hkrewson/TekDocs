@@ -130,7 +130,7 @@ export function EntityRelationships({ organizationId, organizationName, client =
             {candidates === null && <p role="status">Loading eligible organizations…</p>}
             {candidates !== null && candidates.length === 0 && <p>No eligible organizations match this search.</p>}
             {candidates?.map((candidate) => (
-              <label key={candidate.id}><input type="radio" name="relationship-target" value={candidate.id} checked={selectedId === candidate.id} onChange={() => setSelectedId(candidate.id)} /><span><strong>{candidate.display_name}</strong><span>{candidate.workspace_label}</span></span></label>
+              <label key={candidate.id}><input type="radio" name="relationship-target" value={candidate.id} checked={selectedId === candidate.id} onChange={() => setSelectedId(candidate.id)} /><span><strong>{candidate.display_name}</strong><span>{candidate.workspace_label} · {candidate.visibility === 'client_visible' ? 'Client visible' : 'MSP private'}</span></span></label>
             ))}
           </fieldset>
           <div className="form-actions"><button className="primary-button" type="submit" disabled={saving || !selectedId}>{saving ? 'Adding…' : `Add ${selectedType?.forward_label.toLowerCase() ?? 'relationship'}`}</button></div>
@@ -147,7 +147,7 @@ export function EntityRelationships({ organizationId, organizationName, client =
               {relationship.related_entity.entity_type === 'organization'
                 ? <Link to={`/workspaces/organizations/${relationship.related_entity.id}/overview`}>{relationship.related_entity.display_name}</Link>
                 : <span>{relationship.related_entity.display_name}</span>}
-              <span className="relationship-scope">{relationship.direction === 'incoming' ? 'Backlink' : 'Outgoing'}</span>
+              <span className="relationship-scope">{relationship.direction === 'incoming' ? 'Backlink' : 'Outgoing'} · {relationship.related_entity.visibility === 'client_visible' ? 'Client visible' : 'MSP private'}</span>
               {archivingId === relationship.id
                 ? <span className="relationship-confirm"><button className="row-action danger" type="button" disabled={saving} onClick={() => { void archive(relationship) }}>Confirm archive</button><button className="row-action" type="button" disabled={saving} onClick={() => setArchivingId(null)}>Cancel</button></span>
                 : <button className="row-action danger relationship-archive" type="button" aria-label={`Archive relationship with ${relationship.related_entity.display_name}`} onClick={() => setArchivingId(relationship.id)}><Trash2 size={14} aria-hidden="true" />Archive</button>}

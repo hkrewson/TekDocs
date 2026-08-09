@@ -23,4 +23,4 @@ The mode is an additional hard constraint, never a permission grant. Workspace d
 - MFA is permission metadata enforced centrally, not a repeated view convention.
 - Frontend capability hiding may improve navigation but is never authoritative.
 - This release deliberately does not add custom roles, organization/collection role grants, explicit deny rules, or client-portal identities. Explicit MSP staff access assignments arrive in `0.1.10`; role composition remains `0.1.11`–`0.1.12`.
-- PostgreSQL integrity guards and scoped managers remain active, but runtime-role RLS remains `0.1.12`.
+- PostgreSQL integrity guards and scoped managers remain active. Runtime-role RLS was subsequently scheduled for `0.1.14`; ADR 0006 remains authoritative for that boundary.

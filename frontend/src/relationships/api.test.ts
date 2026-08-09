@@ -30,7 +30,7 @@ describe('relationships API client', () => {
     const relationship: EntityRelationship = {
       id: '00000000-0000-4000-8000-000000000001', link_type: 'supplied_by', label: 'Supplied by', direction: 'outgoing',
       source_id: '00000000-0000-4000-8000-000000000002', target_id: '00000000-0000-4000-8000-000000000003',
-      related_entity: { id: '00000000-0000-4000-8000-000000000003', display_name: 'Vendor', entity_type: 'organization', workspace_label: 'MSP organization directory', eligible_link_types: ['supplied_by'] },
+      related_entity: { id: '00000000-0000-4000-8000-000000000003', display_name: 'Vendor', entity_type: 'organization', visibility: 'msp_private', workspace_label: 'MSP organization directory', eligible_link_types: ['supplied_by'] },
       created_at: '2026-08-08T12:00:00Z',
     }
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(relationship), { status: 201 }))

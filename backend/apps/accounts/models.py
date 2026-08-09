@@ -210,6 +210,87 @@ class OrganizationAccessAssignment(models.Model):
 class CustomRoleScope(models.TextChoices):
     TENANT = "tenant", "Tenant"
     ORGANIZATION = "organization", "Organization"
+    COLLECTION = "collection", "Collection"
+
+
+class AccessCollection(models.Model):
+    """A tenant-owned authorization grouping of organizations."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="access_collections")
+    name = models.CharField(max_length=80)
+    name_key = models.CharField(max_length=80, editable=False)
+    description = models.CharField(max_length=500, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_access_collections")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name_key", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "name_key"), name="unique_access_collection_name"),
+        ]
+        indexes = [models.Index(fields=("tenant", "archived_at"), name="accounts_collection_active_idx")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        self.name = " ".join(self.name.split())
+        self.name_key = self.name.casefold()
+        super().save(*args, **kwargs)
+
+
+class AccessCollectionOrganization(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.PROTECT,
+        related_name="access_collection_organizations",
+    )
+    collection = models.ForeignKey(AccessCollection, on_delete=models.PROTECT, related_name="organization_edges")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="access_collection_edges",
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_access_collection_organizations",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("collection", "organization"),
+                name="unique_access_collection_organization",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "collection"),
+                name="accounts_collection_org_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Collection organization {self.id}"
+
+    def clean(self) -> None:
+        if self.collection_id and self.tenant_id != self.collection.tenant_id:
+            raise ValidationError("Collection membership must share the collection tenant")
+        if self.organization_id and self.tenant_id != self.organization.tenant_id:
+            raise ValidationError("Collection membership must share the organization tenant")
 
 
 class CustomRole(models.Model):
@@ -270,7 +351,7 @@ class CustomRolePermission(models.Model):
 
 
 class ScopedRoleAssignment(models.Model):
-    """An additive custom-role grant at tenant or exact-organization scope."""
+    """An additive custom-role grant at tenant, organization, or collection scope."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="scoped_role_assignments")
@@ -278,6 +359,13 @@ class ScopedRoleAssignment(models.Model):
     role = models.ForeignKey(CustomRole, on_delete=models.PROTECT, related_name="assignments")
     organization = models.ForeignKey(
         "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="scoped_role_assignments",
+        null=True,
+        blank=True,
+    )
+    collection = models.ForeignKey(
+        AccessCollection,
         on_delete=models.PROTECT,
         related_name="scoped_role_assignments",
         null=True,
@@ -294,17 +382,25 @@ class ScopedRoleAssignment(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=("membership", "role"),
-                condition=models.Q(organization__isnull=True),
+                condition=models.Q(organization__isnull=True, collection__isnull=True),
                 name="unique_tenant_role_assignment",
             ),
             models.UniqueConstraint(
                 fields=("membership", "role", "organization"),
-                condition=models.Q(organization__isnull=False),
+                condition=models.Q(organization__isnull=False, collection__isnull=True),
                 name="unique_organization_role_assignment",
+            ),
+            models.UniqueConstraint(
+                fields=("membership", "role", "collection"),
+                condition=models.Q(collection__isnull=False),
+                name="unique_collection_role_assignment",
             ),
         ]
         indexes = [
-            models.Index(fields=("tenant", "membership", "organization"), name="accounts_scoped_role_idx"),
+            models.Index(
+                fields=("tenant", "membership", "organization", "collection"),
+                name="accounts_scoped_role_idx",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -319,7 +415,21 @@ class ScopedRoleAssignment(models.Model):
             organization = self.organization
             if organization is not None and self.tenant_id != organization.tenant_id:
                 raise ValidationError("Scoped role assignment must share the organization tenant")
+        if self.collection_id:
+            collection = self.collection
+            if collection is not None and self.tenant_id != collection.tenant_id:
+                raise ValidationError("Scoped role assignment must share the collection tenant")
         if self.role_id:
-            expected_organization = self.role.scope == CustomRoleScope.ORGANIZATION
-            if expected_organization != bool(self.organization_id):
+            has_expected_target = (
+                self.role.scope == CustomRoleScope.TENANT
+                and self.organization_id is None
+                and self.collection_id is None
+                or self.role.scope == CustomRoleScope.ORGANIZATION
+                and self.organization_id is not None
+                and self.collection_id is None
+                or self.role.scope == CustomRoleScope.COLLECTION
+                and self.collection_id is not None
+                and self.organization_id is None
+            )
+            if not has_expected_target:
                 raise ValidationError("Scoped role assignment must match the role scope")

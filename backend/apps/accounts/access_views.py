@@ -4,6 +4,12 @@ from rest_framework.views import APIView
 
 from apps.core.models import OrganizationAccessMode
 
+from .access_collections import (
+    access_collections_for_context,
+    archive_access_collection,
+    create_access_collection,
+    update_access_collection,
+)
 from .access_control import (
     access_mode_organizations,
     assign_membership_role,
@@ -13,6 +19,8 @@ from .access_control import (
     remove_organization_staff,
 )
 from .access_serializers import (
+    AccessCollectionSerializer,
+    AccessCollectionWriteSerializer,
     AccessControlCatalogSerializer,
     CustomRoleCreateSerializer,
     CustomRoleSerializer,
@@ -84,6 +92,45 @@ class CustomRoleListCreateView(APIView):
         return Response(CustomRoleSerializer(role).data, status=201)
 
 
+class AccessCollectionListCreateView(APIView):
+    @extend_schema(responses={200: AccessCollectionSerializer(many=True)})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        context = require_permission(request.user, PermissionKey.ACCESS_COLLECTIONS_VIEW)
+        return Response(AccessCollectionSerializer(access_collections_for_context(context), many=True).data)
+
+    @extend_schema(request=AccessCollectionWriteSerializer, responses={201: AccessCollectionSerializer})
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = AccessCollectionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        collection = create_access_collection(
+            actor=request.user,
+            name=serializer.validated_data["name"],
+            description=serializer.validated_data["description"],
+            organization_entity_ids=serializer.validated_data["organization_ids"],
+        )
+        return Response(AccessCollectionSerializer(collection).data, status=201)
+
+
+class AccessCollectionDetailView(APIView):
+    @extend_schema(request=AccessCollectionWriteSerializer, responses={200: AccessCollectionSerializer})
+    def patch(self, request, collection_id):  # type: ignore[no-untyped-def]
+        serializer = AccessCollectionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        collection = update_access_collection(
+            actor=request.user,
+            collection_id=collection_id,
+            name=serializer.validated_data["name"],
+            description=serializer.validated_data["description"],
+            organization_entity_ids=serializer.validated_data["organization_ids"],
+        )
+        return Response(AccessCollectionSerializer(collection).data)
+
+    @extend_schema(responses={200: AccessCollectionSerializer})
+    def delete(self, request, collection_id):  # type: ignore[no-untyped-def]
+        collection = archive_access_collection(actor=request.user, collection_id=collection_id)
+        return Response(AccessCollectionSerializer(collection).data)
+
+
 class CustomRoleDetailView(APIView):
     @extend_schema(request=CustomRoleUpdateSerializer, responses={200: CustomRoleSerializer})
     def patch(self, request, role_id):  # type: ignore[no-untyped-def]
@@ -118,6 +165,7 @@ class ScopedRoleAssignmentListCreateView(APIView):
             member_user_id=serializer.validated_data["user_id"],
             role_id=serializer.validated_data["role_id"],
             organization_entity_id=serializer.validated_data["organization_id"],
+            collection_id=serializer.validated_data["collection_id"],
         )
         return Response(ScopedRoleAssignmentSerializer(assignment).data, status=201 if created else 200)
 

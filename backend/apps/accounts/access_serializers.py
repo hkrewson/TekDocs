@@ -99,6 +99,28 @@ class CustomRoleUpdateSerializer(serializers.Serializer):
     permissions = serializers.ListField(child=serializers.CharField(max_length=80), allow_empty=False)
 
 
+class AccessCollectionOrganizationSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="organization.entity_id")
+    name = serializers.CharField(source="organization.entity.display_name")
+
+
+class AccessCollectionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    description = serializers.CharField()
+    organizations = AccessCollectionOrganizationSerializer(source="organization_edges", many=True)
+    assignment_count = serializers.IntegerField()
+    archived_at = serializers.DateTimeField(allow_null=True)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+
+class AccessCollectionWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=80, trim_whitespace=True)
+    description = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+    organization_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=True)
+
+
 class ScopedRoleAssignmentSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     member_id = serializers.UUIDField(source="membership.user_id")
@@ -109,6 +131,8 @@ class ScopedRoleAssignmentSerializer(serializers.Serializer):
     role_scope = serializers.ChoiceField(source="role.scope", choices=CustomRoleScope.choices)
     organization_id = serializers.SerializerMethodField()
     organization_name = serializers.SerializerMethodField()
+    collection_id = serializers.UUIDField(allow_null=True)
+    collection_name = serializers.CharField(source="collection.name", allow_null=True)
     created_at = serializers.DateTimeField()
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
@@ -124,3 +148,4 @@ class ScopedRoleAssignmentWriteSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
     role_id = serializers.UUIDField()
     organization_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    collection_id = serializers.UUIDField(required=False, allow_null=True, default=None)

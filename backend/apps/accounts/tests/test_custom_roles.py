@@ -8,6 +8,8 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
+    AccessCollection,
+    AccessCollectionOrganization,
     BuiltInRole,
     CustomRole,
     CustomRolePermission,
@@ -18,12 +20,24 @@ from apps.accounts.models import (
     User,
 )
 from apps.accounts.policy import (
+    DataAudience,
     PermissionKey,
+    SensitiveField,
     accessible_organizations,
     context_has_permission,
+    entity_visible_to_audience,
+    project_authorized_fields,
     require_installation_member,
 )
-from apps.core.models import AuditEvent, Entity, InstallationState, Organization, OrganizationClassification, Tenant
+from apps.core.models import (
+    AuditEvent,
+    Entity,
+    EntityVisibility,
+    InstallationState,
+    Organization,
+    OrganizationClassification,
+    Tenant,
+)
 
 
 @pytest.fixture
@@ -303,3 +317,201 @@ def test_postgresql_guards_custom_permission_and_assignment_scope(installation):
             role=role,
             created_by=installation.owner,
         )
+
+
+@pytest.mark.django_db
+def test_collection_crud_and_assignment_compose_with_restricted_client_access(owner_client, installation):
+    user, membership, _ = member(installation, "collection-reader@example.com")
+    included = organization(installation.tenant, "Included", "assigned_only")
+    sibling = organization(installation.tenant, "Sibling")
+    created = owner_client.post(
+        reverse("access-collection-list-create"),
+        {
+            "name": " Priority Clients ",
+            "description": "Primary support group",
+            "organization_ids": [included.entity_id],
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["name"] == "Priority Clients"
+    assert created.json()["organizations"] == [{"id": str(included.entity_id), "name": "Included"}]
+    collection_id = created.json()["id"]
+    role = create_role(
+        owner_client,
+        name="Collection publisher",
+        scope="collection",
+        permissions=["documents.publish"],
+    ).json()
+    assigned = owner_client.post(
+        reverse("scoped-role-assignment-list-create"),
+        {"user_id": user.id, "role_id": role["id"], "collection_id": collection_id},
+        content_type="application/json",
+    )
+    assert assigned.status_code == 201
+    assert assigned.json()["collection_name"] == "Priority Clients"
+
+    context = require_installation_member(user)
+    assert not context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=included)
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=included,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    assert context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=included)
+    assert not context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=sibling)
+
+    updated = owner_client.patch(
+        reverse("access-collection-detail", kwargs={"collection_id": collection_id}),
+        {"name": "Priority Clients", "description": "Changed", "organization_ids": [sibling.entity_id]},
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    assert not context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=included)
+    assert context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=sibling)
+
+    archived = owner_client.delete(reverse("access-collection-detail", kwargs={"collection_id": collection_id}))
+    assert archived.status_code == 200
+    assert archived.json()["archived_at"] is not None
+    assert not context_has_permission(context, PermissionKey.DOCUMENTS_PUBLISH, organization=sibling)
+    actions = set(
+        AuditEvent.objects.filter(tenant=installation.tenant, entity_id=collection_id).values_list(
+            "action", flat=True
+        )
+    )
+    assert actions == {"access_collection.created", "access_collection.updated", "access_collection.archived"}
+
+
+@pytest.mark.django_db
+def test_collection_api_enforces_mfa_csrf_scope_and_non_disclosure(owner_client, installation):
+    own = organization(installation.tenant, "Own")
+    foreign_tenant = Tenant.objects.create(name="Foreign", slug="foreign-collection-api")
+    foreign = organization(foreign_tenant, "Foreign")
+    url = reverse("access-collection-list-create")
+    assert owner_client.post(
+        url,
+        {"name": "Mixed", "description": "", "organization_ids": [own.entity_id, foreign.entity_id]},
+        content_type="application/json",
+    ).status_code == 404
+    installation.owner.authenticator_set.filter(type="totp").delete()
+    assert owner_client.post(
+        url,
+        {"name": "No MFA", "description": "", "organization_ids": []},
+        content_type="application/json",
+    ).status_code == 403
+    TOTP.activate(installation.owner, generate_totp_secret())
+    csrf_client = Client(enforce_csrf_checks=True)
+    csrf_client.force_login(installation.owner)
+    assert csrf_client.post(
+        url,
+        {"name": "No CSRF", "description": "", "organization_ids": []},
+        content_type="application/json",
+    ).status_code == 403
+
+
+@pytest.mark.django_db
+def test_msp_private_visibility_and_cost_projection_are_hard_policy_boundaries(installation):
+    user, _, _ = member(installation, "field-reader@example.com")
+    client = organization(installation.tenant, "Client")
+    sibling = organization(installation.tenant, "Sibling")
+    private = Entity.objects.create(
+        tenant=installation.tenant,
+        organization=client,
+        entity_type="document",
+        display_name="Private runbook",
+    )
+    visible = Entity.objects.create(
+        tenant=installation.tenant,
+        organization=client,
+        entity_type="document",
+        display_name="Client guide",
+        visibility=EntityVisibility.CLIENT_VISIBLE,
+    )
+    context = require_installation_member(user)
+    assert not entity_visible_to_audience(context, private, audience=DataAudience.CLIENT_PORTAL, organization=client)
+    assert entity_visible_to_audience(context, visible, audience=DataAudience.CLIENT_PORTAL, organization=client)
+    assert not entity_visible_to_audience(context, visible, audience=DataAudience.CLIENT_PORTAL, organization=sibling)
+    values = {"name": "Switch", "cost": "1200.00"}
+    assert project_authorized_fields(context, values, {"cost": SensitiveField.COST}, organization=client) == {
+        "name": "Switch"
+    }
+
+
+@pytest.mark.django_db
+def test_collection_scoped_cost_permission_projects_only_member_organizations(owner_client, installation):
+    user, _, _ = member(installation, "cost-reader@example.com")
+    included = organization(installation.tenant, "Cost client")
+    sibling = organization(installation.tenant, "No cost client")
+    collection = owner_client.post(
+        reverse("access-collection-list-create"),
+        {"name": "Cost access", "description": "", "organization_ids": [included.entity_id]},
+        content_type="application/json",
+    ).json()
+    role = create_role(
+        owner_client,
+        name="Cost viewer",
+        scope="collection",
+        permissions=["costs.view"],
+    ).json()
+    owner_client.post(
+        reverse("scoped-role-assignment-list-create"),
+        {"user_id": user.id, "role_id": role["id"], "collection_id": collection["id"]},
+        content_type="application/json",
+    )
+    context = require_installation_member(user)
+    values = {"name": "Firewall", "cost": "900.00"}
+    assert project_authorized_fields(context, values, {"cost": SensitiveField.COST}, organization=included) == values
+    assert project_authorized_fields(context, values, {"cost": SensitiveField.COST}, organization=sibling) == {
+        "name": "Firewall"
+    }
+
+
+@pytest.mark.django_db
+def test_postgresql_collection_guards_reject_cross_tenant_edges_and_wrong_scope(installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("PostgreSQL trigger contract")
+    user, membership, _ = member(installation, "guard-reader@example.com")
+    own = organization(installation.tenant, "Guard own")
+    foreign_tenant = Tenant.objects.create(name="Foreign", slug="foreign-collection-guard")
+    foreign = organization(foreign_tenant, "Guard foreign")
+    collection = AccessCollection.objects.create(
+        tenant=installation.tenant,
+        name="Guarded collection",
+        created_by=installation.owner,
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        AccessCollectionOrganization.objects.create(
+            tenant=installation.tenant,
+            collection=collection,
+            organization=foreign,
+            created_by=installation.owner,
+        )
+    AccessCollectionOrganization.objects.create(
+        tenant=installation.tenant,
+        collection=collection,
+        organization=own,
+        created_by=installation.owner,
+    )
+    role = CustomRole.objects.create(
+        tenant=installation.tenant,
+        name="Collection guard role",
+        scope=CustomRoleScope.COLLECTION,
+        created_by=installation.owner,
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ScopedRoleAssignment.objects.create(
+            tenant=installation.tenant,
+            membership=membership,
+            role=role,
+            organization=own,
+            created_by=installation.owner,
+        )
+    assignment = ScopedRoleAssignment.objects.create(
+        tenant=installation.tenant,
+        membership=membership,
+        role=role,
+        collection=collection,
+        created_by=installation.owner,
+    )
+    assert assignment.membership.user_id == user.id

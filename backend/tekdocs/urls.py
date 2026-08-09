@@ -3,6 +3,8 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.accounts.access_views import (
+    AccessCollectionDetailView,
+    AccessCollectionListCreateView,
     AccessControlCatalogView,
     CustomRoleDetailView,
     CustomRoleListCreateView,
@@ -80,6 +82,16 @@ urlpatterns = [
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),
+    path(
+        "api/v1/access-control/collections",
+        AccessCollectionListCreateView.as_view(),
+        name="access-collection-list-create",
+    ),
+    path(
+        "api/v1/access-control/collections/<uuid:collection_id>",
+        AccessCollectionDetailView.as_view(),
+        name="access-collection-detail",
+    ),
     path("api/v1/access-control/custom-roles", CustomRoleListCreateView.as_view(), name="custom-role-list-create"),
     path(
         "api/v1/access-control/custom-roles/<uuid:role_id>", CustomRoleDetailView.as_view(), name="custom-role-detail"

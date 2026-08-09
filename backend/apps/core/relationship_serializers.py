@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import EntityLinkType
+from .models import EntityLinkType, EntityVisibility
 from .relationships import SEARCHABLE_ENTITY_TYPES
 
 
@@ -20,6 +20,7 @@ class EntityReferenceSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     display_name = serializers.CharField()
     entity_type = serializers.ChoiceField(choices=SEARCHABLE_ENTITY_TYPES)
+    visibility = serializers.ChoiceField(choices=EntityVisibility.choices)
     workspace_label = serializers.CharField()
     eligible_link_types = serializers.ListField(child=serializers.ChoiceField(choices=EntityLinkType.choices))
 

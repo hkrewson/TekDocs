@@ -10,6 +10,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from apps.core.models import AuditEvent, InstallationState, Organization
 
 from .models import (
+    AccessCollection,
     CustomRole,
     CustomRolePermission,
     CustomRoleScope,
@@ -37,11 +38,16 @@ def custom_roles_for_context(context: InstallationMemberContext) -> QuerySet[Cus
 def scoped_assignments_for_context(context: InstallationMemberContext) -> QuerySet[ScopedRoleAssignment]:
     return (
         ScopedRoleAssignment.scoped.for_tenant(context.tenant)
-        .select_related("membership__user", "role", "organization__entity")
+        .select_related("membership__user", "role", "organization__entity", "collection")
         .prefetch_related(
             Prefetch("role__permission_rows", queryset=CustomRolePermission.objects.order_by("permission"))
         )
-        .order_by("membership__user__display_name", "role__name_key", "organization__entity__display_name")
+        .order_by(
+            "membership__user__display_name",
+            "role__name_key",
+            "organization__entity__display_name",
+            "collection__name_key",
+        )
     )
 
 
@@ -159,6 +165,7 @@ def create_scoped_assignment(
     member_user_id: UUID,
     role_id: UUID,
     organization_entity_id: UUID | None,
+    collection_id: UUID | None,
 ) -> tuple[ScopedRoleAssignment, bool]:
     context = require_permission(actor, PermissionKey.CUSTOM_ROLES_ASSIGN)
     try:
@@ -175,8 +182,9 @@ def create_scoped_assignment(
     except CustomRole.DoesNotExist as exc:
         raise NotFound("The custom role is not available.") from exc
     organization = None
+    collection = None
     if role.scope == CustomRoleScope.ORGANIZATION:
-        if organization_entity_id is None:
+        if organization_entity_id is None or collection_id is not None:
             raise ValidationError({"organization_id": "Select an organization for this role."})
         try:
             organization = Organization.scoped.for_tenant(context.tenant).get(
@@ -185,13 +193,24 @@ def create_scoped_assignment(
             )
         except Organization.DoesNotExist as exc:
             raise NotFound("The organization is not available.") from exc
-    elif organization_entity_id is not None:
-        raise ValidationError({"organization_id": "Tenant-scoped roles cannot target an organization."})
+    elif role.scope == CustomRoleScope.COLLECTION:
+        if collection_id is None or organization_entity_id is not None:
+            raise ValidationError({"collection_id": "Select an access collection for this role."})
+        try:
+            collection = AccessCollection.scoped.for_tenant(context.tenant).get(
+                pk=collection_id,
+                archived_at__isnull=True,
+            )
+        except AccessCollection.DoesNotExist as exc:
+            raise NotFound("The access collection is not available.") from exc
+    elif organization_entity_id is not None or collection_id is not None:
+        raise ValidationError({"organization_id": "Tenant-scoped roles cannot target an organization or collection."})
     assignment, created = ScopedRoleAssignment.objects.get_or_create(
         tenant=context.tenant,
         membership=membership,
         role=role,
         organization=organization,
+        collection=collection,
         defaults={"created_by": actor},
     )
     if created:

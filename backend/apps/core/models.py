@@ -70,12 +70,22 @@ class InstallationState(models.Model):
         raise ValidationError("Installation state cannot be deleted")
 
 
+class EntityVisibility(models.TextChoices):
+    MSP_PRIVATE = "msp_private", "MSP private"
+    CLIENT_VISIBLE = "client_visible", "Client visible"
+
+
 class Entity(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entities")
     entity_type = models.CharField(max_length=80)
     display_name = models.CharField(max_length=240)
     custom_fields = models.JSONField(default=dict, blank=True)
+    visibility = models.CharField(
+        max_length=24,
+        choices=EntityVisibility.choices,
+        default=EntityVisibility.MSP_PRIVATE,
+    )
     organization = models.ForeignKey(
         "Organization",
         on_delete=models.PROTECT,
@@ -89,10 +99,17 @@ class Entity(TimestampedModel):
     scoped = OrganizationScopedManager()
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(visibility__in=EntityVisibility.values),
+                name="entity_visibility_valid",
+            ),
+        ]
         indexes = [
             models.Index(fields=["tenant", "entity_type"]),
             models.Index(fields=["tenant", "display_name"]),
             models.Index(fields=["tenant", "organization", "entity_type"]),
+            models.Index(fields=["tenant", "organization", "visibility"]),
         ]
 
     def __str__(self) -> str:

@@ -10,6 +10,7 @@ from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .models import (
     BlockRevision,
     Document,
+    DocumentCategory,
     DocumentPlacement,
     LocationKind,
     Organization,
@@ -286,10 +287,57 @@ class PeopleResultSerializer(serializers.Serializer):
 class DocumentCreateSerializer(serializers.Serializer):
     title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
     markdown = serializers.CharField(required=False, allow_blank=True, max_length=1_000_000, trim_whitespace=False)
+    category = serializers.ChoiceField(
+        choices=DocumentCategory.choices,
+        required=False,
+        default=DocumentCategory.GENERAL,
+    )
+    is_template = serializers.BooleanField(required=False, default=False)
 
 
 class DocumentUpdateSerializer(DocumentCreateSerializer):
     base_revision_id = serializers.UUIDField()
+
+
+class DocumentListQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
+    category = serializers.ChoiceField(
+        choices=DocumentCategory.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    template = serializers.ChoiceField(
+        choices=("all", "documents", "templates"),
+        required=False,
+        default="all",
+    )
+
+
+class DocumentTemplateInstantiateSerializer(serializers.Serializer):
+    source_document_id = serializers.UUIDField()
+    title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    category = serializers.ChoiceField(choices=DocumentCategory.choices)
+
+
+class MarkdownImportSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    category = serializers.ChoiceField(choices=DocumentCategory.choices, default=DocumentCategory.GENERAL)
+    is_template = serializers.BooleanField(default=False)
+
+
+class DocumentAttachmentWriteSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+
+class DocumentAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    filename = serializers.CharField(source="original_filename")
+    media_type = serializers.CharField()
+    size = serializers.IntegerField()
+    checksum = serializers.CharField()
+    created_at = serializers.DateTimeField()
 
 
 class DocumentPlacementWriteSerializer(serializers.Serializer):
@@ -427,6 +475,10 @@ class DocumentSerializer(serializers.Serializer):
     owner_organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)
     owner_organization_name = serializers.CharField(source="organization.entity.display_name", allow_null=True)
     is_reference = serializers.SerializerMethodField()
+    category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    is_template = serializers.BooleanField()
+    attachments = serializers.SerializerMethodField()
+    attachment_count = serializers.SerializerMethodField()
     markdown = serializers.SerializerMethodField()
     block_id = serializers.SerializerMethodField()
     current_revision_id = serializers.SerializerMethodField()
@@ -444,6 +496,17 @@ class DocumentSerializer(serializers.Serializer):
     def get_is_reference(self, obj: Document) -> bool:
         workspace_organization_id = self.context.get("workspace_organization_id")
         return workspace_organization_id is not None and obj.organization_id is None
+
+    @extend_schema_field(DocumentAttachmentSerializer(many=True))
+    def get_attachments(self, obj: Document) -> list[dict[str, object]]:
+        records = getattr(obj, "active_attachments", None)
+        if records is None:
+            records = obj.attachments.filter(archived_at__isnull=True).order_by("original_filename", "entity_id")
+        return cast(list[dict[str, object]], DocumentAttachmentSerializer(records, many=True).data)
+
+    def get_attachment_count(self, obj: Document) -> int:
+        records = getattr(obj, "active_attachments", None)
+        return len(records) if records is not None else obj.attachments.filter(archived_at__isnull=True).count()
 
     def _placement(self, obj: Document) -> DocumentPlacement | None:
         placements = cast(tuple[DocumentPlacement, ...], getattr(obj, "active_placements", ()))

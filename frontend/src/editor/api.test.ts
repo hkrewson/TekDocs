@@ -18,7 +18,7 @@ describe('Markdown preview API', () => {
     expect(url).toBe('/api/v1/markdown/render')
     expect(init?.method).toBe('POST')
     expect(init?.credentials).toBe('same-origin')
-    expect(init?.body).toBe(JSON.stringify({ markdown: '==Check==', organization_id: null }))
+    expect(init?.body).toBe(JSON.stringify({ markdown: '==Check==', organization_id: null, document_id: null }))
     expect(init?.headers).toEqual(expect.objectContaining({ 'X-CSRFToken': 'preview-csrf' }))
     fetchMock.mockRestore()
   })

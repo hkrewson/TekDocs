@@ -50,6 +50,30 @@ def test_markdown_renderer_resolves_entity_links_from_server_projections() -> No
     assert 'href="tekdocs:' not in rendered
 
 
+def test_markdown_renderer_resolves_attachment_links_from_server_projections() -> None:
+    target = "00000000-0000-4000-8000-000000000002"
+    unavailable = render_markdown(f"[misleading](tekdocs://attachment/{target})")
+    assert "Unavailable attachment" in unavailable
+    assert "misleading" not in unavailable
+    assert 'href="tekdocs:' not in unavailable
+
+    rendered = render_markdown(
+        f"[wrong name](tekdocs://attachment/{target})",
+        attachments={
+            target: {
+                "id": target,
+                "filename": "network-map.pdf",
+                "size": 42,
+                "download_url": "/api/v1/documents/document/attachments/attachment/download",
+            }
+        },
+    )
+    assert "network-map.pdf · 42 bytes" in rendered
+    assert "wrong name" not in rendered
+    assert 'class="attachment-reference"' in rendered
+    assert 'href="/api/v1/documents/document/attachments/attachment/download"' in rendered
+
+
 def test_markdown_renderer_supports_the_tekdocs_dialect() -> None:
     rendered = render_markdown(
         "~~retired~~ and ==verify this==\n\n"

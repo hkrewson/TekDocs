@@ -52,6 +52,8 @@ Documents compose stable Markdown blocks through structured placement trees. Eac
 
 Entity mentions remain portable Markdown links in the form `tekdocs://entity/{uuid}`. Search uses the same workspace-visible entity query as typed relationships. Rendering discards the authored label and substitutes server-authorized name/type/workspace metadata; an inaccessible or missing target becomes one generic unavailable reference, preventing stale labels from leaking hidden records.
 
+Documents carry one portable built-in category and may be designated as reusable templates. Instantiation resolves the source placement graph, creates an independent destination-owned document, copies only active source-owned managed attachments under new Entity identities, and rewrites their stable `tekdocs://attachment/{uuid}` links. Managed attachment records retain the authored filename only as metadata; storage keys are opaque, file bytes never use a public media route, and downloads authorize through the exact visible owning document. Upload validation derives media type from an allowlisted extension plus byte checks, bounds size, records a server checksum, and cleans written storage if the surrounding database transaction fails. UTF-8 Markdown import enters through normal document creation and immutable revision-one storage; export returns the deterministically resolved Markdown rather than editor HTML. ADR 0024 defines the transfer and attachment boundary.
+
 ## Trust boundaries
 
 - Browser to same-origin Django session and CSRF boundary.

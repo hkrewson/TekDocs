@@ -53,7 +53,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
@@ -114,6 +114,28 @@ assert list(client_block.revisions.order_by("revision_number").values_list("mark
     "# Acme onboarding\n\nRevision two is retained.",
     client_block.current_revision.markdown,
 ]
+template = Document.objects.get(entity__display_name="Live incident template")
+template_copy = Document.objects.get(entity__display_name="New from Live incident template")
+assert template.organization == organization
+assert template.category == "procedure"
+assert template.is_template is True
+assert template_copy.organization == organization
+assert template_copy.category == "procedure"
+assert template_copy.is_template is False
+template_attachment = DocumentAttachment.objects.get(document=template, archived_at__isnull=True)
+copied_attachment = DocumentAttachment.objects.get(document=template_copy, archived_at__isnull=True)
+assert template_attachment.entity_id != copied_attachment.entity_id
+assert template_attachment.checksum == copied_attachment.checksum
+assert template_attachment.original_filename == copied_attachment.original_filename == "incident-checklist.txt"
+assert not template_attachment.file.name.endswith("incident-checklist.txt")
+assert str(template_attachment.entity_id) in template.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
+assert str(copied_attachment.entity_id) in template_copy.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
+assert str(template_attachment.entity_id) not in template_copy.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
+imported_document = Document.objects.get(entity__display_name="live-import")
+assert imported_document.organization == organization
+assert imported_document.category == "general"
+assert imported_document.is_template is False
+assert imported_document.placements.get(parent__isnull=True, position=0).block.current_revision.markdown == "# Imported runbook\n\nCanonical UTF-8 Markdown.\n"
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
 shared_block = shared_document.placements.get(parent__isnull=True, position=0).block

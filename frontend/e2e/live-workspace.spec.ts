@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import * as OTPAuth from 'otpauth'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
@@ -242,6 +243,47 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('button', { name: /Revision 2.*Current/ })).toBeVisible()
   await page.getByRole('button', { name: /Revision 1/ }).click()
   await expect(page.locator('.revision-diff pre')).toContainText('# Acme onboarding')
+
+  await page.getByRole('button', { name: 'New document' }).click()
+  await page.getByLabel('Document title').fill('Live incident template')
+  await page.locator('.document-edit-heading').getByLabel('Category').selectOption('procedure')
+  await page.getByRole('checkbox', { name: 'Reusable template' }).check()
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Incident response\n\nFollow the approved checklist.')
+  await page.getByRole('button', { name: 'Save document' }).click()
+  await expect(page.getByRole('status')).toHaveText('Document saved as revision 1.')
+  await page.getByLabel('Attachment file').setInputFiles({
+    name: 'incident-checklist.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Confirm scope\nPreserve evidence\n'),
+  })
+  await expect(page.getByRole('status')).toHaveText('incident-checklist.txt attached.')
+  await page.getByRole('button', { name: 'Insert link' }).click()
+  await page.getByRole('button', { name: 'Save document' }).click()
+  await expect(page.getByRole('status')).toHaveText('Document saved as revision 2.')
+  await page.getByRole('button', { name: 'Use template' }).click()
+  await expect(page.getByRole('status')).toHaveText('Independent document created from the template.')
+  await expect(page.getByLabel('Document title')).toHaveValue('New from Live incident template')
+  await expect(page.getByRole('checkbox', { name: 'Reusable template' })).not.toBeChecked()
+  await expect(page.locator('.document-attachments').getByRole('link', { name: /incident-checklist\.txt/ })).toBeVisible()
+  const exportPromise = page.waitForEvent('download')
+  await page.getByRole('link', { name: 'Export Markdown' }).click()
+  const exported = await exportPromise
+  const exportedPath = await exported.path()
+  if (!exportedPath) throw new Error('The Markdown export did not produce a local download.')
+  const exportedMarkdown = await readFile(exportedPath, 'utf8')
+  expect(exportedMarkdown).toContain('# Incident response')
+  expect(exportedMarkdown).toMatch(/tekdocs:\/\/attachment\/[0-9a-f-]{36}/)
+
+  await page.getByLabel('Markdown file to import').setInputFiles({
+    name: 'live-import.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# Imported runbook\n\nCanonical UTF-8 Markdown.\n'),
+  })
+  await expect(page.getByRole('status')).toHaveText('Markdown imported as a new document.')
+  await expect(page.getByLabel('Document title')).toHaveValue('live-import')
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('# Imported runbook\n\nCanonical UTF-8 Markdown.\n')
 
   await page.getByRole('button', { name: /Current workspace: Live Acme Client/ }).click()
   await page.getByRole('button', { name: 'Back to Live Workspace MSP. MSP workspace' }).click()

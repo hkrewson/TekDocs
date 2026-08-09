@@ -2,7 +2,7 @@ import { browserCsrfToken } from '../auth/api'
 
 type MarkdownPreviewResponse = { html?: unknown }
 
-export async function renderMarkdownPreview(markdown: string, organizationId?: string, signal?: AbortSignal): Promise<string> {
+export async function renderMarkdownPreview(markdown: string, organizationId?: string, documentId?: string, signal?: AbortSignal): Promise<string> {
   const csrfToken = browserCsrfToken()
   if (!csrfToken) throw new Error('The browser security token is unavailable. Refresh and try again.')
   const response = await fetch('/api/v1/markdown/render', {
@@ -14,7 +14,7 @@ export async function renderMarkdownPreview(markdown: string, organizationId?: s
       'Content-Type': 'application/json',
       'X-CSRFToken': csrfToken,
     },
-    body: JSON.stringify({ markdown, organization_id: organizationId ?? null }),
+    body: JSON.stringify({ markdown, organization_id: organizationId ?? null, document_id: documentId ?? null }),
   })
   if (!response.ok) {
     throw new Error(response.status === 400

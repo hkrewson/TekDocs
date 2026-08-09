@@ -23,6 +23,9 @@ _TASK_PATTERN = re.compile(r"^\[([ xX])\][ \t]+")
 _ENTITY_TARGET_PATTERN = re.compile(
     r"^tekdocs://entity/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
 )
+_ATTACHMENT_TARGET_PATTERN = re.compile(
+    r"^tekdocs://attachment/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
+)
 
 
 class RenderedEntityMention(TypedDict):
@@ -30,6 +33,13 @@ class RenderedEntityMention(TypedDict):
     display_name: str
     entity_type: str
     workspace_label: str
+
+
+class RenderedAttachment(TypedDict):
+    id: str
+    filename: str
+    size: int
+    download_url: str
 
 
 def _replace_inline_content(markdown: MarkdownIt, token: Token, value: str, env: dict[str, object]) -> None:
@@ -177,14 +187,74 @@ def _entity_reference_cards(markdown: MarkdownIt):  # type: ignore[no-untyped-de
     markdown.core.ruler.after("tekdocs_semantic_blocks", "tekdocs_entity_reference_cards", transform)
 
 
+def _attachment_reference_cards(markdown: MarkdownIt):  # type: ignore[no-untyped-def]
+    def transform(state):  # type: ignore[no-untyped-def]
+        attachments = state.env.get("attachments", {})
+        if not isinstance(attachments, Mapping):
+            attachments = {}
+        for token in state.tokens:
+            if token.type != "inline" or not token.children:
+                continue
+            children = token.children
+            index = 0
+            while index < len(children):
+                opening = children[index]
+                if opening.type != "link_open":
+                    index += 1
+                    continue
+                match = _ATTACHMENT_TARGET_PATTERN.fullmatch(opening.attrGet("href") or "")
+                if match is None:
+                    index += 1
+                    continue
+                closing_index = next(
+                    (
+                        candidate
+                        for candidate in range(index + 1, len(children))
+                        if children[candidate].type == "link_close"
+                    ),
+                    None,
+                )
+                if closing_index is None:
+                    index += 1
+                    continue
+                attachment_id = str(UUID(match.group(1)))
+                projection = attachments.get(attachment_id)
+                label = Token("text", "", 0)
+                if isinstance(projection, Mapping):
+                    filename = str(projection.get("filename", "Managed attachment"))
+                    size = int(projection.get("size", 0))
+                    opening.attrs = {}
+                    opening.attrSet("href", str(projection.get("download_url", "")))
+                    opening.attrSet("class", "attachment-reference")
+                    opening.attrSet("data-attachment-id", attachment_id)
+                    opening.attrSet("aria-label", f"Download attachment: {filename}")
+                    label.content = f"{filename} · {size} bytes"
+                else:
+                    opening.type = "span_open"
+                    opening.tag = "span"
+                    opening.attrs = {}
+                    opening.attrSet("class", "attachment-reference attachment-reference-unavailable")
+                    opening.attrSet("data-attachment-id", attachment_id)
+                    opening.attrSet("aria-label", "Unavailable attachment reference")
+                    closing = children[closing_index]
+                    closing.type = "span_close"
+                    closing.tag = "span"
+                    label.content = "Unavailable attachment"
+                children[index + 1 : closing_index] = [label]
+                index += 3
+
+    markdown.core.ruler.after("tekdocs_entity_reference_cards", "tekdocs_attachment_reference_cards", transform)
+
+
 _MARKDOWN = (
     MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
     .enable(("table", "strikethrough"))
     .use(footnote_plugin)
     .use(_semantic_blocks)
     .use(_entity_reference_cards)
+    .use(_attachment_reference_cards)
 )
-_ENTITY_SCAN_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
+_REFERENCE_SCAN_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
 _TAGS = {
     "a",
     "blockquote",
@@ -216,14 +286,14 @@ _TAGS = {
     "ul",
 }
 _ATTRIBUTES = {
-    "a": {"href", "title", "id", "class", "aria-label"},
+    "a": {"href", "title", "id", "class", "aria-label", "data-attachment-id"},
     "blockquote": {"class", "data-callout"},
     "code": {"class"},
     "input": {"type", "checked", "disabled", "aria-label"},
     "li": {"id", "class"},
     "ol": {"class"},
     "strong": {"class"},
-    "span": {"class", "data-entity-id", "data-entity-type", "aria-label"},
+    "span": {"class", "data-entity-id", "data-entity-type", "data-attachment-id", "aria-label"},
     "th": {"class"},
 }
 _URL_SCHEMES = {"http", "https", "mailto", "tekdocs"}
@@ -231,7 +301,7 @@ _URL_SCHEMES = {"http", "https", "mailto", "tekdocs"}
 
 def entity_ids_in_markdown(markdown: str) -> set[UUID]:
     entity_ids: set[UUID] = set()
-    for token in _ENTITY_SCAN_MARKDOWN.parse(markdown):
+    for token in _REFERENCE_SCAN_MARKDOWN.parse(markdown):
         for child in token.children or ():
             if child.type != "link_open":
                 continue
@@ -244,8 +314,31 @@ def entity_ids_in_markdown(markdown: str) -> set[UUID]:
     return entity_ids
 
 
-def render_markdown(markdown: str, *, entity_mentions: Mapping[str, RenderedEntityMention] | None = None) -> str:
-    rendered = _MARKDOWN.render(markdown, {"entity_mentions": entity_mentions or {}})
+def attachment_ids_in_markdown(markdown: str) -> set[UUID]:
+    attachment_ids: set[UUID] = set()
+    for token in _REFERENCE_SCAN_MARKDOWN.parse(markdown):
+        for child in token.children or ():
+            if child.type != "link_open":
+                continue
+            target = child.attrGet("href")
+            if not isinstance(target, str):
+                continue
+            match = _ATTACHMENT_TARGET_PATTERN.fullmatch(target)
+            if match is not None:
+                attachment_ids.add(UUID(match.group(1)))
+    return attachment_ids
+
+
+def render_markdown(
+    markdown: str,
+    *,
+    entity_mentions: Mapping[str, RenderedEntityMention] | None = None,
+    attachments: Mapping[str, RenderedAttachment] | None = None,
+) -> str:
+    rendered = _MARKDOWN.render(
+        markdown,
+        {"entity_mentions": entity_mentions or {}, "attachments": attachments or {}},
+    )
     return nh3.clean(rendered, tags=_TAGS, attributes=_ATTRIBUTES, url_schemes=_URL_SCHEMES)
 
 

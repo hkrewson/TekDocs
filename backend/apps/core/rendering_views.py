@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -5,6 +6,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_installation_member, require_permission
 
+from .document_attachments import resolve_rendered_attachments
+from .documents import documents_for_scope
 from .entity_mentions import resolve_entity_mentions
 from .rendering import render_markdown
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
@@ -13,6 +16,7 @@ from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 class MarkdownRenderRequestSerializer(serializers.Serializer):
     markdown = serializers.CharField(allow_blank=True, max_length=1_000_000, trim_whitespace=False)
     organization_id = serializers.UUIDField(required=False, allow_null=True)
+    document_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class MarkdownRenderResponseSerializer(serializers.Serializer):
@@ -40,10 +44,22 @@ class MarkdownRenderView(APIView):
         )
         require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
         markdown = serializer.validated_data["markdown"]
+        document_id = serializer.validated_data.get("document_id")
+        document = (
+            get_object_or_404(documents_for_scope(workspace.data_scope), entity_id=document_id)
+            if document_id is not None
+            else None
+        )
         response = MarkdownRenderResponseSerializer(
             {
                 "html": render_markdown(
-                    markdown, entity_mentions=resolve_entity_mentions(workspace=workspace, markdown=markdown)
+                    markdown,
+                    entity_mentions=resolve_entity_mentions(workspace=workspace, markdown=markdown),
+                    attachments=resolve_rendered_attachments(
+                        workspace=workspace,
+                        document=document,
+                        markdown=markdown,
+                    ),
                 )
             }
         )

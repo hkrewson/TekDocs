@@ -57,4 +57,23 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ markdown: 'updated', base_revision_id: 'revision' }))
     expect(fetchMock.mock.calls[2]?.[1]?.method).toBe('POST')
   })
+
+  it('filters, imports, attaches, and builds private transfer routes', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [], count: 0 }), { status: 200 })))
+    const scope = { organizationId: 'org' }
+
+    await browserDocumentsClient.list(scope, undefined, { q: 'router', category: 'guide', template: 'templates' })
+    await browserDocumentsClient.importMarkdown(scope, new File(['# Guide'], 'guide.md'), 'Guide', 'guide', true)
+    await browserDocumentsClient.uploadAttachment(scope, 'doc', new File(['notes'], 'notes.txt'))
+    await browserDocumentsClient.archiveAttachment(scope, 'doc', 'attachment')
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents?q=router&category=guide&template=templates')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/import')
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBeInstanceOf(FormData)
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/attachments')
+    expect(fetchMock.mock.calls[3]?.[1]?.method).toBe('DELETE')
+    expect(browserDocumentsClient.exportUrl(scope, 'doc').endsWith('/documents/doc/export')).toBe(true)
+    expect(browserDocumentsClient.attachmentDownloadUrl(scope, 'doc', 'attachment').endsWith('/attachments/attachment/download')).toBe(true)
+  })
 })

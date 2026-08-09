@@ -1,13 +1,21 @@
 from uuid import UUID
 
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
+from .document_attachments import (
+    MAX_MARKDOWN_IMPORT_BYTES,
+    archive_document_attachment,
+    create_document_attachment,
+)
 from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
@@ -18,15 +26,17 @@ from .documents import (
     create_document,
     detach_document_placement,
     documents_for_scope,
+    instantiate_document_template,
     remove_document_placement,
     remove_listing_reference,
+    resolve_document,
     revision_diff,
     revisions_for_document,
     update_document,
     update_document_placement,
     update_shared_block,
 )
-from .models import DocumentationListingReference
+from .models import Document, DocumentationListingReference, DocumentAttachment
 from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
@@ -34,14 +44,19 @@ from .serializers import (
     BlockRevisionResultSerializer,
     DocumentationReferenceSerializer,
     DocumentationReferenceWriteSerializer,
+    DocumentAttachmentSerializer,
+    DocumentAttachmentWriteSerializer,
     DocumentCreateSerializer,
+    DocumentListQuerySerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
+    DocumentTemplateInstantiateSerializer,
     DocumentUpdateSerializer,
     EntityMentionResultSerializer,
     EntityMentionSearchQuerySerializer,
+    MarkdownImportSerializer,
     ReuseImpactSerializer,
     RevisionConflictSerializer,
     SharedBlockUpdateSerializer,
@@ -72,8 +87,20 @@ def _document(workspace: ResolvedWorkspace, document_entity_id: UUID):  # type: 
     return get_object_or_404(documents_for_scope(workspace.data_scope), entity_id=document_entity_id)
 
 
-def _list(workspace: ResolvedWorkspace) -> Response:
-    records = list(documents_for_scope(workspace.data_scope).order_by("entity__display_name", "entity_id")[:500])
+def _list(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentListQuerySerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    values = serializer.validated_data
+    queryset = documents_for_scope(workspace.data_scope)
+    if values["q"]:
+        queryset = queryset.filter(entity__display_name__icontains=values["q"])
+    if values["category"]:
+        queryset = queryset.filter(category=values["category"])
+    if values["template"] == "documents":
+        queryset = queryset.filter(is_template=False)
+    elif values["template"] == "templates":
+        queryset = queryset.filter(is_template=True)
+    records = list(queryset.order_by("entity__display_name", "entity_id")[:500])
     context = {"workspace_organization_id": workspace.organization.id if workspace.organization else None}
     return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
 
@@ -87,6 +114,8 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         actor_id=request.user.pk,
         title=serializer.validated_data["title"],
         markdown=serializer.validated_data.get("markdown", ""),
+        category=serializer.validated_data["category"],
+        is_template=serializer.validated_data["is_template"],
     )
     return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
 
@@ -111,6 +140,115 @@ def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> 
     except RevisionConflict as conflict:
         return _revision_conflict_response(conflict)
     return _retrieve(workspace, document_entity_id)
+
+
+def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentTemplateInstantiateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    source = _document(workspace, serializer.validated_data["source_document_id"])
+    try:
+        document = instantiate_document_template(
+            source=source,
+            tenant=workspace.member.tenant,
+            organization=workspace.organization,
+            actor_id=request.user.pk,
+            title=serializer.validated_data["title"],
+            category=serializer.validated_data["category"],
+        )
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+
+
+def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = MarkdownImportSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    upload = serializer.validated_data["file"]
+    if not str(upload.name).lower().endswith(".md"):
+        return Response({"file": ["Markdown imports must use a .md filename."]}, status=400)
+    content = upload.read(MAX_MARKDOWN_IMPORT_BYTES + 1)
+    if len(content) > MAX_MARKDOWN_IMPORT_BYTES:
+        return Response({"file": ["Markdown imports may not exceed 1 MiB."]}, status=400)
+    if b"\x00" in content:
+        return Response({"file": ["Markdown imports must not contain binary data."]}, status=400)
+    try:
+        markdown = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return Response({"file": ["Markdown imports must use UTF-8."]}, status=400)
+    document = create_document(
+        tenant=workspace.member.tenant,
+        organization=workspace.organization,
+        actor_id=request.user.pk,
+        title=serializer.validated_data["title"],
+        markdown=markdown,
+        category=serializer.validated_data["category"],
+        is_template=serializer.validated_data["is_template"],
+    )
+    return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+
+
+def _export_markdown(workspace: ResolvedWorkspace, document_entity_id: UUID) -> HttpResponse:
+    document = _document(workspace, document_entity_id)
+    filename = f"{slugify(document.entity.display_name) or 'document'}.md"
+    response = HttpResponse(
+        resolve_document(document).markdown.encode("utf-8"), content_type="text/markdown; charset=utf-8"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _attachment(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID
+) -> tuple[Document, DocumentAttachment]:
+    document = _document(workspace, document_entity_id)
+    attachment = get_object_or_404(
+        DocumentAttachment.objects.filter(
+            tenant=workspace.member.tenant,
+            document=document,
+            archived_at__isnull=True,
+        ),
+        entity_id=attachment_entity_id,
+    )
+    return document, attachment
+
+
+def _upload_attachment(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    serializer = DocumentAttachmentWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    attachment = create_document_attachment(
+        document=document,
+        actor_id=request.user.pk,
+        upload=serializer.validated_data["file"],
+    )
+    return Response(DocumentAttachmentSerializer(attachment).data, status=201)
+
+
+def _download_attachment(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID
+) -> FileResponse:
+    _document_record, attachment = _attachment(workspace, document_entity_id, attachment_entity_id)
+    response = FileResponse(
+        attachment.file.storage.open(attachment.file.name, "rb"),
+        as_attachment=True,
+        filename=attachment.original_filename,
+        content_type="application/octet-stream",
+    )
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _archive_attachment(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID, request: Request
+) -> Response:
+    document, attachment = _attachment(workspace, document_entity_id, attachment_entity_id)
+    _mutate_workspace(request, workspace, document)
+    archive_document_attachment(attachment=attachment, actor_id=request.user.pk)
+    return Response(status=204)
 
 
 def _revision_list(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
@@ -302,7 +440,7 @@ def _remove_placement(
 class MSPDocumentListCreateView(APIView):
     @extend_schema(operation_id="documents_msp_list", responses={200: DocumentResultSerializer})
     def get(self, request):  # type: ignore[no-untyped-def]
-        return _list(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW))
+        return _list(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
 
     @extend_schema(
         operation_id="documents_msp_create",
@@ -311,6 +449,26 @@ class MSPDocumentListCreateView(APIView):
     )
     def post(self, request):  # type: ignore[no-untyped-def]
         return _create(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
+
+
+class MSPDocumentTemplateInstantiateView(APIView):
+    @extend_schema(
+        operation_id="document_templates_msp_instantiate",
+        request=DocumentTemplateInstantiateSerializer,
+        responses={201: DocumentSerializer, 409: OpenApiResponse(description="Template dependency conflict")},
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        return _instantiate_template(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
+
+
+class MSPMarkdownImportView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="documents_msp_import", request=MarkdownImportSerializer, responses={201: DocumentSerializer}
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        return _import_markdown(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
 
 
 class MSPDocumentDetailView(APIView):
@@ -333,6 +491,42 @@ class MSPDocumentDetailView(APIView):
     )
     def delete(self, request, document_entity_id):  # type: ignore[no-untyped-def]
         return _archive(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentExportView(APIView):
+    @extend_schema(operation_id="documents_msp_export", responses={(200, "text/markdown"): bytes})
+    def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _export_markdown(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
+
+
+class MSPDocumentAttachmentListCreateView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="document_attachments_msp_create",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentAttachmentSerializer},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _upload_attachment(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentAttachmentDetailView(APIView):
+    @extend_schema(operation_id="document_attachments_msp_archive", request=None, responses={204: OpenApiResponse()})
+    def delete(self, request, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _archive_attachment(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, attachment_entity_id, request
+        )
+
+
+class MSPDocumentAttachmentDownloadView(APIView):
+    @extend_schema(
+        operation_id="document_attachments_msp_download", responses={(200, "application/octet-stream"): bytes}
+    )
+    def get(self, request, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _download_attachment(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, attachment_entity_id
+        )
 
 
 class MSPDocumentPlacementListCreateView(APIView):
@@ -408,7 +602,7 @@ class MSPDocumentMentionSearchView(APIView):
 class OrganizationDocumentListCreateView(APIView):
     @extend_schema(operation_id="documents_organization_list", responses={200: DocumentResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _list(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW))
+        return _list(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request)
 
     @extend_schema(
         operation_id="documents_organization_create",
@@ -417,6 +611,32 @@ class OrganizationDocumentListCreateView(APIView):
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _create(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request)
+
+
+class OrganizationDocumentTemplateInstantiateView(APIView):
+    @extend_schema(
+        operation_id="document_templates_organization_instantiate",
+        request=DocumentTemplateInstantiateSerializer,
+        responses={201: DocumentSerializer, 409: OpenApiResponse(description="Template dependency conflict")},
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _instantiate_template(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
+        )
+
+
+class OrganizationMarkdownImportView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="documents_organization_import",
+        request=MarkdownImportSerializer,
+        responses={201: DocumentSerializer},
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _import_markdown(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
+        )
 
 
 class OrganizationDocumentDetailView(APIView):
@@ -448,6 +668,56 @@ class OrganizationDocumentDetailView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
             document_entity_id,
             request,
+        )
+
+
+class OrganizationDocumentExportView(APIView):
+    @extend_schema(operation_id="documents_organization_export", responses={(200, "text/markdown"): bytes})
+    def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _export_markdown(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+        )
+
+
+class OrganizationDocumentAttachmentListCreateView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="document_attachments_organization_create",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentAttachmentSerializer},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _upload_attachment(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentAttachmentDetailView(APIView):
+    @extend_schema(
+        operation_id="document_attachments_organization_archive", request=None, responses={204: OpenApiResponse()}
+    )
+    def delete(self, request, organization_entity_id, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _archive_attachment(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            attachment_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentAttachmentDownloadView(APIView):
+    @extend_schema(
+        operation_id="document_attachments_organization_download", responses={(200, "application/octet-stream"): bytes}
+    )
+    def get(self, request, organization_entity_id, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _download_attachment(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            attachment_entity_id,
         )
 
 

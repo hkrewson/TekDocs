@@ -425,7 +425,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.3` | **Complete:** immutable block revisions, SHA-256 checksums, parent chains, optimistic concurrency, permission-aware history, and line diffs. |
 | `0.2.4` | **Complete:** live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | **Complete:** backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
-| `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
+| `0.2.6` | **Complete:** document categories, reusable templates, managed private attachments, and deterministic Markdown import/export. |
 | `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
 | `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
@@ -495,6 +495,20 @@ Evidence: `docs/releases/0.2.4.md` after certification.
 
 Evidence: `docs/releases/0.2.5.md`.
 
+### `0.2.6` acceptance criteria
+
+- [x] Documents carry one portable built-in category (`general`, `policy`, `procedure`, `guide`, or `reference`) and an explicit template designation; indexes can search and filter both without weakening workspace visibility.
+- [x] An authorized visible template creates a new independent destination-owned document from its resolved Markdown. Source-owned managed attachments are copied under new identities and their stable Markdown references are rewritten; unsupported external attachment references fail closed.
+- [x] Managed attachments have stable UUID identity, exact tenant/workspace/document ownership, randomized storage names, server-derived size/checksum/media type, bounded uploads, soft removal, and no public `/media/` serving path.
+- [x] Attachment download authorizes through the owning document and returns a forced-download, `nosniff`, private response. Hidden, sibling, cross-tenant, archived, malformed, oversized, empty, and disallowed active-content cases are non-disclosing or rejected.
+- [x] Attachment links serialize only as `tekdocs://attachment/{uuid}`. Preview replaces authored labels with server-authorized attachment cards or one unavailable state; attachment HTML and client-supplied media types are never trusted.
+- [x] UTF-8 `.md` import creates one normal document through the existing immutable revision service under a 1 MiB limit. Export returns deterministic resolved Markdown with a sanitized filename, without secrets, private attachment bytes, or browser-rendered HTML.
+- [x] Category/template/attachment/import/export routes use the central policy service, CSRF/MFA rules, route inventory, PostgreSQL guards/RLS, audit events, and allow/deny/sibling/cross-tenant IDOR coverage.
+- [x] The Documentation interface adds restrained category/filter/template/import/export/attachment workflows with keyboard, responsive, loading, empty, error, and accessibility states while Markdown remains canonical.
+- [x] Migration, OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.6`.
+
+Evidence: `docs/releases/0.2.6.md`.
+
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 
 | Release | Slice and exit condition |
@@ -506,7 +520,7 @@ Evidence: `docs/releases/0.2.5.md`.
 | `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
 | `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
 | `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
-| `0.3.8` | Attachments, asset relationships, bulk operations, and safe file-processing corpus. |
+| `0.3.8` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
 | `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
 | `0.3.10` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |

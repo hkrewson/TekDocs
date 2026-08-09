@@ -39,7 +39,11 @@ from apps.core.custom_field_views import (
     OrganizationEntityCustomFieldListView,
 )
 from apps.core.document_views import (
+    MSPDocumentAttachmentDetailView,
+    MSPDocumentAttachmentDownloadView,
+    MSPDocumentAttachmentListCreateView,
     MSPDocumentDetailView,
+    MSPDocumentExportView,
     MSPDocumentListCreateView,
     MSPDocumentMentionSearchView,
     MSPDocumentPlacementDetachView,
@@ -50,7 +54,13 @@ from apps.core.document_views import (
     MSPDocumentReferenceListCreateView,
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
+    MSPDocumentTemplateInstantiateView,
+    MSPMarkdownImportView,
+    OrganizationDocumentAttachmentDetailView,
+    OrganizationDocumentAttachmentDownloadView,
+    OrganizationDocumentAttachmentListCreateView,
     OrganizationDocumentDetailView,
+    OrganizationDocumentExportView,
     OrganizationDocumentListCreateView,
     OrganizationDocumentMentionSearchView,
     OrganizationDocumentPlacementDetachView,
@@ -59,6 +69,8 @@ from apps.core.document_views import (
     OrganizationDocumentPlacementReuseView,
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
+    OrganizationDocumentTemplateInstantiateView,
+    OrganizationMarkdownImportView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
@@ -168,12 +180,38 @@ urlpatterns = [
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
     path(
+        "api/v1/documents/from-template",
+        MSPDocumentTemplateInstantiateView.as_view(),
+        name="msp-document-template-instantiate",
+    ),
+    path("api/v1/documents/import", MSPMarkdownImportView.as_view(), name="msp-document-import"),
+    path(
         "api/v1/documents/mention-entities", MSPDocumentMentionSearchView.as_view(), name="msp-document-mention-search"
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/export",
+        MSPDocumentExportView.as_view(),
+        name="msp-document-export",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/attachments",
+        MSPDocumentAttachmentListCreateView.as_view(),
+        name="msp-document-attachment-list-create",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>",
+        MSPDocumentAttachmentDetailView.as_view(),
+        name="msp-document-attachment-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>/download",
+        MSPDocumentAttachmentDownloadView.as_view(),
+        name="msp-document-attachment-download",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/placements",
@@ -289,6 +327,16 @@ urlpatterns = [
         name="organization-document-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/from-template",
+        OrganizationDocumentTemplateInstantiateView.as_view(),
+        name="organization-document-template-instantiate",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/import",
+        OrganizationMarkdownImportView.as_view(),
+        name="organization-document-import",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/mention-entities",
         OrganizationDocumentMentionSearchView.as_view(),
         name="organization-document-mention-search",
@@ -297,6 +345,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/export",
+        OrganizationDocumentExportView.as_view(),
+        name="organization-document-export",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments",
+        OrganizationDocumentAttachmentListCreateView.as_view(),
+        name="organization-document-attachment-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>",
+        OrganizationDocumentAttachmentDetailView.as_view(),
+        name="organization-document-attachment-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>/download",
+        OrganizationDocumentAttachmentDownloadView.as_view(),
+        name="organization-document-attachment-download",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements",

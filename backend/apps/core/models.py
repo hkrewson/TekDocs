@@ -1,4 +1,5 @@
 import uuid
+from pathlib import PurePosixPath
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -593,6 +594,14 @@ class EntityLink(TimestampedModel):
             raise ValidationError("Entity-link metadata is not accepted by this release")
 
 
+class DocumentCategory(models.TextChoices):
+    GENERAL = "general", "General"
+    POLICY = "policy", "Policy"
+    PROCEDURE = "procedure", "Procedure"
+    GUIDE = "guide", "Guide"
+    REFERENCE = "reference", "Reference"
+
+
 class Document(TimestampedModel):
     """A Markdown document owned by exactly one MSP or organization workspace."""
 
@@ -602,13 +611,31 @@ class Document(TimestampedModel):
         Organization, on_delete=models.PROTECT, related_name="documents", null=True, blank=True
     )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_record")
+    category = models.CharField(
+        max_length=20,
+        choices=DocumentCategory.choices,
+        default=DocumentCategory.GENERAL,
+    )
+    is_template = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
 
     class Meta:
-        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(category__in=DocumentCategory.values),
+                name="document_category_supported",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "organization", "archived_at"]),
+            models.Index(
+                fields=["tenant", "organization", "category", "is_template", "archived_at"],
+                name="core_doc_category_template_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.entity.display_name
@@ -618,6 +645,68 @@ class Document(TimestampedModel):
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Document entity must use the document workspace scope")
+
+
+def document_attachment_upload_to(instance: "DocumentAttachment", _filename: str) -> str:
+    """Return an opaque storage key that never includes an authored filename."""
+
+    return str(
+        PurePosixPath("document-attachments") / str(instance.tenant_id) / str(instance.document_id) / str(instance.id)
+    )
+
+
+class DocumentAttachment(TimestampedModel):
+    """A private managed file owned by exactly one document."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_attachments")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="document_attachments",
+        null=True,
+        blank=True,
+    )
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="attachments")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_attachment_record")
+    file = models.FileField(upload_to=document_attachment_upload_to, max_length=500)
+    original_filename = models.CharField(max_length=240)
+    media_type = models.CharField(max_length=120)
+    size = models.PositiveBigIntegerField()
+    checksum = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="document_attachments",
+        null=True,
+        blank=True,
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["tenant", "organization", "document", "archived_at"],
+                name="core_docatt_scope_idx",
+            ),
+            models.Index(fields=["document", "checksum"], name="core_docatt_checksum_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.original_filename
+
+    def clean(self) -> None:
+        if self.document_id and (
+            self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
+        ):
+            raise ValidationError("Attachment must use its document workspace scope")
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Attachment entity must use the attachment workspace scope")
 
 
 class Block(TimestampedModel):
@@ -657,9 +746,7 @@ class BlockRevision(models.Model):
         Organization, on_delete=models.PROTECT, related_name="block_revisions", null=True, blank=True
     )
     block = models.ForeignKey(Block, on_delete=models.PROTECT, related_name="revisions")
-    parent = models.ForeignKey(
-        "self", on_delete=models.PROTECT, related_name="children", null=True, blank=True
-    )
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="children", null=True, blank=True)
     revision_number = models.PositiveIntegerField()
     markdown = models.TextField(blank=True)
     checksum = models.CharField(max_length=64)
@@ -714,9 +801,7 @@ class DocumentPlacement(TimestampedModel):
     )
     document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="placements")
     block = models.ForeignKey(Block, on_delete=models.PROTECT, related_name="placements")
-    parent = models.ForeignKey(
-        "self", on_delete=models.PROTECT, related_name="children", null=True, blank=True
-    )
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="children", null=True, blank=True)
     position = models.PositiveIntegerField()
     resolution_mode = models.CharField(
         max_length=12,
@@ -771,8 +856,7 @@ class DocumentPlacement(TimestampedModel):
 
     def clean(self) -> None:
         if self.document_id and (
-            self.document.tenant_id != self.tenant_id
-            or self.document.organization_id != self.organization_id
+            self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
         ):
             raise ValidationError("Placement must use its document workspace scope")
         if self.block_id and self.block.tenant_id != self.tenant_id:
@@ -798,9 +882,7 @@ class DocumentationListingReference(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_references")
-    organization = models.ForeignKey(
-        Organization, on_delete=models.PROTECT, related_name="documentation_references"
-    )
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="documentation_references")
     document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="listing_references")
     archived_at = models.DateTimeField(null=True, blank=True)
 

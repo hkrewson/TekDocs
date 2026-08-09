@@ -4,8 +4,10 @@ from hashlib import sha256
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
+from django.test.utils import override_settings
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -23,6 +25,7 @@ from apps.core.models import (
     BlockRevision,
     Document,
     DocumentationListingReference,
+    DocumentAttachment,
     DocumentPlacement,
     Entity,
     InstallationState,
@@ -101,6 +104,144 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert [item.markdown for item in revisions] == ["# Firewall\n\nUse **MFA**.", "Updated from the browser."]
     assert revisions[1].parent == revisions[0]
     assert revisions[1].checksum == sha256(b"Updated from the browser.").hexdigest()
+
+
+@pytest.mark.django_db
+def test_document_categories_templates_and_filters_persist(owner_client, installation):
+    collection = reverse("msp-document-list-create")
+    created = owner_client.post(
+        collection,
+        {"title": "Access policy", "markdown": "Policy body", "category": "policy", "is_template": True},
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["category"] == "policy"
+    assert created.json()["is_template"] is True
+
+    templates = owner_client.get(collection, {"category": "policy", "template": "templates", "q": "access"})
+    documents = owner_client.get(collection, {"template": "documents"})
+    assert [item["title"] for item in templates.json()["results"]] == ["Access policy"]
+    assert documents.json()["count"] == 0
+
+
+@pytest.mark.django_db
+def test_template_instantiation_copies_owned_attachments_and_rewrites_markdown(
+    owner_client, installation, tmp_path
+):
+    with override_settings(MEDIA_ROOT=tmp_path):
+        template = owner_client.post(
+            reverse("msp-document-list-create"),
+            {"title": "Router template", "markdown": "Start", "category": "guide", "is_template": True},
+            content_type="application/json",
+        ).json()
+        upload = owner_client.post(
+            reverse("msp-document-attachment-list-create", kwargs={"document_entity_id": template["id"]}),
+            {"file": SimpleUploadedFile("router.pdf", b"%PDF-1.4\nTekDocs fixture", content_type="text/html")},
+        )
+        assert upload.status_code == 201
+        attachment_id = upload.json()["id"]
+        detail = reverse("msp-document-detail", kwargs={"document_entity_id": template["id"]})
+        linked = owner_client.put(
+            detail,
+            {
+                "title": "Router template",
+                "markdown": f"[authored label](tekdocs://attachment/{attachment_id})",
+                "base_revision_id": template["current_revision_id"],
+                "category": "guide",
+                "is_template": True,
+            },
+            content_type="application/json",
+        ).json()
+        created = owner_client.post(
+            reverse("msp-document-template-instantiate"),
+            {"source_document_id": template["id"], "title": "Branch router", "category": "procedure"},
+            content_type="application/json",
+        )
+        assert created.status_code == 201
+        payload = created.json()
+        assert payload["category"] == "procedure"
+        assert payload["is_template"] is False
+        assert payload["attachment_count"] == 1
+        copied_id = payload["attachments"][0]["id"]
+        assert copied_id != attachment_id
+        assert f"tekdocs://attachment/{copied_id}" in payload["markdown"]
+        assert attachment_id not in payload["markdown"]
+        assert payload["revision_number"] == 1
+        assert linked["revision_number"] == 2
+        assert DocumentAttachment.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_managed_attachment_download_is_private_and_scope_bound(owner_client, installation, tmp_path):
+    acme = organization(installation.tenant, "Acme attachments")
+    beta = organization(installation.tenant, "Beta attachments")
+    with override_settings(MEDIA_ROOT=tmp_path):
+        created = owner_client.post(
+            reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+            {"title": "Private file", "markdown": "", "category": "reference"},
+            content_type="application/json",
+        ).json()
+        upload_url = reverse(
+            "organization-document-attachment-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": created["id"]},
+        )
+        rejected = owner_client.post(
+            upload_url,
+            {"file": SimpleUploadedFile("payload.svg", b"<svg><script>alert(1)</script></svg>")},
+        )
+        assert rejected.status_code == 400
+        uploaded = owner_client.post(
+            upload_url,
+            {"file": SimpleUploadedFile("notes.txt", b"safe UTF-8 notes", content_type="text/html")},
+        )
+        assert uploaded.status_code == 201
+        attachment = DocumentAttachment.objects.get(entity_id=uploaded.json()["id"])
+        assert "notes.txt" not in attachment.file.name
+        assert attachment.media_type == "text/plain"
+        download = owner_client.get(
+            reverse(
+                "organization-document-attachment-download",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": created["id"],
+                    "attachment_entity_id": attachment.entity_id,
+                },
+            )
+        )
+        assert b"".join(download.streaming_content) == b"safe UTF-8 notes"
+        assert download["Content-Type"] == "application/octet-stream"
+        assert download["Cache-Control"] == "private, no-store"
+        assert download["X-Content-Type-Options"] == "nosniff"
+        sibling = reverse(
+            "organization-document-attachment-download",
+            kwargs={
+                "organization_entity_id": beta.entity_id,
+                "document_entity_id": created["id"],
+                "attachment_entity_id": attachment.entity_id,
+            },
+        )
+        assert owner_client.get(sibling).status_code == 404
+
+
+@pytest.mark.django_db
+def test_markdown_import_and_resolved_export_use_portable_bytes(owner_client, installation):
+    imported = owner_client.post(
+        reverse("msp-document-import"),
+        {
+            "file": SimpleUploadedFile("switch-guide.md", "# Switch\n\nCafé\n".encode()),
+            "title": "Imported switch guide",
+            "category": "guide",
+            "is_template": "false",
+        },
+    )
+    assert imported.status_code == 201
+    payload = imported.json()
+    assert payload["markdown"] == "# Switch\n\nCafé\n"
+    exported = owner_client.get(reverse("msp-document-export", kwargs={"document_entity_id": payload["id"]}))
+    assert exported.content == "# Switch\n\nCafé\n".encode()
+    assert exported["Content-Type"].startswith("text/markdown")
+    assert "imported-switch-guide.md" in exported["Content-Disposition"]
+    assert exported["Cache-Control"] == "private, no-store"
 
 
 @pytest.mark.django_db

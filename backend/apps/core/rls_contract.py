@@ -11,6 +11,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_blockrevision",
     "core_documentplacement",
     "core_documentationlistingreference",
+    "core_documentattachment",
 )
 
 TENANT_SCOPED_TABLES = (

@@ -1,6 +1,8 @@
 import { AuthRequestError, browserCsrfToken } from '../auth/api'
 
 export type DocumentScope = { organizationId?: string }
+export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
+export type DocumentFilters = { q?: string; category?: DocumentCategory | ''; template?: 'all' | 'documents' | 'templates' }
 export type PlacementResolutionMode = 'live' | 'pinned'
 export type DocumentPlacement = {
   id: string
@@ -23,6 +25,10 @@ export type DocumentRecord = {
   owner_organization_id: string | null
   owner_organization_name: string | null
   is_reference: boolean
+  category: DocumentCategory
+  is_template: boolean
+  attachments: DocumentAttachment[]
+  attachment_count: number
   markdown: string
   block_id: string
   current_revision_id: string
@@ -34,7 +40,8 @@ export type DocumentRecord = {
   created_at: string
   updated_at: string
 }
-export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown'>
+export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; created_at: string }
+export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'>
 export type DocumentUpdateInput = DocumentInput & { base_revision_id: string }
 export type DocumentResult = { results: DocumentRecord[]; count: number }
 export type BlockRevision = {
@@ -107,7 +114,7 @@ export class RevisionConflictError extends AuthRequestError {
 }
 
 export interface DocumentsClient {
-  list(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentResult>
+  list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
   listRevisions(scope: DocumentScope, id: string): Promise<RevisionResult>
@@ -119,6 +126,12 @@ export interface DocumentsClient {
   updateSharedBlock(scope: DocumentScope, id: string, placementId: string, markdown: string, baseRevisionId: string): Promise<DocumentRecord>
   detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
+  instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory): Promise<DocumentRecord>
+  importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
+  uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
+  archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
+  exportUrl(scope: DocumentScope, id: string): string
+  attachmentDownloadUrl(scope: DocumentScope, id: string, attachmentId: string): string
   archive(scope: DocumentScope, id: string): Promise<void>
   addReference(documentId: string, organizationId: string): Promise<void>
 }
@@ -166,9 +179,22 @@ async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELET
   }))
 }
 
+async function mutateForm<T>(path: string, form: FormData) {
+  return parse<T>(await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json', 'X-CSRFToken': await csrfToken() },
+    body: form,
+  }))
+}
+
 export const browserDocumentsClient: DocumentsClient = {
-  async list(scope, signal) {
-    const response = await fetch(collectionPath(scope), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
+  async list(scope, signal, filters = {}) {
+    const query = new URLSearchParams()
+    if (filters.q) query.set('q', filters.q)
+    if (filters.category) query.set('category', filters.category)
+    if (filters.template && filters.template !== 'all') query.set('template', filters.template)
+    const response = await fetch(`${collectionPath(scope)}${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
@@ -190,6 +216,23 @@ export const browserDocumentsClient: DocumentsClient = {
   async searchMentionEntities(scope, query, signal) {
     return parse<EntityMentionResult>(await fetch(`${collectionPath(scope)}/mention-entities?q=${encodeURIComponent(query)}&page_size=20`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
+  instantiateTemplate: (scope, sourceDocumentId, title, category) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category }),
+  async importMarkdown(scope, file, title, category, isTemplate) {
+    const form = new FormData()
+    form.set('file', file)
+    form.set('title', title)
+    form.set('category', category)
+    form.set('is_template', isTemplate ? 'true' : 'false')
+    return mutateForm<DocumentRecord>(`${collectionPath(scope)}/import`, form)
+  },
+  async uploadAttachment(scope, id, file) {
+    const form = new FormData()
+    form.set('file', file)
+    return mutateForm<DocumentAttachment>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments`, form)
+  },
+  archiveAttachment: (scope, id, attachmentId) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
+  exportUrl: (scope, id) => `${collectionPath(scope)}/${encodeURIComponent(id)}/export`,
+  attachmentDownloadUrl: (scope, id, attachmentId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/download`,
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),
   addReference: (documentId, organizationId) => mutate<void>(`/api/v1/documents/${encodeURIComponent(documentId)}/references`, 'POST', { organization_id: organizationId }),
 }

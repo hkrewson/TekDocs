@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from difflib import unified_diff
 from typing import cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django.db import transaction
 from django.db.models import Max, Prefetch, Q, QuerySet
@@ -16,12 +16,15 @@ from .models import (
     BlockRevision,
     Document,
     DocumentationListingReference,
+    DocumentAttachment,
+    DocumentCategory,
     DocumentPlacement,
     Entity,
     Organization,
     PlacementResolutionMode,
     Tenant,
 )
+from .rendering import attachment_ids_in_markdown
 from .scoping import DataScope
 
 
@@ -109,6 +112,10 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
         "parent",
         "pinned_revision",
     )
+    attachments = DocumentAttachment.objects.filter(
+        tenant_id=scope.tenant_id,
+        archived_at__isnull=True,
+    ).select_related("entity", "created_by")
     records = Document.objects.filter(tenant_id=scope.tenant_id, archived_at__isnull=True)
     if scope.organization_id is None:
         records = records.filter(organization__isnull=True)
@@ -124,6 +131,7 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
     return (
         records.select_related("entity", "organization", "organization__entity")
         .prefetch_related(Prefetch("placements", queryset=placements, to_attr="active_placements"))
+        .prefetch_related(Prefetch("attachments", queryset=attachments, to_attr="active_attachments"))
         .distinct()
     )
 
@@ -188,12 +196,25 @@ def primary_placement(document: Document) -> DocumentPlacement:
 
 @transaction.atomic
 def create_document(
-    *, tenant: Tenant, organization: Organization | None, actor_id: UUID, title: str, markdown: str
+    *,
+    tenant: Tenant,
+    organization: Organization | None,
+    actor_id: UUID,
+    title: str,
+    markdown: str,
+    category: str = DocumentCategory.GENERAL,
+    is_template: bool = False,
 ) -> Document:
     document_entity = Entity.objects.create(
         tenant=tenant, organization=organization, entity_type="document", display_name=title
     )
-    document = Document.objects.create(tenant=tenant, organization=organization, entity=document_entity)
+    document = Document.objects.create(
+        tenant=tenant,
+        organization=organization,
+        entity=document_entity,
+        category=category,
+        is_template=is_template,
+    )
     block_entity = Entity.objects.create(
         tenant=tenant, organization=organization, entity_type="document_block", display_name=f"{title} — content"
     )
@@ -220,7 +241,14 @@ def create_document(
 
 @transaction.atomic
 def update_document(
-    *, document: Document, actor_id: UUID, title: str, markdown: str, base_revision_id: UUID
+    *,
+    document: Document,
+    actor_id: UUID,
+    title: str,
+    markdown: str,
+    base_revision_id: UUID,
+    category: str = DocumentCategory.GENERAL,
+    is_template: bool = False,
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
     placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
@@ -236,7 +264,9 @@ def update_document(
     locked_document.entity.save(update_fields=("display_name", "updated_at"))
     block.entity.display_name = f"{title} — content"
     block.entity.save(update_fields=("display_name", "updated_at"))
-    locked_document.save(update_fields=("updated_at",))
+    locked_document.category = category
+    locked_document.is_template = is_template
+    locked_document.save(update_fields=("category", "is_template", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked_document.tenant,
         actor_id=actor_id,
@@ -245,6 +275,77 @@ def update_document(
         metadata={},
     )
     return resulting_revision
+
+
+_ATTACHMENT_TARGET = "tekdocs://attachment/"
+
+
+def instantiate_document_template(
+    *,
+    source: Document,
+    tenant: Tenant,
+    organization: Organization | None,
+    actor_id: UUID,
+    title: str,
+    category: str,
+) -> Document:
+    from .document_attachments import copy_document_attachment
+
+    copied_attachments: list[DocumentAttachment] = []
+    try:
+        with transaction.atomic():
+            if not source.is_template:
+                raise PlacementConflict("The selected document is not a template.")
+            resolved = resolve_document(source)
+            attachment_ids = attachment_ids_in_markdown(resolved.markdown)
+            source_attachments = list(
+                DocumentAttachment.objects.filter(
+                    tenant=source.tenant,
+                    document=source,
+                    entity_id__in=attachment_ids,
+                    archived_at__isnull=True,
+                ).select_related("entity")
+            )
+            if {item.entity_id for item in source_attachments} != attachment_ids:
+                raise PlacementConflict("The template contains an unavailable managed attachment reference.")
+
+            replacements = {item.entity_id: uuid4() for item in source_attachments}
+            markdown = resolved.markdown
+            for source_id, destination_id in replacements.items():
+                markdown = markdown.replace(
+                    f"{_ATTACHMENT_TARGET}{source_id}",
+                    f"{_ATTACHMENT_TARGET}{destination_id}",
+                )
+            destination = create_document(
+                tenant=tenant,
+                organization=organization,
+                actor_id=actor_id,
+                title=title,
+                markdown=markdown,
+                category=category,
+                is_template=False,
+            )
+            for attachment in source_attachments:
+                copied_attachments.append(
+                    copy_document_attachment(
+                        attachment=attachment,
+                        destination=destination,
+                        actor_id=actor_id,
+                        entity_id=replacements[attachment.entity_id],
+                    )
+                )
+            AuditEvent.objects.create(
+                tenant=tenant,
+                actor_id=actor_id,
+                action="document.template_instantiated",
+                entity_id=destination.entity_id,
+                metadata={"source_document_id": str(source.entity_id)},
+            )
+    except Exception:
+        for copied in copied_attachments:
+            copied.file.storage.delete(copied.file.name)
+        raise
+    return destination
 
 
 @transaction.atomic

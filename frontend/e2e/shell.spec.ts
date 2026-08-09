@@ -17,6 +17,8 @@ const document = {
   owner_organization_id: null,
   owner_organization_name: null,
   is_reference: false,
+  category: 'guide',
+  is_template: false,
   markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
   block_id: documentBlockId,
   current_revision_id: documentRevisionId,
@@ -25,6 +27,8 @@ const document = {
   resolved_markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
   placements: [{ id: documentPlacementId, parent_id: null, block_id: documentBlockId, block_name: 'UniFi Network Setup Guide — content', position: 0, depth: 0, resolution_mode: 'live', pinned_revision_id: null, resolved_revision_id: documentRevisionId, resolved_revision_number: 1, resolved_checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4', is_primary: true }],
   placement_count: 1,
+  attachments: [],
+  attachment_count: 0,
   created_at: '2026-08-09T12:00:00Z',
   updated_at: '2026-08-09T12:00:00Z',
 }
@@ -36,7 +40,7 @@ async function mockAuthenticated(page: Page) {
     json: { status: 200, meta: { is_authenticated: true }, data: { user: context.user } },
   }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
-  await page.route('**/api/v1/documents', (route) => route.fulfill({ json: { results: [document], count: 1 } }))
+  await page.route('**/api/v1/documents*', (route) => route.fulfill({ json: { results: [document], count: 1 } }))
 }
 
 test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }) => {

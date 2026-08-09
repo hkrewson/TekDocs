@@ -12,6 +12,7 @@ from apps.core.models import (
     BlockRevision,
     Document,
     DocumentationListingReference,
+    DocumentAttachment,
     DocumentPlacement,
     Entity,
     Organization,
@@ -153,6 +154,21 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     reference = DocumentationListingReference.objects.create(
         tenant=tenant, organization=selected_org, document=document
     )
+    attachment_entity = Entity.objects.create(
+        tenant=tenant,
+        entity_type="document_attachment",
+        display_name="reference.txt",
+    )
+    attachment = DocumentAttachment.objects.create(
+        tenant=tenant,
+        document=document,
+        entity=attachment_entity,
+        file="document-attachments/fixture",
+        original_filename="reference.txt",
+        media_type="text/plain",
+        size=1,
+        checksum=sha256(b"x").hexdigest(),
+    )
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         _bind(cursor, tenant.id, "organization", selected_org.id)
@@ -166,6 +182,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         assert cursor.fetchall() == [(placement.id,)]
         cursor.execute("SELECT id FROM core_documentationlistingreference")
         assert cursor.fetchall() == [(reference.id,)]
+        cursor.execute("SELECT id FROM core_documentattachment")
+        assert cursor.fetchall() == [(attachment.id,)]
         runtime.commit()
 
         _bind(cursor, tenant.id, "organization", sibling_org.id)
@@ -175,6 +193,7 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
             "core_blockrevision",
             "core_documentplacement",
             "core_documentationlistingreference",
+            "core_documentattachment",
         ):
             cursor.execute(f"SELECT count(*) FROM {table}")  # noqa: S608 - fixed test allowlist
             assert cursor.fetchone() == (0,)

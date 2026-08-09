@@ -10,7 +10,7 @@ export function sanitizeMarkdownHtml(html: string): string {
       'span', 'thead', 'tr', 'ul',
     ],
     ALLOWED_ATTR: [
-      'aria-label', 'checked', 'class', 'data-callout', 'data-entity-id', 'data-entity-type', 'disabled', 'href', 'id', 'rel', 'title', 'type',
+      'aria-label', 'checked', 'class', 'data-attachment-id', 'data-callout', 'data-entity-id', 'data-entity-type', 'disabled', 'href', 'id', 'rel', 'title', 'type',
     ],
     ALLOWED_URI_REGEXP: allowedUri,
   })

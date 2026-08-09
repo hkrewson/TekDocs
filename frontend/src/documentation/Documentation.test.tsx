@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, attachments: [], attachment_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -28,6 +28,10 @@ function clients() {
   const updateSharedBlock = vi.fn().mockResolvedValue(document)
   const detachPlacement = vi.fn().mockResolvedValue(document)
   const searchMentionEntities = vi.fn().mockResolvedValue({ results: [], count: 0, has_more: false })
+  const instantiateTemplate = vi.fn().mockResolvedValue({ ...document, id: 'doc-from-template', title: 'New from Firewall standard', is_template: false })
+  const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
+  const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', created_at: '2026-08-09T00:00:00Z' })
+  const archiveAttachment = vi.fn().mockResolvedValue(undefined)
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
@@ -41,6 +45,12 @@ function clients() {
     updateSharedBlock,
     detachPlacement,
     searchMentionEntities,
+    instantiateTemplate,
+    importMarkdown,
+    uploadAttachment,
+    archiveAttachment,
+    exportUrl: (_scope, id) => `/documents/${id}/export`,
+    attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
     addReference,
   }
@@ -48,7 +58,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment }
 }
 
 it('lists titles and persists edited Markdown', async () => {
@@ -59,7 +69,7 @@ it('lists titles and persists edited Markdown', async () => {
   await user.clear(await screen.findByRole('textbox', { name: 'Document Markdown' }))
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '# Updated')
   await user.click(screen.getByRole('button', { name: 'Save document' }))
-  await waitFor(() => expect(updateDocument).toHaveBeenCalledWith({}, 'doc-1', { title: 'Firewall standard', markdown: '# Updated', base_revision_id: 'revision-1' }))
+  await waitFor(() => expect(updateDocument).toHaveBeenCalledWith({}, 'doc-1', { title: 'Firewall standard', markdown: '# Updated', category: 'policy', is_template: false, base_revision_id: 'revision-1' }))
   expect(screen.getByRole('status')).toHaveTextContent('Document saved as revision 2.')
 })
 
@@ -101,7 +111,7 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.type(screen.getByLabelText('Document title'), 'New guide')
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), 'Portable Markdown')
   await user.click(screen.getByRole('button', { name: 'Save document' }))
-  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown' }))
+  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', is_template: false }))
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
@@ -135,4 +145,19 @@ it('reviews shared audiences and detaches a reused block', async () => {
   expect(screen.getByText('Will update')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Detach into this workspace' }))
   expect(detachPlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused')
+})
+
+it('imports Markdown and manages a private attachment link', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, importMarkdown, uploadAttachment, archiveAttachment } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await screen.findByRole('button', { name: /Firewall standard/ })
+  await user.upload(screen.getByLabelText('Markdown file to import'), new File(['# Imported'], 'imported.md', { type: 'text/markdown' }))
+  await waitFor(() => expect(importMarkdown).toHaveBeenCalledWith({}, expect.any(File), 'imported', 'general', false))
+  await user.upload(screen.getByLabelText('Attachment file'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
+  await waitFor(() => expect(uploadAttachment).toHaveBeenCalledWith({}, 'doc-imported', expect.any(File)))
+  await user.click(await screen.findByRole('button', { name: 'Insert link' }))
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
+  await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
+  expect(archiveAttachment).toHaveBeenCalledWith({}, 'doc-imported', 'attachment-1')
 })

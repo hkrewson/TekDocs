@@ -25,7 +25,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Relationships | Typed links and backlinks among visible MSP records | Client-owned records plus explicit links to eligible organization anchors | Supplier-owned records plus explicit links to eligible organization anchors | organization relationship UI and scoped search available (`0.1.8`) |
 | Access control | Built-in roles, custom tenant/organization roles, staff-access modes, and explicit per-client MSP staff assignments | — | — | custom role and scoped assignment administration available (`0.1.11`) |
 | Recycle bin | Archived organizations and MSP-owned domain records | Archived records owned by the exact organization | Archived records owned by the exact supplier | records and recovery available (`0.1.13`) |
-| Documentation | MSP-owned documentation | Client-owned and explicitly referenced documentation | Supplier-owned product/support documentation | `0.2.x` |
+| Documentation | Categorized MSP documents and reusable templates | Categorized client-owned and explicitly referenced documents, templates, managed attachments, and Markdown transfer | Categorized supplier-owned product/support documentation and templates | categories/templates/attachments/import-export available (`0.2.6`) |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
 | Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |
 | Licenses | MSP entitlements | Client entitlements and seats | — | `0.3.6` |

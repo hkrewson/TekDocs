@@ -1,24 +1,34 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Archive, BookOpenText, Copy, ExternalLink, History, Link2, Pin, Plus, Search, Share2, Unlink, X } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, BookOpenText, Copy, Download, ExternalLink, FileUp, History, Link2, Paperclip, Pin, Plus, Search, Share2, Trash2, Unlink, X } from 'lucide-react'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
 import { browserWorkspaceClient } from '../workspaces/api'
 import { browserDocumentsClient, RevisionConflictError } from './api'
-import type { BlockRevision, BlockRevisionDetail, DocumentInput, DocumentRecord, DocumentsClient, EntityMentionOption, ReuseImpact } from './api'
+import type { BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentRecord, DocumentsClient, EntityMentionOption, ReuseImpact } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
+const categories: { value: DocumentCategory; label: string }[] = [
+  { value: 'general', label: 'General' }, { value: 'policy', label: 'Policy' },
+  { value: 'procedure', label: 'Procedure' }, { value: 'guide', label: 'Guide' },
+  { value: 'reference', label: 'Reference' },
+]
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Documentation could not be loaded.'
 }
 
 export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient }) {
-  const scope = useMemo(() => ({ organizationId: workspace?.id }), [workspace?.id])
+  const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
   const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[] } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
   const [title, setTitle] = useState('')
   const [markdown, setMarkdown] = useState('')
+  const [category, setCategory] = useState<DocumentCategory>('general')
+  const [isTemplate, setIsTemplate] = useState(false)
+  const [documentQuery, setDocumentQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | ''>('')
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'documents' | 'templates'>('all')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -37,14 +47,16 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOptions, setMentionOptions] = useState<EntityMentionOption[]>([])
   const [editorGeneration, setEditorGeneration] = useState(0)
+  const importInput = useRef<HTMLInputElement>(null)
+  const attachmentInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
-    client.list(scope, controller.signal)
+    client.list(scope, controller.signal, { q: documentQuery, category: categoryFilter, template: templateFilter })
       .then((result) => { if (!controller.signal.aborted) { setLoaded({ key: scopeKey, results: result.results }); setPhase('ready'); setError(null) } })
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
-  }, [client, revision, scope, scopeKey])
+  }, [categoryFilter, client, documentQuery, revision, scope, scopeKey, templateFilter])
 
   useEffect(() => {
     if (workspace || !shareQuery.trim() || selected === null || selected === 'new') return
@@ -71,13 +83,13 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
   const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]) }
-  const open = (document: DocumentRecord) => { resetRevisionUi(); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
-  const create = () => { resetRevisionUi(); setSelected('new'); setTitle(''); setMarkdown(''); setMessage(null); setError(null) }
+  const open = (document: DocumentRecord) => { resetRevisionUi(); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
+  const create = () => { resetRevisionUi(); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
   const close = () => { resetRevisionUi(); setSelected(null); setShareQuery(''); setShareOptions([]) }
   const save = async (skipImpactReview = false) => {
     if (!selected || !title.trim()) return
     setSaving(true); setError(null)
-    const input: DocumentInput = { title: title.trim(), markdown }
+    const input: DocumentInput = { title: title.trim(), markdown, category, is_template: isTemplate }
     try {
       if (selected !== 'new' && markdown !== selected.markdown && !skipImpactReview && approvedRevisionId !== selected.current_revision_id) {
         const primary = selected.placements.find((placement) => placement.is_primary)
@@ -93,7 +105,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       const record = selected === 'new'
         ? await client.create(scope, input)
         : await client.update(scope, selected.id, { ...input, base_revision_id: selected.current_revision_id })
-      setSelected(record); setTitle(record.title); setMarkdown(record.markdown); setConflict(null); setMessage(`Document saved as revision ${record.revision_number}.`); setRevision((value) => value + 1)
+      setSelected(record); setTitle(record.title); setMarkdown(record.markdown); setCategory(record.category); setIsTemplate(record.is_template); setConflict(null); setMessage(`Document saved as revision ${record.revision_number}.`); setRevision((value) => value + 1)
       if (historyOpen) void loadHistory(record)
     } catch (saveError) {
       if (saveError instanceof RevisionConflictError) setConflict(saveError)
@@ -196,24 +208,64 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://entity/${entity.id})`)
     setMentionQuery(''); setMentionOptions([]); setEditorGeneration((value) => value + 1)
   }
+  const importMarkdown = async (file: File) => {
+    setSaving(true); setError(null)
+    try {
+      const imported = await client.importMarkdown(scope, file, file.name.replace(/\.md$/i, '') || 'Imported document', 'general', false)
+      open(imported); setMessage('Markdown imported as a new document.'); setRevision((value) => value + 1)
+    } catch (importError) { setError(errorMessage(importError)) } finally { setSaving(false); if (importInput.current) importInput.current.value = '' }
+  }
+  const instantiateSelectedTemplate = async () => {
+    if (!selected || selected === 'new' || !selected.is_template) return
+    setSaving(true); setError(null)
+    try {
+      const created = await client.instantiateTemplate(scope, selected.id, `New from ${selected.title}`, selected.category)
+      open(created); setMessage('Independent document created from the template.'); setRevision((value) => value + 1)
+    } catch (templateError) { setError(errorMessage(templateError)) } finally { setSaving(false) }
+  }
+  const uploadAttachment = async (file: File) => {
+    if (!selected || selected === 'new') return
+    setSaving(true); setError(null)
+    try {
+      const attachment = await client.uploadAttachment(scope, selected.id, file)
+      setSelected({ ...selected, attachments: [...selected.attachments, attachment], attachment_count: selected.attachment_count + 1 })
+      setMessage(`${attachment.filename} attached.`)
+    } catch (attachmentError) { setError(errorMessage(attachmentError)) } finally { setSaving(false); if (attachmentInput.current) attachmentInput.current.value = '' }
+  }
+  const removeAttachment = async (attachmentId: string) => {
+    if (!selected || selected === 'new') return
+    setSaving(true); setError(null)
+    try {
+      await client.archiveAttachment(scope, selected.id, attachmentId)
+      setSelected({ ...selected, attachments: selected.attachments.filter((item) => item.id !== attachmentId), attachment_count: selected.attachment_count - 1 })
+      setMessage('Attachment removed from the document.')
+    } catch (attachmentError) { setError(errorMessage(attachmentError)) } finally { setSaving(false) }
+  }
+  const insertAttachment = (attachmentId: string, filename: string) => {
+    const label = filename.replaceAll('[', '\\[').replaceAll(']', '\\]')
+    setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://attachment/${attachmentId})`)
+    setEditorGeneration((value) => value + 1)
+  }
 
   return <>
-    <header className="page-header"><div><h1>Documentation</h1><p>{workspace ? `Documents owned by or referenced into ${workspace.name}.` : 'MSP-owned procedures, policies, and reusable reference material.'}</p></div><button className="primary-button" type="button" onClick={create}><Plus size={16} />New document</button></header>
+    <header className="page-header"><div><h1>Documentation</h1><p>{workspace ? `Documents owned by or referenced into ${workspace.name}.` : 'MSP-owned procedures, policies, and reusable reference material.'}</p></div><div className="page-actions"><input ref={importInput} aria-label="Markdown file to import" className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} />Import Markdown</button><button className="primary-button" type="button" onClick={create}><Plus size={16} />New document</button></div></header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {message && <div className="form-message success" role="status">{message}</div>}
     <section className="content-section document-index" aria-labelledby="document-index-heading">
       <div className="section-heading"><h2 id="document-index-heading">Documents</h2><span>{phase === 'ready' ? `${results.length} total` : 'Loading'}</span></div>
+      <div className="document-filters"><label><span>Search</span><input type="search" value={documentQuery} onChange={(event) => setDocumentQuery(event.target.value)} /></label><label><span>Category</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as DocumentCategory | '')}><option value="">All categories</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label><span>Type</span><select value={templateFilter} onChange={(event) => setTemplateFilter(event.target.value as typeof templateFilter)}><option value="all">Documents and templates</option><option value="documents">Documents</option><option value="templates">Templates</option></select></label></div>
       {visiblePhase === 'loading' && <p className="empty-state" role="status">Loading documents…</p>}
       {visiblePhase === 'error' && <p className="empty-state">Documents are unavailable.</p>}
       {visiblePhase === 'ready' && results.length === 0 && <p className="empty-state">No documents have been added to this workspace.</p>}
-      {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || 'Untitled document'}</strong>{document.is_reference && <small>MSP reference</small>}</span></button></li>)}</ul>}
+      {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || 'Untitled document'}</strong><small>{categories.find((item) => item.value === document.category)?.label}{document.is_template ? ' · Template' : ''}{document.is_reference ? ' · MSP reference' : ''}</small></span></button></li>)}</ul>}
     </section>
     {selected && <section className="document-workspace" aria-label={selected === 'new' ? 'New document' : `Edit ${selected.title}`}>
-      <div className="document-edit-heading"><label>Document title<input autoFocus={selected === 'new'} maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
-      <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`${selected === 'new' ? 'new' : selected.id}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="Canonical Markdown · changes save to PostgreSQL" organizationId={workspace?.id} onMarkdownChange={setMarkdown} /></Suspense>
+      <div className="document-edit-heading"><label>Document title<input autoFocus={selected === 'new'} maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
+      <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`${selected === 'new' ? 'new' : selected.id}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="Canonical Markdown · changes save to PostgreSQL" organizationId={workspace?.id} documentId={selected === 'new' ? undefined : selected.id} onMarkdownChange={setMarkdown} /></Suspense>
       <div className="entity-mention-picker"><label><Search size={15} /><span>Reference an entity</span><input type="search" placeholder="Search people, sites, organizations…" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionQuery.trim() && mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div>
       {conflict && <div className="revision-conflict" role="alert"><strong>Newer revision detected</strong><p>Your draft remains in the editor. Review the server changes below and reconcile them into your draft.</p>{conflict.payload.diff && <pre>{conflict.payload.diff}</pre>}<button className="secondary-button" type="button" onClick={acknowledgeConflict}>I reconciled with revision {conflict.payload.current_revision.revision_number}</button></div>}
-      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      {selected !== 'new' && <section className="document-attachments" aria-labelledby="document-attachments-heading"><div className="section-heading"><div><h2 id="document-attachments-heading">Attachments</h2><p>Private managed files referenced by stable Markdown links.</p></div><div><input ref={attachmentInput} aria-label="Attachment file" className="sr-only" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => attachmentInput.current?.click()}><Paperclip size={15} />Add attachment</button></div></div>{selected.attachments.length === 0 ? <p className="empty-state">No files attached.</p> : <ul>{selected.attachments.map((attachment) => <li key={attachment.id}><a href={client.attachmentDownloadUrl(scope, selected.id, attachment.id)}><strong>{attachment.filename}</strong><small>{attachment.media_type} · {attachment.size.toLocaleString()} bytes</small></a><div><button className="secondary-button" type="button" onClick={() => insertAttachment(attachment.id, attachment.filename)}>Insert link</button><button className="icon-button" type="button" aria-label={`Remove ${attachment.filename}`} disabled={saving} onClick={() => { void removeAttachment(attachment.id) }}><Trash2 size={15} /></button></div></li>)}</ul>}</section>}
       {selected !== 'new' && <section className="document-composition" aria-labelledby="document-composition-heading">
         <div className="section-heading"><div><h2 id="document-composition-heading">Reusable blocks</h2><p>Live blocks follow new revisions. Pinned blocks retain the selected revision.</p></div><span>{selected.placement_count} block{selected.placement_count === 1 ? '' : 's'}</span></div>
         <ol>{selected.placements.map((placement) => <li key={placement.id} style={{ paddingInlineStart: `${placement.depth * 18}px` }}><div><Link2 size={15} /><span><strong>{placement.is_primary ? title || selected.title : placement.block_name.replace(/ — content$/, '')}</strong><small>{placement.is_primary ? 'Primary block' : `${placement.resolution_mode === 'live' ? 'Live' : 'Pinned'} · revision ${placement.resolved_revision_number} · ${placement.resolved_checksum.slice(0, 12)}`}</small></span></div><div className="composition-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reviewPlacement(placement.id) }}><Share2 size={14} />Review reuse</button>{!placement.is_primary && <>{placement.resolution_mode === 'live' ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'pinned', placement.resolved_revision_id) }}><Pin size={14} />Pin revision</button> : <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'live', placement.resolved_revision_id) }}><Link2 size={14} />Follow latest</button>}<button className="icon-button" type="button" disabled={saving} aria-label={`Remove ${placement.block_name.replace(/ — content$/, '')}`} onClick={() => { void removePlacement(placement.id) }}><Unlink size={15} /></button></>}</div></li>)}</ol>

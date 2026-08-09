@@ -32,7 +32,7 @@ function clients() {
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
   const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', created_at: '2026-08-09T00:00:00Z' })
   const archiveAttachment = vi.fn().mockResolvedValue(undefined)
-  const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v1' } }
+  const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, reason: 'Approved for operations', audience: 'msp_internal' as const, retention: 'permanent' as const, retention_review_on: null, lifecycle_state: 'current' as const, supersedes_id: null, superseded_by_id: null, artifacts: [{ id: 'pdf-1', kind: 'pdf' as const, filename: 'firewall-static.pdf', media_type: 'application/pdf', size: 1200, checksum: 'c'.repeat(64), source_attachment_id: null }], content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v2' } }
   const publish = vi.fn().mockResolvedValue(publication)
   const getPublication = vi.fn().mockResolvedValue(publication)
   const documents: DocumentsClient = {
@@ -56,6 +56,7 @@ function clients() {
     getPublication,
     publicationMarkdownUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/markdown`,
     publicationManifestUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/manifest`,
+    publicationArtifactUrl: (_scope, id, publicationId, artifactId) => `/documents/${id}/publications/${publicationId}/artifacts/${artifactId}/download`,
     exportUrl: (_scope, id) => `/documents/${id}/export`,
     attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
@@ -176,8 +177,11 @@ it('publishes and opens an immutable verified STATIC version', async () => {
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
-  await waitFor(() => expect(publish).toHaveBeenCalledWith({}, 'doc-1'))
+  await user.type(screen.getByLabelText('Publication reason'), 'Approved for operations')
+  await user.click(screen.getByRole('button', { name: 'Publish immutable version' }))
+  await waitFor(() => expect(publish).toHaveBeenCalledWith({}, 'doc-1', { reason: 'Approved for operations', audience: 'msp_internal', retention: 'permanent', retention_review_on: null, supersedes_id: null }))
   expect(await screen.findByText('Signature verified')).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/artifacts/pdf-1/download')
   expect(screen.getByText(`SHA-256 ${'a'.repeat(64)}`)).toBeVisible()
   expect(screen.getByRole('link', { name: 'Download Markdown' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/markdown')
   expect(screen.queryByRole('textbox', { name: 'Document Markdown' })).not.toBeInTheDocument()

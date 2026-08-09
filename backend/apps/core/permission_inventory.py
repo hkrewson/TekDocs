@@ -71,6 +71,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-document-publication-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-publication-markdown", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-publication-manifest", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-publication-artifact-download", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
@@ -298,6 +299,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-document-publication-manifest",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-publication-artifact-download",
         ("GET",),
         PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,

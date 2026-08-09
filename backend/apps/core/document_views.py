@@ -3,6 +3,7 @@ from uuid import UUID
 
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.http import content_disposition_header
 from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -37,8 +38,14 @@ from .documents import (
     update_document_placement,
     update_shared_block,
 )
-from .models import Document, DocumentationListingReference, DocumentAttachment, DocumentPublication
-from .publications import PublicationConflict, canonical_json, publish_document
+from .models import (
+    Document,
+    DocumentationListingReference,
+    DocumentAttachment,
+    DocumentPublication,
+    DocumentPublicationArtifact,
+)
+from .publications import PublicationConflict, canonical_json, publish_document, read_publication_artifact
 from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
@@ -54,6 +61,7 @@ from .serializers import (
     DocumentPlacementWriteSerializer,
     DocumentPublicationDetailSerializer,
     DocumentPublicationResultSerializer,
+    DocumentPublicationWriteSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentTemplateInstantiateSerializer,
@@ -257,8 +265,8 @@ def _archive_attachment(
 
 def _publication_records(document: Document):  # type: ignore[no-untyped-def]
     return DocumentPublication.objects.filter(tenant=document.tenant, document=document).select_related(
-        "entity", "document", "document__entity", "published_by"
-    )
+        "entity", "document", "document__entity", "published_by", "supersedes__entity", "superseded_by__entity"
+    ).prefetch_related("artifacts", "artifacts__entity", "artifacts__source_attachment__entity")
 
 
 def _publication(
@@ -285,11 +293,58 @@ def _publish(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Re
         # only its owning workspace may freeze dependency projections.
         raise Http404
     require_permission(request.user, PermissionKey.DOCUMENTS_PUBLISH, organization=document.organization)
+    serializer = DocumentPublicationWriteSerializer(
+        data=request.data,
+        context={"organization_scoped": workspace.organization is not None},
+    )
+    serializer.is_valid(raise_exception=True)
     try:
-        publication = publish_document(workspace=workspace, document=document, actor_id=request.user.pk)
+        publication = publish_document(
+            workspace=workspace,
+            document=document,
+            actor_id=request.user.pk,
+            reason=serializer.validated_data["reason"],
+            audience=serializer.validated_data["audience"],
+            retention=serializer.validated_data["retention"],
+            retention_review_on=serializer.validated_data.get("retention_review_on"),
+            supersedes_entity_id=serializer.validated_data.get("supersedes_id"),
+        )
     except PublicationConflict as conflict:
         return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
     return Response(DocumentPublicationDetailSerializer(publication).data, status=201)
+
+
+def _publication_artifact(
+    workspace: ResolvedWorkspace,
+    document_entity_id: UUID,
+    publication_entity_id: UUID,
+    artifact_entity_id: UUID,
+) -> DocumentPublicationArtifact:
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    return get_object_or_404(
+        DocumentPublicationArtifact.objects.filter(publication=publication).select_related("entity"),
+        entity_id=artifact_entity_id,
+    )
+
+
+def _publication_artifact_download(
+    workspace: ResolvedWorkspace,
+    document_entity_id: UUID,
+    publication_entity_id: UUID,
+    artifact_entity_id: UUID,
+) -> HttpResponse:
+    artifact = _publication_artifact(workspace, document_entity_id, publication_entity_id, artifact_entity_id)
+    try:
+        content = read_publication_artifact(artifact)
+    except PublicationConflict as conflict:
+        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+    response = HttpResponse(content, content_type=artifact.media_type)
+    content_disposition = content_disposition_header(True, artifact.original_filename)
+    if content_disposition is not None:
+        response["Content-Disposition"] = content_disposition
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def _retrieve_publication(
@@ -608,7 +663,7 @@ class MSPDocumentPublicationListCreateView(APIView):
 
     @extend_schema(
         operation_id="document_publications_msp_create",
-        request=None,
+        request=DocumentPublicationWriteSerializer,
         responses={201: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="Dependency conflict")},
     )
     def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
@@ -639,6 +694,20 @@ class MSPDocumentPublicationManifestView(APIView):
     def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
         return _publication_manifest(
             _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, publication_entity_id
+        )
+
+
+class MSPDocumentPublicationArtifactDownloadView(APIView):
+    @extend_schema(
+        operation_id="document_publication_artifacts_msp_download",
+        responses={(200, "application/octet-stream"): bytes},
+    )
+    def get(self, request, document_entity_id, publication_entity_id, artifact_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_artifact_download(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+            artifact_entity_id,
         )
 
 
@@ -847,7 +916,7 @@ class OrganizationDocumentPublicationListCreateView(APIView):
 
     @extend_schema(
         operation_id="document_publications_organization_create",
-        request=None,
+        request=DocumentPublicationWriteSerializer,
         responses={201: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="Dependency conflict")},
     )
     def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
@@ -892,6 +961,27 @@ class OrganizationDocumentPublicationManifestView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
             publication_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationArtifactDownloadView(APIView):
+    @extend_schema(
+        operation_id="document_publication_artifacts_organization_download",
+        responses={(200, "application/octet-stream"): bytes},
+    )
+    def get(
+        self,
+        request: Request,
+        organization_entity_id: UUID,
+        document_entity_id: UUID,
+        publication_entity_id: UUID,
+        artifact_entity_id: UUID,
+    ) -> HttpResponse:
+        return _publication_artifact_download(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+            artifact_entity_id,
         )
 
 

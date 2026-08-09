@@ -50,6 +50,7 @@ from apps.core.document_views import (
     MSPDocumentPlacementDetailView,
     MSPDocumentPlacementListCreateView,
     MSPDocumentPlacementReuseView,
+    MSPDocumentPublicationArtifactDownloadView,
     MSPDocumentPublicationDetailView,
     MSPDocumentPublicationListCreateView,
     MSPDocumentPublicationManifestView,
@@ -71,6 +72,7 @@ from apps.core.document_views import (
     OrganizationDocumentPlacementDetailView,
     OrganizationDocumentPlacementListCreateView,
     OrganizationDocumentPlacementReuseView,
+    OrganizationDocumentPublicationArtifactDownloadView,
     OrganizationDocumentPublicationDetailView,
     OrganizationDocumentPublicationListCreateView,
     OrganizationDocumentPublicationManifestView,
@@ -240,6 +242,11 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/manifest",
         MSPDocumentPublicationManifestView.as_view(),
         name="msp-document-publication-manifest",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/artifacts/<uuid:artifact_entity_id>/download",
+        MSPDocumentPublicationArtifactDownloadView.as_view(),
+        name="msp-document-publication-artifact-download",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/placements",
@@ -413,6 +420,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/manifest",
         OrganizationDocumentPublicationManifestView.as_view(),
         name="organization-document-publication-manifest",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/artifacts/<uuid:artifact_entity_id>/download",
+        OrganizationDocumentPublicationArtifactDownloadView.as_view(),
+        name="organization-document-publication-artifact-download",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements",

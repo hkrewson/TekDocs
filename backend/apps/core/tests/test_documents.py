@@ -7,9 +7,11 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
+from django.db.models.deletion import ProtectedError
 from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
@@ -29,12 +31,14 @@ from apps.core.models import (
     DocumentAttachment,
     DocumentPlacement,
     DocumentPublication,
+    DocumentPublicationArtifact,
     Entity,
     InstallationState,
     Organization,
     OrganizationClassification,
 )
-from apps.core.publications import canonical_json, verify_publication
+from apps.core.publications import canonical_json, publish_document, verify_publication
+from apps.core.workspaces import resolve_msp_workspace
 
 
 @pytest.fixture
@@ -169,7 +173,11 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "organization-document-publication-list-create",
             kwargs={"organization_entity_id": client_org.entity_id, "document_entity_id": created["id"]},
         )
-        response = owner_client.post(publication_url, content_type="application/json")
+        response = owner_client.post(
+            publication_url,
+            {"reason": "Approved access policy", "audience": "client_visible", "retention": "permanent"},
+            content_type="application/json",
+        )
 
         assert response.status_code == 201
         publication_payload = response.json()
@@ -180,10 +188,15 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "signature_valid": True,
             "key_fingerprint_valid": True,
         }
-        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v1"
+        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v2"
         assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
         assert publication_payload["manifest"]["entities"][0]["display_name"] == "Static Client"
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
+        assert publication_payload["reason"] == "Approved access policy"
+        assert publication_payload["audience"] == "client_visible"
+        assert publication_payload["lifecycle_state"] == "current"
+        assert len(publication_payload["artifacts"]) == 2
+        assert {item["kind"] for item in publication_payload["manifest"]["artifacts"]} == {"pdf", "attachment"}
         assert "Access standard" in publication_payload["sanitized_html"]
         assert 'href="tekdocs:' not in publication_payload["sanitized_html"]
 
@@ -226,6 +239,99 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
         assert manifest_download.content == canonical_json(publication.manifest) + b"\n"
         assert markdown_download["Cache-Control"] == "private, no-store"
         assert manifest_download["X-Content-Type-Options"] == "nosniff"
+        pdf_artifact = next(item for item in publication_payload["artifacts"] if item["kind"] == "pdf")
+        retained_attachment = next(item for item in publication_payload["artifacts"] if item["kind"] == "attachment")
+        artifact_route = "organization-document-publication-artifact-download"
+        artifact_kwargs = {
+            "organization_entity_id": client_org.entity_id,
+            "document_entity_id": created["id"],
+            "publication_entity_id": publication.entity_id,
+        }
+        pdf_download = owner_client.get(
+            reverse(artifact_route, kwargs={**artifact_kwargs, "artifact_entity_id": pdf_artifact["id"]})
+        )
+        retained_download = owner_client.get(
+            reverse(artifact_route, kwargs={**artifact_kwargs, "artifact_entity_id": retained_attachment["id"]})
+        )
+        assert pdf_download.content.startswith(b"%PDF-")
+        assert retained_download.content == b"retained evidence"
+        assert pdf_download["Cache-Control"] == "private, no-store"
+        assert retained_download["X-Content-Type-Options"] == "nosniff"
+        assert all(
+            artifact.original_filename not in artifact.file.name
+            for artifact in DocumentPublicationArtifact.objects.all()
+        )
+
+
+@pytest.mark.django_db
+def test_static_correction_retention_and_audience_rules_are_append_only(owner_client, installation, tmp_path):
+    client_org = organization(installation.tenant, "Lifecycle Client")
+    created = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": client_org.entity_id}),
+        {"title": "Retention policy", "markdown": "Approved content"},
+        content_type="application/json",
+    ).json()
+    publication_url = reverse(
+        "organization-document-publication-list-create",
+        kwargs={"organization_entity_id": client_org.entity_id, "document_entity_id": created["id"]},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        first = owner_client.post(
+            publication_url,
+            {
+                "reason": "Annual approval",
+                "audience": "client_visible",
+                "retention": "review_on",
+                "retention_review_on": timezone.localdate().isoformat(),
+            },
+            content_type="application/json",
+        )
+        assert first.status_code == 201
+        assert first.json()["lifecycle_state"] == "review_due"
+        corrected = owner_client.post(
+            publication_url,
+            {
+                "reason": "Corrected an outdated support contact",
+                "audience": "client_visible",
+                "retention": "permanent",
+                "supersedes_id": first.json()["id"],
+            },
+            content_type="application/json",
+        )
+        assert corrected.status_code == 201
+        assert corrected.json()["supersedes_id"] == first.json()["id"]
+        prior = DocumentPublication.objects.get(entity_id=first.json()["id"])
+        assert prior.lifecycle_state == "superseded"
+        duplicate = owner_client.post(
+            publication_url,
+            {
+                "reason": "Second replacement",
+                "audience": "client_visible",
+                "retention": "permanent",
+                "supersedes_id": first.json()["id"],
+            },
+            content_type="application/json",
+        )
+        assert duplicate.status_code == 409
+        assert DocumentPublication.objects.count() == 2
+
+    msp_document = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Internal only", "markdown": "MSP"},
+        content_type="application/json",
+    ).json()
+    invalid_audience = owner_client.post(
+        reverse("msp-document-publication-list-create", kwargs={"document_entity_id": msp_document["id"]}),
+        {"reason": "Wrong audience", "audience": "client_visible", "retention": "permanent"},
+        content_type="application/json",
+    )
+    assert invalid_audience.status_code == 400
+    missing_reason = owner_client.post(
+        reverse("msp-document-publication-list-create", kwargs={"document_entity_id": msp_document["id"]}),
+        {"audience": "msp_internal", "retention": "permanent"},
+        content_type="application/json",
+    )
+    assert missing_reason.status_code == 400
 
 
 @pytest.mark.django_db
@@ -240,12 +346,44 @@ def test_static_publication_fails_closed_for_unavailable_dependencies(owner_clie
     ).json()
     response = owner_client.post(
         reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+        {"reason": "Dependency test", "audience": "msp_internal", "retention": "permanent"},
         content_type="application/json",
     )
     assert response.status_code == 409
     assert response.json()["code"] == "publication_conflict"
     assert DocumentPublication.objects.count() == 0
     assert Entity.objects.filter(entity_type="document_publication").count() == 0
+
+
+@pytest.mark.django_db
+def test_static_publication_cleans_retained_files_when_artifact_persistence_fails(
+    owner_client, installation, tmp_path, monkeypatch
+):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Storage rollback", "markdown": "Retain nothing after failure."},
+        content_type="application/json",
+    ).json()
+    document = Document.objects.get(entity_id=created["id"])
+
+    def reject_artifact_save(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("simulated retained storage failure")
+
+    monkeypatch.setattr(DocumentPublicationArtifact, "save", reject_artifact_save)
+    with override_settings(MEDIA_ROOT=tmp_path), pytest.raises(OSError, match="simulated"):
+        publish_document(
+            workspace=resolve_msp_workspace(installation.owner),
+            document=document,
+            actor_id=installation.owner.pk,
+            reason="Storage rollback test",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+
+    assert DocumentPublication.objects.count() == 0
+    assert DocumentPublicationArtifact.objects.count() == 0
+    assert not [path for path in tmp_path.rglob("*") if path.is_file()]
 
 
 @pytest.mark.django_db
@@ -267,6 +405,7 @@ def test_static_publication_requires_owning_workspace_and_hides_cross_client_ids
             "organization-document-publication-list-create",
             kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": shared["id"]},
         ),
+        {"reason": "Invalid workspace", "audience": "msp_internal", "retention": "permanent"},
         content_type="application/json",
     )
     assert referenced_publish.status_code == 404
@@ -281,6 +420,7 @@ def test_static_publication_requires_owning_workspace_and_hides_cross_client_ids
             "organization-document-publication-list-create",
             kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": acme_document["id"]},
         ),
+        {"reason": "Client record", "audience": "msp_internal", "retention": "permanent"},
         content_type="application/json",
     ).json()
     cross_client = owner_client.get(
@@ -294,6 +434,19 @@ def test_static_publication_requires_owning_workspace_and_hides_cross_client_ids
         )
     )
     assert cross_client.status_code == 404
+    pdf_artifact = next(artifact for artifact in published["artifacts"] if artifact["kind"] == "pdf")
+    cross_client_artifact = owner_client.get(
+        reverse(
+            "organization-document-publication-artifact-download",
+            kwargs={
+                "organization_entity_id": beta.entity_id,
+                "document_entity_id": acme_document["id"],
+                "publication_entity_id": published["id"],
+                "artifact_entity_id": pdf_artifact["id"],
+            },
+        )
+    )
+    assert cross_client_artifact.status_code == 404
 
 
 @pytest.mark.django_db(transaction=True)
@@ -305,14 +458,21 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
     ).json()
     owner_client.post(
         reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+        {"reason": "Immutability test", "audience": "msp_internal", "retention": "permanent"},
         content_type="application/json",
     )
     publication = DocumentPublication.objects.get()
+    artifact = DocumentPublicationArtifact.objects.get(kind="pdf")
     publication.title = "Mutated"
     with pytest.raises(ValidationError, match="append-only"):
         publication.save()
     with pytest.raises(ValidationError, match="append-only"):
         publication.delete()
+    artifact.original_filename = "mutated.pdf"
+    with pytest.raises(ValidationError, match="append-only"):
+        artifact.save()
+    with pytest.raises(ValidationError, match="append-only"):
+        artifact.delete()
     malformed = DocumentPublication(
         tenant=publication.tenant,
         document=publication.document,
@@ -323,6 +483,9 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
         ),
         title="Malformed",
         category="general",
+        reason="Malformed test",
+        audience="msp_internal",
+        retention="permanent",
         manifest={},
         content_digest="a" * 64,
         signature="fixture",
@@ -335,8 +498,14 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
     if connection.vendor == "postgresql":
         with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
             DocumentPublication.objects.filter(pk=publication.pk).update(title="Database mutation")
-        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+        with pytest.raises(ProtectedError):
             DocumentPublication.objects.filter(pk=publication.pk).delete()
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("DELETE FROM core_documentpublication WHERE id = %s", [publication.pk])
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+            DocumentPublicationArtifact.objects.filter(pk=artifact.pk).update(original_filename="database.pdf")
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("DELETE FROM core_documentpublicationartifact WHERE id = %s", [artifact.pk])
         with pytest.raises(DatabaseError, match="publication"), transaction.atomic():
             DocumentPublication.objects.bulk_create([malformed])
 

@@ -427,7 +427,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.5` | **Complete:** backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | **Complete:** document categories, reusable templates, managed private attachments, and deterministic Markdown import/export. |
 | `0.2.7` | **Complete:** immutable STATIC dependency resolution, canonical snapshot/manifest, content digest, and Ed25519 signing. |
-| `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
+| `0.2.8` | **Complete:** deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
 | `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
 | `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
 
@@ -522,6 +522,20 @@ Evidence: `docs/releases/0.2.6.md`.
 - [x] Migration, OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.7`.
 
 Evidence: `docs/releases/0.2.7.md`.
+
+### `0.2.8` acceptance criteria
+
+- [x] Every new STATIC publication retains one generated PDF plus independent copies of every referenced managed attachment under opaque storage names; artifact identifiers, media types, byte sizes, and SHA-256 checksums are included in the signed manifest.
+- [x] PDF output is deterministic for the same frozen publication inputs, uses only server-controlled presentation, carries publication identity and page numbering, and passes structural, text-extraction, and rendered-page checks without loading remote resources.
+- [x] Publication requests require a bounded reason, an explicit `msp_internal` or `client_visible` audience, and a retention class. Client-visible intent is valid only for organization-owned publications and does not itself grant portal access.
+- [x] Retention is either permanent or review-on-date. Reaching a review date produces a visible `review_due` state but never deletes, hides, or mutates publication evidence; TekDocs exposes no application retention purge.
+- [x] A correction creates a complete new publication that references exactly one prior publication of the same source document and workspace. The prior record remains readable, the chain is acyclic and single-successor, and current/superseded state is derived without updating either publication.
+- [x] PDF and retained-attachment downloads authorize through the source publication, use forced private `nosniff` responses, and reject malformed, sibling-client, cross-tenant, mismatched-source, or unretained artifact identifiers without disclosure.
+- [x] Publication, artifact, supersession, audience, retention, signature, and file-failure paths are append-only and fail closed in Django and PostgreSQL; partially written storage is cleaned when publication fails.
+- [x] The Documentation interface collects publication metadata before confirmation, distinguishes current and superseded STATIC records, shows audience/reason/retention state, and offers authorized PDF and retained-artifact downloads with responsive and accessible denial/error states.
+- [x] Migration, OpenAPI, backend/frontend, PDF rendering, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.8`.
+
+Evidence: `docs/releases/0.2.8.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

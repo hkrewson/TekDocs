@@ -43,6 +43,7 @@ DOCUMENT_RLS_TABLES = {
     "core_documentplacement",
     "core_documentattachment",
     "core_documentpublication",
+    "core_documentpublicationartifact",
 }
 
 
@@ -213,7 +214,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     with connection.cursor() as cursor:
         cursor.execute("SELECT markdown FROM core_block WHERE id = %s", [block.id])
         assert cursor.fetchone() == ("# Preserved revision\n",)
-    call_command("migrate", "core", "0029", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0031", verbosity=0, interactive=False)
     preserved_revision = BlockRevision.objects.get(block_id=block.id)
     assert preserved_revision.markdown == "# Preserved revision\n"
     assert preserved_revision.checksum
@@ -229,7 +230,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0029", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0031", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

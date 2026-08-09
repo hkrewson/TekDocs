@@ -4,6 +4,7 @@ from pathlib import PurePosixPath
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from .scoping import OrganizationScopedManager, TenantScopedManager
 
@@ -655,6 +656,17 @@ def document_attachment_upload_to(instance: "DocumentAttachment", _filename: str
     )
 
 
+def publication_artifact_upload_to(instance: "DocumentPublicationArtifact", _filename: str) -> str:
+    """Return an opaque retained-artifact key without authored path material."""
+
+    return str(
+        PurePosixPath("publication-artifacts")
+        / str(instance.tenant_id)
+        / str(instance.publication_id)
+        / str(instance.id)
+    )
+
+
 class DocumentAttachment(TimestampedModel):
     """A private managed file owned by exactly one document."""
 
@@ -709,6 +721,21 @@ class DocumentAttachment(TimestampedModel):
             raise ValidationError("Attachment entity must use the attachment workspace scope")
 
 
+class PublicationAudience(models.TextChoices):
+    MSP_INTERNAL = "msp_internal", "MSP internal"
+    CLIENT_VISIBLE = "client_visible", "Client visible"
+
+
+class PublicationRetention(models.TextChoices):
+    PERMANENT = "permanent", "Permanent"
+    REVIEW_ON = "review_on", "Review on date"
+
+
+class PublicationArtifactKind(models.TextChoices):
+    PDF = "pdf", "PDF"
+    ATTACHMENT = "attachment", "Retained attachment"
+
+
 class DocumentPublication(models.Model):
     """An append-only STATIC snapshot of one document and its resolved dependencies."""
 
@@ -725,6 +752,17 @@ class DocumentPublication(models.Model):
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_publication_record")
     title = models.CharField(max_length=240)
     category = models.CharField(max_length=20, choices=DocumentCategory.choices)
+    reason = models.CharField(max_length=500)
+    audience = models.CharField(max_length=24, choices=PublicationAudience.choices)
+    retention = models.CharField(max_length=20, choices=PublicationRetention.choices)
+    retention_review_on = models.DateField(null=True, blank=True)
+    supersedes = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="superseded_by",
+        null=True,
+        blank=True,
+    )
     canonical_markdown = models.TextField(blank=True)
     sanitized_html = models.TextField(blank=True)
     manifest = models.JSONField()
@@ -747,6 +785,25 @@ class DocumentPublication(models.Model):
 
     class Meta:
         ordering = ("-published_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(audience__in=PublicationAudience.values), name="publication_audience_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(retention__in=PublicationRetention.values), name="publication_retention_valid"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(retention=PublicationRetention.PERMANENT, retention_review_on__isnull=True)
+                    | models.Q(retention=PublicationRetention.REVIEW_ON, retention_review_on__isnull=False)
+                ),
+                name="publication_retention_date_valid",
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(audience=PublicationAudience.MSP_INTERNAL) | models.Q(organization__isnull=False)),
+                name="publication_client_audience_scoped",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["tenant", "organization", "document", "published_at"],
@@ -777,7 +834,10 @@ class DocumentPublication(models.Model):
             raise ValidationError("Publication entity must use the publication workspace scope")
         if self.entity_id and self.entity.entity_type != "document_publication":
             raise ValidationError("Publication entity must use the document_publication type")
-        if not isinstance(self.manifest, dict) or self.manifest.get("format") != "tekdocs-static-publication/v1":
+        if not isinstance(self.manifest, dict) or self.manifest.get("format") not in {
+            "tekdocs-static-publication/v1",
+            "tekdocs-static-publication/v2",
+        }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
             "publication_id": str(self.id),
@@ -794,6 +854,127 @@ class DocumentPublication(models.Model):
         }
         if workspace != expected_workspace:
             raise ValidationError("Publication manifest workspace does not match the publication")
+        if not self.reason.strip() or len(self.reason) > 500:
+            raise ValidationError("Publication reason is required and may not exceed 500 characters")
+        if self.audience == PublicationAudience.CLIENT_VISIBLE and self.organization_id is None:
+            raise ValidationError("Client-visible publications require an organization workspace")
+        if (self.retention == PublicationRetention.REVIEW_ON) != (self.retention_review_on is not None):
+            raise ValidationError("Publication retention date does not match its retention class")
+        supersedes = self.supersedes if self.supersedes_id else None
+        if supersedes is not None and (
+            supersedes.tenant_id != self.tenant_id
+            or supersedes.organization_id != self.organization_id
+            or supersedes.document_id != self.document_id
+        ):
+            raise ValidationError("A correction may supersede only a publication of the same document and workspace")
+        if self.manifest.get("format") == "tekdocs-static-publication/v2":
+            expected_lifecycle = {
+                "reason": self.reason,
+                "audience": self.audience,
+                "retention": self.retention,
+                "retention_review_on": self.retention_review_on.isoformat() if self.retention_review_on else None,
+                "supersedes_id": str(supersedes.entity_id) if supersedes is not None else None,
+            }
+            if any(self.manifest.get(key) != value for key, value in expected_lifecycle.items()):
+                raise ValidationError("Publication manifest lifecycle metadata does not match the publication")
+
+    @property
+    def lifecycle_state(self) -> str:
+        if hasattr(self, "superseded_by"):
+            return "superseded"
+        if self.retention_review_on is not None and self.retention_review_on <= timezone.localdate():
+            return "review_due"
+        return "current"
+
+
+class DocumentPublicationArtifact(models.Model):
+    """An append-only retained byte artifact belonging to a STATIC publication."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_publication_artifacts")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="document_publication_artifacts",
+        null=True,
+        blank=True,
+    )
+    publication = models.ForeignKey(DocumentPublication, on_delete=models.PROTECT, related_name="artifacts")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_publication_artifact")
+    kind = models.CharField(max_length=20, choices=PublicationArtifactKind.choices)
+    source_attachment = models.ForeignKey(
+        DocumentAttachment,
+        on_delete=models.PROTECT,
+        related_name="publication_artifacts",
+        null=True,
+        blank=True,
+    )
+    file = models.FileField(upload_to=publication_artifact_upload_to, max_length=500)
+    original_filename = models.CharField(max_length=240)
+    media_type = models.CharField(max_length=120)
+    size = models.PositiveBigIntegerField()
+    checksum = models.CharField(max_length=64)
+    created_at = models.DateTimeField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("kind", "original_filename", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(kind__in=PublicationArtifactKind.values), name="publication_artifact_kind_valid"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind=PublicationArtifactKind.PDF, source_attachment__isnull=True)
+                    | models.Q(kind=PublicationArtifactKind.ATTACHMENT, source_attachment__isnull=False)
+                ),
+                name="publication_artifact_source_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("publication", "kind"),
+                condition=models.Q(kind=PublicationArtifactKind.PDF),
+                name="one_pdf_per_publication",
+            ),
+            models.UniqueConstraint(
+                fields=("publication", "source_attachment"),
+                condition=models.Q(source_attachment__isnull=False),
+                name="one_retained_source_attachment",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "publication"), name="core_pubart_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.publication.title}: {self.original_filename}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Publication artifacts are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Publication artifacts are append-only")
+
+    def clean(self) -> None:
+        if self.publication_id and (
+            self.publication.tenant_id != self.tenant_id
+            or self.publication.organization_id != self.organization_id
+        ):
+            raise ValidationError("Publication artifact must use its publication workspace scope")
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "document_publication_artifact"
+        ):
+            raise ValidationError("Publication artifact entity scope or type is invalid")
+        if self.kind == PublicationArtifactKind.PDF and self.source_attachment_id is not None:
+            raise ValidationError("PDF artifacts cannot identify a source attachment")
+        if self.kind == PublicationArtifactKind.ATTACHMENT and self.source_attachment_id is None:
+            raise ValidationError("Retained attachment artifacts require a source attachment")
+        source_attachment = self.source_attachment if self.source_attachment_id else None
+        if source_attachment is not None and source_attachment.document_id != self.publication.document_id:
+            raise ValidationError("Retained attachment must belong to the source document")
 
 
 class Block(TimestampedModel):

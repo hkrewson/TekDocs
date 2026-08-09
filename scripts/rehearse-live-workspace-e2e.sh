@@ -48,12 +48,13 @@ docker run --rm \
   -e TEKDOCS_E2E_BOOTSTRAP_TOKEN="$bootstrap_token" \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
-live_compose run --rm migrate python manage.py shell -c '
+live_compose run --rm -v "${project_name}_media_data:/app/media:ro" migrate python manage.py shell -c '
 from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
@@ -157,6 +158,15 @@ resolved = resolve_document(client_document).markdown
 assert "MSP-owned block revision two." in resolved
 assert "revision three" not in resolved
 assert Block.objects.filter(placements__document=shared_document).count() == 1
+publication = DocumentPublication.objects.get(document=client_document)
+assert publication.reason == "Live publication regression"
+assert publication.audience == "client_visible"
+assert publication.retention == "permanent"
+assert publication.lifecycle_state == "current"
+assert verify_publication(publication)["valid"] is True
+pdf_artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind="pdf")
+assert read_publication_artifact(pdf_artifact).startswith(b"%PDF-")
+assert publication.manifest["artifacts"][0]["checksum"] == pdf_artifact.checksum
 print("Live workspace database fixture verified")
 '
 echo "Real browser-to-Django-to-PostgreSQL workspace journey passed"

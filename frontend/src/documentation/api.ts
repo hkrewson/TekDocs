@@ -44,11 +44,24 @@ export type DocumentRecord = {
 }
 export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; created_at: string }
 export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
+export type PublicationAudience = 'msp_internal' | 'client_visible'
+export type PublicationRetention = 'permanent' | 'review_on'
+export type PublicationLifecycleState = 'current' | 'superseded' | 'review_due'
+export type DocumentPublicationArtifact = { id: string; kind: 'pdf' | 'attachment'; filename: string; media_type: string; size: number; checksum: string; source_attachment_id: string | null }
+export type DocumentPublicationInput = { reason: string; audience: PublicationAudience; retention: PublicationRetention; retention_review_on?: string | null; supersedes_id?: string | null }
 export type DocumentPublication = {
   id: string
   source_document_id: string
   title: string
   category: DocumentCategory
+  reason: string
+  audience: PublicationAudience
+  retention: PublicationRetention
+  retention_review_on: string | null
+  lifecycle_state: PublicationLifecycleState
+  supersedes_id: string | null
+  superseded_by_id: string | null
+  artifacts: DocumentPublicationArtifact[]
   content_digest: string
   signature_algorithm: 'Ed25519'
   signature: string
@@ -153,10 +166,11 @@ export interface DocumentsClient {
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
-  publish(scope: DocumentScope, id: string): Promise<DocumentPublicationDetail>
+  publish(scope: DocumentScope, id: string, input: DocumentPublicationInput): Promise<DocumentPublicationDetail>
   getPublication(scope: DocumentScope, id: string, publicationId: string): Promise<DocumentPublicationDetail>
   publicationMarkdownUrl(scope: DocumentScope, id: string, publicationId: string): string
   publicationManifestUrl(scope: DocumentScope, id: string, publicationId: string): string
+  publicationArtifactUrl(scope: DocumentScope, id: string, publicationId: string, artifactId: string): string
   exportUrl(scope: DocumentScope, id: string): string
   attachmentDownloadUrl(scope: DocumentScope, id: string, attachmentId: string): string
   archive(scope: DocumentScope, id: string): Promise<void>
@@ -259,12 +273,13 @@ export const browserDocumentsClient: DocumentsClient = {
     return mutateForm<DocumentAttachment>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments`, form)
   },
   archiveAttachment: (scope, id, attachmentId) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
-  publish: (scope, id) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications`, 'POST'),
+  publish: (scope, id, input) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications`, 'POST', input),
   async getPublication(scope, id, publicationId) {
     return parse<DocumentPublicationDetail>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   publicationMarkdownUrl: (scope, id, publicationId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/markdown`,
   publicationManifestUrl: (scope, id, publicationId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/manifest`,
+  publicationArtifactUrl: (scope, id, publicationId, artifactId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,
   exportUrl: (scope, id) => `${collectionPath(scope)}/${encodeURIComponent(id)}/export`,
   attachmentDownloadUrl: (scope, id, attachmentId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/download`,
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),

@@ -5,7 +5,8 @@ import binascii
 import hashlib
 import json
 import re
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -14,9 +15,13 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
+from rest_framework.exceptions import ValidationError
 
+from .document_attachments import copy_attachment_content
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import (
@@ -26,17 +31,42 @@ from .models import (
     DocumentAttachment,
     DocumentPlacement,
     DocumentPublication,
+    DocumentPublicationArtifact,
     Entity,
+    EntityVisibility,
+    PublicationArtifactKind,
+    PublicationAudience,
 )
-from .rendering import RenderedAttachment, attachment_ids_in_markdown, entity_ids_in_markdown, render_markdown
+from .rendering import (
+    RenderedAttachment,
+    attachment_ids_in_markdown,
+    entity_ids_in_markdown,
+    render_markdown,
+    render_pdf,
+)
 from .workspaces import ResolvedWorkspace
 
-MANIFEST_VERSION = "tekdocs-static-publication/v1"
+MANIFEST_VERSION = "tekdocs-static-publication/v2"
 SIGNATURE_ALGORITHM = "Ed25519"
+MAX_PUBLICATION_MARKDOWN_BYTES = 2 * 1024 * 1024
+MAX_RETAINED_ATTACHMENTS = 50
+MAX_RETAINED_ATTACHMENT_BYTES = 50 * 1024 * 1024
 
 
 class PublicationConflict(Exception):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class PendingArtifact:
+    id: UUID
+    entity_id: UUID
+    kind: str
+    filename: str
+    media_type: str
+    content: bytes
+    checksum: str
+    source_attachment: DocumentAttachment | None = None
 
 
 def canonical_json(value: object) -> bytes:
@@ -85,7 +115,7 @@ def _timestamp(value: datetime) -> str:
 
 def _resolved_attachments(
     *, document: Document, markdown: str
-) -> tuple[list[dict[str, object]], dict[str, RenderedAttachment]]:
+) -> tuple[list[dict[str, object]], dict[str, RenderedAttachment], list[DocumentAttachment]]:
     requested = attachment_ids_in_markdown(markdown)
     records = list(
         DocumentAttachment.objects.select_for_update()
@@ -110,7 +140,7 @@ def _resolved_attachments(
             "filename": record.original_filename,
             "size": record.size,
         }
-    return manifest_records, rendered
+    return manifest_records, rendered, records
 
 
 def _resolved_entities(*, workspace: ResolvedWorkspace, markdown: str) -> list[dict[str, str]]:
@@ -129,124 +159,258 @@ def _resolved_entities(*, workspace: ResolvedWorkspace, markdown: str) -> list[d
     ]
 
 
-@transaction.atomic
-def publish_document(*, workspace: ResolvedWorkspace, document: Document, actor_id: UUID) -> DocumentPublication:
-    locked_document = (
-        Document.objects.select_for_update(of=("self",))
-        .select_related("tenant", "organization", "organization__entity", "entity")
-        .get(pk=document.pk)
-    )
-    placements = list(
-        DocumentPlacement.objects.select_for_update(of=("self",))
-        .filter(document=locked_document)
-        .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
-        .order_by("id")
-    )
-    block_ids = sorted({placement.block_id for placement in placements}, key=str)
-    list(Block.objects.select_for_update().filter(id__in=block_ids).order_by("id"))
-    # Refresh the placement graph after the block locks are held. A concurrent
-    # shared-block edit may have advanced current_revision while the initial
-    # placement query was waiting for those locks.
-    placements = list(
-        DocumentPlacement.objects.select_for_update(of=("self",))
-        .filter(document=locked_document)
-        .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
-        .order_by("id")
-    )
-    locked_document.__dict__["active_placements"] = placements
-    try:
-        resolved = resolve_document(locked_document)
-    except PlacementConflict as exc:
-        raise PublicationConflict(str(exc)) from exc
-
-    entity_projections = _resolved_entities(workspace=workspace, markdown=resolved.markdown)
-    attachment_records, rendered_attachments = _resolved_attachments(
-        document=locked_document,
-        markdown=resolved.markdown,
-    )
-    rendered_entities = {record["id"]: record for record in entity_projections}
-    sanitized_html = render_markdown(
-        resolved.markdown,
-        entity_mentions=rendered_entities,  # type: ignore[arg-type]
-        attachments=rendered_attachments,
-    )
-
-    publication_id = uuid4()
-    published_at = timezone.now()
-    publication_entity = Entity.objects.create(
-        tenant=locked_document.tenant,
-        organization=locked_document.organization,
-        entity_type="document_publication",
-        display_name=locked_document.entity.display_name,
-    )
-    organization = locked_document.organization
-    manifest: dict[str, Any] = {
-        "format": MANIFEST_VERSION,
-        "publication_id": str(publication_id),
-        "publication_entity_id": str(publication_entity.id),
-        "source_document_id": str(locked_document.entity_id),
-        "workspace": {
-            "kind": "organization" if locked_document.organization_id else "msp",
-            "id": str(organization.entity_id) if organization is not None else None,
-        },
-        "title": locked_document.entity.display_name,
-        "category": locked_document.category,
-        "published_by": str(actor_id),
-        "published_at": _timestamp(published_at),
-        "placements": [
-            {
-                "id": str(item.placement.id),
-                "parent_id": str(item.placement.parent_id) if item.placement.parent_id else None,
-                "position": item.placement.position,
-                "depth": item.depth,
-                "block_id": str(item.placement.block.entity_id),
-                "resolution_mode": item.placement.resolution_mode,
-                "revision_id": str(item.revision.id),
-                "revision_number": item.revision.revision_number,
-                "checksum": item.revision.checksum,
-            }
-            for item in resolved.placements
-        ],
-        "entities": entity_projections,
-        "attachments": attachment_records,
+def _artifact_descriptor(artifact: PendingArtifact) -> dict[str, object]:
+    return {
+        "id": str(artifact.id),
+        "entity_id": str(artifact.entity_id),
+        "kind": artifact.kind,
+        "filename": artifact.filename,
+        "media_type": artifact.media_type,
+        "size": len(artifact.content),
+        "checksum": artifact.checksum,
+        "source_attachment_id": (
+            str(artifact.source_attachment.entity_id) if artifact.source_attachment is not None else None
+        ),
     }
-    payload = snapshot_payload(
-        manifest=manifest,
-        markdown=resolved.markdown,
-        sanitized_html=sanitized_html,
-    )
-    digest_bytes = hashlib.sha256(payload).digest()
-    key = publication_signing_key()
-    public_key, key_fingerprint = _encoded_public_key(key)
-    publication = DocumentPublication(
-        id=publication_id,
-        tenant=locked_document.tenant,
-        organization=locked_document.organization,
-        document=locked_document,
-        entity=publication_entity,
-        title=locked_document.entity.display_name,
-        category=locked_document.category,
-        canonical_markdown=resolved.markdown,
-        sanitized_html=sanitized_html,
-        manifest=manifest,
-        content_digest=digest_bytes.hex(),
-        signature=base64.urlsafe_b64encode(key.sign(digest_bytes)).decode("ascii"),
-        signature_algorithm=SIGNATURE_ALGORITHM,
-        public_key=public_key,
-        key_fingerprint=key_fingerprint,
-        published_by_id=actor_id,
-        published_at=published_at,
-    )
-    publication.full_clean()
-    publication.save()  # type: ignore[no-untyped-call]
-    AuditEvent.objects.create(
-        tenant=locked_document.tenant,
-        actor_id=actor_id,
-        action="document.publication.created",
-        entity_id=publication.entity_id,
-        metadata={"source_document_id": str(locked_document.entity_id)},
-    )
-    return publication
+
+
+def publish_document(
+    *,
+    workspace: ResolvedWorkspace,
+    document: Document,
+    actor_id: UUID,
+    reason: str,
+    audience: str,
+    retention: str,
+    retention_review_on: date | None,
+    supersedes_entity_id: UUID | None = None,
+) -> DocumentPublication:
+    stored_artifacts: list[tuple[object, str]] = []
+    try:
+        with transaction.atomic():
+            locked_document = (
+                Document.objects.select_for_update(of=("self",))
+                .select_related("tenant", "organization", "organization__entity", "entity")
+                .get(pk=document.pk)
+            )
+            placements = list(
+                DocumentPlacement.objects.select_for_update(of=("self",))
+                .filter(document=locked_document)
+                .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
+                .order_by("id")
+            )
+            block_ids = sorted({placement.block_id for placement in placements}, key=str)
+            list(Block.objects.select_for_update().filter(id__in=block_ids).order_by("id"))
+            placements = list(
+                DocumentPlacement.objects.select_for_update(of=("self",))
+                .filter(document=locked_document)
+                .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
+                .order_by("id")
+            )
+            locked_document.__dict__["active_placements"] = placements
+            try:
+                resolved = resolve_document(locked_document)
+            except PlacementConflict as exc:
+                raise PublicationConflict(str(exc)) from exc
+            if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
+                raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
+
+            supersedes = None
+            if supersedes_entity_id is not None:
+                supersedes = (
+                    DocumentPublication.objects.select_for_update()
+                    .select_related("entity", "document")
+                    .filter(entity_id=supersedes_entity_id)
+                    .first()
+                )
+                if supersedes is None or (
+                    supersedes.document_id != locked_document.id
+                    or supersedes.tenant_id != locked_document.tenant_id
+                    or supersedes.organization_id != locked_document.organization_id
+                    or hasattr(supersedes, "superseded_by")
+                ):
+                    raise PublicationConflict("The selected STATIC publication cannot be superseded.")
+
+            entity_projections = _resolved_entities(workspace=workspace, markdown=resolved.markdown)
+            attachment_records, rendered_attachments, source_attachments = _resolved_attachments(
+                document=locked_document,
+                markdown=resolved.markdown,
+            )
+            if len(source_attachments) > MAX_RETAINED_ATTACHMENTS:
+                raise PublicationConflict("A publication may retain at most 50 referenced attachments.")
+            rendered_entities = {record["id"]: record for record in entity_projections}
+            sanitized_html = render_markdown(
+                resolved.markdown,
+                entity_mentions=rendered_entities,  # type: ignore[arg-type]
+                attachments=rendered_attachments,
+            )
+
+            publication_id = uuid4()
+            publication_entity_id = uuid4()
+            published_at = timezone.now()
+            encoded_timestamp = _timestamp(published_at)
+            pdf_content = render_pdf(
+                resolved.markdown,
+                title=locked_document.entity.display_name,
+                publication_id=str(publication_entity_id),
+                published_at=encoded_timestamp,
+                audience=audience,
+                reason=reason,
+            )
+            pending_artifacts = [
+                PendingArtifact(
+                    id=uuid4(),
+                    entity_id=uuid4(),
+                    kind=PublicationArtifactKind.PDF,
+                    filename=f"{slugify(locked_document.entity.display_name) or 'publication'}-static.pdf",
+                    media_type="application/pdf",
+                    content=pdf_content,
+                    checksum=hashlib.sha256(pdf_content).hexdigest(),
+                )
+            ]
+            retained_size = 0
+            for attachment in source_attachments:
+                try:
+                    content = copy_attachment_content(attachment)
+                except ValidationError as exc:
+                    raise PublicationConflict(
+                        "A referenced attachment failed its retained-copy integrity check."
+                    ) from exc
+                retained_size += len(content)
+                if retained_size > MAX_RETAINED_ATTACHMENT_BYTES:
+                    raise PublicationConflict("Retained attachment bytes may not exceed 50 MiB per publication.")
+                pending_artifacts.append(
+                    PendingArtifact(
+                        id=uuid4(),
+                        entity_id=uuid4(),
+                        kind=PublicationArtifactKind.ATTACHMENT,
+                        filename=attachment.original_filename,
+                        media_type=attachment.media_type,
+                        content=content,
+                        checksum=attachment.checksum,
+                        source_attachment=attachment,
+                    )
+                )
+
+            organization = locked_document.organization
+            manifest: dict[str, Any] = {
+                "format": MANIFEST_VERSION,
+                "publication_id": str(publication_id),
+                "publication_entity_id": str(publication_entity_id),
+                "source_document_id": str(locked_document.entity_id),
+                "workspace": {
+                    "kind": "organization" if locked_document.organization_id else "msp",
+                    "id": str(organization.entity_id) if organization is not None else None,
+                },
+                "title": locked_document.entity.display_name,
+                "category": locked_document.category,
+                "reason": reason,
+                "audience": audience,
+                "retention": retention,
+                "retention_review_on": retention_review_on.isoformat() if retention_review_on else None,
+                "supersedes_id": str(supersedes.entity_id) if supersedes is not None else None,
+                "published_by": str(actor_id),
+                "published_at": encoded_timestamp,
+                "placements": [
+                    {
+                        "id": str(item.placement.id),
+                        "parent_id": str(item.placement.parent_id) if item.placement.parent_id else None,
+                        "position": item.placement.position,
+                        "depth": item.depth,
+                        "block_id": str(item.placement.block.entity_id),
+                        "resolution_mode": item.placement.resolution_mode,
+                        "revision_id": str(item.revision.id),
+                        "revision_number": item.revision.revision_number,
+                        "checksum": item.revision.checksum,
+                    }
+                    for item in resolved.placements
+                ],
+                "entities": entity_projections,
+                "attachments": attachment_records,
+                "artifacts": [_artifact_descriptor(artifact) for artifact in pending_artifacts],
+            }
+            payload = snapshot_payload(manifest=manifest, markdown=resolved.markdown, sanitized_html=sanitized_html)
+            digest_bytes = hashlib.sha256(payload).digest()
+            key = publication_signing_key()
+            public_key, key_fingerprint = _encoded_public_key(key)
+            visibility = (
+                EntityVisibility.CLIENT_VISIBLE
+                if audience == PublicationAudience.CLIENT_VISIBLE
+                else EntityVisibility.MSP_PRIVATE
+            )
+            publication_entity = Entity.objects.create(
+                id=publication_entity_id,
+                tenant=locked_document.tenant,
+                organization=locked_document.organization,
+                entity_type="document_publication",
+                display_name=locked_document.entity.display_name,
+                visibility=visibility,
+            )
+            publication = DocumentPublication(
+                id=publication_id,
+                tenant=locked_document.tenant,
+                organization=locked_document.organization,
+                document=locked_document,
+                entity=publication_entity,
+                title=locked_document.entity.display_name,
+                category=locked_document.category,
+                reason=reason,
+                audience=audience,
+                retention=retention,
+                retention_review_on=retention_review_on,
+                supersedes=supersedes,
+                canonical_markdown=resolved.markdown,
+                sanitized_html=sanitized_html,
+                manifest=manifest,
+                content_digest=digest_bytes.hex(),
+                signature=base64.urlsafe_b64encode(key.sign(digest_bytes)).decode("ascii"),
+                signature_algorithm=SIGNATURE_ALGORITHM,
+                public_key=public_key,
+                key_fingerprint=key_fingerprint,
+                published_by_id=actor_id,
+                published_at=published_at,
+            )
+            publication.full_clean()
+            publication.save()  # type: ignore[no-untyped-call]
+            for pending in pending_artifacts:
+                artifact_entity = Entity.objects.create(
+                    id=pending.entity_id,
+                    tenant=publication.tenant,
+                    organization=publication.organization,
+                    entity_type="document_publication_artifact",
+                    display_name=pending.filename,
+                    visibility=visibility,
+                )
+                artifact = DocumentPublicationArtifact(
+                    id=pending.id,
+                    tenant=publication.tenant,
+                    organization=publication.organization,
+                    publication=publication,
+                    entity=artifact_entity,
+                    kind=pending.kind,
+                    source_attachment=pending.source_attachment,
+                    original_filename=pending.filename,
+                    media_type=pending.media_type,
+                    size=len(pending.content),
+                    checksum=pending.checksum,
+                    created_at=published_at,
+                )
+                artifact.file.save("retained", ContentFile(pending.content), save=False)
+                stored_artifacts.append((artifact.file.storage, artifact.file.name))
+                artifact.full_clean()
+                artifact.save()  # type: ignore[no-untyped-call]
+            AuditEvent.objects.create(
+                tenant=locked_document.tenant,
+                actor_id=actor_id,
+                action="document.publication.corrected" if supersedes is not None else "document.publication.created",
+                entity_id=publication.entity_id,
+                metadata={"source_document_id": str(locked_document.entity_id)},
+            )
+            return publication
+    except Exception:
+        for storage, stored_name in stored_artifacts:
+            storage.delete(stored_name)  # type: ignore[attr-defined]
+        raise
 
 
 def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
@@ -279,3 +443,14 @@ def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
         "signature_valid": signature_valid,
         "key_fingerprint_valid": key_fingerprint_valid,
     }
+
+
+def read_publication_artifact(artifact: DocumentPublicationArtifact) -> bytes:
+    try:
+        with artifact.file.storage.open(artifact.file.name, "rb") as stream:
+            content = bytes(stream.read(artifact.size + 1))
+    except OSError as exc:
+        raise PublicationConflict("The retained publication artifact is unavailable.") from exc
+    if len(content) != artifact.size or hashlib.sha256(content).hexdigest() != artifact.checksum:
+        raise PublicationConflict("The retained publication artifact failed its integrity check.")
+    return content

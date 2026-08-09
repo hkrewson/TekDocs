@@ -13,6 +13,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_documentationlistingreference",
     "core_documentattachment",
     "core_documentpublication",
+    "core_documentpublicationartifact",
 )
 
 TENANT_SCOPED_TABLES = (

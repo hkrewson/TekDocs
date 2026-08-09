@@ -11,10 +11,11 @@ import nh3
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from mdit_py_plugins.footnote import footnote_plugin
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import Flowable, Paragraph, Preformatted, SimpleDocTemplate, Spacer
+from reportlab.platypus import Flowable, Paragraph, Preformatted, SimpleDocTemplate, Spacer, Table, TableStyle
 
 CALLOUT_TYPES = frozenset({"note", "tip", "important", "warning", "caution"})
 _CALLOUT_PATTERN = re.compile(r"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]*\n|[ \t]+)?")
@@ -350,15 +351,67 @@ def render_markdown(
     return nh3.clean(rendered, tags=_TAGS, attributes=_ATTRIBUTES, url_schemes=_URL_SCHEMES)
 
 
-def render_pdf(markdown: str) -> bytes:
+def render_pdf(
+    markdown: str,
+    *,
+    title: str = "TekDocs publication",
+    publication_id: str = "",
+    published_at: str = "",
+    audience: str = "",
+    reason: str = "",
+) -> bytes:
     output = BytesIO()
     styles = getSampleStyleSheet()
     story: list[Flowable] = []
     heading_level: int | None = None
     list_depth = 0
+    table_rows: list[list[Flowable]] | None = None
+    table_row: list[Flowable] | None = None
+    table_header_cell = False
+
+    if publication_id:
+        story.extend(
+            (
+                Paragraph(escape(title), styles["Title"]),
+                Paragraph(
+                    escape(f"STATIC publication {publication_id} | Published {published_at} | Audience {audience}"),
+                    styles["BodyText"],
+                ),
+                Paragraph(escape(f"Publication reason: {reason}"), styles["BodyText"]),
+                Spacer(1, 14),
+            )
+        )
 
     for token in _MARKDOWN.parse(markdown):
-        if token.type == "heading_open":
+        if token.type == "table_open":
+            table_rows = []
+        elif token.type == "tr_open" and table_rows is not None:
+            table_row = []
+        elif token.type == "th_open":
+            table_header_cell = True
+        elif token.type in {"th_close", "td_close"}:
+            table_header_cell = False
+        elif token.type == "tr_close" and table_rows is not None and table_row is not None:
+            table_rows.append(table_row)
+            table_row = None
+        elif token.type == "table_close" and table_rows:
+            table = Table(table_rows, repeatRows=1, hAlign="LEFT")
+            table.setStyle(
+                TableStyle(
+                    (
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8ECE8")),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#808780")),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                        ("TOPPADDING", (0, 0), (-1, -1), 5),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    )
+                )
+            )
+            story.extend((table, Spacer(1, 8)))
+            table_rows = None
+        elif token.type == "heading_open":
             heading_level = int(token.tag[1])
         elif token.type == "heading_close":
             heading_level = None
@@ -367,9 +420,13 @@ def render_pdf(markdown: str) -> bytes:
         elif token.type in {"bullet_list_close", "ordered_list_close"}:
             list_depth = max(0, list_depth - 1)
         elif token.type == "inline" and token.content.strip():
-            style = styles[f"Heading{min(heading_level, 3)}"] if heading_level else styles["BodyText"]
-            prefix = f"{'  ' * (list_depth - 1)}• " if list_depth else ""
-            story.extend((Paragraph(escape(prefix + token.content), style), Spacer(1, 6)))
+            if table_row is not None:
+                cell_style = styles["Heading5"] if table_header_cell else styles["BodyText"]
+                table_row.append(Paragraph(escape(token.content), cell_style))
+            else:
+                style = styles[f"Heading{min(heading_level, 3)}"] if heading_level else styles["BodyText"]
+                prefix = f"{'  ' * (list_depth - 1)}- " if list_depth else ""
+                story.extend((Paragraph(escape(prefix + token.content), style), Spacer(1, 6)))
         elif token.type in {"fence", "code_block"}:
             story.extend((Preformatted(token.content, styles["Code"]), Spacer(1, 6)))
 
@@ -383,7 +440,7 @@ def render_pdf(markdown: str) -> bytes:
         leftMargin=54,
         topMargin=54,
         bottomMargin=54,
-        title="TekDocs publication",
+        title=title,
         author="TekDocs",
     )
 
@@ -391,5 +448,16 @@ def render_pdf(markdown: str) -> bytes:
         kwargs["invariant"] = 1
         return Canvas(*args, **kwargs)
 
-    document.build(story, canvasmaker=invariant_canvas)
+    def page_footer(canvas, doc):  # type: ignore[no-untyped-def]
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        footer = (
+            f"TekDocs STATIC {publication_id} | Page {doc.page}"
+            if publication_id
+            else f"TekDocs | Page {doc.page}"
+        )
+        canvas.drawString(54, 28, footer)
+        canvas.restoreState()
+
+    document.build(story, canvasmaker=invariant_canvas, onFirstPage=page_footer, onLaterPages=page_footer)
     return output.getvalue()

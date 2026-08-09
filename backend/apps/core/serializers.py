@@ -3,6 +3,7 @@ from urllib.parse import urlsplit
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -19,6 +20,8 @@ from .models import (
     OrganizationKind,
     PersonAssociationKind,
     PlacementResolutionMode,
+    PublicationAudience,
+    PublicationRetention,
     Site,
 )
 
@@ -348,11 +351,58 @@ class PublicationVerificationSerializer(serializers.Serializer):
     key_fingerprint_valid = serializers.BooleanField()
 
 
+class DocumentPublicationWriteSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=1, max_length=500, trim_whitespace=True)
+    audience = serializers.ChoiceField(choices=PublicationAudience.choices)
+    retention = serializers.ChoiceField(choices=PublicationRetention.choices)
+    retention_review_on = serializers.DateField(required=False, allow_null=True)
+    supersedes_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_reason(self, value: str) -> str:
+        if any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Control characters are not allowed.")
+        return value
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        review_on = attrs.get("retention_review_on")
+        if (attrs["retention"] == PublicationRetention.REVIEW_ON) != (review_on is not None):
+            raise serializers.ValidationError(
+                {"retention_review_on": "A review date is required only for review-on-date retention."}
+            )
+        if review_on is not None and review_on < timezone.localdate():
+            raise serializers.ValidationError(
+                {"retention_review_on": "The retention review date cannot be in the past."}
+            )
+        if attrs["audience"] == PublicationAudience.CLIENT_VISIBLE and not self.context.get("organization_scoped"):
+            raise serializers.ValidationError(
+                {"audience": "Client-visible publications require an organization workspace."}
+            )
+        return attrs
+
+
+class DocumentPublicationArtifactSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    kind = serializers.CharField()
+    filename = serializers.CharField(source="original_filename")
+    media_type = serializers.CharField()
+    size = serializers.IntegerField()
+    checksum = serializers.CharField()
+    source_attachment_id = serializers.UUIDField(source="source_attachment.entity_id", allow_null=True)
+
+
 class DocumentPublicationSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     source_document_id = serializers.UUIDField(source="document.entity_id")
     title = serializers.CharField()
     category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    reason = serializers.CharField()
+    audience = serializers.ChoiceField(choices=PublicationAudience.choices)
+    retention = serializers.ChoiceField(choices=PublicationRetention.choices)
+    retention_review_on = serializers.DateField(allow_null=True)
+    lifecycle_state = serializers.CharField()
+    supersedes_id = serializers.UUIDField(source="supersedes.entity_id", allow_null=True)
+    superseded_by_id = serializers.UUIDField(source="superseded_by.entity_id", allow_null=True)
+    artifacts = DocumentPublicationArtifactSerializer(many=True)
     content_digest = serializers.CharField()
     signature_algorithm = serializers.CharField()
     signature = serializers.CharField()

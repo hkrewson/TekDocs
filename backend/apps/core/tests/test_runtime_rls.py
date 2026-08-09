@@ -4,7 +4,7 @@ from hashlib import sha256
 import psycopg
 import pytest
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
@@ -15,6 +15,7 @@ from apps.core.models import (
     DocumentAttachment,
     DocumentPlacement,
     DocumentPublication,
+    DocumentPublicationArtifact,
     Entity,
     Organization,
     Tenant,
@@ -174,28 +175,69 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         display_name="Shared runbook STATIC",
     )
     publication_id = uuid.uuid4()
-    publication = DocumentPublication.objects.create(
-        id=publication_id,
+    artifact_id = uuid.uuid4()
+    artifact_entity = Entity.objects.create(
         tenant=tenant,
-        document=document,
-        entity=publication_entity,
-        title="Shared runbook",
-        category="reference",
-        canonical_markdown="Reference content\n",
-        sanitized_html="<p>Reference content</p>",
-        manifest={
-            "format": "tekdocs-static-publication/v1",
-            "publication_id": str(publication_id),
-            "publication_entity_id": str(publication_entity.id),
-            "source_document_id": str(document.entity_id),
-            "workspace": {"kind": "msp", "id": None},
-        },
-        content_digest="a" * 64,
-        signature="fixture",
-        public_key="fixture",
-        key_fingerprint="b" * 64,
-        published_at="2026-08-09T12:00:00Z",
+        entity_type="document_publication_artifact",
+        display_name="Shared runbook STATIC.pdf",
     )
+    artifact_checksum = sha256(b"%PDF-fixture").hexdigest()
+    with transaction.atomic():
+        publication = DocumentPublication.objects.create(
+            id=publication_id,
+            tenant=tenant,
+            document=document,
+            entity=publication_entity,
+            title="Shared runbook",
+            category="reference",
+            reason="RLS fixture",
+            audience="msp_internal",
+            retention="permanent",
+            canonical_markdown="Reference content\n",
+            sanitized_html="<p>Reference content</p>",
+            manifest={
+                "format": "tekdocs-static-publication/v2",
+                "publication_id": str(publication_id),
+                "publication_entity_id": str(publication_entity.id),
+                "source_document_id": str(document.entity_id),
+                "workspace": {"kind": "msp", "id": None},
+                "reason": "RLS fixture",
+                "audience": "msp_internal",
+                "retention": "permanent",
+                "retention_review_on": None,
+                "supersedes_id": None,
+                "artifacts": [
+                    {
+                        "id": str(artifact_id),
+                        "entity_id": str(artifact_entity.id),
+                        "kind": "pdf",
+                        "filename": "shared-runbook-static.pdf",
+                        "media_type": "application/pdf",
+                        "size": 12,
+                        "checksum": artifact_checksum,
+                        "source_attachment_id": None,
+                    }
+                ],
+            },
+            content_digest="a" * 64,
+            signature="fixture",
+            public_key="fixture",
+            key_fingerprint="b" * 64,
+            published_at="2026-08-09T12:00:00Z",
+        )
+        artifact = DocumentPublicationArtifact.objects.create(
+            id=artifact_id,
+            tenant=tenant,
+            publication=publication,
+            entity=artifact_entity,
+            kind="pdf",
+            file="publication-artifacts/fixture",
+            original_filename="shared-runbook-static.pdf",
+            media_type="application/pdf",
+            size=12,
+            checksum=artifact_checksum,
+            created_at="2026-08-09T12:00:00Z",
+        )
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         _bind(cursor, tenant.id, "organization", selected_org.id)
@@ -213,6 +255,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         assert cursor.fetchall() == [(attachment.id,)]
         cursor.execute("SELECT id FROM core_documentpublication")
         assert cursor.fetchall() == [(publication.id,)]
+        cursor.execute("SELECT id FROM core_documentpublicationartifact")
+        assert cursor.fetchall() == [(artifact.id,)]
         cursor.execute("SELECT id FROM core_entity WHERE entity_type = 'document_publication'")
         assert cursor.fetchall() == [(publication_entity.id,)]
         runtime.commit()

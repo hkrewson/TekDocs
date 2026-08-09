@@ -125,11 +125,25 @@ def test_markdown_renderer_malicious_corpus_cannot_emit_executable_or_authored_h
 
 
 def test_pdf_renderer_produces_a_pdf_document() -> None:
-    rendered = render_pdf("# Static publication\n\nImmutable content.")
+    rendered = render_pdf(
+        "# Static publication\n\nImmutable content.",
+        title="Access policy",
+        publication_id="00000000-0000-4000-8000-000000000001",
+        published_at="2026-08-09T20:00:00Z",
+        audience="client_visible",
+        reason="Annual approval",
+    )
 
     assert rendered.startswith(b"%PDF-")
     assert len(rendered) > 1_000
-    assert rendered == render_pdf("# Static publication\n\nImmutable content.")
+    assert rendered == render_pdf(
+        "# Static publication\n\nImmutable content.",
+        title="Access policy",
+        publication_id="00000000-0000-4000-8000-000000000001",
+        published_at="2026-08-09T20:00:00Z",
+        audience="client_visible",
+        reason="Annual approval",
+    )
 
 
 @pytest.mark.django_db

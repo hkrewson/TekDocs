@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.7
+  version: 0.2.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1121,6 +1121,18 @@ paths:
         required: true
       tags:
       - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+        required: true
       security:
       - cookieAuth: []
       responses:
@@ -1158,6 +1170,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+  /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/artifacts/{artifact_entity_id}/download:
+    get:
+      operationId: document_publication_artifacts_msp_download
+      parameters:
+      - in: path
+        name: artifact_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
           description: ''
   /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/manifest:
     get:
@@ -3226,6 +3272,18 @@ paths:
         required: true
       tags:
       - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationWrite'
+        required: true
       security:
       - cookieAuth: []
       responses:
@@ -3269,6 +3327,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/artifacts/{artifact_entity_id}/download
+  : get:
+      operationId: document_publication_artifacts_organization_download
+      parameters:
+      - in: path
+        name: artifact_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
           description: ''
   ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/manifest
   : get:
@@ -4421,6 +4519,14 @@ components:
       - email
       - id
       - role
+    AudienceEnum:
+      enum:
+      - msp_internal
+      - client_visible
+      type: string
+      description: |-
+        * `msp_internal` - MSP internal
+        * `client_visible` - Client visible
     AuthenticatedContext:
       type: object
       properties:
@@ -5054,6 +5160,30 @@ components:
           type: string
         category:
           $ref: '#/components/schemas/CategoryEnum'
+        reason:
+          type: string
+        audience:
+          $ref: '#/components/schemas/AudienceEnum'
+        retention:
+          $ref: '#/components/schemas/RetentionEnum'
+        retention_review_on:
+          type: string
+          format: date
+          nullable: true
+        lifecycle_state:
+          type: string
+        supersedes_id:
+          type: string
+          format: uuid
+          nullable: true
+        superseded_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPublicationArtifact'
         content_digest:
           type: string
         signature_algorithm:
@@ -5076,18 +5206,54 @@ components:
           - $ref: '#/components/schemas/PublicationVerification'
           readOnly: true
       required:
+      - artifacts
+      - audience
       - category
       - content_digest
       - id
       - key_fingerprint
+      - lifecycle_state
       - public_key
       - published_at
       - published_by
+      - reason
+      - retention
+      - retention_review_on
       - signature
       - signature_algorithm
       - source_document_id
+      - superseded_by_id
+      - supersedes_id
       - title
       - verification
+    DocumentPublicationArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+        source_attachment_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - checksum
+      - filename
+      - id
+      - kind
+      - media_type
+      - size
+      - source_attachment_id
     DocumentPublicationDetail:
       type: object
       properties:
@@ -5101,6 +5267,30 @@ components:
           type: string
         category:
           $ref: '#/components/schemas/CategoryEnum'
+        reason:
+          type: string
+        audience:
+          $ref: '#/components/schemas/AudienceEnum'
+        retention:
+          $ref: '#/components/schemas/RetentionEnum'
+        retention_review_on:
+          type: string
+          format: date
+          nullable: true
+        lifecycle_state:
+          type: string
+        supersedes_id:
+          type: string
+          format: uuid
+          nullable: true
+        superseded_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPublicationArtifact'
         content_digest:
           type: string
         signature_algorithm:
@@ -5128,19 +5318,27 @@ components:
           type: string
         manifest: {}
       required:
+      - artifacts
+      - audience
       - canonical_markdown
       - category
       - content_digest
       - id
       - key_fingerprint
+      - lifecycle_state
       - manifest
       - public_key
       - published_at
       - published_by
+      - reason
+      - retention
+      - retention_review_on
       - sanitized_html
       - signature
       - signature_algorithm
       - source_document_id
+      - superseded_by_id
+      - supersedes_id
       - title
       - verification
     DocumentPublicationResult:
@@ -5155,6 +5353,29 @@ components:
       required:
       - count
       - results
+    DocumentPublicationWrite:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 1
+        audience:
+          $ref: '#/components/schemas/AudienceEnum'
+        retention:
+          $ref: '#/components/schemas/RetentionEnum'
+        retention_review_on:
+          type: string
+          format: date
+          nullable: true
+        supersedes_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - audience
+      - reason
+      - retention
     DocumentResult:
       type: object
       properties:
@@ -6339,6 +6560,14 @@ components:
       description: |-
         * `live` - Live
         * `pinned` - Pinned
+    RetentionEnum:
+      enum:
+      - permanent
+      - review_on
+      type: string
+      description: |-
+        * `permanent` - Permanent
+        * `review_on` - Review on date
     ReuseAudience:
       type: object
       properties:

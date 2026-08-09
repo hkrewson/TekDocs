@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.2.0`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.2.1`.
 
 ## Start locally
 
@@ -26,6 +26,8 @@ The installation owner can open **Organizations** to create, classify, edit, fil
 **Profile → Access control** manages built-in MSP roles, organization access modes, explicit client-by-client MSP staff assignments, access collections, and custom roles scoped to the tenant, one organization, or one collection. An assignment allows an existing role to reach an assigned-only client; it never grants permissions or replaces MFA. The entity/RBAC foundation is certified for the supported one-MSP-per-installation topology.
 
 The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
+
+The **Documentation** area now proves the final safe Markdown dialect before persistence is added. It offers visual block controls, selection formatting, raw Markdown, a server-rendered preview, and page-local formatting help. Semantic highlight uses `==important context==`; NOTE, TIP, IMPORTANT, WARNING, and CAUTION callouts use the portable blockquote form `> [!WARNING]`. Raw HTML, MDX, scripts, inline styles, and document-authored CSS are intentionally unsupported.
 
 ### First-owner bootstrap
 
@@ -53,6 +55,7 @@ make test-e2e-all
 make test-e2e-live
 make test-stabilization
 make test-certification
+make test-markdown
 make compose-doctor
 make production-image-rehearsal
 make clean-install-rehearsal
@@ -65,7 +68,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 ## Current boundaries
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
-- The documentation route contains an executable Milkdown feasibility spike; it does not persist content yet.
+- The documentation route contains the certified Markdown/editor contract; it does not persist content yet. Public end-user documentation will live in the repository's GitHub Wiki once publication is authorized, while the current page-local formatting reference is available directly in the editor.
 - Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
 - Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
 

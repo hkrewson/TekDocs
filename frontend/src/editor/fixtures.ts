@@ -1,29 +1,26 @@
-export const markdownFixture = `# Firewall replacement
+import unifiNetworkSetupGuide from './examples/unifi-network-setup-guide.md?raw'
 
-This procedure covers **planned replacement** of the edge firewall for [Example Client](tekdocs://entity/00000000-0000-4000-8000-000000000001).
+export const markdownFixture = unifiNetworkSetupGuide
 
-## Preparation
+export const markdownDialectFixture = `## TekDocs formatting fixture
 
-- [ ] Export the current configuration
-- [ ] Confirm the maintenance window
-- [ ] Record the rollback owner
+Use ==semantic highlight== for information that needs attention without implying danger.
 
-> Never copy managed credentials into a document.
+~~Retired guidance~~ remains visible when its history matters.
 
-| Check | Owner |
-| --- | --- |
-| ISP handoff | Network team |
-| Configuration | Assigned technician |
+- [x] Export the current configuration
+- [ ] Confirm the rollback owner
 
-1. Verify the serial number.
-2. Apply the approved configuration.
-3. Run the validation command:
+> [!WARNING]
+> Rebooting this switch will disconnect the site.
 
-\`\`\`shell
-ping -c 4 192.0.2.1
-\`\`\`
+| Port | Purpose |
+| :--- | ---: |
+| 1 | WAN |
 
----
+Documented exception.[^exception]
 
-Use \`tekdocs://entity/{uuid}\` links for stable object references.
+[^exception]: Approved by the change owner.
 `
+
+export const markdownRoundTripFixture = `${markdownFixture.trim()}\n\n---\n\n${markdownDialectFixture}`

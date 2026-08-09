@@ -34,11 +34,47 @@ test('raw Markdown remains the editable canonical representation', async ({ page
   await page.goto('/documentation')
   await page.getByRole('tab', { name: 'Markdown' }).click()
   const source = page.getByLabel('Markdown source')
-  await expect(source).toHaveValue(/# Firewall replacement/)
+  await expect(source).toHaveValue(/# UniFi Network Setup Guide/)
   await source.fill('# Updated procedure\n\nUse **approved** access.')
   await page.getByRole('tab', { name: 'Editor' }).click()
   await page.getByRole('tab', { name: 'Markdown' }).click()
-  await expect(source).toHaveValue('# Updated procedure\n\nUse **approved** access.')
+  await expect(source).toHaveValue('# Updated procedure\n\nUse **approved** access.\n')
+})
+
+test('technical Markdown has visual controls, semantic rendering, preview, and page help', async ({ page, baseURL }) => {
+  await mockAuthenticated(page)
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/markdown/render', async (route) => {
+    expect(route.request().method()).toBe('POST')
+    expect(route.request().headers()['x-csrftoken']).toBeTruthy()
+    const body: unknown = await route.request().postDataJSON()
+    expect(body).toEqual(expect.objectContaining({ markdown: expect.stringContaining('==VLAN 10==') }))
+    await route.fulfill({ json: { html: '<p>Verify <mark>VLAN 10</mark>.</p><blockquote class="callout callout-warning" data-callout="warning"><strong class="callout-title">Warning</strong><br>Disconnects the site.</blockquote>' } })
+  })
+
+  await page.goto('/documentation')
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await page.getByLabel('Markdown source').fill('Verify ==VLAN 10==.')
+  await page.getByRole('tab', { name: 'Editor' }).click()
+
+  await expect(page.getByRole('toolbar', { name: 'Block formatting' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Text style' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Task list' })).toBeEnabled()
+  await expect(page.locator('.milkdown-host mark')).toHaveText('VLAN 10')
+
+  await page.getByRole('combobox', { name: 'Text style' }).selectOption('h2')
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await expect(page.getByLabel('Markdown source')).toHaveValue(/^## Verify ==VLAN 10==\./)
+
+  await page.getByRole('tab', { name: 'Preview' }).click()
+  await expect(page.locator('.markdown-preview mark')).toHaveText('VLAN 10')
+  await expect(page.locator('.markdown-preview blockquote')).toHaveAttribute('data-callout', 'warning')
+  expect((await new AxeBuilder({ page }).include('.editor-section').analyze()).violations).toEqual([])
+
+  await page.getByRole('tab', { name: 'Formatting help' }).click()
+  await expect(page.getByRole('heading', { name: 'TekDocs Markdown' })).toBeVisible()
+  await expect(page.getByText('==verify this==')).toBeVisible()
+  await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
 })
 
 test('mobile authenticated navigation is operable', async ({ page }) => {

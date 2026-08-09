@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tekdocs-backend"
-version = "0.2.0"
+version = "0.2.1"
 description = "TekDocs API and background services"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -17,6 +17,7 @@ dependencies = [
   "gunicorn>=23,<24",
   "jsonschema[format]>=4.25,<5",
   "markdown-it-py>=3,<4",
+  "mdit-py-plugins>=0.6,<0.7",
   "nh3>=0.3,<0.4",
   "psycopg[binary]>=3.2,<3.3",
   "reportlab>=4.4,<5",

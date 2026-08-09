@@ -26,6 +26,7 @@ def route(
 AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
+    route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
     route("access-control-catalog", ("GET",), PermissionKey.MEMBERSHIPS_VIEW),
     route(
         "access-collection-list-create",

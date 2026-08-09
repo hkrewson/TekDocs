@@ -420,8 +420,8 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.2.1` | Final Markdown dialect, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and explicit disposition of `TD-RISK-014`. |
-| `0.2.2` | Workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, WYSIWYG/raw/preview editing, and persistence. Live titles open the authorized editor while STATIC publication titles open immutable output. |
+| `0.2.1` | **Complete:** final Markdown dialect, semantic highlight/callouts, accessible visual/raw/preview/help modes, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and resolution of `TD-RISK-014`. |
+| `0.2.2` | Workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
@@ -430,6 +430,19 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.8` | Deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
 | `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
 | `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
+
+### `0.2.1` acceptance criteria
+
+- [x] ADR 0019 freezes a portable technical-documentation dialect with no raw HTML, MDX, scripts, inline styles, author CSS, or arbitrary colors.
+- [x] The visual editor exposes accessible structural and inline controls, semantic `==highlight==`, five typed callouts, raw Markdown, secure preview, and internally hosted formatting help without making editor HTML/JSON canonical.
+- [x] The supplied UniFi guide and every supported extension pass an executable Milkdown-to-Markdown semantic round-trip fixture.
+- [x] Authenticated preview uses the central `documents.view` policy, normal CSRF/session protection, a bounded request, raw-HTML-disabled parsing, an explicit server allowlist, and a second browser sanitizer.
+- [x] A malicious corpus proves authored elements, event attributes, styles, and unsafe active URL schemes cannot enter rendered DOM.
+- [x] The future documentation ownership model is explicit: the public repository's actual GitHub Wiki is the end-user/operator home, repository docs remain engineering artifacts, and authenticated pages may later expose concise contextual help plus stable Wiki links without executing remote content.
+- [x] `TD-RISK-014` is resolved by reviewing and including the previously isolated editor/example work; `TD-RISK-013` and `TD-RISK-019` retain later owners.
+- [x] Version, OpenAPI, static, unit, Docker/PostgreSQL, browser-matrix, accessibility, clean-install, upgrade, dependency, static-analysis, secret-scanning, and container evidence agree at `0.2.1`.
+
+Evidence: `docs/releases/0.2.1.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 
@@ -521,7 +534,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
 | `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
-| `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion. |
+| `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion; publish the end-user/operator corpus to the public repository's actual GitHub Wiki, add drift/link checks, and connect stable page-level contextual help to the relevant Wiki topics. |
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
 | `0.9.0` | Feature freeze and public beta; only fixes, hardening, and release evidence follow. |
 

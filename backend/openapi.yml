@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.0
+  version: 0.2.1
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1092,6 +1092,36 @@ paths:
           description: Sign out before accepting an invitation
         '410':
           description: Invitation unavailable
+  /api/v1/markdown/render:
+    post:
+      operationId: markdown_render_create
+      tags:
+      - markdown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkdownRenderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarkdownRenderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarkdownRenderRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkdownRenderResponse'
+          description: ''
+        '400':
+          description: Invalid or oversized Markdown
+        '403':
+          description: Documentation view permission required
   /api/v1/organizations:
     get:
       operationId: organizations_list
@@ -3452,6 +3482,21 @@ components:
       required:
       - kind
       - name
+    MarkdownRenderRequest:
+      type: object
+      properties:
+        markdown:
+          type: string
+          maxLength: 1000000
+      required:
+      - markdown
+    MarkdownRenderResponse:
+      type: object
+      properties:
+        html:
+          type: string
+      required:
+      - html
     Member:
       type: object
       properties:

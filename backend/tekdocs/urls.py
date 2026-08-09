@@ -60,6 +60,7 @@ from apps.core.relationship_views import (
     OrganizationEntityRelationshipListCreateView,
     OrganizationEntitySearchView,
 )
+from apps.core.rendering_views import MarkdownRenderView
 from apps.core.site_views import (
     MSPLocationDetailView,
     MSPLocationListCreateView,
@@ -140,6 +141,7 @@ urlpatterns = [
     ),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
+    path("api/v1/markdown/render", MarkdownRenderView.as_view(), name="markdown-render"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/recycle-bin", MSPRecycleBinListView.as_view(), name="msp-recycle-bin"),

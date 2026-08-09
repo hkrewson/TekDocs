@@ -4,7 +4,7 @@ PostgreSQL migrations are the sole schema source of truth. A milestone cannot cl
 
 ## Blocking migration cycle
 
-`backend/apps/core/tests/test_migration_stabilization.py` creates representative data for the current foundation, including an organization and classification, person, site and nested location, versioned custom-field definition, typed relationship, non-owner custom role and assignment, archived record, and audit events.
+`backend/apps/core/tests/test_migration_stabilization.py` creates representative data for the current foundation, including an organization and classification, person, site and nested location, versioned custom-field definition, typed relationship, non-owner custom role and assignment, archived record, and audit events. It reverses and reapplies the latest authorization-control-plane guard migration as well as the active RLS migration, verifying that both trigger inventories and representative identifiers survive.
 
 The test then:
 
@@ -28,6 +28,7 @@ For cross-cutting stabilization:
 
 ```sh
 make test-stabilization
+make test-certification
 ```
 
 For release evidence, also run:

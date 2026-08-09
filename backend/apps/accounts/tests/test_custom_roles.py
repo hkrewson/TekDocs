@@ -133,6 +133,11 @@ def test_custom_role_rejects_privilege_ceiling_duplicate_and_cross_tenant_ids(ow
     assert create_role(owner_client, name="  DOCUMENT   PUBLISHER ").status_code == 400
 
     foreign = Tenant.objects.create(name="Foreign", slug="foreign-custom-role")
+    TenantMembership.objects.create(
+        tenant=foreign,
+        user=installation.owner,
+        role=BuiltInRole.READ_ONLY,
+    )
     role = CustomRole.objects.create(
         tenant=foreign,
         name="Foreign role",

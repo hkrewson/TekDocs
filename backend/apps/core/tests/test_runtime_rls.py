@@ -5,6 +5,7 @@ import pytest
 from django.conf import settings
 from django.db import connection
 
+from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import Entity, Organization, Tenant
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
 
@@ -49,6 +50,11 @@ def test_runtime_role_is_constrained_and_forced_rls_inventory_is_complete():
             [list(RLS_TABLES)],
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES)
+        cursor.execute(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(%s)",
+            [list(CONTROL_PLANE_GUARD_TRIGGERS)],
+        )
+        assert {row[0] for row in cursor.fetchall()} == set(CONTROL_PLANE_GUARD_TRIGGERS)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cursor.execute("CREATE TABLE runtime_role_escape (id integer)")
         runtime.rollback()

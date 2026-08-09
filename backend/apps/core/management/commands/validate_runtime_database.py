@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
+from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
 
 
@@ -45,4 +46,13 @@ class Command(BaseCommand):
             missing = sorted(set(RLS_TABLES) - active)
             if missing:
                 raise CommandError(f"Required forced-RLS tables are missing: {', '.join(missing)}")
-        self.stdout.write("Runtime database role and forced-RLS inventory verified.")
+
+            cursor.execute(
+                "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(%s)",
+                [list(CONTROL_PLANE_GUARD_TRIGGERS)],
+            )
+            active_guards = {row[0] for row in cursor.fetchall()}
+            missing_guards = sorted(set(CONTROL_PLANE_GUARD_TRIGGERS) - active_guards)
+            if missing_guards:
+                raise CommandError(f"Required control-plane guards are missing: {', '.join(missing_guards)}")
+        self.stdout.write("Runtime database role, forced-RLS inventory, and control-plane guards verified.")

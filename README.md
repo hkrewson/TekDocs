@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.15`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.2.0`.
 
 ## Start locally
 
@@ -23,7 +23,7 @@ Authenticated users can open **Profile → Settings** to update their display na
 
 The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL. The workspace control searches the authorized organization directory, preserves equivalent section routes when switching, exposes the union of classification capabilities, and always provides a return to the MSP workspace.
 
-**Profile → Access control** manages built-in MSP roles, organization access modes, and explicit client-by-client MSP staff assignments. An assignment allows an existing role to reach an assigned-only client; it never grants permissions or replaces MFA. Custom and more narrowly scoped roles remain scheduled RBAC slices.
+**Profile → Access control** manages built-in MSP roles, organization access modes, explicit client-by-client MSP staff assignments, access collections, and custom roles scoped to the tenant, one organization, or one collection. An assignment allows an existing role to reach an assigned-only client; it never grants permissions or replaces MFA. The entity/RBAC foundation is certified for the supported one-MSP-per-installation topology.
 
 The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
 
@@ -52,6 +52,7 @@ make test-e2e
 make test-e2e-all
 make test-e2e-live
 make test-stabilization
+make test-certification
 make compose-doctor
 make production-image-rehearsal
 make clean-install-rehearsal

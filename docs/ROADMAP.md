@@ -191,7 +191,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.13` | Complete | Workspace-scoped recycle-bin recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
 | `0.1.14` | Complete | Active non-owner runtime-role RLS for the implemented domain boundary (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and an explicit externally blocked disposition for hosted-automation evidence (`TD-RISK-010`). |
 | `0.1.15` | Complete | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
-| `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
+| `0.2.0` | Complete | Certify the entity/RBAC subsystem, close control-plane scope-integrity gaps, and add no new domain family. |
 
 ### `0.1.1` acceptance criteria
 
@@ -374,6 +374,20 @@ Evidence: `docs/releases/0.1.14.md`.
 - [x] OpenAPI, architecture, threat model, security guidance, performance/migration runbooks, engineering risks, and release evidence agree at `0.1.15`; the complete Docker-backed release gate passes with no unresolved stabilization blocker. Hosted workflow execution remains externally blocked unless publication is separately authorized.
 
 Evidence: `docs/releases/0.1.15.md`.
+
+### `0.2.0` acceptance criteria
+
+- [x] One maintained inventory classifies every model carrying a tenant foreign key as forced-RLS domain data, authorization control-plane state, or the installation singleton. Adding an unclassified tenant-bearing model fails certification.
+- [x] Every tenant-owned model except the reviewed installation singleton exposes the fail-closed scoped manager, and the forced-RLS inventory exactly matches the domain-data portion of the certification contract.
+- [x] PostgreSQL makes tenant membership identity and invitation ownership immutable, requires invitation actors and authorization-record creators to belong to the same tenant, and retains existing role, collection, assignment, entity, audience, and audit constraints. Runtime startup verifies the required guard inventory.
+- [x] The permission and built-in-role catalogs are complete, unique, bounded, and deny custom-role access to ownership, role administration, and secret reveal. Every unsafe method on every cataloged route denies Read-only members and requires MFA where cataloged.
+- [x] The accounts control-plane migration reverses and reapplies without losing membership, scoped-role, entity, archive, or audit state. Raw runtime-role RLS, route/IDOR, CSRF, cross-tenant, sibling-client, assigned-only, recycle-bin, and append-only audit suites remain blocking.
+- [x] `make test-certification` is a dedicated PostgreSQL gate and is part of `make release-gate`. Version, architecture, threat model, security baseline, risk register, migration runbook, and release evidence agree at `0.2.0`.
+- [x] The certified product remains one MSP per installation. Authentication-provider and authorization control-plane reads intentionally remain outside RLS because they establish tenant identity; hosted multi-MSP deployment requires a separately reviewed identity/control-plane boundary and is not claimed by this release.
+
+ADR 0018 defines the certification inventory, control-plane integrity guards, and the accepted single-installation boundary.
+
+Evidence: `docs/releases/0.2.0.md`.
 
 ### `0.1.3` acceptance criteria
 

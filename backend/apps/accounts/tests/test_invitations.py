@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import Invitation, InvitationState, User
+from apps.accounts.models import BuiltInRole, Invitation, InvitationState, TenantMembership, User
 from apps.core.models import AuditEvent, InstallationState, Tenant
 
 
@@ -228,6 +228,11 @@ def test_invitation_endpoints_deny_anonymous_unrelated_and_cross_tenant_access(c
     )
 
     second_tenant = Tenant.objects.create(name="Other MSP", slug="other")
+    TenantMembership.objects.create(
+        tenant=second_tenant,
+        user=unrelated,
+        role=BuiltInRole.READ_ONLY,
+    )
     foreign = Invitation.objects.create(
         tenant=second_tenant,
         email="foreign@example.com",

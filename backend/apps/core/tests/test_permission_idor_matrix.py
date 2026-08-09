@@ -116,6 +116,15 @@ def _request(client: Client, method: str, route_name: str):
     return client.generic(method, url, data="{}", content_type="application/json")
 
 
+MUTATION_ROUTE_METHODS = tuple(
+    (contract, method)
+    for contract in AUTHENTICATED_ROUTE_PERMISSIONS
+    if contract.mutation_permissions
+    for method in contract.methods
+    if method != "GET"
+)
+
+
 def test_route_permission_inventory_covers_every_api_route_and_has_stable_unique_contracts():
     contracts = {contract.route_name: contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS}
 
@@ -148,11 +157,11 @@ def test_every_authenticated_route_denies_anonymous_and_non_member(contract, ins
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "contract",
-    tuple(contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS if contract.mutation_permissions),
-    ids=lambda item: item.route_name,
+    ("contract", "method"),
+    MUTATION_ROUTE_METHODS,
+    ids=lambda item: item.route_name if hasattr(item, "route_name") else item,
 )
-def test_every_cataloged_mutation_denies_read_only_members(contract, installation):  # type: ignore[no-untyped-def]
+def test_every_cataloged_mutation_method_denies_read_only_members(contract, method, installation):  # type: ignore[no-untyped-def]
     reader = User.objects.create_user(
         email=f"{uuid.uuid4()}@example.com",
         display_name="Reader",
@@ -160,8 +169,6 @@ def test_every_cataloged_mutation_denies_read_only_members(contract, installatio
     TenantMembership.objects.create(tenant=installation.tenant, user=reader, role=BuiltInRole.READ_ONLY)
     client = Client()
     client.force_login(reader)
-    method = next(method for method in contract.methods if method != "GET")
-
     assert _request(client, method, contract.route_name).status_code in {403, 404}
 
 
@@ -204,14 +211,12 @@ def test_every_unsafe_route_rejects_a_session_without_csrf(contract, installatio
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "contract",
-    tuple(contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS if contract.mutation_permissions),
-    ids=lambda item: item.route_name,
+    ("contract", "method"),
+    MUTATION_ROUTE_METHODS,
+    ids=lambda item: item.route_name if hasattr(item, "route_name") else item,
 )
-def test_every_cataloged_privileged_mutation_requires_mfa(contract, installation):  # type: ignore[no-untyped-def]
+def test_every_cataloged_privileged_mutation_method_requires_mfa(contract, method, installation):  # type: ignore[no-untyped-def]
     installation.owner.authenticator_set.all().delete()
     client = Client()
     client.force_login(installation.owner)
-    method = next(method for method in contract.methods if method != "GET")
-
     assert _request(client, method, contract.route_name).status_code in {403, 404}

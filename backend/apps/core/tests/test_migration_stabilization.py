@@ -168,6 +168,27 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         "audits": AuditEvent.objects.filter(tenant=result.tenant).count(),
     }
 
+    call_command("migrate", "accounts", "0011", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM pg_trigger WHERE tgname IN "
+            "('accounts_tenant_membership_guard', 'accounts_invitation_scope_guard', "
+            "'accounts_organization_access_assignment_actor_guard', 'accounts_custom_role_creator_guard', "
+            "'accounts_access_collection_creator_guard')"
+        )
+        assert cursor.fetchone() == (0,)
+    call_command("migrate", "accounts", "0012", verbosity=0, interactive=False)
+    assert TenantMembership.objects.filter(id=membership.id, tenant=result.tenant, user=member).exists()
+    assert ScopedRoleAssignment.objects.filter(id=assignment.id).exists()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM pg_trigger WHERE tgname IN "
+            "('accounts_tenant_membership_guard', 'accounts_invitation_scope_guard', "
+            "'accounts_organization_access_assignment_actor_guard', 'accounts_custom_role_creator_guard', "
+            "'accounts_access_collection_creator_guard')"
+        )
+        assert cursor.fetchone() == (5,)
+
     call_command("migrate", "core", "0018", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(

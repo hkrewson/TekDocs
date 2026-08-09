@@ -38,6 +38,10 @@ PostgreSQL scope helpers consume transaction-local tenant, organization, and org
 
 Python production, development, and build inputs are checked in as hash-locked requirements. External container bases, Compose services, browser images, and local scanners are digest-pinned; GitHub Actions are commit-SHA pinned with release annotations. Dependabot remains the controlled update path, while local pin and workflow-lint gates reject a return to mutable inputs. Hosted workflow results are evidence only after an authorized published run.
 
+Cross-cutting stabilization is a maintained architecture gate. A fixed-shape PostgreSQL fixture checks bounded query counts and local p95 latency through the same central-policy and workspace services used in production. The migration-cycle fixture reverses and reapplies the latest reversible isolation migration while retaining representative domain, authorization, archive, and audit state. Those tests run together with the permission/IDOR and raw runtime-role RLS matrices through `make test-stabilization`; optimization never permits an unscoped query or authorization-result cache.
+
+Organization routes have an explicit in-context fallback: an unsupported nested path returns to that authorized organization's overview rather than silently changing to the MSP workspace. Missing or unauthorized workspaces retain one non-disclosing unavailable state. Browser coverage treats URL-derived workspace context, keyboard focus, history, stale-response cancellation, capability navigation, and denied-state accessibility as boundary behavior rather than cosmetic shell behavior.
+
 Documents compose stable blocks. Block content changes only by adding immutable revisions. Placements select the latest revision or pin an exact revision. A STATIC publication resolves all dependencies and stores a signed manifest plus immutable render artifacts.
 
 ## Trust boundaries

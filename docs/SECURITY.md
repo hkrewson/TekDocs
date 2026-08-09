@@ -26,6 +26,8 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - SSRF-resistant outbound integration and monitoring requests.
 - Dependency, license, secret, source, container, and browser security gates.
 - Reviewed Python build/production/development hash locks, digest-pinned external images and local scanners, commit-SHA-pinned Actions, local workflow linting, and controlled Dependabot updates.
+- A blocking PostgreSQL stabilization gate that combines bounded policy-aware query paths, representative migration reversal/reapplication, the complete authenticated-route and IDOR matrix, scoped custom-role composition, recovery, audit immutability, and raw non-owner RLS checks. Performance work may not cache or bypass authorization scope.
+- Keyboard and axe regression coverage for implemented MSP/client workflows, unavailable and capability-denied states, direct routes, history, mobile context changes, and stale workspace responses across the release browser matrix.
 
 Production startup must fail for missing or placeholder secrets, wildcard hosts/origins, insecure cookies, inadequate HSTS, mismatched public/CSRF origins, incomplete OIDC settings, debug mode, or an unsupported database configuration. The development Compose stack's HTTP origin requires the explicit localhost-only insecure-public-URL acknowledgement.
 

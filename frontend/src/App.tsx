@@ -277,9 +277,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.13 adds scoped recovery and certifies the authorization boundary for the current API." />
+      <PageHeader title="Overview" description="TekDocs 0.1.15 stabilizes the entity, workspace, and authorization foundation before certification." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.13</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.15</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -441,6 +441,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} />} />)}
+            <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>

@@ -190,7 +190,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.12` | Complete | Organization access collections, collection-scoped custom-role assignments, MSP-private Entity constraints, and the field-level cost visibility seam that completes `TD-RISK-001` implementation. |
 | `0.1.13` | Complete | Workspace-scoped recycle-bin recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
 | `0.1.14` | Complete | Active non-owner runtime-role RLS for the implemented domain boundary (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and an explicit externally blocked disposition for hosted-automation evidence (`TD-RISK-010`). |
-| `0.1.15` | Planned | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
+| `0.1.15` | Complete | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
 
 ### `0.1.1` acceptance criteria
@@ -363,6 +363,17 @@ Evidence: `docs/releases/0.1.13.md`.
 ADR 0017 defines runtime/migration role separation, request and worker scope binding, the initial active-policy inventory, and the supply-chain reproducibility boundary.
 
 Evidence: `docs/releases/0.1.14.md`.
+
+### `0.1.15` acceptance criteria
+
+- [x] A deterministic PostgreSQL reference fixture covers 100 organizations and at least 10,000 implemented entities. Workspace discovery, organization listing, People listing/search, Sites listing, and relationship discovery retain bounded query counts as result pages and unrelated tenant/client data grow; ordinary indexed reads remain below the documented 500 ms p95 target on the local Docker reference environment.
+- [x] A blocking migration-cycle rehearsal creates representative tenant, organization, person, site/location, custom-field, relationship, role/assignment, archive, and audit data; reverses and reapplies the latest reversible isolation migration; and proves row counts, stable identifiers, RLS inventory, audit immutability, and runtime-role restrictions are preserved. Fresh-install and the supported `0.1.3` upgrade rehearsals remain green.
+- [x] Automated axe coverage includes every currently implemented MSP and organization workflow plus workspace-unavailable and capability-denied states. Keyboard-only tests cover navigation opening/closing, workspace search, Escape focus restoration, route switching, dialogs, and data-table controls in Chromium, Firefox, and WebKit.
+- [x] Workspace regression tests certify direct links, refresh, back/forward history, mobile switching, rapid stale-response cancellation, client-only search while in client context, capability-derived navigation, and safe handling of unsupported or unauthorized organization areas without leaking workspace data.
+- [x] The authenticated-route inventory, permission matrix, custom-role/collection/assigned-only suites, sensitive-field/audience constraints, recycle recovery, append-only audit behavior, and raw runtime-role RLS matrix pass together against PostgreSQL. Query optimization or caching may not weaken policy filtering or database scope.
+- [x] OpenAPI, architecture, threat model, security guidance, performance/migration runbooks, engineering risks, and release evidence agree at `0.1.15`; the complete Docker-backed release gate passes with no unresolved stabilization blocker. Hosted workflow execution remains externally blocked unless publication is separately authorized.
+
+Evidence: `docs/releases/0.1.15.md`.
 
 ### `0.1.3` acceptance criteria
 

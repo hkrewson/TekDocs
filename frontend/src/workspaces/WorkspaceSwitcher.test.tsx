@@ -60,6 +60,7 @@ describe('WorkspaceSwitcher', () => {
     expect(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' })).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Switch workspace' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Current workspace: Acme Dental/ })).toHaveFocus())
 
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
     await user.click(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' }))

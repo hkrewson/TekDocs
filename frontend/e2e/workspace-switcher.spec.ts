@@ -377,3 +377,45 @@ test('separate tabs retain independent URL-derived workspace context', async ({ 
   await expect(otherPage).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/assets$`))
   await otherPage.close()
 })
+
+test('keyboard-only workspace switching restores focus and keeps unsupported routes in context', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/overview`)
+
+  const trigger = page.getByRole('button', { name: /Current workspace: Acme Dental/ })
+  await expect(trigger).toBeVisible()
+  let focusedLabel = ''
+  for (let step = 0; step < 20 && !focusedLabel.includes('Current workspace: Acme Dental'); step += 1) {
+    await page.keyboard.press('Tab')
+    const focused = page.locator(':focus')
+    focusedLabel = (await focused.count()) > 0 ? ((await focused.getAttribute('aria-label')) ?? '') : ''
+  }
+  await expect(trigger).toBeFocused()
+  await page.keyboard.press('Enter')
+  const search = page.getByRole('textbox', { name: 'Find a client' })
+  await expect(search).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('button', { name: 'Back to Example MSP. MSP workspace' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(trigger).toBeFocused()
+
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/unsupported-area`)
+  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/overview$`))
+  await expect(page.getByRole('button', { name: /Current workspace: Acme Dental/ })).toBeVisible()
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+})
+
+test('workspace denial and capability-denied states remain accessible and non-disclosing', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+
+  await page.goto(`/workspaces/organizations/${supplierWorkspace.id}/networks`)
+  await expect(page.getByRole('heading', { name: 'Area unavailable' })).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+
+  const deniedId = crypto.randomUUID()
+  await page.route(`**/api/v1/workspaces/organizations/${deniedId}`, (route) => route.fulfill({ status: 404, body: 'Confidential Organization' }))
+  await page.goto(`/workspaces/organizations/${deniedId}/overview`)
+  await expect(page.getByRole('heading', { name: 'Workspace unavailable' })).toBeVisible()
+  await expect(page.getByText('Confidential Organization')).not.toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.1.12
+  version: 0.1.13
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1364,6 +1364,92 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/recycle-bin:
+    get:
+      operationId: recycle_bin_msp_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      - in: query
+        name: record_type
+        schema:
+          enum:
+          - ''
+          - organization
+          - person_association
+          - site
+          - location
+          - custom_field_definition
+          type: string
+          default: ''
+        description: |-
+          * `` - All
+          * `organization` - organization
+          * `person_association` - person_association
+          * `site` - site
+          * `location` - location
+          * `custom_field_definition` - custom_field_definition
+      tags:
+      - recycle-bin
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecycleBinResult'
+          description: ''
+        '403':
+          description: Recycle-bin view permission required
+        '404':
+          description: Organization workspace not found
+  /api/v1/recycle-bin/{record_type}/{record_id}/restore:
+    post:
+      operationId: recycle_bin_msp_restore
+      parameters:
+      - in: path
+        name: record_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: record_type
+        schema:
+          type: string
+        required: true
+      tags:
+      - recycle-bin
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Archived record restored
+        '403':
+          description: Recovery and domain permission plus MFA required
+        '404':
+          description: Archived record not found
+        '409':
+          description: Archived dependencies must be recovered first
   /api/v1/sites:
     get:
       operationId: sites_msp_list
@@ -2228,6 +2314,104 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/recycle-bin:
+    get:
+      operationId: recycle_bin_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 80
+      - in: query
+        name: record_type
+        schema:
+          enum:
+          - ''
+          - organization
+          - person_association
+          - site
+          - location
+          - custom_field_definition
+          type: string
+          default: ''
+        description: |-
+          * `` - All
+          * `organization` - organization
+          * `person_association` - person_association
+          * `site` - site
+          * `location` - location
+          * `custom_field_definition` - custom_field_definition
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecycleBinResult'
+          description: ''
+        '403':
+          description: Recycle-bin view permission required
+        '404':
+          description: Organization workspace not found
+  /api/v1/workspaces/organizations/{organization_entity_id}/recycle-bin/{record_type}/{record_id}/restore:
+    post:
+      operationId: recycle_bin_organization_restore
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: record_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: record_type
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Archived record restored
+        '403':
+          description: Recovery and domain permission plus MFA required
+        '404':
+          description: Archived record not found
+        '409':
+          description: Archived dependencies must be recovered first
   /api/v1/workspaces/organizations/{organization_entity_id}/sites:
     get:
       operationId: sites_organization_list
@@ -3189,6 +3373,14 @@ components:
           maxLength: 254
       required:
       - email
+    KindDd6Enum:
+      enum:
+      - msp
+      - organization
+      type: string
+      description: |-
+        * `msp` - msp
+        * `organization` - organization
     Location:
       type: object
       properties:
@@ -3794,6 +3986,76 @@ components:
       required:
       - full_name
       - kind
+    RecordTypeEnum:
+      enum:
+      - organization
+      - person_association
+      - site
+      - location
+      - custom_field_definition
+      type: string
+      description: |-
+        * `organization` - organization
+        * `person_association` - person_association
+        * `site` - site
+        * `location` - location
+        * `custom_field_definition` - custom_field_definition
+    RecycleBinItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        record_type:
+          $ref: '#/components/schemas/RecordTypeEnum'
+        label:
+          type: string
+        archived_at:
+          type: string
+          format: date-time
+        workspace_kind:
+          $ref: '#/components/schemas/WorkspaceKindEnum'
+        workspace_id:
+          type: string
+          format: uuid
+        workspace_name:
+          type: string
+        cascade_count:
+          type: integer
+          minimum: 1
+        can_restore:
+          type: boolean
+      required:
+      - archived_at
+      - can_restore
+      - cascade_count
+      - id
+      - label
+      - record_type
+      - workspace_id
+      - workspace_kind
+      - workspace_name
+    RecycleBinResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecycleBinItem'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     RoleDefinition:
       type: object
       properties:
@@ -4030,7 +4292,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/WorkspaceContextKindEnum'
+          $ref: '#/components/schemas/KindDd6Enum'
         id:
           type: string
           format: uuid
@@ -4055,7 +4317,7 @@ components:
       - kind
       - name
       - organization
-    WorkspaceContextKindEnum:
+    WorkspaceKindEnum:
       enum:
       - msp
       - organization

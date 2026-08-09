@@ -21,6 +21,7 @@ export type WorkspaceCapability =
   | 'products'
   | 'compliance'
   | 'activity'
+  | 'recycle_bin'
   | 'integrations'
   | 'accounting'
 

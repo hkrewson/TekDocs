@@ -31,6 +31,7 @@ const capabilityLabels = {
   products: 'Products',
   compliance: 'Compliance',
   activity: 'Activity',
+  recycle_bin: 'Recycle bin',
   integrations: 'Integrations',
   accounting: 'Accounting',
 }

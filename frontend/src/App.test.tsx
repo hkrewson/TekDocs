@@ -24,7 +24,7 @@ const loadOrganization = vi.fn().mockResolvedValue({
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors', 'recycle_bin'],
   organization: {
     id: '00000000-0000-4000-8000-000000000010',
     name: 'Acme Dental',
@@ -114,7 +114,8 @@ describe('application shell', () => {
     for (const link of sidebar.getAllByRole('link')) {
       expect(link.getAttribute('href')).toMatch(/^\/workspaces\/organizations\/00000000-0000-4000-8000-000000000010\//)
     }
-    expect(screen.queryByRole('navigation', { name: 'Governance' })).not.toBeInTheDocument()
+    expect(sidebar.getByRole('link', { name: 'Recycle bin' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/recycle_bin')
+    expect(screen.getByRole('navigation', { name: 'Governance' })).toBeInTheDocument()
   })
 
   it('loads People through the selected organization boundary', async () => {

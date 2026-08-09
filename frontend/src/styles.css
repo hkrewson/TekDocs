@@ -151,6 +151,19 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .archive-confirmation { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 14px 0 0; border-top: 1px solid var(--border); }
 .archive-confirmation p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .archive-confirmation .form-actions { flex: none; }
+.recycle-bin-heading { margin-bottom: 12px; }
+.recycle-bin-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(160px, .35fr); align-items: end; gap: 10px; padding-bottom: 14px; }
+.recycle-bin-toolbar > label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.recycle-bin-toolbar input, .recycle-bin-toolbar select { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.recycle-bin-search { position: relative; }
+.recycle-bin-search svg { position: absolute; left: 10px; bottom: 11px; color: var(--muted); }
+.recycle-bin-search input { padding-left: 34px; }
+.recycle-bin-table-wrap { overflow-x: auto; border-top: 1px solid var(--border); }
+.recycle-bin-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+.recycle-bin-table th, .recycle-bin-table td { padding: 11px 12px 11px 2px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.recycle-bin-table th { color: var(--muted); font-size: 11px; font-weight: 600; }
+.recycle-bin-table td:last-child { width: 1%; padding-right: 2px; text-align: right; }
+.recycle-bin-table .row-action:disabled { color: var(--quiet); cursor: not-allowed; }
 .breadcrumbs { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
 .breadcrumbs a { color: inherit; }
 .workspace-page-header { align-items: flex-start; }
@@ -487,6 +500,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .organization-table-row > span:nth-child(3)::before { content: 'Website'; }
   .organization-row-actions { padding-top: 4px; }
   .archive-confirmation { align-items: flex-start; flex-direction: column; }
+  .recycle-bin-toolbar { grid-template-columns: 1fr; }
   .organization-profile { grid-template-columns: 1fr; }
   .organization-profile > div:nth-child(odd) { padding-right: 0; }
   .workspace-capability-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }

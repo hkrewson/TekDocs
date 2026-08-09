@@ -80,6 +80,7 @@ class CustomRoleListCreateView(APIView):
 
     @extend_schema(request=CustomRoleCreateSerializer, responses={201: CustomRoleSerializer})
     def post(self, request):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.CUSTOM_ROLES_MANAGE)
         serializer = CustomRoleCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         role = create_custom_role(
@@ -100,6 +101,7 @@ class AccessCollectionListCreateView(APIView):
 
     @extend_schema(request=AccessCollectionWriteSerializer, responses={201: AccessCollectionSerializer})
     def post(self, request):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.ACCESS_COLLECTIONS_MANAGE)
         serializer = AccessCollectionWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         collection = create_access_collection(
@@ -114,6 +116,7 @@ class AccessCollectionListCreateView(APIView):
 class AccessCollectionDetailView(APIView):
     @extend_schema(request=AccessCollectionWriteSerializer, responses={200: AccessCollectionSerializer})
     def patch(self, request, collection_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.ACCESS_COLLECTIONS_MANAGE)
         serializer = AccessCollectionWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         collection = update_access_collection(
@@ -134,6 +137,7 @@ class AccessCollectionDetailView(APIView):
 class CustomRoleDetailView(APIView):
     @extend_schema(request=CustomRoleUpdateSerializer, responses={200: CustomRoleSerializer})
     def patch(self, request, role_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.CUSTOM_ROLES_MANAGE)
         serializer = CustomRoleUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         role = update_custom_role(
@@ -158,6 +162,7 @@ class ScopedRoleAssignmentListCreateView(APIView):
 
     @extend_schema(request=ScopedRoleAssignmentWriteSerializer, responses={201: ScopedRoleAssignmentSerializer})
     def post(self, request):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.CUSTOM_ROLES_ASSIGN)
         serializer = ScopedRoleAssignmentWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         assignment, created = create_scoped_assignment(
@@ -200,6 +205,7 @@ class MemberRoleView(APIView):
         },
     )
     def patch(self, request, user_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.MEMBERSHIPS_ASSIGN_ROLE)
         serializer = MemberRoleWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         membership = assign_membership_role(
@@ -244,6 +250,7 @@ class OrganizationAccessDetailView(APIView):
         },
     )
     def patch(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.ORGANIZATIONS_MANAGE_ACCESS)
         serializer = OrganizationAccessWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         organization = change_organization_access_mode(
@@ -266,6 +273,7 @@ class OrganizationStaffAssignmentView(APIView):
         },
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.ORGANIZATIONS_ASSIGN_STAFF)
         serializer = OrganizationStaffWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         organization, created = assign_organization_staff(

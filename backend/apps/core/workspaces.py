@@ -38,6 +38,7 @@ MSP_CAPABILITIES = (
     "products",
     "compliance",
     "activity",
+    "recycle_bin",
     "integrations",
     "accounting",
 )
@@ -59,10 +60,20 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "services",
         "tickets",
         "vendors",
+        "recycle_bin",
     ),
-    "vendor": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products"),
-    "manufacturer": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products"),
-    "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products"),
+    "vendor": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products", "recycle_bin"),
+    "manufacturer": (
+        "overview",
+        "people",
+        "sites",
+        "custom_fields",
+        "documentation",
+        "files",
+        "products",
+        "recycle_bin",
+    ),
+    "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products", "recycle_bin"),
 }
 
 CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
@@ -85,6 +96,7 @@ CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
     "products": PermissionKey.ASSETS_VIEW,
     "compliance": PermissionKey.COMPLIANCE_VIEW,
     "activity": PermissionKey.WORKSPACES_VIEW,
+    "recycle_bin": PermissionKey.RECYCLE_BIN_VIEW,
     "integrations": PermissionKey.INTEGRATIONS_VIEW,
     "accounting": PermissionKey.COSTS_VIEW,
 }

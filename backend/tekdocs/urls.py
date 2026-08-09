@@ -45,6 +45,12 @@ from apps.core.people_views import (
     OrganizationPeopleListCreateView,
     OrganizationPersonDetailView,
 )
+from apps.core.recycle_views import (
+    MSPRecycleBinListView,
+    MSPRecycleBinRestoreView,
+    OrganizationRecycleBinListView,
+    OrganizationRecycleBinRestoreView,
+)
 from apps.core.relationship_views import (
     EntityLinkTypeCatalogView,
     MSPEntityRelationshipDetailView,
@@ -136,6 +142,12 @@ urlpatterns = [
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
+    path("api/v1/recycle-bin", MSPRecycleBinListView.as_view(), name="msp-recycle-bin"),
+    path(
+        "api/v1/recycle-bin/<str:record_type>/<uuid:record_id>/restore",
+        MSPRecycleBinRestoreView.as_view(),
+        name="msp-recycle-bin-restore",
+    ),
     path("api/v1/entity-link-types", EntityLinkTypeCatalogView.as_view(), name="entity-link-type-catalog"),
     path("api/v1/entities/search", MSPEntitySearchView.as_view(), name="msp-entity-search"),
     path(
@@ -197,6 +209,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin",
+        OrganizationRecycleBinListView.as_view(),
+        name="organization-recycle-bin",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",
+        OrganizationRecycleBinRestoreView.as_view(),
+        name="organization-recycle-bin-restore",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/search",

@@ -70,6 +70,8 @@ class PermissionKey(StrEnum):
     CUSTOM_ROLES_ASSIGN = "custom_roles.assign"
     ACCESS_COLLECTIONS_VIEW = "access_collections.view"
     ACCESS_COLLECTIONS_MANAGE = "access_collections.manage"
+    RECYCLE_BIN_VIEW = "recycle_bin.view"
+    RECYCLE_BIN_RESTORE = "recycle_bin.restore"
     DOCUMENTS_VIEW = "documents.view"
     DOCUMENTS_EDIT = "documents.edit"
     DOCUMENTS_PUBLISH = "documents.publish"
@@ -147,6 +149,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.CUSTOM_ROLES_ASSIGN, "Assign custom roles", "Administration", mfa=True),
     _permission(PermissionKey.ACCESS_COLLECTIONS_VIEW, "View access collections", "Administration"),
     _permission(PermissionKey.ACCESS_COLLECTIONS_MANAGE, "Manage access collections", "Administration", mfa=True),
+    _permission(PermissionKey.RECYCLE_BIN_VIEW, "View archived records", "Recovery"),
+    _permission(PermissionKey.RECYCLE_BIN_RESTORE, "Restore archived records", "Recovery", mfa=True),
     _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),
     _permission(PermissionKey.DOCUMENTS_EDIT, "Edit documentation", "Documentation", mfa=True),
     _permission(PermissionKey.DOCUMENTS_PUBLISH, "Publish documentation", "Documentation", mfa=True),
@@ -172,6 +176,7 @@ IMPLEMENTED_READS = frozenset(
         PermissionKey.SITES_VIEW,
         PermissionKey.CUSTOM_FIELDS_VIEW,
         PermissionKey.RELATIONSHIPS_VIEW,
+        PermissionKey.RECYCLE_BIN_VIEW,
         PermissionKey.DOCUMENTS_VIEW,
         PermissionKey.ASSETS_VIEW,
         PermissionKey.NETWORKS_VIEW,
@@ -190,6 +195,7 @@ TECHNICIAN_MUTATIONS = frozenset(
         PermissionKey.CUSTOM_FIELDS_EDIT_VALUES,
         PermissionKey.RELATIONSHIPS_CREATE,
         PermissionKey.RELATIONSHIPS_ARCHIVE,
+        PermissionKey.RECYCLE_BIN_RESTORE,
         PermissionKey.DOCUMENTS_EDIT,
         PermissionKey.ASSETS_EDIT,
         PermissionKey.NETWORKS_EDIT,
@@ -384,6 +390,17 @@ def _organization_allowed(context: InstallationMemberContext, organization: Orga
     ).exists()
 
 
+def _archived_organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:
+    if organization.tenant_id != context.tenant.id or organization.entity.archived_at is None:
+        return False
+    if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED or context.is_owner:
+        return True
+    return OrganizationAccessAssignment.scoped.for_tenant(context.tenant).filter(
+        organization=organization,
+        membership__user=context.user,
+    ).exists()
+
+
 def context_has_permission(
     context: InstallationMemberContext,
     permission: PermissionKey,
@@ -411,6 +428,34 @@ def require_permission(
             type=Authenticator.Type.TOTP,
         ).exists()
     ):
+        raise PrivilegedMFARequired()
+    return context
+
+
+def context_has_archived_organization_permission(
+    context: InstallationMemberContext,
+    permission: PermissionKey,
+    *,
+    organization: Organization,
+) -> bool:
+    return _permission_granted(context, permission, organization=organization) and _archived_organization_allowed(
+        context, organization
+    )
+
+
+def require_archived_organization_permission(
+    user: User,
+    permission: PermissionKey,
+    *,
+    organization: Organization,
+) -> InstallationMemberContext:
+    context = require_installation_member(user)
+    if not context_has_archived_organization_permission(context, permission, organization=organization):
+        raise PermissionDenied("Your account is not authorized for this action.")
+    if PERMISSION_BY_KEY[permission].requires_mfa and not Authenticator.objects.filter(
+        user=user,
+        type=Authenticator.Type.TOTP,
+    ).exists():
         raise PrivilegedMFARequired()
     return context
 

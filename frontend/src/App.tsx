@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   ScrollText,
   TicketCheck,
+  Trash2,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -49,6 +50,9 @@ import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
 import { browserRelationshipsClient } from './relationships/api'
 import type { RelationshipsClient } from './relationships/api'
+import { RecycleBin } from './recycle-bin/RecycleBin'
+import { browserRecycleBinClient } from './recycle-bin/api'
+import type { RecycleBinClient } from './recycle-bin/api'
 import { Sites } from './sites/Sites'
 import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
@@ -113,6 +117,7 @@ const navigationSections: NavigationSection[] = [
     { label: 'Custom fields', path: '/custom-fields', area: 'custom_fields', icon: ListPlus },
     { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
     { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
+    { label: 'Recycle bin', path: '/recycle-bin', area: 'recycle_bin', icon: Trash2 },
     { label: 'Integrations', path: '/integrations', area: 'integrations', icon: Plug },
   ] },
 ]
@@ -272,9 +277,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.1.8 adds typed links and permission-aware backlinks between addressable records." />
+      <PageHeader title="Overview" description="TekDocs 0.1.13 adds scoped recovery and certifies the authorization boundary for the current API." />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.8</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.1.13</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -283,6 +288,9 @@ function Overview() {
             ['Organization records and classifications', 'Available'],
             ['Versioned custom-field definitions', 'Available'],
             ['Typed entity links and backlinks', 'Available'],
+            ['Scoped roles and access collections', 'Available'],
+            ['Workspace recycle bin', 'Available'],
+            ['Database-enforced audit immutability', 'Available'],
             ['Owner authentication', 'Available'],
             ['Email delivery foundation', 'Available'],
             ['Invitation issuance API', 'Available'],
@@ -339,9 +347,10 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   vendors: { title: 'Vendors', description: 'Suppliers related to this organization through products, assets, or services.', release: '0.3.4' },
   products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
   tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
+  recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -351,6 +360,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
+  if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
     <>
@@ -361,7 +371,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -370,6 +380,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   sitesClient: SitesClient
   customFieldsClient: CustomFieldsClient
   relationshipsClient: RelationshipsClient
+  recycleBinClient: RecycleBinClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -422,13 +433,14 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
             <Route path="/custom-fields" element={<CustomFields workspace={null} client={customFieldsClient} />} />
+            <Route path="/recycle-bin" element={<RecycleBin workspace={null} client={recycleBinClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <AccessControl client={accessControlClient} /> : <Navigate to="/overview" replace />} />
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} />} />)}
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
@@ -437,7 +449,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -446,6 +458,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   sitesClient?: SitesClient
   customFieldsClient?: CustomFieldsClient
   relationshipsClient?: RelationshipsClient
+  recycleBinClient?: RecycleBinClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -460,6 +473,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           sitesClient={sitesClient}
           customFieldsClient={customFieldsClient}
           relationshipsClient={relationshipsClient}
+          recycleBinClient={recycleBinClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

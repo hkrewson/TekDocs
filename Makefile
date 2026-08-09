@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -35,10 +35,10 @@ test-auth-abuse:
 	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q
 
 test-policy:
-	docker compose exec -T backend pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py -q
+	docker compose exec -T backend pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py -q
 
 test-isolation:
-	docker compose exec -T backend pytest apps/core/tests/test_scoping.py -q
+	docker compose exec -T backend pytest apps/core/tests/test_scoping.py apps/core/tests/test_permission_idor_matrix.py -q
 
 test-organizations:
 	docker compose exec -T backend pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q
@@ -57,6 +57,9 @@ test-custom-fields:
 
 test-relationships:
 	docker compose exec -T backend pytest apps/core/tests/test_relationships.py apps/core/tests/test_scoping.py -q
+
+test-recovery:
+	docker compose exec -T backend pytest apps/core/tests/test_recycle_bin.py apps/core/tests/test_audit_immutability.py apps/core/tests/test_permission_idor_matrix.py -q
 
 test-compose:
 	docker compose -f compose.yml -f compose.test.yml up -d --build --wait
@@ -85,7 +88,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

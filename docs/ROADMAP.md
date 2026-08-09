@@ -188,7 +188,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.10` | Complete | Explicit per-client MSP staff assignments, assigned-only policy composition, assignment administration, and the next bounded portion of `TD-RISK-001`. |
 | `0.1.11` | Complete | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
 | `0.1.12` | Complete | Organization access collections, collection-scoped custom-role assignments, MSP-private Entity constraints, and the field-level cost visibility seam that completes `TD-RISK-001` implementation. |
-| `0.1.13` | Planned | Recycle bin/recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
+| `0.1.13` | Complete | Workspace-scoped recycle-bin recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
 | `0.1.14` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and hosted-automation evidence when authorized (`TD-RISK-010`). |
 | `0.1.15` | Planned | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
@@ -335,6 +335,20 @@ Evidence: `docs/releases/0.1.11.md`.
 ADR 0015 defines access-collection semantics, audience visibility precedence, and field-policy projection.
 
 Evidence: `docs/releases/0.1.12.md`.
+
+### `0.1.13` acceptance criteria
+
+- [x] MSP and active organization workspaces expose one bounded recycle-bin API for archived organizations, person associations, sites, location subtrees, and custom-field definitions. Results disclose only records in the exact authorized workspace and include stable type, identifier, display label, archive time, and cascade count.
+- [x] Recovery requires the central `recycle_bin.restore` permission, MFA, and the record type's existing archive/manage permission. Tenant scope, organization reachability, `assigned_only`, custom-role scope, and non-disclosing identifier resolution remain hard constraints; CSRF protects every recovery mutation.
+- [x] Site and location recovery restores only records archived in the same cascade, preserves intentionally older archive state, and refuses missing or archived dependencies. Conflicts and stale requests fail atomically without partial recovery or value-bearing audit metadata.
+- [x] Audit events are insert-only in PostgreSQL. Database triggers reject ORM queryset, bulk, raw-SQL, and cascade update/delete attempts while ordinary inserts remain available; the application exposes no audit retention bypass.
+- [x] A maintained route/permission inventory drives a blocking IDOR matrix across every implemented authenticated API family. Anonymous, insufficient-permission, missing-MFA, CSRF, malformed/guessed identifier, cross-tenant, sibling-client, and assigned-only bypass cases are covered where applicable without treating frontend visibility as authorization.
+- [x] The shell exposes a restrained, keyboard-accessible recycle-bin list in MSP and organization context with bounded search/type filters, loading, empty, denial, conflict, confirmation, recovery, responsive, and stale-workspace states.
+- [x] Existing list/detail/archive behavior remains unchanged. Migration, OpenAPI, Docker/PostgreSQL, unit, component, browser, real-stack, clean-install, preserved-data upgrade, security, and permission/IDOR evidence agree at `0.1.13`.
+
+ADR 0016 defines the recoverable-record boundary, cascade semantics, database audit immutability, and route-matrix certification contract.
+
+Evidence: `docs/releases/0.1.13.md`.
 
 ### `0.1.3` acceptance criteria
 

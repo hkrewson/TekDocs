@@ -5,7 +5,7 @@ generated="$(mktemp /tmp/tekdocs-openapi.XXXXXX)"
 trap 'rm -f "$generated"' EXIT
 
 docker compose run --rm --no-deps \
-  -e TEKDOCS_RUN_MIGRATIONS=false \
+  -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false \
   -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test \
   backend python manage.py spectacular --validate > "$generated"
 

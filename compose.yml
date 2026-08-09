@@ -2,11 +2,11 @@ name: ${COMPOSE_PROJECT_NAME:-tekdocs}
 
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
-      POSTGRES_USER: ${POSTGRES_USER:?Run make bootstrap}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make bootstrap}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:?Run make bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Run make bootstrap}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
     networks: [internal]
 
   valkey:
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:8-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
     command: ["valkey-server", "--save", "60", "1", "--appendonly", "yes"]
     volumes:
       - valkey_data:/data
@@ -48,6 +48,42 @@ services:
     restart: unless-stopped
     networks: [internal]
 
+  migrate:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      DJANGO_SETTINGS_MODULE: tekdocs.settings.production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Run make bootstrap}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3200}
+      POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:?Run make bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Run make bootstrap}
+      POSTGRES_HOST: db
+      TEKDOCS_DATABASE_ROLE: migration
+      TEKDOCS_DATABASE_RUNTIME_ROLE: ${POSTGRES_RUNTIME_USER:?Run make bootstrap}
+      TEKDOCS_DATABASE_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?Run make bootstrap}
+      TEKDOCS_MASTER_KEY: ${TEKDOCS_MASTER_KEY:?Run make bootstrap}
+      TEKDOCS_PUBLICATION_SIGNING_KEY: ${TEKDOCS_PUBLICATION_SIGNING_KEY:?Run make bootstrap}
+      TEKDOCS_BOOTSTRAP_TOKEN: ${TEKDOCS_BOOTSTRAP_TOKEN:?Run make bootstrap}
+      TEKDOCS_PUBLIC_URL: ${TEKDOCS_PUBLIC_URL:-http://localhost:3200}
+      TEKDOCS_ALLOW_INSECURE_PUBLIC_URL: ${TEKDOCS_ALLOW_INSECURE_PUBLIC_URL:-true}
+      EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      EMAIL_PORT: ${EMAIL_PORT:-1025}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-TekDocs <noreply@tekdocs.local>}
+      TEKDOCS_ALLOW_INSECURE_SMTP: ${TEKDOCS_ALLOW_INSECURE_SMTP:-true}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
+    command: ["/migrate.sh"]
+    volumes:
+      - static_data:/app/staticfiles
+    depends_on:
+      db: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+    restart: "no"
+    networks: [internal]
+
   backend:
     build:
       context: ./backend
@@ -58,9 +94,11 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3200}
       POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
-      POSTGRES_USER: ${POSTGRES_USER:?Run make bootstrap}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make bootstrap}
+      POSTGRES_USER: ${POSTGRES_RUNTIME_USER:?Run make bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?Run make bootstrap}
       POSTGRES_HOST: db
+      TEKDOCS_DATABASE_ROLE: runtime
+      TEKDOCS_DATABASE_RUNTIME_ROLE: ${POSTGRES_RUNTIME_USER:?Run make bootstrap}
       CELERY_BROKER_URL: redis://valkey:6379/0
       CELERY_RESULT_BACKEND: redis://valkey:6379/1
       DJANGO_CACHE_URL: redis://valkey:6379/2
@@ -88,13 +126,13 @@ services:
       TEKDOCS_ALLOW_INSECURE_SMTP: ${TEKDOCS_ALLOW_INSECURE_SMTP:-true}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
       TZ: ${TZ:-America/Chicago}
-      TEKDOCS_RUN_MIGRATIONS: "true"
+      TEKDOCS_VALIDATE_RUNTIME_DATABASE: "true"
     command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-", "tekdocs.wsgi:application"]
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
     depends_on:
-      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
       mailpit: { condition: service_healthy }
     healthcheck:
@@ -112,7 +150,6 @@ services:
       target: development
     environment:
       <<: *backend-environment
-      TEKDOCS_RUN_MIGRATIONS: "false"
     command: ["celery", "-A", "tekdocs", "worker", "--loglevel=INFO", "--concurrency=2"]
     depends_on:
       backend: { condition: service_healthy }
@@ -125,7 +162,6 @@ services:
       target: development
     environment:
       <<: *backend-environment
-      TEKDOCS_RUN_MIGRATIONS: "false"
     command: ["celery", "-A", "tekdocs", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
     depends_on:
       backend: { condition: service_healthy }

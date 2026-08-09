@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.13`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.1.14`.
 
 ## Start locally
 
@@ -12,6 +12,8 @@ make up
 ```
 
 Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with generated local secrets, installs the frontend lockfile, and builds the images. For an existing `.env`, it only adds newly required generated values and never replaces an existing value.
+
+Compose runs schema changes through a one-shot migration container using the database owner. Web, worker, and scheduler containers connect as the fixed, non-owner `tekdocs_runtime` role and validate its forced-RLS policy inventory before startup. Python installs use reviewed hash locks; run `./scripts/update-python-locks.sh` after intentionally changing backend requirements.
 
 Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
 

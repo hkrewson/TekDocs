@@ -1,9 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ "${TEKDOCS_RUN_MIGRATIONS:-false}" = "true" ]; then
-  python manage.py migrate --noinput
-  python manage.py collectstatic --noinput
+if [ "${TEKDOCS_VALIDATE_RUNTIME_DATABASE:-false}" = "true" ]; then
+  python manage.py validate_runtime_database
 fi
 
 exec "$@"

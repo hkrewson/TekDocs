@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from rest_framework.exceptions import APIException
 
 from apps.core.models import AuditEvent, InstallationState, Tenant
+from apps.core.rls import bind_tenant_scope_if_postgresql
 
 from .models import TenantMembership, User
 
@@ -38,6 +39,7 @@ def bootstrap_owner(*, tenant_name: str, owner_email: str, owner_display_name: s
             raise BootstrapConflict("Bootstrap requires an installation with no existing tenants or users.")
 
         tenant = Tenant.objects.create(name=tenant_name, slug=slugify(tenant_name)[:80] or "msp")
+        bind_tenant_scope_if_postgresql(tenant)
         owner = User.objects.create_user(
             email=owner_email,
             password=password,

@@ -1,4 +1,6 @@
 services:
+  migrate:
+    restart: "no"
   backend:
     environment:
       DJANGO_SETTINGS_MODULE: tekdocs.settings.production

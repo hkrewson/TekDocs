@@ -19,11 +19,13 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - Additive custom roles may target the tenant, one organization, or a maintained access collection, but never bypass assigned-client reachability. MSP-private audience classification and cataloged sensitive-field projection remain hard constraints after role composition; denied cost fields are omitted, not masked with placeholders.
 - Recycle-bin reads and restores derive scope from the MSP or exact organization route. Restore requires the central recovery permission, the domain's archive/manage permission, MFA, and CSRF; stale, foreign, sibling, and guessed identifiers do not disclose records.
 - Audit evidence is insert-only at both the Django model and PostgreSQL layers. PostgreSQL rejects row updates and deletes; the application exposes no retention bypass. Destructive table/schema administration remains inside the trusted database-owner boundary.
+- Schema ownership is isolated to the one-shot migration service. Web, worker, and scheduler processes use a fixed non-owner/non-`BYPASSRLS` PostgreSQL role, validate the expected forced-RLS inventory at startup, and bind tenant/organization scope only inside transactions. Missing scope, cross-scope writes, runtime unrestricted mode, and schema changes fail closed.
 - Strict Markdown/HTML sanitization, Content Security Policy, and no executable raw HTML or MDX.
 - Envelope encryption for managed secrets with the wrapping key supplied outside the database.
 - Redacted structured logs, append-only audit records, scoped API/service credentials, and webhook replay protection.
 - SSRF-resistant outbound integration and monitoring requests.
 - Dependency, license, secret, source, container, and browser security gates.
+- Reviewed Python build/production/development hash locks, digest-pinned external images and local scanners, commit-SHA-pinned Actions, local workflow linting, and controlled Dependabot updates.
 
 Production startup must fail for missing or placeholder secrets, wildcard hosts/origins, insecure cookies, inadequate HSTS, mismatched public/CSRF origins, incomplete OIDC settings, debug mode, or an unsupported database configuration. The development Compose stack's HTTP origin requires the explicit localhost-only insecure-public-URL acknowledgement.
 

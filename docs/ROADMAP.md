@@ -189,7 +189,7 @@ Evidence: `docs/releases/0.1.0.md`.
 | `0.1.11` | Complete | Custom role definitions plus tenant- and organization-scoped role assignments without inline permission logic. |
 | `0.1.12` | Complete | Organization access collections, collection-scoped custom-role assignments, MSP-private Entity constraints, and the field-level cost visibility seam that completes `TD-RISK-001` implementation. |
 | `0.1.13` | Complete | Workspace-scoped recycle-bin recovery, database-enforced audit immutability (`TD-RISK-008`), and comprehensive IDOR/permission matrix. |
-| `0.1.14` | Planned | Active runtime-role RLS (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and hosted-automation evidence when authorized (`TD-RISK-010`). |
+| `0.1.14` | Complete | Active non-owner runtime-role RLS for the implemented domain boundary (`TD-RISK-002`), reproducible Python/runtime inputs (`TD-RISK-009`), and an explicit externally blocked disposition for hosted-automation evidence (`TD-RISK-010`). |
 | `0.1.15` | Planned | Reference performance, migration, accessibility, workspace, authorization, and isolation stabilization. |
 | `0.2.0` | Planned | Stabilize and certify the entity/RBAC subsystem; add no new domain family. |
 
@@ -349,6 +349,20 @@ Evidence: `docs/releases/0.1.12.md`.
 ADR 0016 defines the recoverable-record boundary, cascade semantics, database audit immutability, and route-matrix certification contract.
 
 Evidence: `docs/releases/0.1.13.md`.
+
+### `0.1.14` acceptance criteria
+
+- [x] Compose separates the PostgreSQL migration owner from a fixed, provisioned application runtime role. Web, worker, and scheduler use the runtime credential; only the one-shot migration service receives owner credentials and schema-changing authority.
+- [x] Production validation rejects a runtime connection that owns application tables, is superuser, has `BYPASSRLS`, or is not the configured runtime role. Runtime startup also verifies that the expected policy inventory is active.
+- [x] Every currently implemented core tenant-owned table has forced PostgreSQL RLS under the runtime role. Direct organization-owned tables enforce exact MSP/organization scope with `USING` and `WITH CHECK`; tenant-wide registry/control records enforce the exact tenant. Authentication-provider tables and the tenant authorization control plane remain outside organization RLS and retain the central policy boundary pending final `0.2.0` certification.
+- [x] Authenticated session requests run in one atomic boundary, derive the installation tenant server-side, and bind transaction-local scope before domain access. After Django's CSRF view check, organization routes resolve the URL workspace inside that tenant and rebind its exact database scope; each view then applies the central policy service before returning data or mutating state. Anonymous bootstrap and invitation acceptance bind only after their tenant is established.
+- [x] Runtime-role tests prove missing-scope denial, raw-SQL cross-tenant and sibling-organization denial, write denial through `WITH CHECK`, inability to mutate schema, exact organization operation, authorized MSP operation, and pooled-connection scope cleanup. Worker and management-command helpers fail closed without an explicit scope.
+- [x] Python production and development dependencies resolve from reviewed hash-locked files. Backend, frontend, database, cache, mail, browser, scanner, and release base images are digest pinned; GitHub Actions use immutable commit SHAs with update annotations and Dependabot remains configured.
+- [x] Local workflow linting and the complete release gate agree at `0.1.14`. Hosted CodeQL, dependency review, browser matrix, artifact, and branch-protection evidence is either retained from an authorized published run or recorded as externally blocked without being represented as verified.
+
+ADR 0017 defines runtime/migration role separation, request and worker scope binding, the initial active-policy inventory, and the supply-chain reproducibility boundary.
+
+Evidence: `docs/releases/0.1.14.md`.
 
 ### `0.1.3` acceptance criteria
 

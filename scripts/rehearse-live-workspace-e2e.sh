@@ -48,7 +48,7 @@ docker run --rm \
   -e TEKDOCS_E2E_BOOTSTRAP_TOKEN="$bootstrap_token" \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
-live_compose exec -T backend python manage.py shell -c '
+live_compose run --rm migrate python manage.py shell -c '
 from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User

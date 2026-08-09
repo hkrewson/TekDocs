@@ -4,7 +4,7 @@
 
 TekDocs ships as a same-origin web application. Nginx serves the React build and proxies `/api/`, `/accounts/`, `/admin/`, and `/static/` to Gunicorn. Celery workers and the scheduler share the Django codebase. PostgreSQL is the system of record; Valkey supplies task transport and cache primitives.
 
-The default Compose services are `db`, `valkey`, `backend`, `worker`, `scheduler`, and `frontend`. Persistent application artifacts use a storage provider: local volumes initially and S3-compatible storage later.
+The default Compose services are `db`, `valkey`, a one-shot `migrate` job, `backend`, `worker`, `scheduler`, and `frontend`. The migration job owns schema changes and provisions the fixed `tekdocs_runtime` login; application processes receive only that non-owner credential. Persistent application artifacts use a storage provider: local volumes initially and S3-compatible storage later.
 
 ## Domain direction
 
@@ -34,7 +34,9 @@ Workspace context is an explicit URL and query boundary, not ambient authorizati
 
 The shell derives its workspace label and available sections from organization classifications. A multi-classified organization receives the union of applicable navigation capabilities and displays every applicable classification; vendor, manufacturer, and partner are retained as classifications rather than separate table hierarchies. Hidden navigation is only presentation—every endpoint, worker, search result, backlink, export, and creation path independently enforces the selected scope.
 
-PostgreSQL scope helpers consume transaction-local tenant, organization, and organization-mode settings. Same-tenant organization anchors, entity ownership, and entity-link endpoints are protected by database triggers. RLS policies are not yet enabled for the runtime role: ADR 0006 defines the staged activation work required before that defense can be claimed.
+PostgreSQL scope helpers consume transaction-local tenant, organization, and organization-mode settings. The non-owner, non-`BYPASSRLS` runtime role is subject to forced `USING` and `WITH CHECK` policies on every implemented core tenant-owned table. Authenticated session requests run inside one transaction: the server derives and binds the installation tenant, then, after Django's CSRF view check, resolves an organization route within that tenant before rebinding its exact scope. The view's central-policy decision remains authorization; selecting database scope alone grants nothing. Missing scope and runtime attempts to select an unrestricted `all` mode fail closed; committed scope values cannot survive connection reuse. Same-tenant organization anchors, entity ownership, and entity-link endpoints retain database integrity triggers as an additional layer. Authentication-provider and authorization-control-plane tables remain outside organization RLS while application policy and final `0.2.0` isolation certification cover that boundary. ADRs 0006 and 0017 define the contract and policy inventory.
+
+Python production, development, and build inputs are checked in as hash-locked requirements. External container bases, Compose services, browser images, and local scanners are digest-pinned; GitHub Actions are commit-SHA pinned with release annotations. Dependabot remains the controlled update path, while local pin and workflow-lint gates reject a return to mutable inputs. Hosted workflow results are evidence only after an authorized published run.
 
 Documents compose stable blocks. Block content changes only by adding immutable revisions. Placements select the latest revision or pin an exact revision. A STATIC publication resolves all dependencies and stores a signed manifest plus immutable render artifacts.
 

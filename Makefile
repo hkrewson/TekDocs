@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -21,45 +21,50 @@ logs:
 
 check:
 	./scripts/check-version.sh
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend ruff check .
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend mypy apps tekdocs
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations --check --dry-run
+	./scripts/check-supply-chain-pins.sh
+	docker run --rm -v "$(CURDIR):/repo:ro" -w /repo rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend ruff check .
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend mypy apps tekdocs
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations --check --dry-run
 	./scripts/check-openapi.sh
 	./scripts/frontend-gate.sh check
 
 test:
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest --cov
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest --cov
 	./scripts/frontend-gate.sh test
 
 test-auth-abuse:
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q
 
 test-policy:
-	docker compose exec -T backend pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py -q
+	docker compose run --rm migrate pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py -q
 
 test-isolation:
-	docker compose exec -T backend pytest apps/core/tests/test_scoping.py apps/core/tests/test_permission_idor_matrix.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_scoping.py apps/core/tests/test_permission_idor_matrix.py -q
+
+test-rls:
+	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
 
 test-organizations:
-	docker compose exec -T backend pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q
 
 test-workspaces:
-	docker compose exec -T backend pytest apps/core/tests/test_workspaces.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_workspaces.py apps/core/tests/test_scoping.py -q
 
 test-people:
-	docker compose exec -T backend pytest apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
 
 test-sites:
-	docker compose exec -T backend pytest apps/core/tests/test_sites.py apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_sites.py apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q
 
 test-custom-fields:
-	docker compose exec -T backend pytest apps/core/tests/test_custom_fields.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_custom_fields.py apps/core/tests/test_scoping.py -q
 
 test-relationships:
-	docker compose exec -T backend pytest apps/core/tests/test_relationships.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_relationships.py apps/core/tests/test_scoping.py -q
 
 test-recovery:
-	docker compose exec -T backend pytest apps/core/tests/test_recycle_bin.py apps/core/tests/test_audit_immutability.py apps/core/tests/test_permission_idor_matrix.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_recycle_bin.py apps/core/tests/test_audit_immutability.py apps/core/tests/test_permission_idor_matrix.py -q
 
 test-compose:
 	docker compose -f compose.yml -f compose.test.yml up -d --build --wait
@@ -67,7 +72,7 @@ test-compose:
 	curl --fail --silent http://127.0.0.1:$${MAILPIT_UI_PORT:-8025}/readyz
 	docker compose exec -T backend python manage.py send_test_email operator-test@example.invalid
 	docker compose exec -T backend python manage.py check --deploy
-	docker compose exec -T backend pytest --cov
+	docker compose run --rm migrate pytest --cov
 	./scripts/check-compose-provenance.sh
 
 test-e2e:
@@ -80,15 +85,16 @@ test-e2e-live:
 	./scripts/rehearse-live-workspace-e2e.sh
 
 security:
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false backend pip-audit
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false backend bandit -c pyproject.toml -r apps tekdocs
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend pip-audit
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend bandit -c pyproject.toml -r apps tekdocs
 	./scripts/frontend-gate.sh audit
-	docker run --rm -v "$(CURDIR):/src:ro" -v /dev/null:/src/.env:ro zricethezav/gitleaks:latest detect --source=/src --no-git --no-banner --redact
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-backend
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+	docker run --rm -v "$(CURDIR):/src:ro" -v /dev/null:/src/.env:ro zricethezav/gitleaks:latest@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/src --no-git --no-banner --redact
+	docker build --target production -t tekdocs-backend-security ./backend
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-backend-security
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh
@@ -103,10 +109,10 @@ upgrade-rehearsal:
 	./scripts/rehearse-upgrade.sh
 
 schema:
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py spectacular --validate > backend/openapi.yml
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py spectacular --validate > backend/openapi.yml
 
 migrations:
-	docker compose run --rm --no-deps -e TEKDOCS_RUN_MIGRATIONS=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations
+	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations
 
 mail-test:
 	@test -n "$(EMAIL_TO)" || (echo "Usage: make mail-test EMAIL_TO=you@example.com" && exit 2)

@@ -87,12 +87,13 @@ print("Baseline identity fixture created")
 
 baseline_compose down --remove-orphans
 
+"$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
 echo "Applying TekDocs $current_version to the preserved database"
 current_compose up -d --build --wait backend
-current_compose exec -T \
+current_compose run --rm \
   -e UPGRADE_TEST_EMAIL="$test_email" \
   -e UPGRADE_TEST_PASSWORD="$test_password" \
-  backend python manage.py shell -c '
+  migrate python manage.py shell -c '
 import os
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator

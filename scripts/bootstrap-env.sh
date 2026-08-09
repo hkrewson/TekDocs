@@ -3,19 +3,35 @@ set -eu
 
 target="${1:-.env}"
 if [ -e "$target" ]; then
-  if grep -q '^TEKDOCS_BOOTSTRAP_TOKEN=' "$target"; then
-    echo "$target already contains the required generated secrets; leaving it unchanged"
-    exit 0
-  fi
   umask 077
-  bootstrap_token="$(openssl rand -base64 32 | tr -d '\n')"
-  echo "TEKDOCS_BOOTSTRAP_TOKEN=$bootstrap_token" >> "$target"
-  echo "Added the missing generated bootstrap token to $target without changing existing values"
+  changed=false
+  if ! grep -q '^TEKDOCS_BOOTSTRAP_TOKEN=' "$target"; then
+    echo "TEKDOCS_BOOTSTRAP_TOKEN=$(openssl rand -base64 32 | tr -d '\n')" >> "$target"
+    changed=true
+  fi
+  if ! grep -q '^POSTGRES_OWNER_USER=' "$target"; then
+    legacy_user=$(sed -n 's/^POSTGRES_USER=//p' "$target" | head -n 1)
+    legacy_password=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$target" | head -n 1)
+    echo "POSTGRES_OWNER_USER=${legacy_user:-tekdocs_owner}" >> "$target"
+    echo "POSTGRES_OWNER_PASSWORD=${legacy_password:-$(openssl rand -hex 32)}" >> "$target"
+    changed=true
+  fi
+  if ! grep -q '^POSTGRES_RUNTIME_USER=' "$target"; then
+    echo "POSTGRES_RUNTIME_USER=tekdocs_runtime" >> "$target"
+    echo "POSTGRES_RUNTIME_PASSWORD=$(openssl rand -hex 32)" >> "$target"
+    changed=true
+  fi
+  if [ "$changed" = true ]; then
+    echo "Added missing database-role or bootstrap settings to $target without changing existing values"
+  else
+    echo "$target already contains the required generated secrets; leaving it unchanged"
+  fi
   exit 0
 fi
 
 umask 077
-postgres_password="$(openssl rand -hex 32)"
+postgres_owner_password="$(openssl rand -hex 32)"
+postgres_runtime_password="$(openssl rand -hex 32)"
 django_secret="$(openssl rand -base64 48 | tr -d '\n')"
 master_key="$(openssl rand -base64 32 | tr -d '\n')"
 signing_key="$(openssl rand -base64 32 | tr -d '\n')"
@@ -24,8 +40,10 @@ bootstrap_token="$(openssl rand -base64 32 | tr -d '\n')"
 {
   echo "COMPOSE_PROJECT_NAME=tekdocs"
   echo "POSTGRES_DB=tekdocs"
-  echo "POSTGRES_USER=tekdocs"
-  echo "POSTGRES_PASSWORD=$postgres_password"
+  echo "POSTGRES_OWNER_USER=tekdocs_owner"
+  echo "POSTGRES_OWNER_PASSWORD=$postgres_owner_password"
+  echo "POSTGRES_RUNTIME_USER=tekdocs_runtime"
+  echo "POSTGRES_RUNTIME_PASSWORD=$postgres_runtime_password"
   echo "DJANGO_SECRET_KEY=$django_secret"
   echo "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend"
   echo "DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3200"

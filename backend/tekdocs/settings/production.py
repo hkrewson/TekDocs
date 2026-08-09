@@ -27,6 +27,14 @@ _invalid = [
 ]
 if _invalid:
     raise ImproperlyConfigured(f"Missing or weak production secrets: {', '.join(_invalid)}")
+if TEKDOCS_DATABASE_ROLE not in {"migration", "runtime"}:  # noqa: F405
+    raise ImproperlyConfigured("TEKDOCS_DATABASE_ROLE must be migration or runtime")
+if TEKDOCS_DATABASE_RUNTIME_ROLE != "tekdocs_runtime":  # noqa: F405
+    raise ImproperlyConfigured("TEKDOCS_DATABASE_RUNTIME_ROLE must be tekdocs_runtime")
+if TEKDOCS_DATABASE_ROLE == "runtime" and DATABASES["default"]["USER"] != TEKDOCS_DATABASE_RUNTIME_ROLE:  # noqa: F405
+    raise ImproperlyConfigured("The application database connection must use the configured runtime role")
+if TEKDOCS_DATABASE_ROLE == "migration" and len(TEKDOCS_DATABASE_RUNTIME_PASSWORD) < 32:  # noqa: F405
+    raise ImproperlyConfigured("Migration startup requires the generated runtime database password")
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must contain explicit production hosts")
 

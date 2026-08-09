@@ -41,7 +41,7 @@ curl --fail --silent "http://127.0.0.1:$mailpit_port/readyz" >/dev/null
 
 clean_compose exec -T backend python manage.py migrate --check
 clean_compose exec -T backend python manage.py makemigrations --check --dry-run
-clean_compose exec -T backend python manage.py shell -c '
+clean_compose run --rm migrate python manage.py shell -c '
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import AuditEvent, CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, InstallationState, Organization, OrganizationAccessMode, Tenant
 

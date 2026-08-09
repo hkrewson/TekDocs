@@ -33,6 +33,9 @@ def env_int(name: str, default: int) -> int:
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
 TEKDOCS_MASTER_KEY = os.getenv("TEKDOCS_MASTER_KEY", "")
 TEKDOCS_BOOTSTRAP_TOKEN = os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", "")
+TEKDOCS_DATABASE_ROLE = os.getenv("TEKDOCS_DATABASE_ROLE", "runtime")
+TEKDOCS_DATABASE_RUNTIME_ROLE = os.getenv("TEKDOCS_DATABASE_RUNTIME_ROLE", "tekdocs_runtime")
+TEKDOCS_DATABASE_RUNTIME_PASSWORD = os.getenv("TEKDOCS_DATABASE_RUNTIME_PASSWORD", "")
 TEKDOCS_PUBLIC_URL = os.getenv("TEKDOCS_PUBLIC_URL", "http://localhost:3200").rstrip("/")
 TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL", False)
 INVITATION_TTL_HOURS = env_int("INVITATION_TTL_HOURS", 168)
@@ -76,6 +79,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "allauth.usersessions.middleware.UserSessionsMiddleware",
+    "apps.core.middleware.RLSRequestScopeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.RequestContextMiddleware",

@@ -16,6 +16,7 @@ from rest_framework.exceptions import APIException, ValidationError
 
 from apps.core.email import send_invitation_email
 from apps.core.models import AuditEvent, Tenant
+from apps.core.rls import bind_tenant_scope_if_postgresql
 
 from .models import EMPTY_DIGEST, Invitation, InvitationState, TenantMembership, User
 
@@ -196,12 +197,14 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
             if invitation is None or invitation.state != InvitationState.PENDING:
                 pass
             elif invitation.expires_at <= timezone.now():
+                bind_tenant_scope_if_postgresql(invitation.tenant)
                 _mark_expired(invitation, actor=None)
             elif not invitation.matches_active_token(token):
                 pass
             elif User.objects.filter(email__iexact=invitation.email).exists():
                 pass
             else:
+                bind_tenant_scope_if_postgresql(invitation.tenant)
                 candidate = User(email=invitation.email, display_name=display_name.strip())
                 try:
                     password_validation.validate_password(password, candidate)

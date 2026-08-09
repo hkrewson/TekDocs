@@ -6,7 +6,15 @@ from django.conf import settings
 from django.db import connection
 
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
-from apps.core.models import Entity, Organization, Tenant
+from apps.core.models import (
+    Block,
+    Document,
+    DocumentationListingReference,
+    DocumentPlacement,
+    Entity,
+    Organization,
+    Tenant,
+)
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
 
 
@@ -114,3 +122,40 @@ def test_runtime_raw_sql_denies_missing_cross_tenant_sibling_write_and_all_mode(
         _bind(cursor, first.id, "all")
         cursor.execute("SELECT id FROM core_entity WHERE entity_type = 'document'")
         assert cursor.fetchall() == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_document_projection_exposes_only_the_referenced_client():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Document RLS tenant", slug=f"documents-{uuid.uuid4()}")
+    selected_org = _organization(tenant, "Selected client")
+    sibling_org = _organization(tenant, "Sibling client")
+    document_entity = Entity.objects.create(tenant=tenant, entity_type="document", display_name="Shared runbook")
+    document = Document.objects.create(tenant=tenant, entity=document_entity)
+    block_entity = Entity.objects.create(tenant=tenant, entity_type="document_block", display_name="Shared block")
+    block = Block.objects.create(tenant=tenant, entity=block_entity, markdown="Reference content")
+    placement = DocumentPlacement.objects.create(
+        tenant=tenant, document=document, block=block, position=0
+    )
+    reference = DocumentationListingReference.objects.create(
+        tenant=tenant, organization=selected_org, document=document
+    )
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, tenant.id, "organization", selected_org.id)
+        cursor.execute("SELECT id FROM core_document")
+        assert cursor.fetchall() == [(document.id,)]
+        cursor.execute("SELECT id FROM core_block")
+        assert cursor.fetchall() == [(block.id,)]
+        cursor.execute("SELECT id FROM core_documentplacement")
+        assert cursor.fetchall() == [(placement.id,)]
+        cursor.execute("SELECT id FROM core_documentationlistingreference")
+        assert cursor.fetchall() == [(reference.id,)]
+        runtime.commit()
+
+        _bind(cursor, tenant.id, "organization", sibling_org.id)
+        for table in ("core_document", "core_block", "core_documentplacement", "core_documentationlistingreference"):
+            cursor.execute(f"SELECT count(*) FROM {table}")  # noqa: S608 - fixed test allowlist
+            assert cursor.fetchone() == (0,)

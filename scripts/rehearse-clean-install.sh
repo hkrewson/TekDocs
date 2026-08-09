@@ -27,7 +27,11 @@ trap cleanup EXIT HUP INT TERM
 
 release_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
 echo "Starting isolated clean install of TekDocs $release_version"
-clean_compose up -d --build --wait
+if ! clean_compose up -d --build --wait; then
+  echo "Clean-install stack failed before readiness; disposable database diagnostics follow" >&2
+  clean_compose logs --no-color db >&2 || true
+  exit 1
+fi
 
 readiness=$(curl --fail --silent "http://localhost:$test_port/api/v1/health/ready")
 case "$readiness" in

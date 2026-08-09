@@ -1,11 +1,13 @@
 from typing import cast
 from urllib.parse import urlsplit
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import (
+    Document,
     LocationKind,
     Organization,
     OrganizationAccessMode,
@@ -275,3 +277,56 @@ class PeopleResultSerializer(serializers.Serializer):
     page_size = serializers.IntegerField()
     count = serializers.IntegerField()
     has_more = serializers.BooleanField()
+
+
+class DocumentWriteSerializer(serializers.Serializer):
+    title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    markdown = serializers.CharField(required=False, allow_blank=True, max_length=1_000_000)
+
+
+class DocumentSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    title = serializers.CharField(source="entity.display_name")
+    owner_kind = serializers.SerializerMethodField()
+    owner_organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)
+    owner_organization_name = serializers.CharField(source="organization.entity.display_name", allow_null=True)
+    is_reference = serializers.SerializerMethodField()
+    markdown = serializers.SerializerMethodField()
+    block_id = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    def get_owner_kind(self, obj: Document) -> str:
+        return "organization" if obj.organization_id else "msp"
+
+    def get_is_reference(self, obj: Document) -> bool:
+        workspace_organization_id = self.context.get("workspace_organization_id")
+        return workspace_organization_id is not None and obj.organization_id is None
+
+    def _placement(self, obj: Document):  # type: ignore[no-untyped-def]
+        placements = getattr(obj, "active_placements", ())
+        return placements[0] if placements else None
+
+    def get_markdown(self, obj: Document) -> str:
+        placement = self._placement(obj)
+        return placement.block.markdown if placement is not None else ""
+
+    def get_block_id(self, obj: Document) -> UUID | None:
+        placement = self._placement(obj)
+        return placement.block.entity_id if placement is not None else None
+
+
+class DocumentResultSerializer(serializers.Serializer):
+    results = DocumentSerializer(many=True)
+    count = serializers.IntegerField()
+
+
+class DocumentationReferenceWriteSerializer(serializers.Serializer):
+    organization_id = serializers.UUIDField()
+
+
+class DocumentationReferenceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    organization_id = serializers.UUIDField(source="organization.entity_id")
+    organization_name = serializers.CharField(source="organization.entity.display_name")
+    created_at = serializers.DateTimeField()

@@ -14,7 +14,7 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 | `0.1.0` | Secure identity, authentication, owner administration, and tenant shell. |
 | `0.2.0` | Addressable entities, selectable MSP/organization workspaces, scoped RBAC, and isolation. |
 | `0.3.0` | Reusable Markdown documentation and immutable STATIC publication. |
-| `0.4.0` | Encrypted credentials, supplier catalogs, and client hardware/software inventory. |
+| `0.4.0` | External credential references, supplier catalogs, and client hardware/software inventory. |
 | `0.5.0` | Network inventory and relationship-derived views. |
 | `0.6.0` | Controlled client portal, publication workflow, and notifications. |
 | `0.7.0` | Stable integration API, provider runtime, webhooks, and reconciliation. |
@@ -421,7 +421,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.2.1` | **Complete:** final Markdown dialect, semantic highlight/callouts, accessible visual/raw/preview/help modes, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and resolution of `TD-RISK-014`. |
-| `0.2.2` | Workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
+| `0.2.2` | **Complete:** workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
 | `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
@@ -444,12 +444,25 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 
 Evidence: `docs/releases/0.2.1.md`.
 
+### `0.2.2` acceptance criteria
+
+- [x] `Document`, `Block`, and ordered `DocumentPlacement` records have stable UUID identity, explicit tenant/workspace ownership, canonical Markdown content, normal migrations, and database scope guards.
+- [x] MSP and organization Documentation pages list active records title-first; titles open the real authorized editor, which creates, renames, edits, and archives persisted records through Django.
+- [x] An MSP-owned document can be explicitly projected into any authorized client Documentation listing without copying its document, block, Markdown, or ownership; the client listing labels that provenance.
+- [x] Cross-listing does not grant mutation authority. Organization users can read only exact-workspace documents and authorized MSP references, while sibling and cross-tenant identifiers remain non-disclosing.
+- [x] Every document endpoint uses the central policy service and permission inventory, and PostgreSQL forced RLS covers documents, blocks, placements, listing references, and their stable entity labels.
+- [x] Runtime-role and API negative tests cover scope mismatch, sibling isolation, reference projection, and MSP ownership; the migration-cycle test removes and reapplies the new schema and policies without weakening prior RLS.
+- [x] A disposable Chromium journey creates and edits an organization document, creates an MSP document, lists it in the client, verifies the client projection, and confirms the same records in PostgreSQL.
+- [x] Immutable revisions, live/pinned resolution, backlinks, detach, entity mentions, attachments, and STATIC publications remain explicitly deferred to `0.2.3`–`0.2.8`.
+
+Evidence: `docs/releases/0.2.2.md`.
+
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.3.1` | `SecretProvider` contract, PostgreSQL envelope-encrypted versions, associated data, master-key validation, and secret-file injection implementation from `TD-RISK-004`. |
-| `0.3.2` | Explicit reveal boundary, recent MFA, value-free audit, redaction, rewrap rotation, and backup failure tests. |
+| `0.3.1` | Provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
+| `0.3.2` | Production runtime `*_FILE` inputs, secret-file precedence/validation, production-image tests, and an operator-owned 1Password CLI injection recipe that never gives TekDocs a vault-retrieval capability. |
 | `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
@@ -457,8 +470,8 @@ Evidence: `docs/releases/0.2.1.md`.
 | `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
 | `0.3.8` | Attachments, asset relationships, bulk operations, and safe file-processing corpus. |
 | `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
-| `0.3.10` | Inventory/vault stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
-| `0.4.0` | Stabilize and certify encrypted credentials and hardware/software inventory. |
+| `0.3.10` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
+| `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

@@ -166,6 +166,7 @@ async function mockWorkspaceApplication(page: Page) {
       return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
     }
     if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
+    if (url.pathname.endsWith('/documents')) return route.fulfill({ json: { results: [], count: 0 } })
     const id = url.pathname.split('/').at(-1)
     if (id === clientWorkspace.id) return route.fulfill({ json: clientWorkspace })
     if (id === secondClientWorkspace.id) return route.fulfill({ json: secondClientWorkspace })

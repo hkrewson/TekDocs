@@ -24,6 +24,7 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 - Canonical Markdown with no executable raw HTML, MDX, inline styles, or author CSS. Authenticated preview requires `documents.view`, normal CSRF/session protection, and bounded input; server rendering uses a raw-HTML-disabled parser plus explicit `nh3` tag/attribute/scheme allowlists, followed by an explicit DOMPurify allowlist at the single browser HTML sink. A malicious corpus checks authored tags, active unsafe URLs, style/event attributes, and representative MDX payloads.
 - Envelope encryption for managed secrets with the wrapping key supplied outside the database.
 - Redacted structured logs, append-only audit records, scoped API/service credentials, and webhook replay protection.
+- Customer credential values are not stored or retrieved by TekDocs. Credential records are strictly validated external references; 1Password unlock, authorization, reveal, and value audit remain in 1Password. Runtime deployment secrets are supplied separately through deployment files or an operator-controlled secret manager.
 - SSRF-resistant outbound integration and monitoring requests.
 - Dependency, license, secret, source, container, and browser security gates.
 - Reviewed Python build/production/development hash locks, digest-pinned external images and local scanners, commit-SHA-pinned Actions, local workflow linting, and controlled Dependabot updates.

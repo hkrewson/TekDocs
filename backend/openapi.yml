@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.1
+  version: 0.2.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -662,6 +662,192 @@ paths:
         required: true
       tags:
       - custom-field-definitions
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/documents:
+    get:
+      operationId: documents_msp_list
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResult'
+          description: ''
+    post:
+      operationId: documents_msp_create
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+  /api/v1/documents/{document_entity_id}:
+    get:
+      operationId: documents_msp_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+    put:
+      operationId: documents_msp_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+    delete:
+      operationId: documents_msp_archive
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/documents/{document_entity_id}/references:
+    get:
+      operationId: document_references_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentationReference'
+          description: ''
+    post:
+      operationId: document_references_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentationReferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentationReferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentationReferenceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationReference'
+          description: ''
+  /api/v1/documents/{document_entity_id}/references/{reference_id}:
+    delete:
+      operationId: document_references_archive
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: reference_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
       security:
       - cookieAuth: []
       responses:
@@ -1900,6 +2086,146 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents:
+    get:
+      operationId: documents_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResult'
+          description: ''
+    post:
+      operationId: documents_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}:
+    get:
+      operationId: documents_organization_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+    put:
+      operationId: documents_organization_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+    delete:
+      operationId: documents_organization_archive
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields:
     get:
       operationId: entity_custom_fields_organization_list
@@ -3104,6 +3430,103 @@ components:
       description: |-
         * `outgoing` - outgoing
         * `incoming` - incoming
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        owner_kind:
+          type: string
+          readOnly: true
+        owner_organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_organization_name:
+          type: string
+          nullable: true
+        is_reference:
+          type: boolean
+          readOnly: true
+        markdown:
+          type: string
+          readOnly: true
+        block_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - block_id
+      - created_at
+      - id
+      - is_reference
+      - markdown
+      - owner_kind
+      - owner_organization_id
+      - owner_organization_name
+      - title
+      - updated_at
+    DocumentResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    DocumentWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        markdown:
+          type: string
+          maxLength: 1000000
+      required:
+      - title
+    DocumentationReference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        organization_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - id
+      - organization_id
+      - organization_name
+    DocumentationReferenceWrite:
+      type: object
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+      required:
+      - organization_id
     EntityCustomField:
       type: object
       properties:

@@ -38,6 +38,14 @@ from apps.core.custom_field_views import (
     OrganizationEntityCustomFieldDetailView,
     OrganizationEntityCustomFieldListView,
 )
+from apps.core.document_views import (
+    MSPDocumentDetailView,
+    MSPDocumentListCreateView,
+    MSPDocumentReferenceDetailView,
+    MSPDocumentReferenceListCreateView,
+    OrganizationDocumentDetailView,
+    OrganizationDocumentListCreateView,
+)
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -144,6 +152,22 @@ urlpatterns = [
     path("api/v1/markdown/render", MarkdownRenderView.as_view(), name="markdown-render"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
+    path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>",
+        MSPDocumentDetailView.as_view(),
+        name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/references",
+        MSPDocumentReferenceListCreateView.as_view(),
+        name="msp-document-reference-list-create",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/references/<uuid:reference_id>",
+        MSPDocumentReferenceDetailView.as_view(),
+        name="msp-document-reference-detail",
+    ),
     path("api/v1/recycle-bin", MSPRecycleBinListView.as_view(), name="msp-recycle-bin"),
     path(
         "api/v1/recycle-bin/<str:record_type>/<uuid:record_id>/restore",
@@ -211,6 +235,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents",
+        OrganizationDocumentListCreateView.as_view(),
+        name="organization-document-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
+        OrganizationDocumentDetailView.as_view(),
+        name="organization-document-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin",

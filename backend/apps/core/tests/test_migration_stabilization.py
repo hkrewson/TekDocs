@@ -33,6 +33,13 @@ from apps.core.rls_contract import RLS_TABLES
 from apps.core.scoping import DataScope
 from apps.core.sites import archive_site, create_location, create_site
 
+DOCUMENT_RLS_TABLES = {
+    "core_block",
+    "core_document",
+    "core_documentationlistingreference",
+    "core_documentplacement",
+}
+
 
 @pytest.mark.django_db(transaction=True)
 def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
@@ -189,15 +196,16 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert cursor.fetchone() == (5,)
 
-    call_command("migrate", "core", "0018", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0019", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT count(*) FROM pg_class WHERE relname = ANY(%s) AND relrowsecurity",
+            "SELECT relname FROM pg_class WHERE relname = ANY(%s) "
+            "AND relrowsecurity AND relforcerowsecurity",
             [list(RLS_TABLES)],
         )
-        assert cursor.fetchone() == (0,)
+        assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0019", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0021", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

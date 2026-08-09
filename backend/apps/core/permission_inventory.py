@@ -27,6 +27,29 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
+    route(
+        "msp-document-list-create",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route(
+        "msp-document-detail",
+        ("GET", "PUT", "DELETE"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route(
+        "msp-document-reference-list-create",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route(
+        "msp-document-reference-detail",
+        ("DELETE",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
     route("access-control-catalog", ("GET",), PermissionKey.MEMBERSHIPS_VIEW),
     route(
         "access-collection-list-create",
@@ -177,6 +200,20 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "POST"),
         PermissionKey.PEOPLE_VIEW,
         (PermissionKey.PEOPLE_CREATE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-list-create",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-detail",
+        ("GET", "PUT", "DELETE"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
     ),
     route(

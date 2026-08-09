@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
 import {
@@ -44,6 +44,9 @@ import { SecuritySettings } from './auth/SecuritySettings'
 import { CustomFields } from './custom-fields/CustomFields'
 import { browserCustomFieldsClient } from './custom-fields/api'
 import type { CustomFieldsClient } from './custom-fields/api'
+import { Documentation } from './documentation/Documentation'
+import { browserDocumentsClient } from './documentation/api'
+import type { DocumentsClient } from './documentation/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
@@ -62,10 +65,6 @@ import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
-const EditorSpike = lazy(async () => {
-  const module = await import('./editor/EditorSpike')
-  return { default: module.EditorSpike }
-})
 
 type NavigationItem = {
   label: string
@@ -305,15 +304,6 @@ function Overview() {
   )
 }
 
-function Documentation() {
-  return (
-    <>
-      <PageHeader title="Documentation" description="Canonical Markdown with a rich editor and stable block identity." action={<button className="primary-button">New document</button>} />
-      <Suspense fallback={<section className="content-section">Loading editor…</section>}><EditorSpike /></Suspense>
-    </>
-  )
-}
-
 type OrganizationWorkspaceState =
   | { phase: 'idle' }
   | { phase: 'ready'; organizationId: string; workspace: WorkspaceContext }
@@ -342,7 +332,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   networks: { title: 'Networks', description: 'Network records scoped to this organization.', release: '0.4.1' },
   domains: { title: 'Domains', description: 'Domain registration and DNS records scoped to this organization.', release: '0.7.8' },
   certificates: { title: 'Certificates', description: 'TLS endpoints and certificate evidence scoped to this organization.', release: '0.7.9' },
-  credentials: { title: 'Credentials', description: 'Protected credential records scoped to this organization.', release: '0.3.1' },
+  credentials: { title: 'Credential references', description: 'Links to externally protected credentials; TekDocs does not store or reveal their values.', release: '0.3.1' },
   services: { title: 'Services', description: 'Services, providers, contracts, and dependencies scoped to this organization.', release: '0.3.7' },
   vendors: { title: 'Vendors', description: 'Suppliers related to this organization through products, assets, or services.', release: '0.3.4' },
   products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
@@ -350,7 +340,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -360,6 +350,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
+  if (area === 'documentation') return <Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} />
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -371,7 +362,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -381,6 +372,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   customFieldsClient: CustomFieldsClient
   relationshipsClient: RelationshipsClient
   recycleBinClient: RecycleBinClient
+  documentsClient: DocumentsClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -429,7 +421,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
-            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/documentation" element={<Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
             <Route path="/custom-fields" element={<CustomFields workspace={null} client={customFieldsClient} />} />
@@ -440,7 +432,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
@@ -450,7 +442,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -460,6 +452,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   customFieldsClient?: CustomFieldsClient
   relationshipsClient?: RelationshipsClient
   recycleBinClient?: RecycleBinClient
+  documentsClient?: DocumentsClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -475,6 +468,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           customFieldsClient={customFieldsClient}
           relationshipsClient={relationshipsClient}
           recycleBinClient={recycleBinClient}
+          documentsClient={documentsClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

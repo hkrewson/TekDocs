@@ -11,13 +11,15 @@ import { configureTekDocsMarkdown, extendSelectionToolbar, normalizeTekDocsMarkd
 type EditorMode = 'wysiwyg' | 'markdown' | 'preview' | 'help'
 type PreviewState = { phase: 'idle' | 'loading' } | { phase: 'ready'; html: string } | { phase: 'error'; message: string }
 
-export function EditorSpike() {
+export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewall replacement', description = 'Canonical Markdown editor', onMarkdownChange }: { initialMarkdown?: string; title?: string; description?: string; onMarkdownChange?: (markdown: string) => void }) {
   const editorRoot = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<Crepe | null>(null)
   const [mode, setMode] = useState<EditorMode>('wysiwyg')
-  const [markdown, setMarkdown] = useState(markdownFixture)
-  const [editorSeed, setEditorSeed] = useState(markdownFixture)
+  const [markdown, setMarkdown] = useState(initialMarkdown)
+  const [editorSeed, setEditorSeed] = useState(initialMarkdown)
   const [preview, setPreview] = useState<PreviewState>({ phase: 'idle' })
+  const markdownChange = useRef(onMarkdownChange)
+  useEffect(() => { markdownChange.current = onMarkdownChange }, [onMarkdownChange])
 
   useEffect(() => {
     if (mode !== 'wysiwyg' || !editorRoot.current) return
@@ -36,7 +38,11 @@ export function EditorSpike() {
     })
     configureTekDocsMarkdown(instance)
     instance.on((listener) => {
-      listener.markdownUpdated((_ctx, value) => setMarkdown(normalizeTekDocsMarkdown(value)))
+      listener.markdownUpdated((_ctx, value) => {
+        const normalized = normalizeTekDocsMarkdown(value)
+        setMarkdown(normalized)
+        markdownChange.current?.(normalized)
+      })
     })
     void instance.create().then(() => {
       if (active) setEditor(instance)
@@ -67,7 +73,11 @@ export function EditorSpike() {
   }
 
   const leaveEditor = (nextMode: Exclude<EditorMode, 'wysiwyg'>) => {
-    if (editor) setMarkdown(normalizeTekDocsMarkdown(editor.getMarkdown()))
+    if (editor) {
+      const normalized = normalizeTekDocsMarkdown(editor.getMarkdown())
+      setMarkdown(normalized)
+      markdownChange.current?.(normalized)
+    }
     if (nextMode === 'preview') setPreview({ phase: 'loading' })
     setMode(nextMode)
   }
@@ -76,8 +86,8 @@ export function EditorSpike() {
     <section className="editor-section" aria-label="Markdown editor feasibility spike">
       <div className="editor-toolbar">
         <div>
-          <strong>Firewall replacement</strong>
-          <span>Executable editor spike — content is not saved</span>
+          <strong>{title}</strong>
+          <span>{description}</span>
         </div>
         <div className="mode-tabs" role="tablist" aria-label="Editor mode">
           <button className={mode === 'wysiwyg' ? 'selected' : ''} onClick={showEditor} role="tab" aria-selected={mode === 'wysiwyg'}>Editor</button>
@@ -90,7 +100,7 @@ export function EditorSpike() {
         <EditorControls editor={editor} ready={editor !== null} />
         <div className="milkdown-host" ref={editorRoot} />
       </>}
-      {mode === 'markdown' && <textarea className="markdown-source" value={markdown} onChange={(event) => setMarkdown(event.target.value)} aria-label="Markdown source" spellCheck="false" />}
+      {mode === 'markdown' && <textarea className="markdown-source" value={markdown} onChange={(event) => { setMarkdown(event.target.value); markdownChange.current?.(event.target.value) }} aria-label="Markdown source" spellCheck="false" />}
       {mode === 'preview' && preview.phase === 'loading' && <div className="markdown-preview-state" role="status">Rendering secure preview…</div>}
       {mode === 'preview' && preview.phase === 'error' && <div className="markdown-preview-state" role="alert">{preview.message}</div>}
       {mode === 'preview' && preview.phase === 'ready' && <SanitizedMarkdown html={preview.html} />}

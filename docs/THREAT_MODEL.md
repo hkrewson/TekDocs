@@ -2,7 +2,7 @@
 
 ## Protected data
 
-Client documentation, credentials, personal/contact information, asset and network inventory, vendor terms and costs, audit history, integration credentials, compliance evidence, and immutable publications.
+Client documentation, credential-reference metadata, personal/contact information, asset and network inventory, vendor terms and costs, audit history, integration credentials, compliance evidence, and immutable publications. Customer credential values are deliberately outside the TekDocs trust boundary.
 
 ## Principal threats and planned controls
 

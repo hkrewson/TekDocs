@@ -7,6 +7,19 @@ const context = {
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
 }
 
+const document = {
+  id: crypto.randomUUID(),
+  title: 'UniFi Network Setup Guide',
+  owner_kind: 'msp',
+  owner_organization_id: null,
+  owner_organization_name: null,
+  is_reference: false,
+  markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
+  block_id: crypto.randomUUID(),
+  created_at: '2026-08-09T12:00:00Z',
+  updated_at: '2026-08-09T12:00:00Z',
+}
+
 async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({
@@ -14,6 +27,7 @@ async function mockAuthenticated(page: Page) {
     json: { status: 200, meta: { is_authenticated: true }, data: { user: context.user } },
   }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
+  await page.route('**/api/v1/documents', (route) => route.fulfill({ json: { results: [document], count: 1 } }))
 }
 
 test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }) => {
@@ -26,12 +40,13 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByText('Example MSP', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Documentation' }).click()
   await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Editor' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
 test('raw Markdown remains the editable canonical representation', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/documentation')
+  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
   await page.getByRole('tab', { name: 'Markdown' }).click()
   const source = page.getByLabel('Markdown source')
   await expect(source).toHaveValue(/# UniFi Network Setup Guide/)
@@ -53,6 +68,7 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   })
 
   await page.goto('/documentation')
+  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
   await page.getByRole('tab', { name: 'Markdown' }).click()
   await page.getByLabel('Markdown source').fill('Verify ==VLAN 10==.')
   await page.getByRole('tab', { name: 'Editor' }).click()

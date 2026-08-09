@@ -52,7 +52,7 @@ live_compose run --rm migrate python manage.py shell -c '
 from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
-from apps.core.models import CustomFieldDefinition, CustomFieldDefinitionVersion, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
 assert organization.tenant.name == "Live Workspace MSP"
@@ -102,6 +102,16 @@ vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
 link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
 assert link.archived_at is None
 assert link.metadata == {}
+client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
+assert client_document.organization == organization
+assert client_document.placements.get(position=0).block.markdown == "# Acme onboarding\n\nClient-owned canonical Markdown."
+shared_document = Document.objects.get(entity__display_name="Live shared response")
+assert shared_document.organization is None
+assert shared_document.placements.get(position=0).block.markdown == "One MSP-owned block."
+assert DocumentationListingReference.objects.filter(
+    document=shared_document, organization=organization, archived_at__isnull=True
+).count() == 1
+assert Block.objects.filter(placements__document=shared_document).count() == 1
 print("Live workspace database fixture verified")
 '
 echo "Real browser-to-Django-to-PostgreSQL workspace journey passed"

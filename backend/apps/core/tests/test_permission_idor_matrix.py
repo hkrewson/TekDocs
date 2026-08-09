@@ -74,6 +74,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-entity-relationship-detail": ("entity_id", "link_id"),
         "msp-person-detail": ("person_entity_id",),
         "msp-site-detail": ("site_entity_id",),
+        "msp-document-detail": ("document_entity_id",),
+        "msp-document-reference-list-create": ("document_entity_id",),
+        "msp-document-reference-detail": ("document_entity_id", "reference_id"),
         "msp-location-list-create": ("site_entity_id",),
         "msp-location-detail": ("site_entity_id", "location_entity_id"),
         "msp-custom-field-definition-detail": ("definition_id",),
@@ -83,6 +86,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-people-list-create": ("organization_entity_id",),
         "organization-person-detail": ("organization_entity_id", "person_entity_id"),
         "organization-site-list-create": ("organization_entity_id",),
+        "organization-document-list-create": ("organization_entity_id",),
+        "organization-document-detail": ("organization_entity_id", "document_entity_id"),
         "organization-site-detail": ("organization_entity_id", "site_entity_id"),
         "organization-location-list-create": ("organization_entity_id", "site_entity_id"),
         "organization-location-detail": (

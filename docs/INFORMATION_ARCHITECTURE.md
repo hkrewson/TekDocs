@@ -32,7 +32,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Networks | MSP networks | Client networks | — | `0.5.x` |
 | Domains | MSP-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | Client-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | — | inventory `0.7.8`; hierarchy/renewals/monitoring `0.7.9`–`0.7.11` |
 | Certificates | MSP TLS endpoints and validation history related to managed domains/hostnames | Client TLS endpoints and validation history related to managed domains/hostnames | — | `0.7.12`–`0.7.13` |
-| Credentials | MSP-protected secrets | Client-protected secrets | — | `0.3.1`–`0.3.2` |
+| Credential references | Links to externally protected credentials; no values stored or revealed by TekDocs | Client-scoped links whose provider independently enforces vault access | — | references `0.3.1`; runtime secret injection `0.3.2` |
 | Services | MSP services and contracts | Client services, providers, and dependencies | — | relationship seam in `0.3.7` |
 | Vendors | MSP supplier directory/relationships | Vendors related to the client through assets or services | — | `0.3.4` |
 | Products | MSP-visible supplier catalog | — | Supplier-owned product/model templates | `0.3.3` |

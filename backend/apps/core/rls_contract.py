@@ -6,6 +6,10 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_location",
     "core_customfielddefinition",
     "core_personassociation",
+    "core_document",
+    "core_block",
+    "core_documentplacement",
+    "core_documentationlistingreference",
 )
 
 TENANT_SCOPED_TABLES = (

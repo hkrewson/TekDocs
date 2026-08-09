@@ -593,6 +593,107 @@ class EntityLink(TimestampedModel):
             raise ValidationError("Entity-link metadata is not accepted by this release")
 
 
+class Document(TimestampedModel):
+    """A Markdown document owned by exactly one MSP or organization workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documents")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documents", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_record")
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Document entity must use the document workspace scope")
+
+
+class Block(TimestampedModel):
+    """A stable addressable content block; immutable revisions arrive in 0.2.3."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="blocks")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="blocks", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="block_record")
+    markdown = models.TextField(blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+
+    def __str__(self) -> str:
+        return str(self.entity_id)
+
+
+class DocumentPlacement(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_placements")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="document_placements", null=True, blank=True
+    )
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="placements")
+    block = models.ForeignKey(Block, on_delete=models.PROTECT, related_name="placements")
+    position = models.PositiveIntegerField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("position", "id")
+        constraints = [
+            models.UniqueConstraint(fields=["document", "position"], name="unique_document_block_position")
+        ]
+        indexes = [models.Index(fields=["tenant", "organization", "document", "position"])]
+
+    def __str__(self) -> str:
+        return f"{self.document_id} position {self.position}"
+
+
+class DocumentationListingReference(TimestampedModel):
+    """Projects an MSP-owned document into one client documentation index."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_references")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documentation_references"
+    )
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="listing_references")
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "document"],
+                condition=models.Q(archived_at__isnull=True),
+                name="unique_active_documentation_listing_reference",
+            )
+        ]
+        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.document_id} listed in {self.organization_id}"
+
+
 class AuditEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="audit_events", null=True, blank=True)

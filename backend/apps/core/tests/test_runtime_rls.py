@@ -1,4 +1,5 @@
 import uuid
+from hashlib import sha256
 
 import psycopg
 import pytest
@@ -8,6 +9,7 @@ from django.db import connection
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
     Block,
+    BlockRevision,
     Document,
     DocumentationListingReference,
     DocumentPlacement,
@@ -135,7 +137,16 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     document_entity = Entity.objects.create(tenant=tenant, entity_type="document", display_name="Shared runbook")
     document = Document.objects.create(tenant=tenant, entity=document_entity)
     block_entity = Entity.objects.create(tenant=tenant, entity_type="document_block", display_name="Shared block")
-    block = Block.objects.create(tenant=tenant, entity=block_entity, markdown="Reference content")
+    block = Block.objects.create(tenant=tenant, entity=block_entity)
+    revision = BlockRevision.objects.create(
+        tenant=tenant,
+        block=block,
+        revision_number=1,
+        markdown="Reference content",
+        checksum=sha256(b"Reference content").hexdigest(),
+    )
+    block.current_revision = revision
+    block.save(update_fields=("current_revision", "updated_at"))
     placement = DocumentPlacement.objects.create(
         tenant=tenant, document=document, block=block, position=0
     )
@@ -149,6 +160,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         assert cursor.fetchall() == [(document.id,)]
         cursor.execute("SELECT id FROM core_block")
         assert cursor.fetchall() == [(block.id,)]
+        cursor.execute("SELECT id FROM core_blockrevision")
+        assert cursor.fetchall() == [(revision.id,)]
         cursor.execute("SELECT id FROM core_documentplacement")
         assert cursor.fetchall() == [(placement.id,)]
         cursor.execute("SELECT id FROM core_documentationlistingreference")
@@ -156,6 +169,12 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         runtime.commit()
 
         _bind(cursor, tenant.id, "organization", sibling_org.id)
-        for table in ("core_document", "core_block", "core_documentplacement", "core_documentationlistingreference"):
+        for table in (
+            "core_document",
+            "core_block",
+            "core_blockrevision",
+            "core_documentplacement",
+            "core_documentationlistingreference",
+        ):
             cursor.execute(f"SELECT count(*) FROM {table}")  # noqa: S608 - fixed test allowlist
             assert cursor.fetchone() == (0,)

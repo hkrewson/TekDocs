@@ -325,7 +325,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
   sites: { title: 'Sites', description: 'Sites and nested physical locations scoped to this organization.', release: '0.1.6' },
   custom_fields: { title: 'Custom fields', description: 'Versioned extensions scoped to this organization or inherited from the MSP.', release: '0.1.7' },
-  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.2' },
+  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.3' },
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
   assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
   licenses: { title: 'Licenses', description: 'Software entitlements and assignments scoped to this organization.', release: '0.3.6' },

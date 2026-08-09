@@ -16,6 +16,9 @@ const document = {
   is_reference: false,
   markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
   block_id: crypto.randomUUID(),
+  current_revision_id: crypto.randomUUID(),
+  revision_number: 1,
+  checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4',
   created_at: '2026-08-09T12:00:00Z',
   updated_at: '2026-08-09T12:00:00Z',
 }

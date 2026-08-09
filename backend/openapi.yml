@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.2
+  version: 0.2.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -689,13 +689,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
         required: true
       security:
       - cookieAuth: []
@@ -742,13 +742,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
         required: true
       security:
       - cookieAuth: []
@@ -758,6 +758,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflict'
           description: ''
     delete:
       operationId: documents_msp_archive
@@ -853,6 +859,54 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/documents/{document_entity_id}/revisions:
+    get:
+      operationId: document_revisions_msp_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockRevisionResult'
+          description: ''
+  /api/v1/documents/{document_entity_id}/revisions/{revision_id}:
+    get:
+      operationId: document_revisions_msp_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: revision_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockRevisionDetail'
+          description: ''
   /api/v1/entities/{entity_id}/custom-fields:
     get:
       operationId: entity_custom_fields_msp_list
@@ -2122,13 +2176,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentCreate'
         required: true
       security:
       - cookieAuth: []
@@ -2187,13 +2241,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DocumentWrite'
+              $ref: '#/components/schemas/DocumentUpdate'
         required: true
       security:
       - cookieAuth: []
@@ -2203,6 +2257,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflict'
           description: ''
     delete:
       operationId: documents_organization_archive
@@ -2226,6 +2286,66 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
+    get:
+      operationId: document_revisions_organization_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockRevisionResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions/{revision_id}:
+    get:
+      operationId: document_revisions_organization_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: revision_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockRevisionDetail'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields:
     get:
       operationId: entity_custom_fields_organization_list
@@ -3170,6 +3290,89 @@ components:
       - display_name
       - email
       - id
+    BlockRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        revision_number:
+          type: integer
+        checksum:
+          type: string
+        created_by:
+          type: string
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+          readOnly: true
+      required:
+      - checksum
+      - created_at
+      - created_by
+      - id
+      - is_current
+      - parent_id
+      - revision_number
+    BlockRevisionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        revision_number:
+          type: integer
+        checksum:
+          type: string
+        created_by:
+          type: string
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+          readOnly: true
+        markdown:
+          type: string
+        diff_from_parent:
+          type: string
+          readOnly: true
+      required:
+      - checksum
+      - created_at
+      - created_by
+      - diff_from_parent
+      - id
+      - is_current
+      - markdown
+      - parent_id
+      - revision_number
+    BlockRevisionResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockRevision'
+        count:
+          type: integer
+      required:
+      - count
+      - results
     BootstrapOwnerResult:
       type: object
       properties:
@@ -3459,6 +3662,18 @@ components:
           format: uuid
           nullable: true
           readOnly: true
+        current_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        revision_number:
+          type: integer
+          nullable: true
+          readOnly: true
+        checksum:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -3467,15 +3682,30 @@ components:
           format: date-time
       required:
       - block_id
+      - checksum
       - created_at
+      - current_revision_id
       - id
       - is_reference
       - markdown
       - owner_kind
       - owner_organization_id
       - owner_organization_name
+      - revision_number
       - title
       - updated_at
+    DocumentCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        markdown:
+          type: string
+          maxLength: 1000000
+      required:
+      - title
     DocumentResult:
       type: object
       properties:
@@ -3488,7 +3718,7 @@ components:
       required:
       - count
       - results
-    DocumentWrite:
+    DocumentUpdate:
       type: object
       properties:
         title:
@@ -3498,7 +3728,11 @@ components:
         markdown:
           type: string
           maxLength: 1000000
+        base_revision_id:
+          type: string
+          format: uuid
       required:
+      - base_revision_id
       - title
     DocumentationReference:
       type: object
@@ -4524,6 +4758,26 @@ components:
       - page
       - page_size
       - results
+    RevisionConflict:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+        submitted_base_revision_id:
+          type: string
+          format: uuid
+        current_revision:
+          $ref: '#/components/schemas/BlockRevisionDetail'
+        diff:
+          type: string
+      required:
+      - code
+      - current_revision
+      - detail
+      - diff
+      - submitted_base_revision_id
     RoleDefinition:
       type: object
       properties:

@@ -104,10 +104,15 @@ assert link.archived_at is None
 assert link.metadata == {}
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
-assert client_document.placements.get(position=0).block.markdown == "# Acme onboarding\n\nClient-owned canonical Markdown."
+client_block = client_document.placements.get(position=0).block
+assert client_block.current_revision.markdown == "# Acme onboarding\n\nRevision two is retained."
+assert list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True)) == [
+    "# Acme onboarding\n\nClient-owned canonical Markdown.",
+    "# Acme onboarding\n\nRevision two is retained.",
+]
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
-assert shared_document.placements.get(position=0).block.markdown == "One MSP-owned block."
+assert shared_document.placements.get(position=0).block.current_revision.markdown == "One MSP-owned block."
 assert DocumentationListingReference.objects.filter(
     document=shared_document, organization=organization, archived_at__isnull=True
 ).count() == 1

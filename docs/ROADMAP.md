@@ -422,7 +422,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | --- | --- |
 | `0.2.1` | **Complete:** final Markdown dialect, semantic highlight/callouts, accessible visual/raw/preview/help modes, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and resolution of `TD-RISK-014`. |
 | `0.2.2` | **Complete:** workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
-| `0.2.3` | Immutable block revisions, checksums, optimistic concurrency, history, and diff. |
+| `0.2.3` | **Complete:** immutable block revisions, SHA-256 checksums, parent chains, optimistic concurrency, permission-aware history, and line diffs. |
 | `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
@@ -456,6 +456,18 @@ Evidence: `docs/releases/0.2.1.md`.
 - [x] Immutable revisions, live/pinned resolution, backlinks, detach, entity mentions, attachments, and STATIC publications remain explicitly deferred to `0.2.3`–`0.2.8`.
 
 Evidence: `docs/releases/0.2.2.md`.
+
+### `0.2.3` acceptance criteria
+
+- [x] Canonical Markdown is stored in immutable `BlockRevision` rows with stable UUIDs, sequential numbers, parent links, server-computed SHA-256 checksums, authors, and timestamps; existing mutable block Markdown migrates without losing document or block identity.
+- [x] Every content edit locks the document and block, requires the exact base revision, and atomically appends a new revision plus advances the current pointer. Title-only or unchanged-content saves do not create redundant revisions.
+- [x] A stale edit returns a structured `409 revision_conflict` with the authorized current revision and a unified base-to-current diff while leaving both the stored content and the browser's unsaved draft unchanged.
+- [x] MSP and organization document routes expose permission-aware revision lists and individual parent diffs. MSP references inherit only the document's existing read projection; sibling and cross-tenant revision identifiers remain non-disclosing.
+- [x] Django rejects revision instance mutation, PostgreSQL rejects raw update/delete and invalid parent/scope/current-pointer edges, and forced RLS includes revision rows under the fixed runtime role.
+- [x] The Documentation interface displays current revision save feedback, accessible history loading/empty/error states, author/time/checksum metadata, selected line diffs, and an explicit conflict state without rendering revision content as HTML.
+- [x] Migration-cycle, route inventory/IDOR, runtime RLS, backend/frontend, OpenAPI, Docker Compose, browser, security, clean-install, and upgrade evidence agree at `0.2.3`.
+
+Evidence: `docs/releases/0.2.3.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

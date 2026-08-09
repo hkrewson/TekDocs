@@ -39,6 +39,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route("msp-document-revision-list", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-revision-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
@@ -214,6 +216,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "PUT", "DELETE"),
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-revision-list",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-revision-detail",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,
     ),
     route(

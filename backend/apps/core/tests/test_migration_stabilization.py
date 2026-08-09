@@ -15,8 +15,10 @@ from apps.accounts.models import (
     User,
 )
 from apps.core.custom_fields import create_definition
+from apps.core.documents import create_document
 from apps.core.models import (
     AuditEvent,
+    BlockRevision,
     CustomFieldDefinition,
     Entity,
     EntityLink,
@@ -35,6 +37,7 @@ from apps.core.sites import archive_site, create_location, create_site
 
 DOCUMENT_RLS_TABLES = {
     "core_block",
+    "core_blockrevision",
     "core_document",
     "core_documentationlistingreference",
     "core_documentplacement",
@@ -160,6 +163,14 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         phone="",
     )
     archive_site(site=archived, actor_id=result.owner.id)
+    document = create_document(
+        tenant=result.tenant,
+        organization=organization,
+        actor_id=result.owner.id,
+        title="Migration runbook",
+        markdown="# Preserved revision\n",
+    )
+    block = document.placements.get(position=0).block
 
     stable_entity_ids = {
         organization.entity_id,
@@ -196,6 +207,15 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert cursor.fetchone() == (5,)
 
+    call_command("migrate", "core", "0021", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT markdown FROM core_block WHERE id = %s", [block.id])
+        assert cursor.fetchone() == ("# Preserved revision\n",)
+    call_command("migrate", "core", "0023", verbosity=0, interactive=False)
+    preserved_revision = BlockRevision.objects.get(block_id=block.id)
+    assert preserved_revision.markdown == "# Preserved revision\n"
+    assert preserved_revision.checksum
+
     call_command("migrate", "core", "0019", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(
@@ -205,7 +225,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0021", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0023", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

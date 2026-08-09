@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Archive, BookOpenText, ExternalLink, Plus, Share2, X } from 'lucide-react'
+import { Archive, BookOpenText, ExternalLink, History, Plus, Share2, X } from 'lucide-react'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
 import { browserWorkspaceClient } from '../workspaces/api'
-import { browserDocumentsClient } from './api'
-import type { DocumentInput, DocumentRecord, DocumentsClient } from './api'
+import { browserDocumentsClient, RevisionConflictError } from './api'
+import type { BlockRevision, BlockRevisionDetail, DocumentInput, DocumentRecord, DocumentsClient } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 
@@ -25,6 +25,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [revision, setRevision] = useState(0)
   const [shareQuery, setShareQuery] = useState('')
   const [shareOptions, setShareOptions] = useState<WorkspaceOption[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState<BlockRevision[]>([])
+  const [historyPhase, setHistoryPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [viewedRevision, setViewedRevision] = useState<BlockRevisionDetail | null>(null)
+  const [conflict, setConflict] = useState<RevisionConflictError | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -47,17 +52,24 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
-  const open = (document: DocumentRecord) => { setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setMessage(null); setError(null); setShareQuery('') }
-  const create = () => { setSelected('new'); setTitle(''); setMarkdown(''); setMessage(null); setError(null) }
-  const close = () => { setSelected(null); setShareQuery(''); setShareOptions([]) }
+  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null) }
+  const open = (document: DocumentRecord) => { resetRevisionUi(); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setMessage(null); setError(null); setShareQuery('') }
+  const create = () => { resetRevisionUi(); setSelected('new'); setTitle(''); setMarkdown(''); setMessage(null); setError(null) }
+  const close = () => { resetRevisionUi(); setSelected(null); setShareQuery(''); setShareOptions([]) }
   const save = async () => {
     if (!title.trim()) return
     setSaving(true); setError(null)
     const input: DocumentInput = { title: title.trim(), markdown }
     try {
-      const record = selected === 'new' ? await client.create(scope, input) : await client.update(scope, selected!.id, input)
-      setSelected(record); setTitle(record.title); setMarkdown(record.markdown); setMessage('Document saved.'); setRevision((value) => value + 1)
-    } catch (saveError) { setError(errorMessage(saveError)) } finally { setSaving(false) }
+      const record = selected === 'new'
+        ? await client.create(scope, input)
+        : await client.update(scope, selected!.id, { ...input, base_revision_id: selected!.current_revision_id })
+      setSelected(record); setTitle(record.title); setMarkdown(record.markdown); setConflict(null); setMessage(`Document saved as revision ${record.revision_number}.`); setRevision((value) => value + 1)
+      if (historyOpen) void loadHistory(record)
+    } catch (saveError) {
+      if (saveError instanceof RevisionConflictError) setConflict(saveError)
+      else setError(errorMessage(saveError))
+    } finally { setSaving(false) }
   }
   const archive = async () => {
     if (!selected || selected === 'new') return
@@ -71,6 +83,24 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setSaving(true); setError(null)
     try { await client.addReference(selected.id, organization.id); setMessage(`Reference added to ${organization.name}.`); setShareQuery(''); setShareOptions([]) }
     catch (shareError) { setError(errorMessage(shareError)) } finally { setSaving(false) }
+  }
+  const loadHistory = async (document = selected) => {
+    if (!document || document === 'new') return
+    setHistoryOpen(true); setHistoryPhase('loading'); setViewedRevision(null)
+    try { const result = await client.listRevisions(scope, document.id); setHistory(result.results); setHistoryPhase('ready') }
+    catch (historyError) { setHistoryPhase('error'); setError(errorMessage(historyError)) }
+  }
+  const inspectRevision = async (revisionRecord: BlockRevision) => {
+    if (!selected || selected === 'new') return
+    try { setViewedRevision(await client.getRevision(scope, selected.id, revisionRecord.id)) }
+    catch (historyError) { setError(errorMessage(historyError)) }
+  }
+  const acknowledgeConflict = () => {
+    if (!conflict || !selected || selected === 'new') return
+    const current = conflict.payload.current_revision
+    setSelected({ ...selected, current_revision_id: current.id, revision_number: current.revision_number, checksum: current.checksum })
+    setConflict(null)
+    setMessage('Conflict acknowledged. Reconcile the draft with the shown server changes before saving.')
   }
 
   return <>
@@ -87,7 +117,9 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     {selected && <section className="document-workspace" aria-label={selected === 'new' ? 'New document' : `Edit ${selected.title}`}>
       <div className="document-edit-heading"><label>Document title<input autoFocus={selected === 'new'} maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
       <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={selected === 'new' ? 'new' : selected.id} initialMarkdown={markdown} title={title || 'Untitled document'} description="Canonical Markdown · changes save to PostgreSQL" onMarkdownChange={setMarkdown} /></Suspense>
-      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim()} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      {conflict && <div className="revision-conflict" role="alert"><strong>Newer revision detected</strong><p>Your draft remains in the editor. Review the server changes below and reconcile them into your draft.</p>{conflict.payload.diff && <pre>{conflict.payload.diff}</pre>}<button className="secondary-button" type="button" onClick={acknowledgeConflict}>I reconciled with revision {conflict.payload.current_revision.revision_number}</button></div>}
+      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      {historyOpen && selected !== 'new' && <section className="revision-history" aria-labelledby="revision-history-heading"><div className="section-heading"><h2 id="revision-history-heading">Revision history</h2><span>Latest first</span></div>{historyPhase === 'loading' && <p role="status">Loading revision history…</p>}{historyPhase === 'error' && <p>Revision history is unavailable.</p>}{historyPhase === 'ready' && history.length === 0 && <p>No revisions are available.</p>}{historyPhase === 'ready' && history.length > 0 && <div className="revision-history-body"><ol>{history.map((item) => <li key={item.id}><button type="button" onClick={() => { void inspectRevision(item) }} aria-current={viewedRevision?.id === item.id ? 'true' : undefined}><strong>Revision {item.revision_number}</strong>{item.is_current && <span>Current</span>}<small>{item.created_by ?? 'System'} · {new Date(item.created_at).toLocaleString()}</small><code>{item.checksum.slice(0, 12)}</code></button></li>)}</ol><div className="revision-diff">{viewedRevision ? <><h3>Revision {viewedRevision.revision_number} changes</h3><pre>{viewedRevision.diff_from_parent || 'No line changes.'}</pre></> : <p>Select a revision to inspect its diff.</p>}</div></div>}</section>}
       {!workspace && selected !== 'new' && <div className="document-share"><div><Share2 size={16} /><span><strong>List in a client workspace</strong><small>The MSP remains the owner; no document is copied.</small></span></div><label><span className="sr-only">Find client organization</span><input type="search" placeholder="Find a client" value={shareQuery} onChange={(event) => setShareQuery(event.target.value)} /></label>{shareOptions.length > 0 && <ul>{shareOptions.map((organization) => <li key={organization.id}><button type="button" disabled={saving} onClick={() => { void share(organization) }}>{organization.name}<ExternalLink size={14} /></button></li>)}</ul>}</div>}
     </section>}
   </>

@@ -7,6 +7,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import (
+    BlockRevision,
     Document,
     LocationKind,
     Organization,
@@ -279,9 +280,15 @@ class PeopleResultSerializer(serializers.Serializer):
     has_more = serializers.BooleanField()
 
 
-class DocumentWriteSerializer(serializers.Serializer):
+class DocumentCreateSerializer(serializers.Serializer):
     title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
-    markdown = serializers.CharField(required=False, allow_blank=True, max_length=1_000_000)
+    markdown = serializers.CharField(
+        required=False, allow_blank=True, max_length=1_000_000, trim_whitespace=False
+    )
+
+
+class DocumentUpdateSerializer(DocumentCreateSerializer):
+    base_revision_id = serializers.UUIDField()
 
 
 class DocumentSerializer(serializers.Serializer):
@@ -293,6 +300,9 @@ class DocumentSerializer(serializers.Serializer):
     is_reference = serializers.SerializerMethodField()
     markdown = serializers.SerializerMethodField()
     block_id = serializers.SerializerMethodField()
+    current_revision_id = serializers.SerializerMethodField()
+    revision_number = serializers.SerializerMethodField()
+    checksum = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
 
@@ -309,11 +319,64 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_markdown(self, obj: Document) -> str:
         placement = self._placement(obj)
-        return placement.block.markdown if placement is not None else ""
+        revision = placement.block.current_revision if placement is not None else None
+        return revision.markdown if revision is not None else ""
 
     def get_block_id(self, obj: Document) -> UUID | None:
         placement = self._placement(obj)
         return placement.block.entity_id if placement is not None else None
+
+    def get_current_revision_id(self, obj: Document) -> UUID | None:
+        placement = self._placement(obj)
+        return placement.block.current_revision_id if placement is not None else None
+
+    def get_revision_number(self, obj: Document) -> int | None:
+        placement = self._placement(obj)
+        revision = placement.block.current_revision if placement is not None else None
+        return revision.revision_number if revision is not None else None
+
+    def get_checksum(self, obj: Document) -> str:
+        placement = self._placement(obj)
+        revision = placement.block.current_revision if placement is not None else None
+        return revision.checksum if revision is not None else ""
+
+
+class BlockRevisionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    parent_id = serializers.UUIDField(allow_null=True)
+    revision_number = serializers.IntegerField()
+    checksum = serializers.CharField()
+    created_by = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField()
+    is_current = serializers.SerializerMethodField()
+
+    def get_created_by(self, obj: BlockRevision) -> str | None:
+        return obj.created_by.get_full_name() or obj.created_by.get_username() if obj.created_by else None
+
+    def get_is_current(self, obj: BlockRevision) -> bool:
+        return bool(obj.id == self.context.get("current_revision_id"))
+
+
+class BlockRevisionDetailSerializer(BlockRevisionSerializer):
+    markdown = serializers.CharField()
+    diff_from_parent = serializers.SerializerMethodField()
+
+    def get_diff_from_parent(self, obj: BlockRevision) -> str:
+        value = self.context.get("diff_from_parent", "")
+        return value if isinstance(value, str) else ""
+
+
+class BlockRevisionResultSerializer(serializers.Serializer):
+    results = BlockRevisionSerializer(many=True)
+    count = serializers.IntegerField()
+
+
+class RevisionConflictSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    detail = serializers.CharField()
+    submitted_base_revision_id = serializers.UUIDField()
+    current_revision = BlockRevisionDetailSerializer()
+    diff = serializers.CharField()
 
 
 class DocumentResultSerializer(serializers.Serializer):

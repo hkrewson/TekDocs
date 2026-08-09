@@ -192,6 +192,20 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-edit-heading input, .document-share input { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .document-actions { display: flex; gap: 8px; }
 .document-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.revision-conflict { padding: 12px 14px; border: 1px solid #c9822a; border-radius: 7px; background: #fff8ed; }
+.revision-conflict p { margin: 4px 0 10px; color: var(--muted); }
+.revision-conflict button { margin-top: 10px; }
+.revision-conflict pre, .revision-diff pre { max-height: 280px; overflow: auto; margin: 0; padding: 10px; color: #292722; background: #f5f3ed; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.revision-history { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.revision-history-body { display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr); gap: 14px; }
+.revision-history ol { margin: 0; padding: 0; list-style: none; }
+.revision-history li + li { border-top: 1px solid var(--border); }
+.revision-history li button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 6px; text-align: left; color: var(--text); background: transparent; border: 0; cursor: pointer; }
+.revision-history li button:hover, .revision-history li button[aria-current="true"] { background: #eceae4; }
+.revision-history li small, .revision-history li code { color: var(--muted); font-size: 11px; }
+.revision-history li small { grid-column: 1 / -1; }
+.revision-diff h3 { margin: 0 0 8px; font-size: 14px; }
+@media (max-width: 700px) { .revision-history-body { grid-template-columns: 1fr; } }
 .document-share { position: relative; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, .7fr); align-items: center; gap: 14px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .document-share > div { display: flex; align-items: center; gap: 9px; }
 .document-share > div > span { display: grid; gap: 2px; }

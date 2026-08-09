@@ -621,7 +621,7 @@ class Document(TimestampedModel):
 
 
 class Block(TimestampedModel):
-    """A stable addressable content block; immutable revisions arrive in 0.2.3."""
+    """A stable addressable content block whose content is an immutable revision chain."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="blocks")
@@ -629,7 +629,13 @@ class Block(TimestampedModel):
         Organization, on_delete=models.PROTECT, related_name="blocks", null=True, blank=True
     )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="block_record")
-    markdown = models.TextField(blank=True)
+    current_revision = models.ForeignKey(
+        "BlockRevision",
+        on_delete=models.PROTECT,
+        related_name="current_for_blocks",
+        null=True,
+        blank=True,
+    )
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
@@ -640,6 +646,59 @@ class Block(TimestampedModel):
 
     def __str__(self) -> str:
         return str(self.entity_id)
+
+
+class BlockRevision(models.Model):
+    """Append-only canonical Markdown for one stable block."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="block_revisions")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="block_revisions", null=True, blank=True
+    )
+    block = models.ForeignKey(Block, on_delete=models.PROTECT, related_name="revisions")
+    parent = models.ForeignKey(
+        "self", on_delete=models.PROTECT, related_name="children", null=True, blank=True
+    )
+    revision_number = models.PositiveIntegerField()
+    markdown = models.TextField(blank=True)
+    checksum = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="block_revisions",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-revision_number", "-created_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=["block", "revision_number"], name="unique_block_revision_number"),
+            models.CheckConstraint(condition=models.Q(revision_number__gte=1), name="block_revision_number_positive"),
+        ]
+        indexes = [
+            models.Index(
+                fields=["tenant", "organization", "block", "-revision_number"],
+                name="core_blockr_tenant__42e5a8_idx",
+            ),
+            models.Index(fields=["block", "checksum"], name="core_blockr_block_i_a9954b_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.block_id} revision {self.revision_number}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Block revisions are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Block revisions are append-only")
 
 
 class DocumentPlacement(TimestampedModel):

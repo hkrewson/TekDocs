@@ -8,6 +8,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_personassociation",
     "core_document",
     "core_block",
+    "core_blockrevision",
     "core_documentplacement",
     "core_documentationlistingreference",
 )

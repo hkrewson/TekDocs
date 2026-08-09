@@ -8,21 +8,28 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .documents import (
+    RevisionConflict,
     add_listing_reference,
     archive_document,
     create_document,
     documents_for_scope,
     remove_listing_reference,
+    revision_diff,
+    revisions_for_document,
     update_document,
 )
 from .models import DocumentationListingReference
 from .scoping import DataScope
 from .serializers import (
+    BlockRevisionDetailSerializer,
+    BlockRevisionResultSerializer,
     DocumentationReferenceSerializer,
     DocumentationReferenceWriteSerializer,
+    DocumentCreateSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
-    DocumentWriteSerializer,
+    DocumentUpdateSerializer,
+    RevisionConflictSerializer,
 )
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
 
@@ -57,7 +64,7 @@ def _list(workspace: ResolvedWorkspace) -> Response:
 
 
 def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
-    serializer = DocumentWriteSerializer(data=request.data)
+    serializer = DocumentCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     document = create_document(
         tenant=workspace.member.tenant,
@@ -82,10 +89,52 @@ def _mutate_workspace(request, workspace: ResolvedWorkspace, document):  # type:
 def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> Response:  # type: ignore[no-untyped-def]
     document = _document(workspace, document_entity_id)
     _mutate_workspace(request, workspace, document)
-    serializer = DocumentWriteSerializer(data=request.data)
+    serializer = DocumentUpdateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    update_document(document=document, actor_id=request.user.pk, **serializer.validated_data)
+    try:
+        update_document(document=document, actor_id=request.user.pk, **serializer.validated_data)
+    except RevisionConflict as conflict:
+        current = conflict.current_revision
+        return Response(
+            {
+                "code": "revision_conflict",
+                "detail": str(conflict),
+                "submitted_base_revision_id": conflict.submitted_base_revision_id,
+                "current_revision": BlockRevisionDetailSerializer(
+                    current,
+                    context={
+                        "current_revision_id": current.id,
+                        "diff_from_parent": revision_diff(current.parent, current),
+                    },
+                ).data,
+                "diff": revision_diff(conflict.base_revision, current),
+            },
+            status=409,
+        )
     return _retrieve(workspace, document_entity_id)
+
+
+def _revision_list(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
+    document = _document(workspace, document_entity_id)
+    records = list(revisions_for_document(document)[:200])
+    current_id = document.active_placements[0].block.current_revision_id
+    context = {"current_revision_id": current_id}
+    return Response(BlockRevisionResultSerializer({"results": records, "count": len(records)}, context=context).data)
+
+
+def _revision_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, revision_id: UUID) -> Response:
+    document = _document(workspace, document_entity_id)
+    revision = get_object_or_404(revisions_for_document(document), id=revision_id)
+    current_id = document.active_placements[0].block.current_revision_id
+    return Response(
+        BlockRevisionDetailSerializer(
+            revision,
+            context={
+                "current_revision_id": current_id,
+                "diff_from_parent": revision_diff(revision.parent, revision),
+            },
+        ).data
+    )
 
 
 def _archive(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> Response:  # type: ignore[no-untyped-def]
@@ -102,7 +151,7 @@ class MSPDocumentListCreateView(APIView):
 
     @extend_schema(
         operation_id="documents_msp_create",
-        request=DocumentWriteSerializer,
+        request=DocumentCreateSerializer,
         responses={201: DocumentSerializer},
     )
     def post(self, request):  # type: ignore[no-untyped-def]
@@ -115,7 +164,9 @@ class MSPDocumentDetailView(APIView):
         return _retrieve(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
 
     @extend_schema(
-        operation_id="documents_msp_update", request=DocumentWriteSerializer, responses={200: DocumentSerializer}
+        operation_id="documents_msp_update",
+        request=DocumentUpdateSerializer,
+        responses={200: DocumentSerializer, 409: RevisionConflictSerializer},
     )
     def put(self, request, document_entity_id):  # type: ignore[no-untyped-def]
         return _update(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
@@ -132,7 +183,7 @@ class OrganizationDocumentListCreateView(APIView):
 
     @extend_schema(
         operation_id="documents_organization_create",
-        request=DocumentWriteSerializer,
+        request=DocumentCreateSerializer,
         responses={201: DocumentSerializer},
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
@@ -148,8 +199,8 @@ class OrganizationDocumentDetailView(APIView):
 
     @extend_schema(
         operation_id="documents_organization_update",
-        request=DocumentWriteSerializer,
-        responses={200: DocumentSerializer},
+        request=DocumentUpdateSerializer,
+        responses={200: DocumentSerializer, 409: RevisionConflictSerializer},
     )
     def put(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
         return _update(
@@ -164,6 +215,41 @@ class OrganizationDocumentDetailView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
             document_entity_id,
             request,
+        )
+
+
+class MSPDocumentRevisionListView(APIView):
+    @extend_schema(operation_id="document_revisions_msp_list", responses={200: BlockRevisionResultSerializer})
+    def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _revision_list(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
+
+
+class MSPDocumentRevisionDetailView(APIView):
+    @extend_schema(operation_id="document_revisions_msp_retrieve", responses={200: BlockRevisionDetailSerializer})
+    def get(self, request, document_entity_id, revision_id):  # type: ignore[no-untyped-def]
+        return _revision_detail(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, revision_id
+        )
+
+
+class OrganizationDocumentRevisionListView(APIView):
+    @extend_schema(operation_id="document_revisions_organization_list", responses={200: BlockRevisionResultSerializer})
+    def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _revision_list(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+        )
+
+
+class OrganizationDocumentRevisionDetailView(APIView):
+    @extend_schema(
+        operation_id="document_revisions_organization_retrieve", responses={200: BlockRevisionDetailSerializer}
+    )
+    def get(self, request, organization_entity_id, document_entity_id, revision_id):  # type: ignore[no-untyped-def]
+        return _revision_detail(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            revision_id,
         )
 
 

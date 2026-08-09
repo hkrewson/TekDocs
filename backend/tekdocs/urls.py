@@ -43,8 +43,12 @@ from apps.core.document_views import (
     MSPDocumentListCreateView,
     MSPDocumentReferenceDetailView,
     MSPDocumentReferenceListCreateView,
+    MSPDocumentRevisionDetailView,
+    MSPDocumentRevisionListView,
     OrganizationDocumentDetailView,
     OrganizationDocumentListCreateView,
+    OrganizationDocumentRevisionDetailView,
+    OrganizationDocumentRevisionListView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
@@ -159,6 +163,16 @@ urlpatterns = [
         name="msp-document-detail",
     ),
     path(
+        "api/v1/documents/<uuid:document_entity_id>/revisions",
+        MSPDocumentRevisionListView.as_view(),
+        name="msp-document-revision-list",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/revisions/<uuid:revision_id>",
+        MSPDocumentRevisionDetailView.as_view(),
+        name="msp-document-revision-detail",
+    ),
+    path(
         "api/v1/documents/<uuid:document_entity_id>/references",
         MSPDocumentReferenceListCreateView.as_view(),
         name="msp-document-reference-list-create",
@@ -245,6 +259,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/revisions",
+        OrganizationDocumentRevisionListView.as_view(),
+        name="organization-document-revision-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/revisions/<uuid:revision_id>",
+        OrganizationDocumentRevisionDetailView.as_view(),
+        name="organization-document-revision-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin",

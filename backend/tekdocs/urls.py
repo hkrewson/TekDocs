@@ -41,12 +41,16 @@ from apps.core.custom_field_views import (
 from apps.core.document_views import (
     MSPDocumentDetailView,
     MSPDocumentListCreateView,
+    MSPDocumentPlacementDetailView,
+    MSPDocumentPlacementListCreateView,
     MSPDocumentReferenceDetailView,
     MSPDocumentReferenceListCreateView,
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
     OrganizationDocumentDetailView,
     OrganizationDocumentListCreateView,
+    OrganizationDocumentPlacementDetailView,
+    OrganizationDocumentPlacementListCreateView,
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
 )
@@ -163,6 +167,16 @@ urlpatterns = [
         name="msp-document-detail",
     ),
     path(
+        "api/v1/documents/<uuid:document_entity_id>/placements",
+        MSPDocumentPlacementListCreateView.as_view(),
+        name="msp-document-placement-list-create",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>",
+        MSPDocumentPlacementDetailView.as_view(),
+        name="msp-document-placement-detail",
+    ),
+    path(
         "api/v1/documents/<uuid:document_entity_id>/revisions",
         MSPDocumentRevisionListView.as_view(),
         name="msp-document-revision-list",
@@ -259,6 +273,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements",
+        OrganizationDocumentPlacementListCreateView.as_view(),
+        name="organization-document-placement-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/placements/<uuid:placement_id>",
+        OrganizationDocumentPlacementDetailView.as_view(),
+        name="organization-document-placement-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/revisions",

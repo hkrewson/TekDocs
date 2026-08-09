@@ -701,6 +701,11 @@ class BlockRevision(models.Model):
         raise ValidationError("Block revisions are append-only")
 
 
+class PlacementResolutionMode(models.TextChoices):
+    LIVE = "live", "Live"
+    PINNED = "pinned", "Pinned"
+
+
 class DocumentPlacement(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_placements")
@@ -709,7 +714,22 @@ class DocumentPlacement(TimestampedModel):
     )
     document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="placements")
     block = models.ForeignKey(Block, on_delete=models.PROTECT, related_name="placements")
+    parent = models.ForeignKey(
+        "self", on_delete=models.PROTECT, related_name="children", null=True, blank=True
+    )
     position = models.PositiveIntegerField()
+    resolution_mode = models.CharField(
+        max_length=12,
+        choices=PlacementResolutionMode.choices,
+        default=PlacementResolutionMode.LIVE,
+    )
+    pinned_revision = models.ForeignKey(
+        BlockRevision,
+        on_delete=models.PROTECT,
+        related_name="pinned_placements",
+        null=True,
+        blank=True,
+    )
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -717,12 +737,60 @@ class DocumentPlacement(TimestampedModel):
     class Meta:
         ordering = ("position", "id")
         constraints = [
-            models.UniqueConstraint(fields=["document", "position"], name="unique_document_block_position")
+            models.UniqueConstraint(
+                fields=["document", "position"],
+                condition=models.Q(parent__isnull=True),
+                name="unique_document_root_position",
+            ),
+            models.UniqueConstraint(
+                fields=["parent", "position"],
+                condition=models.Q(parent__isnull=False),
+                name="unique_document_child_position",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(resolution_mode=PlacementResolutionMode.LIVE, pinned_revision__isnull=True)
+                    | models.Q(resolution_mode=PlacementResolutionMode.PINNED, pinned_revision__isnull=False)
+                ),
+                name="document_placement_resolution_target",
+            ),
         ]
-        indexes = [models.Index(fields=["tenant", "organization", "document", "position"])]
+        indexes = [
+            models.Index(
+                fields=["tenant", "organization", "document", "parent", "position"],
+                name="core_docpl_scope_tree_idx",
+            ),
+            models.Index(
+                fields=["tenant", "block", "resolution_mode"],
+                name="core_docpl_block_mode_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.document_id} position {self.position}"
+
+    def clean(self) -> None:
+        if self.document_id and (
+            self.document.tenant_id != self.tenant_id
+            or self.document.organization_id != self.organization_id
+        ):
+            raise ValidationError("Placement must use its document workspace scope")
+        if self.block_id and self.block.tenant_id != self.tenant_id:
+            raise ValidationError("Placed block must belong to the placement tenant")
+        parent = self.parent if self.parent_id else None
+        if parent is not None and (
+            parent.document_id != self.document_id
+            or parent.tenant_id != self.tenant_id
+            or parent.organization_id != self.organization_id
+        ):
+            raise ValidationError("Placement parent must belong to the same document")
+        if self.resolution_mode == PlacementResolutionMode.LIVE and self.pinned_revision_id is not None:
+            raise ValidationError("Live placements cannot pin a revision")
+        if self.resolution_mode == PlacementResolutionMode.PINNED and self.pinned_revision_id is None:
+            raise ValidationError("Pinned placements require a revision")
+        pinned_revision = self.pinned_revision if self.pinned_revision_id else None
+        if pinned_revision is not None and pinned_revision.block_id != self.block_id:
+            raise ValidationError("Pinned revision must belong to the placed block")
 
 
 class DocumentationListingReference(TimestampedModel):

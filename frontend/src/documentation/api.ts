@@ -1,6 +1,21 @@
 import { AuthRequestError, browserCsrfToken } from '../auth/api'
 
 export type DocumentScope = { organizationId?: string }
+export type PlacementResolutionMode = 'live' | 'pinned'
+export type DocumentPlacement = {
+  id: string
+  parent_id: string | null
+  block_id: string
+  block_name: string
+  position: number
+  depth: number
+  resolution_mode: PlacementResolutionMode
+  pinned_revision_id: string | null
+  resolved_revision_id: string
+  resolved_revision_number: number
+  resolved_checksum: string
+  is_primary: boolean
+}
 export type DocumentRecord = {
   id: string
   title: string
@@ -13,6 +28,9 @@ export type DocumentRecord = {
   current_revision_id: string
   revision_number: number
   checksum: string
+  resolved_markdown: string
+  placements: DocumentPlacement[]
+  placement_count: number
   created_at: string
   updated_at: string
 }
@@ -37,6 +55,17 @@ export type RevisionConflictPayload = {
   current_revision: BlockRevisionDetail
   diff: string
 }
+export type PlacementConflictPayload = { code: 'placement_conflict'; detail: string }
+export type PlacementInput = {
+  source_document_id: string
+  resolution_mode: PlacementResolutionMode
+  pinned_revision_id?: string | null
+  parent_id?: string | null
+}
+export type PlacementUpdateInput = {
+  resolution_mode: PlacementResolutionMode
+  pinned_revision_id?: string | null
+}
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -51,6 +80,9 @@ export interface DocumentsClient {
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
   listRevisions(scope: DocumentScope, id: string): Promise<RevisionResult>
   getRevision(scope: DocumentScope, id: string, revisionId: string): Promise<BlockRevisionDetail>
+  addPlacement(scope: DocumentScope, id: string, input: PlacementInput): Promise<DocumentRecord>
+  updatePlacement(scope: DocumentScope, id: string, placementId: string, input: PlacementUpdateInput): Promise<DocumentRecord>
+  removePlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   archive(scope: DocumentScope, id: string): Promise<void>
   addReference(documentId: string, organizationId: string): Promise<void>
 }
@@ -74,8 +106,9 @@ async function csrfToken() {
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 409) {
-      const payload = await response.json() as RevisionConflictPayload
+      const payload = await response.json() as RevisionConflictPayload | PlacementConflictPayload
       if (payload.code === 'revision_conflict') throw new RevisionConflictError(payload)
+      if (payload.code === 'placement_conflict') throw new AuthRequestError(payload.detail, 409)
     }
     const message = response.status === 403
       ? 'Your account is not authorized to change documentation in this workspace.'
@@ -88,7 +121,7 @@ async function parse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>
 }
 
-async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: object) {
+async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: object) {
   return parse<T>(await fetch(path, {
     method,
     credentials: 'same-origin',
@@ -110,6 +143,9 @@ export const browserDocumentsClient: DocumentsClient = {
   async getRevision(scope, id, revisionId) {
     return parse<BlockRevisionDetail>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/revisions/${encodeURIComponent(revisionId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
+  addPlacement: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements`, 'POST', input),
+  updatePlacement: (scope, id, placementId, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}`, 'PATCH', input),
+  removePlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}`, 'DELETE'),
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),
   addReference: (documentId, organizationId) => mutate<void>(`/api/v1/documents/${encodeURIComponent(documentId)}/references`, 'POST', { organization_id: organizationId }),
 }

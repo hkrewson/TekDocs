@@ -423,7 +423,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.1` | **Complete:** final Markdown dialect, semantic highlight/callouts, accessible visual/raw/preview/help modes, server allowlist rendering, malicious corpus, editor round-trip fixture gate, and resolution of `TD-RISK-014`. |
 | `0.2.2` | **Complete:** workspace-aware title-first Documentation indexes, MSP/client document ownership scopes, permission-aware cross-listing references, stable blocks, ordered placements, and persistence. Live titles open the authorized editor while future STATIC publication titles open immutable output. |
 | `0.2.3` | **Complete:** immutable block revisions, SHA-256 checksums, parent chains, optimistic concurrency, permission-aware history, and line diffs. |
-| `0.2.4` | Live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
+| `0.2.4` | **Complete:** live/pinned placement resolution, cycle prevention, and deterministic transclusion. |
 | `0.2.5` | Backlinks, reuse-impact preview across client listings, permission-aware shared editing, detach, and entity mentions. |
 | `0.2.6` | Policies/procedures/guides, templates, managed attachments, and Markdown import/export. |
 | `0.2.7` | STATIC dependency resolution, canonical snapshot/manifest, digest, and Ed25519 signing. |
@@ -468,6 +468,19 @@ Evidence: `docs/releases/0.2.2.md`.
 - [x] Migration-cycle, route inventory/IDOR, runtime RLS, backend/frontend, OpenAPI, Docker Compose, browser, security, clean-install, and upgrade evidence agree at `0.2.3`.
 
 Evidence: `docs/releases/0.2.3.md`.
+
+### `0.2.4` acceptance criteria
+
+- [x] Every placement explicitly resolves either its block's current revision (`live`) or one exact immutable revision (`pinned`), and the primary editable block remains live.
+- [x] Documents expose primary canonical Markdown, deterministic assembled Markdown, and an ordered placement/revision manifest without embedding proprietary transclusion tokens in authored Markdown.
+- [x] Nested placements resolve depth first by stable sibling order under explicit 500-placement and 32-level limits; self-transclusion, ancestor block cycles, unreachable placement graphs, and invalid pins fail closed.
+- [x] Placement create/update/remove routes use the central `documents.edit` policy, normal CSRF/MFA rules, destination-derived scope, non-disclosing source lookup, and route/IDOR inventory coverage.
+- [x] Client compositions may use an MSP primary block only through an active client listing reference. Sibling-client sources are denied, and application plus PostgreSQL guards prevent removing a reference while a dependent client placement remains.
+- [x] PostgreSQL validates placement/document/block/parent/pinned-revision scope and rejects raw cross-client placement and recursive-cycle attempts; migration and runtime-RLS evidence retain the existing isolation boundary.
+- [x] The Documentation interface lists resolved blocks, revision/checksum state, live/pinned controls, removal, visible-source selection, assembled Markdown, responsive behavior, and accessible labels without making browser controls authoritative.
+- [x] OpenAPI, backend/frontend, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.4`.
+
+Evidence: `docs/releases/0.2.4.md` after certification.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

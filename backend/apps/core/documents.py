@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from difflib import unified_diff
+from typing import cast
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Max, Prefetch, Q, QuerySet
 from django.utils import timezone
 
 from .models import (
@@ -17,6 +19,7 @@ from .models import (
     DocumentPlacement,
     Entity,
     Organization,
+    PlacementResolutionMode,
     Tenant,
 )
 from .scoping import DataScope
@@ -34,6 +37,23 @@ class RevisionConflict(Exception):
         self.submitted_base_revision_id = submitted_base_revision_id
         self.current_revision = current_revision
         self.base_revision = base_revision
+
+
+class PlacementConflict(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ResolvedPlacement:
+    placement: DocumentPlacement
+    revision: BlockRevision
+    depth: int
+
+
+@dataclass(frozen=True)
+class ResolvedDocument:
+    markdown: str
+    placements: tuple[ResolvedPlacement, ...]
 
 
 def markdown_checksum(markdown: str) -> str:
@@ -54,7 +74,12 @@ def revision_diff(before: BlockRevision | None, after: BlockRevision) -> str:
 
 def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
     placements = DocumentPlacement.objects.filter(tenant_id=scope.tenant_id).select_related(
-        "block", "block__entity", "block__current_revision", "block__current_revision__created_by"
+        "block",
+        "block__entity",
+        "block__current_revision",
+        "block__current_revision__created_by",
+        "parent",
+        "pinned_revision",
     )
     records = Document.objects.filter(tenant_id=scope.tenant_id, archived_at__isnull=True)
     if scope.organization_id is None:
@@ -72,6 +97,64 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
         records.select_related("entity", "organization", "organization__entity")
         .prefetch_related(Prefetch("placements", queryset=placements, to_attr="active_placements"))
         .distinct()
+    )
+
+
+def resolve_document(document: Document) -> ResolvedDocument:
+    placements = list(getattr(document, "active_placements", ()))
+    if not placements:
+        placements = list(
+            document.placements.select_related(
+                "block", "block__entity", "block__current_revision", "parent", "pinned_revision"
+            )
+        )
+    if len(placements) > 500:
+        raise PlacementConflict("Document composition exceeds the 500-placement resolution limit.")
+
+    children: dict[UUID | None, list[DocumentPlacement]] = {}
+    for placement in placements:
+        children.setdefault(placement.parent_id, []).append(placement)
+    for siblings in children.values():
+        siblings.sort(key=lambda item: (item.position, item.id.int))
+
+    resolved: list[ResolvedPlacement] = []
+
+    def visit(placement: DocumentPlacement, *, depth: int, ancestor_blocks: frozenset[UUID]) -> None:
+        if depth >= 32:
+            raise PlacementConflict("Document composition exceeds the 32-level transclusion limit.")
+        if placement.block_id in ancestor_blocks:
+            raise PlacementConflict("Circular block transclusion detected.")
+        revision = (
+            placement.block.current_revision
+            if placement.resolution_mode == PlacementResolutionMode.LIVE
+            else placement.pinned_revision
+        )
+        if revision is None or revision.block_id != placement.block_id:
+            raise PlacementConflict("A document placement does not resolve to a valid block revision.")
+        resolved.append(ResolvedPlacement(placement=placement, revision=revision, depth=depth))
+        next_ancestors = ancestor_blocks | {placement.block_id}
+        for child in children.get(placement.id, ()):
+            visit(child, depth=depth + 1, ancestor_blocks=next_ancestors)
+
+    for root in children.get(None, ()):
+        visit(root, depth=0, ancestor_blocks=frozenset())
+    if len(resolved) != len(placements):
+        raise PlacementConflict("Document composition contains an unreachable or circular placement.")
+
+    parts = [item.revision.markdown.strip("\n") for item in resolved]
+    markdown = "\n\n".join(parts)
+    if markdown:
+        markdown += "\n"
+    return ResolvedDocument(markdown=markdown, placements=tuple(resolved))
+
+
+def primary_placement(document: Document) -> DocumentPlacement:
+    placements = cast(tuple[DocumentPlacement, ...], getattr(document, "active_placements", ()))
+    for placement in placements:
+        if placement.parent_id is None and placement.position == 0:
+            return placement
+    return document.placements.select_related("block", "block__entity", "block__current_revision").get(
+        parent__isnull=True, position=0
     )
 
 
@@ -112,7 +195,9 @@ def update_document(
     *, document: Document, actor_id: UUID, title: str, markdown: str, base_revision_id: UUID
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
-    placement = locked_document.placements.select_related("block", "block__entity").get(position=0)
+    placement = locked_document.placements.select_related("block", "block__entity").get(
+        parent__isnull=True, position=0
+    )
     block = Block.objects.select_for_update().get(pk=placement.block_id)
     if block.current_revision_id is None:
         raise RuntimeError("Document block has no current revision")
@@ -156,7 +241,7 @@ def update_document(
 
 
 def revisions_for_document(document: Document) -> QuerySet[BlockRevision]:
-    placement = document.placements.only("block_id").get(position=0)
+    placement = document.placements.only("block_id").get(parent__isnull=True, position=0)
     return BlockRevision.objects.filter(
         tenant=document.tenant,
         block_id=placement.block_id,
@@ -168,14 +253,127 @@ def revision_for_document(*, document: Document, revision_id: UUID) -> BlockRevi
 
 
 @transaction.atomic
+def add_document_placement(
+    *,
+    document: Document,
+    source_document: Document,
+    actor_id: UUID,
+    resolution_mode: str,
+    pinned_revision_id: UUID | None,
+    parent_id: UUID | None,
+) -> DocumentPlacement:
+    locked_document = Document.objects.select_for_update().get(pk=document.pk)
+    if source_document.pk == locked_document.pk:
+        raise PlacementConflict("A document cannot transclude its own primary block.")
+    source = primary_placement(source_document)
+    block = Block.objects.select_related("current_revision").get(pk=source.block_id)
+    parent = None
+    if parent_id is not None:
+        parent = locked_document.placements.select_for_update().filter(id=parent_id).first()
+        if parent is None:
+            raise PlacementConflict("The parent placement is not part of this document.")
+        ancestor: DocumentPlacement | None = parent
+        seen: set[UUID] = set()
+        while ancestor is not None:
+            if ancestor.id in seen or ancestor.block_id == block.id:
+                raise PlacementConflict("Circular block transclusion detected.")
+            seen.add(ancestor.id)
+            ancestor = (
+                locked_document.placements.select_related("parent").filter(id=ancestor.parent_id).first()
+                if ancestor.parent_id
+                else None
+            )
+    pinned_revision = None
+    if resolution_mode == PlacementResolutionMode.PINNED:
+        if pinned_revision_id is None:
+            raise PlacementConflict("Pinned placements require an exact revision.")
+        pinned_revision = BlockRevision.objects.filter(block=block, id=pinned_revision_id).first()
+        if pinned_revision is None:
+            raise PlacementConflict("The pinned revision does not belong to the selected block.")
+    elif resolution_mode != PlacementResolutionMode.LIVE or pinned_revision_id is not None:
+        raise PlacementConflict("Live placements cannot specify a pinned revision.")
+
+    siblings = locked_document.placements.filter(parent=parent)
+    last_position = siblings.aggregate(value=Max("position"))["value"]
+    position = 0 if last_position is None else last_position + 1
+    placement = DocumentPlacement.objects.create(
+        tenant=locked_document.tenant,
+        organization=locked_document.organization,
+        document=locked_document,
+        block=block,
+        parent=parent,
+        position=position,
+        resolution_mode=resolution_mode,
+        pinned_revision=pinned_revision,
+    )
+    AuditEvent.objects.create(
+        tenant=locked_document.tenant,
+        actor_id=actor_id,
+        action="document.placement_added",
+        entity_id=locked_document.entity_id,
+        metadata={},
+    )
+    return placement
+
+
+@transaction.atomic
+def update_document_placement(
+    *, placement: DocumentPlacement, actor_id: UUID, resolution_mode: str, pinned_revision_id: UUID | None
+) -> DocumentPlacement:
+    locked = DocumentPlacement.objects.select_for_update().select_related("block").get(pk=placement.pk)
+    if locked.parent_id is None and locked.position == 0:
+        raise PlacementConflict("The primary document block must remain live.")
+    pinned_revision = None
+    if resolution_mode == PlacementResolutionMode.PINNED:
+        if pinned_revision_id is None:
+            raise PlacementConflict("Pinned placements require an exact revision.")
+        pinned_revision = BlockRevision.objects.filter(block=locked.block, id=pinned_revision_id).first()
+        if pinned_revision is None:
+            raise PlacementConflict("The pinned revision does not belong to the placed block.")
+    elif resolution_mode != PlacementResolutionMode.LIVE or pinned_revision_id is not None:
+        raise PlacementConflict("Live placements cannot specify a pinned revision.")
+    locked.resolution_mode = resolution_mode
+    locked.pinned_revision = pinned_revision
+    locked.save(update_fields=("resolution_mode", "pinned_revision", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.placement_updated",
+        entity_id=locked.document.entity_id,
+        metadata={},
+    )
+    return locked
+
+
+@transaction.atomic
+def remove_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -> None:
+    locked = DocumentPlacement.objects.select_for_update().get(pk=placement.pk)
+    if locked.parent_id is None and locked.position == 0:
+        raise PlacementConflict("The primary document block cannot be removed.")
+    if locked.children.exists():
+        raise PlacementConflict("Remove nested placements before removing their parent.")
+    tenant = locked.tenant
+    document_entity_id = locked.document.entity_id
+    locked.delete()
+    AuditEvent.objects.create(
+        tenant=tenant,
+        actor_id=actor_id,
+        action="document.placement_removed",
+        entity_id=document_entity_id,
+        metadata={},
+    )
+
+
+@transaction.atomic
 def archive_document(*, document: Document, actor_id: UUID) -> None:
     archived_at = timezone.now()
-    placements = list(document.placements.select_related("block", "block__entity"))
-    for placement in placements:
-        placement.block.archived_at = archived_at
-        placement.block.save(update_fields=("archived_at", "updated_at"))
-        placement.block.entity.archived_at = archived_at
-        placement.block.entity.save(update_fields=("archived_at", "updated_at"))
+    placement = primary_placement(document)
+    if DocumentPlacement.objects.filter(block_id=placement.block_id).exclude(document=document).exists():
+        raise PlacementConflict("Remove document transclusions before archiving their source document.")
+    placement.block.archived_at = archived_at
+    placement.block.save(update_fields=("archived_at", "updated_at"))
+    placement.block.entity.archived_at = archived_at
+    placement.block.entity.save(update_fields=("archived_at", "updated_at"))
     document.listing_references.filter(archived_at__isnull=True).update(
         archived_at=archived_at, updated_at=archived_at
     )
@@ -215,6 +413,13 @@ def add_listing_reference(
 
 @transaction.atomic
 def remove_listing_reference(*, reference: DocumentationListingReference, actor_id: UUID) -> None:
+    source_block_id = primary_placement(reference.document).block_id
+    if DocumentPlacement.objects.filter(
+        tenant=reference.tenant,
+        organization=reference.organization,
+        block_id=source_block_id,
+    ).exists():
+        raise PlacementConflict("Remove client document transclusions before removing this listing reference.")
     reference.archived_at = timezone.now()
     reference.save(update_fields=("archived_at", "updated_at"))
     AuditEvent.objects.create(

@@ -206,6 +206,25 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .revision-history li small { grid-column: 1 / -1; }
 .revision-diff h3 { margin: 0 0 8px; font-size: 14px; }
 @media (max-width: 700px) { .revision-history-body { grid-template-columns: 1fr; } }
+.document-composition { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.document-composition .section-heading > div { min-width: 0; }
+.document-composition .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.document-composition ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.document-composition li { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); }
+.document-composition li > div:first-child { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.document-composition li span { min-width: 0; display: grid; gap: 2px; }
+.document-composition li strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.document-composition li small { color: var(--muted); font-size: 11px; }
+.composition-actions { display: flex; align-items: center; gap: 6px; }
+.composition-actions .secondary-button { min-height: 31px; padding: 5px 8px; font-size: 11px; }
+.composition-add { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .55fr) auto; align-items: end; gap: 10px; padding-top: 14px; }
+.composition-add label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.composition-add select { min-height: 38px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.composition-add button { min-height: 38px; display: inline-flex; align-items: center; gap: 6px; }
+.resolved-markdown { margin-top: 12px; border-top: 1px solid var(--border); }
+.resolved-markdown summary { padding: 11px 2px 0; color: var(--muted); font-size: 12px; cursor: pointer; }
+.resolved-markdown pre { max-height: 280px; overflow: auto; margin: 10px 0 0; padding: 10px; color: #292722; background: #f5f3ed; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+@media (max-width: 700px) { .document-composition li { align-items: flex-start; flex-direction: column; padding-block: 10px; } .composition-add { grid-template-columns: 1fr; } }
 .document-share { position: relative; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, .7fr); align-items: center; gap: 14px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .document-share > div { display: flex; align-items: center; gap: 9px; }
 .document-share > div > span { display: grid; gap: 2px; }

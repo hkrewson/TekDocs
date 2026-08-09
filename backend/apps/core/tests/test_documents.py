@@ -231,3 +231,225 @@ def test_block_revisions_are_append_only_in_application_and_postgresql(owner_cli
             cursor.execute("UPDATE core_blockrevision SET markdown = %s WHERE id = %s", ["Mutated", revision.id])
     revision.refresh_from_db()
     assert revision.markdown == "Original"
+
+
+@pytest.mark.django_db
+def test_live_and_pinned_transclusions_resolve_deterministically(owner_client, installation):
+    collection = reverse("msp-document-list-create")
+    source = owner_client.post(
+        collection, {"title": "Shared checklist", "markdown": "Shared revision one"}, content_type="application/json"
+    ).json()
+    live_document = owner_client.post(
+        collection, {"title": "Live composition", "markdown": "Live introduction"}, content_type="application/json"
+    ).json()
+    pinned_document = owner_client.post(
+        collection, {"title": "Pinned composition", "markdown": "Pinned introduction"}, content_type="application/json"
+    ).json()
+
+    live_added = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": live_document["id"]}),
+        {"source_document_id": source["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    )
+    pinned_added = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": pinned_document["id"]}),
+        {
+            "source_document_id": source["id"],
+            "resolution_mode": "pinned",
+            "pinned_revision_id": source["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+    assert live_added.status_code == 200
+    assert pinned_added.status_code == 200
+    assert live_added.json()["resolved_markdown"] == "Live introduction\n\nShared revision one\n"
+    assert pinned_added.json()["resolved_markdown"] == "Pinned introduction\n\nShared revision one\n"
+
+    owner_client.put(
+        reverse("msp-document-detail", kwargs={"document_entity_id": source["id"]}),
+        {
+            "title": source["title"],
+            "markdown": "Shared revision two",
+            "base_revision_id": source["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+    live_reloaded = owner_client.get(
+        reverse("msp-document-detail", kwargs={"document_entity_id": live_document["id"]})
+    ).json()
+    pinned_reloaded = owner_client.get(
+        reverse("msp-document-detail", kwargs={"document_entity_id": pinned_document["id"]})
+    ).json()
+    assert live_reloaded["resolved_markdown"].endswith("Shared revision two\n")
+    assert pinned_reloaded["resolved_markdown"].endswith("Shared revision one\n")
+    assert live_reloaded["placements"][1]["resolved_revision_number"] == 2
+    assert pinned_reloaded["placements"][1]["resolved_revision_number"] == 1
+
+
+@pytest.mark.django_db
+def test_nested_transclusion_is_depth_first_and_rejects_ancestor_cycle(owner_client, installation):
+    collection = reverse("msp-document-list-create")
+    destination = owner_client.post(
+        collection, {"title": "Composition", "markdown": "A"}, content_type="application/json"
+    ).json()
+    source_b = owner_client.post(collection, {"title": "B", "markdown": "B"}, content_type="application/json").json()
+    source_c = owner_client.post(collection, {"title": "C", "markdown": "C"}, content_type="application/json").json()
+    placements_url = reverse(
+        "msp-document-placement-list-create", kwargs={"document_entity_id": destination["id"]}
+    )
+    added_b = owner_client.post(
+        placements_url,
+        {"source_document_id": source_b["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    ).json()
+    b_placement = added_b["placements"][1]
+    added_c = owner_client.post(
+        placements_url,
+        {
+            "source_document_id": source_c["id"],
+            "resolution_mode": "live",
+            "parent_id": b_placement["id"],
+        },
+        content_type="application/json",
+    )
+    assert added_c.status_code == 200
+    assert added_c.json()["resolved_markdown"] == "A\n\nB\n\nC\n"
+    assert [item["depth"] for item in added_c.json()["placements"]] == [0, 0, 1]
+
+    cycle = owner_client.post(
+        placements_url,
+        {
+            "source_document_id": source_b["id"],
+            "resolution_mode": "live",
+            "parent_id": b_placement["id"],
+        },
+        content_type="application/json",
+    )
+    assert cycle.status_code == 409
+    assert cycle.json()["code"] == "placement_conflict"
+    assert "Circular" in cycle.json()["detail"]
+
+
+@pytest.mark.django_db
+def test_transclusion_source_must_be_visible_in_destination_workspace(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    beta = organization(installation.tenant, "Beta")
+    acme_collection = reverse(
+        "organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}
+    )
+    beta_collection = reverse(
+        "organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}
+    )
+    destination = owner_client.post(
+        acme_collection, {"title": "Acme composition", "markdown": "Acme"}, content_type="application/json"
+    ).json()
+    sibling_source = owner_client.post(
+        beta_collection, {"title": "Beta private", "markdown": "Beta"}, content_type="application/json"
+    ).json()
+    response = owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"source_document_id": sibling_source["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(
+    owner_client, installation
+):
+    acme = organization(installation.tenant, "Acme")
+    source = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "MSP standard", "markdown": "Shared standard"},
+        content_type="application/json",
+    ).json()
+    reference = owner_client.post(
+        reverse("msp-document-reference-list-create", kwargs={"document_entity_id": source["id"]}),
+        {"organization_id": str(acme.entity_id)},
+        content_type="application/json",
+    ).json()
+    destination = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Client runbook", "markdown": "Client introduction"},
+        content_type="application/json",
+    ).json()
+    added = owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"source_document_id": source["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    )
+    assert added.status_code == 200
+    assert added.json()["resolved_markdown"] == "Client introduction\n\nShared standard\n"
+
+    revoked = owner_client.delete(
+        reverse(
+            "msp-document-reference-detail",
+            kwargs={"document_entity_id": source["id"], "reference_id": reference["id"]},
+        )
+    )
+    assert revoked.status_code == 409
+    assert revoked.json()["code"] == "placement_conflict"
+    archived = owner_client.delete(
+        reverse("msp-document-detail", kwargs={"document_entity_id": source["id"]})
+    )
+    assert archived.status_code == 409
+    assert Document.objects.get(entity_id=source["id"]).archived_at is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_postgresql_rejects_raw_placement_cycle_and_cross_client_block(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Placement database guards require PostgreSQL")
+    acme = organization(installation.tenant, "Acme")
+    beta = organization(installation.tenant, "Beta")
+    destination = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme composition", "markdown": "A"},
+        content_type="application/json",
+    ).json()
+    beta_source = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}),
+        {"title": "Beta source", "markdown": "B"},
+        content_type="application/json",
+    ).json()
+    destination_record = Document.objects.get(entity_id=destination["id"])
+    root = destination_record.placements.get(parent__isnull=True, position=0)
+    beta_block = Block.objects.get(entity_id=beta_source["block_id"])
+    with pytest.raises(DatabaseError), transaction.atomic():
+        DocumentPlacement.objects.create(
+            tenant=installation.tenant,
+            organization=acme,
+            document=destination_record,
+            block=beta_block,
+            position=1,
+        )
+
+    source = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme source", "markdown": "B"},
+        content_type="application/json",
+    ).json()
+    added = owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"source_document_id": source["id"], "resolution_mode": "live", "parent_id": str(root.id)},
+        content_type="application/json",
+    ).json()
+    child = DocumentPlacement.objects.get(id=added["placements"][1]["id"])
+    with pytest.raises(DatabaseError), transaction.atomic():
+        DocumentPlacement.objects.filter(id=root.id).update(parent=child)
+    with pytest.raises(DatabaseError), transaction.atomic():
+        DocumentPlacement.objects.filter(id=root.id).update(
+            resolution_mode="pinned", pinned_revision_id=root.block.current_revision_id
+        )
+    with pytest.raises(DatabaseError), transaction.atomic():
+        DocumentPlacement.objects.filter(id=root.id).delete()

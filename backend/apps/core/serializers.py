@@ -6,14 +6,17 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .models import (
     BlockRevision,
     Document,
+    DocumentPlacement,
     LocationKind,
     Organization,
     OrganizationAccessMode,
     OrganizationKind,
     PersonAssociationKind,
+    PlacementResolutionMode,
     Site,
 )
 
@@ -291,6 +294,80 @@ class DocumentUpdateSerializer(DocumentCreateSerializer):
     base_revision_id = serializers.UUIDField()
 
 
+class DocumentPlacementWriteSerializer(serializers.Serializer):
+    source_document_id = serializers.UUIDField()
+    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
+    pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
+    parent_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class DocumentPlacementUpdateSerializer(serializers.Serializer):
+    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
+    pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class DocumentPlacementSerializer(serializers.Serializer):
+    id = serializers.SerializerMethodField()
+    parent_id = serializers.SerializerMethodField()
+    block_id = serializers.SerializerMethodField()
+    block_name = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
+    depth = serializers.IntegerField()
+    resolution_mode = serializers.SerializerMethodField()
+    pinned_revision_id = serializers.SerializerMethodField()
+    resolved_revision_id = serializers.SerializerMethodField()
+    resolved_revision_number = serializers.SerializerMethodField()
+    resolved_checksum = serializers.SerializerMethodField()
+    is_primary = serializers.SerializerMethodField()
+
+    def _placement(self, obj: ResolvedPlacement) -> DocumentPlacement:
+        return obj.placement
+
+    @extend_schema_field(serializers.UUIDField())
+    def get_id(self, obj: ResolvedPlacement) -> UUID:
+        return self._placement(obj).id
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_parent_id(self, obj: ResolvedPlacement) -> UUID | None:
+        return self._placement(obj).parent_id
+
+    @extend_schema_field(serializers.UUIDField())
+    def get_block_id(self, obj: ResolvedPlacement) -> UUID:
+        return self._placement(obj).block.entity_id
+
+    @extend_schema_field(serializers.CharField())
+    def get_block_name(self, obj: ResolvedPlacement) -> str:
+        return self._placement(obj).block.entity.display_name
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_position(self, obj: ResolvedPlacement) -> int:
+        return self._placement(obj).position
+
+    @extend_schema_field(serializers.ChoiceField(choices=PlacementResolutionMode.choices))
+    def get_resolution_mode(self, obj: ResolvedPlacement) -> str:
+        return self._placement(obj).resolution_mode
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_pinned_revision_id(self, obj: ResolvedPlacement) -> UUID | None:
+        return self._placement(obj).pinned_revision_id
+
+    @extend_schema_field(serializers.UUIDField())
+    def get_resolved_revision_id(self, obj: ResolvedPlacement) -> UUID:
+        return obj.revision.id
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_resolved_revision_number(self, obj: ResolvedPlacement) -> int:
+        return obj.revision.revision_number
+
+    @extend_schema_field(serializers.CharField())
+    def get_resolved_checksum(self, obj: ResolvedPlacement) -> str:
+        return obj.revision.checksum
+
+    def get_is_primary(self, obj: ResolvedPlacement) -> bool:
+        placement = self._placement(obj)
+        return placement.parent_id is None and placement.position == 0
+
+
 class DocumentSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     title = serializers.CharField(source="entity.display_name")
@@ -303,6 +380,9 @@ class DocumentSerializer(serializers.Serializer):
     current_revision_id = serializers.SerializerMethodField()
     revision_number = serializers.SerializerMethodField()
     checksum = serializers.SerializerMethodField()
+    resolved_markdown = serializers.SerializerMethodField()
+    placements = serializers.SerializerMethodField()
+    placement_count = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
 
@@ -313,9 +393,19 @@ class DocumentSerializer(serializers.Serializer):
         workspace_organization_id = self.context.get("workspace_organization_id")
         return workspace_organization_id is not None and obj.organization_id is None
 
-    def _placement(self, obj: Document):  # type: ignore[no-untyped-def]
-        placements = getattr(obj, "active_placements", ())
-        return placements[0] if placements else None
+    def _placement(self, obj: Document) -> DocumentPlacement | None:
+        placements = cast(tuple[DocumentPlacement, ...], getattr(obj, "active_placements", ()))
+        return next(
+            (placement for placement in placements if placement.parent_id is None and placement.position == 0),
+            None,
+        )
+
+    def _resolved(self, obj: Document) -> ResolvedDocument:
+        resolved = cast(ResolvedDocument | None, getattr(obj, "_tekdocs_resolved_document", None))
+        if resolved is None:
+            resolved = resolve_document(obj)
+            obj.__dict__["_tekdocs_resolved_document"] = resolved
+        return resolved
 
     def get_markdown(self, obj: Document) -> str:
         placement = self._placement(obj)
@@ -339,6 +429,19 @@ class DocumentSerializer(serializers.Serializer):
         placement = self._placement(obj)
         revision = placement.block.current_revision if placement is not None else None
         return revision.checksum if revision is not None else ""
+
+    def get_resolved_markdown(self, obj: Document) -> str:
+        return self._resolved(obj).markdown
+
+    @extend_schema_field(DocumentPlacementSerializer(many=True))
+    def get_placements(self, obj: Document) -> list[dict[str, object]]:
+        return cast(
+            list[dict[str, object]],
+            DocumentPlacementSerializer(self._resolved(obj).placements, many=True).data,
+        )
+
+    def get_placement_count(self, obj: Document) -> int:
+        return len(self._resolved(obj).placements)
 
 
 class BlockRevisionSerializer(serializers.Serializer):

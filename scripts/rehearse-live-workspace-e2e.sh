@@ -52,6 +52,7 @@ live_compose run --rm migrate python manage.py shell -c '
 from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
+from apps.core.documents import resolve_document
 from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -104,7 +105,7 @@ assert link.archived_at is None
 assert link.metadata == {}
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
-client_block = client_document.placements.get(position=0).block
+client_block = client_document.placements.get(parent__isnull=True, position=0).block
 assert client_block.current_revision.markdown == "# Acme onboarding\n\nRevision two is retained."
 assert list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True)) == [
     "# Acme onboarding\n\nClient-owned canonical Markdown.",
@@ -112,10 +113,22 @@ assert list(client_block.revisions.order_by("revision_number").values_list("mark
 ]
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
-assert shared_document.placements.get(position=0).block.current_revision.markdown == "One MSP-owned block."
+shared_block = shared_document.placements.get(parent__isnull=True, position=0).block
+assert shared_block.current_revision.markdown == "MSP-owned block revision three."
+assert list(shared_block.revisions.order_by("revision_number").values_list("markdown", flat=True)) == [
+    "One MSP-owned block.",
+    "MSP-owned block revision two.",
+    "MSP-owned block revision three.",
+]
 assert DocumentationListingReference.objects.filter(
     document=shared_document, organization=organization, archived_at__isnull=True
 ).count() == 1
+reuse = client_document.placements.get(block=shared_block)
+assert reuse.resolution_mode == "pinned"
+assert reuse.pinned_revision.markdown == "MSP-owned block revision two."
+resolved = resolve_document(client_document).markdown
+assert "MSP-owned block revision two." in resolved
+assert "revision three" not in resolved
 assert Block.objects.filter(placements__document=shared_document).count() == 1
 print("Live workspace database fixture verified")
 '

@@ -6,6 +6,9 @@ const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
 }
+const documentBlockId = crypto.randomUUID()
+const documentRevisionId = crypto.randomUUID()
+const documentPlacementId = crypto.randomUUID()
 
 const document = {
   id: crypto.randomUUID(),
@@ -15,10 +18,13 @@ const document = {
   owner_organization_name: null,
   is_reference: false,
   markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
-  block_id: crypto.randomUUID(),
-  current_revision_id: crypto.randomUUID(),
+  block_id: documentBlockId,
+  current_revision_id: documentRevisionId,
   revision_number: 1,
   checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4',
+  resolved_markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
+  placements: [{ id: documentPlacementId, parent_id: null, block_id: documentBlockId, block_name: 'UniFi Network Setup Guide — content', position: 0, depth: 0, resolution_mode: 'live', pinned_revision_id: null, resolved_revision_id: documentRevisionId, resolved_revision_number: 1, resolved_checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4', is_primary: true }],
+  placement_count: 1,
   created_at: '2026-08-09T12:00:00Z',
   updated_at: '2026-08-09T12:00:00Z',
 }

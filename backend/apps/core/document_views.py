@@ -2,21 +2,26 @@ from uuid import UUID
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .documents import (
+    PlacementConflict,
     RevisionConflict,
+    add_document_placement,
     add_listing_reference,
     archive_document,
     create_document,
     documents_for_scope,
+    remove_document_placement,
     remove_listing_reference,
     revision_diff,
     revisions_for_document,
     update_document,
+    update_document_placement,
 )
 from .models import DocumentationListingReference
 from .scoping import DataScope
@@ -26,6 +31,8 @@ from .serializers import (
     DocumentationReferenceSerializer,
     DocumentationReferenceWriteSerializer,
     DocumentCreateSerializer,
+    DocumentPlacementUpdateSerializer,
+    DocumentPlacementWriteSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentUpdateSerializer,
@@ -140,8 +147,68 @@ def _revision_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, rev
 def _archive(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> Response:  # type: ignore[no-untyped-def]
     document = _document(workspace, document_entity_id)
     _mutate_workspace(request, workspace, document)
-    archive_document(document=document, actor_id=request.user.pk)
+    try:
+        archive_document(document=document, actor_id=request.user.pk)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
     return Response(status=204)
+
+
+def _placement_conflict(conflict: PlacementConflict) -> Response:
+    return Response({"code": "placement_conflict", "detail": str(conflict)}, status=409)
+
+
+def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    serializer = DocumentPlacementWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    source_document = _document(workspace, serializer.validated_data["source_document_id"])
+    try:
+        add_document_placement(
+            document=document,
+            source_document=source_document,
+            actor_id=request.user.pk,
+            resolution_mode=serializer.validated_data["resolution_mode"],
+            pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
+            parent_id=serializer.validated_data.get("parent_id"),
+        )
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    return _retrieve(workspace, document_entity_id)
+
+
+def _update_placement(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID, request: Request
+) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    placement = get_object_or_404(document.placements, id=placement_id)
+    serializer = DocumentPlacementUpdateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        update_document_placement(
+            placement=placement,
+            actor_id=request.user.pk,
+            resolution_mode=serializer.validated_data["resolution_mode"],
+            pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
+        )
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    return _retrieve(workspace, document_entity_id)
+
+
+def _remove_placement(
+    workspace: ResolvedWorkspace, document_entity_id: UUID, placement_id: UUID, request: Request
+) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    placement = get_object_or_404(document.placements, id=placement_id)
+    try:
+        remove_document_placement(placement=placement, actor_id=request.user.pk)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    return _retrieve(workspace, document_entity_id)
 
 
 class MSPDocumentListCreateView(APIView):
@@ -171,9 +238,45 @@ class MSPDocumentDetailView(APIView):
     def put(self, request, document_entity_id):  # type: ignore[no-untyped-def]
         return _update(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
 
-    @extend_schema(operation_id="documents_msp_archive", request=None, responses={204: OpenApiResponse()})
+    @extend_schema(
+        operation_id="documents_msp_archive",
+        request=None,
+        responses={204: OpenApiResponse(), 409: OpenApiResponse(description="Placement dependency conflict")},
+    )
     def delete(self, request, document_entity_id):  # type: ignore[no-untyped-def]
         return _archive(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentPlacementListCreateView(APIView):
+    @extend_schema(
+        operation_id="document_placements_msp_create",
+        request=DocumentPlacementWriteSerializer,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _add_placement(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentPlacementDetailView(APIView):
+    @extend_schema(
+        operation_id="document_placements_msp_update",
+        request=DocumentPlacementUpdateSerializer,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def patch(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _update_placement(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, placement_id, request
+        )
+
+    @extend_schema(
+        operation_id="document_placements_msp_destroy",
+        request=None,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def delete(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _remove_placement(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, placement_id, request
+        )
 
 
 class OrganizationDocumentListCreateView(APIView):
@@ -209,11 +312,57 @@ class OrganizationDocumentDetailView(APIView):
             request,
         )
 
-    @extend_schema(operation_id="documents_organization_archive", request=None, responses={204: OpenApiResponse()})
+    @extend_schema(
+        operation_id="documents_organization_archive",
+        request=None,
+        responses={204: OpenApiResponse(), 409: OpenApiResponse(description="Placement dependency conflict")},
+    )
     def delete(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
         return _archive(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
             document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentPlacementListCreateView(APIView):
+    @extend_schema(
+        operation_id="document_placements_organization_create",
+        request=DocumentPlacementWriteSerializer,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _add_placement(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentPlacementDetailView(APIView):
+    @extend_schema(
+        operation_id="document_placements_organization_update",
+        request=DocumentPlacementUpdateSerializer,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def patch(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _update_placement(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            placement_id,
+            request,
+        )
+
+    @extend_schema(
+        operation_id="document_placements_organization_destroy",
+        request=None,
+        responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
+    )
+    def delete(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
+        return _remove_placement(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            placement_id,
             request,
         )
 
@@ -286,7 +435,11 @@ class MSPDocumentReferenceListCreateView(APIView):
 
 
 class MSPDocumentReferenceDetailView(APIView):
-    @extend_schema(operation_id="document_references_archive", request=None, responses={204: OpenApiResponse()})
+    @extend_schema(
+        operation_id="document_references_archive",
+        request=None,
+        responses={204: OpenApiResponse(), 409: OpenApiResponse(description="Placement dependency conflict")},
+    )
     def delete(self, request, document_entity_id, reference_id):  # type: ignore[no-untyped-def]
         workspace = _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT)
         document = _document(workspace, document_entity_id)
@@ -296,5 +449,8 @@ class MSPDocumentReferenceDetailView(APIView):
             document=document,
             archived_at__isnull=True,
         )
-        remove_listing_reference(reference=reference, actor_id=request.user.pk)
+        try:
+            remove_listing_reference(reference=reference, actor_id=request.user.pk)
+        except PlacementConflict as conflict:
+            return _placement_conflict(conflict)
         return Response(status=204)

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.3
+  version: 0.2.4
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -781,6 +781,111 @@ paths:
       responses:
         '204':
           description: No response body
+        '409':
+          description: Placement dependency conflict
+  /api/v1/documents/{document_entity_id}/placements:
+    post:
+      operationId: document_placements_msp_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+  /api/v1/documents/{document_entity_id}/placements/{placement_id}:
+    patch:
+      operationId: document_placements_msp_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+    delete:
+      operationId: document_placements_msp_destroy
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
   /api/v1/documents/{document_entity_id}/references:
     get:
       operationId: document_references_list
@@ -859,6 +964,8 @@ paths:
       responses:
         '204':
           description: No response body
+        '409':
+          description: Placement dependency conflict
   /api/v1/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_msp_list
@@ -2286,6 +2393,129 @@ paths:
       responses:
         '204':
           description: No response body
+        '409':
+          description: Placement dependency conflict
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements:
+    post:
+      operationId: document_placements_organization_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPlacementWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements/{placement_id}:
+    patch:
+      operationId: document_placements_organization_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
+    delete:
+      operationId: document_placements_organization_destroy
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: placement_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+        '409':
+          description: Placement conflict
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -3674,6 +3904,17 @@ components:
         checksum:
           type: string
           readOnly: true
+        resolved_markdown:
+          type: string
+          readOnly: true
+        placements:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPlacement'
+          readOnly: true
+        placement_count:
+          type: integer
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -3691,6 +3932,9 @@ components:
       - owner_kind
       - owner_organization_id
       - owner_organization_name
+      - placement_count
+      - placements
+      - resolved_markdown
       - revision_number
       - title
       - updated_at
@@ -3706,6 +3950,84 @@ components:
           maxLength: 1000000
       required:
       - title
+    DocumentPlacement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        block_id:
+          type: string
+          format: uuid
+          readOnly: true
+        block_name:
+          type: string
+          readOnly: true
+        position:
+          type: integer
+          readOnly: true
+        depth:
+          type: integer
+        resolution_mode:
+          allOf:
+          - $ref: '#/components/schemas/ResolutionModeEnum'
+          readOnly: true
+        pinned_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        resolved_revision_id:
+          type: string
+          format: uuid
+          readOnly: true
+        resolved_revision_number:
+          type: integer
+          readOnly: true
+        resolved_checksum:
+          type: string
+          readOnly: true
+        is_primary:
+          type: boolean
+          readOnly: true
+      required:
+      - block_id
+      - block_name
+      - depth
+      - id
+      - is_primary
+      - parent_id
+      - pinned_revision_id
+      - position
+      - resolution_mode
+      - resolved_checksum
+      - resolved_revision_id
+      - resolved_revision_number
+    DocumentPlacementWrite:
+      type: object
+      properties:
+        source_document_id:
+          type: string
+          format: uuid
+        resolution_mode:
+          $ref: '#/components/schemas/ResolutionModeEnum'
+        pinned_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - resolution_mode
+      - source_document_id
     DocumentResult:
       type: object
       properties:
@@ -4411,6 +4733,15 @@ components:
           items:
             type: string
             maxLength: 80
+    PatchedDocumentPlacementUpdate:
+      type: object
+      properties:
+        resolution_mode:
+          $ref: '#/components/schemas/ResolutionModeEnum'
+        pinned_revision_id:
+          type: string
+          format: uuid
+          nullable: true
     PatchedLocationWrite:
       type: object
       properties:
@@ -4758,6 +5089,14 @@ components:
       - page
       - page_size
       - results
+    ResolutionModeEnum:
+      enum:
+      - live
+      - pinned
+      type: string
+      description: |-
+        * `live` - Live
+        * `pinned` - Pinned
     RevisionConflict:
       type: object
       properties:

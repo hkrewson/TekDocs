@@ -75,6 +75,7 @@ import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
+const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 
 type NavigationItem = {
@@ -292,7 +293,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.5 adds client hardware identity, acquisition, warranty, assignment, disposal, and retained lifecycle history." />
+      <PageHeader title="Overview" description="TekDocs 0.3.6 adds client software installations, entitlements, seat assignments, and renewal tracking." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -316,6 +317,7 @@ function Overview() {
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],
+            ['Software installations and licensing', 'Available'],
             ['Derived client vendors', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
@@ -374,6 +376,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]

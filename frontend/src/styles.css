@@ -689,6 +689,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .lifecycle-history li:first-child { border-top: 0; }
 .lifecycle-history strong { text-transform: capitalize; }
 .lifecycle-history span, .lifecycle-history time { color: var(--muted); }
+.license-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.license-section h3 { margin: 0 0 8px; font-size: 13px; }
+.license-seat-list { margin: 0; padding: 0; list-style: none; }
+.license-seat-list li { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); }
+.license-seat-list li > div { display: grid; gap: 2px; }
+.license-seat-list span { color: var(--muted); font-size: 10px; }
 .inventory-documents { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .inventory-documents ul { margin-top: 8px; }
 .inventory-documents button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 2px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }

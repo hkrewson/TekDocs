@@ -196,6 +196,16 @@ class HardwareAssignmentChoicesSerializer(serializers.Serializer):
     locations = serializers.ListField()
 
 
+class SoftwareInstallationSummarySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    status = serializers.CharField()
+    installed_version = serializers.CharField()
+    installed_on = serializers.DateField(allow_null=True)
+    last_verified_on = serializers.DateField(allow_null=True)
+    site_id = serializers.UUIDField(allow_null=True)
+    site_name = serializers.CharField(source="site.entity.display_name", allow_null=True)
+
+
 class ClientAssetSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
@@ -216,6 +226,7 @@ class ClientAssetSerializer(serializers.Serializer):
     provenance_checksum = serializers.CharField()
     documents = AssetDocumentSummarySerializer(source="document_provenance", many=True)
     hardware = HardwareProfileSerializer(allow_null=True)
+    software_installation = SoftwareInstallationSummarySerializer(allow_null=True)
     created_at = serializers.DateTimeField()
 
 

@@ -148,6 +148,17 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-client-hardware-assignment": ("organization_entity_id", "asset_entity_id"),
         "organization-client-hardware-disposal": ("organization_entity_id", "asset_entity_id"),
         "organization-client-hardware-lifecycle": ("organization_entity_id", "asset_entity_id"),
+        "organization-client-software-detail": ("organization_entity_id", "asset_entity_id"),
+        "organization-software-license-list-create": ("organization_entity_id",),
+        "organization-software-license-choices": ("organization_entity_id",),
+        "organization-software-license-detail": ("organization_entity_id", "license_entity_id"),
+        "organization-software-license-installation": ("organization_entity_id", "license_entity_id"),
+        "organization-software-license-seat": ("organization_entity_id", "license_entity_id"),
+        "organization-software-license-seat-detail": (
+            "organization_entity_id",
+            "license_entity_id",
+            "seat_id",
+        ),
         "organization-client-asset-document-detail": (
             "organization_entity_id",
             "asset_entity_id",

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.5
+  version: 0.3.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -3094,6 +3094,44 @@ paths:
                 items:
                   $ref: '#/components/schemas/HardwareLifecycleEvent'
           description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/software:
+    patch:
+      operationId: workspaces_organizations_assets_software_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareInstallation'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
     get:
       operationId: organization_client_asset_model_choices_list
@@ -5018,6 +5056,253 @@ paths:
           description: Workspace access required
         '404':
           description: Organization workspace not found
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses:
+    get:
+      operationId: organization_software_licenses_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseResult'
+          description: ''
+    post:
+      operationId: organization_software_licenses_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}:
+    get:
+      operationId: organization_software_licenses_retrieve
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+    patch:
+      operationId: organization_software_licenses_update
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}/installations:
+    post:
+      operationId: workspaces_organizations_licenses_installations_create
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}/seats:
+    post:
+      operationId: workspaces_organizations_licenses_seats_create
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}/seats/{seat_id}:
+    delete:
+      operationId: workspaces_organizations_licenses_seats_destroy
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: seat_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/licenses/choices:
+    get:
+      operationId: workspaces_organizations_licenses_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceResult'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
       operationId: people_organization_list
@@ -6237,6 +6522,19 @@ components:
         * `procedure` - Procedure
         * `guide` - Guide
         * `reference` - Reference
+    ChoiceResult:
+      type: object
+      properties:
+        installations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareInstallation'
+        people:
+          type: array
+          items: {}
+      required:
+      - installations
+      - people
     ClientAsset:
       type: object
       properties:
@@ -6288,6 +6586,10 @@ components:
           allOf:
           - $ref: '#/components/schemas/HardwareProfile'
           nullable: true
+        software_installation:
+          allOf:
+          - $ref: '#/components/schemas/SoftwareInstallationSummary'
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -6306,6 +6608,7 @@ components:
       - product_id
       - product_name
       - provenance_checksum
+      - software_installation
       - specification_definition_id
       - specification_version
       - specification_version_id
@@ -7661,6 +7964,14 @@ components:
       - warranty_provider
       - warranty_reference
       - warranty_starts_on
+    InstallationLinkWrite:
+      type: object
+      properties:
+        installation_id:
+          type: string
+          format: uuid
+      required:
+      - installation_id
     Invitation:
       type: object
       properties:
@@ -7749,6 +8060,79 @@ components:
       description: |-
         * `msp` - msp
         * `organization` - organization
+    LicenseResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareLicense'
+        count:
+          type: integer
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - results
+    LicenseWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        asset_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/LicenseWriteKindEnum'
+        status:
+          $ref: '#/components/schemas/LicenseWriteStatusEnum'
+        seat_limit:
+          type: integer
+          maximum: 100000
+          minimum: 1
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renewal_interval:
+          $ref: '#/components/schemas/RenewalIntervalEnum'
+        auto_renew:
+          type: boolean
+        reference:
+          type: string
+          maxLength: 240
+    LicenseWriteKindEnum:
+      enum:
+      - subscription
+      - perpetual
+      - trial
+      type: string
+      description: |-
+        * `subscription` - subscription
+        * `perpetual` - perpetual
+        * `trial` - trial
+    LicenseWriteStatusEnum:
+      enum:
+      - active
+      - suspended
+      - expired
+      - terminated
+      type: string
+      description: |-
+        * `active` - active
+        * `suspended` - suspended
+        * `expired` - expired
+        * `terminated` - terminated
     LifecycleStateEnum:
       enum:
       - in_stock
@@ -8230,6 +8614,42 @@ components:
         warranty_reference:
           type: string
           maxLength: 240
+    PatchedLicenseWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        asset_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/LicenseWriteKindEnum'
+        status:
+          $ref: '#/components/schemas/LicenseWriteStatusEnum'
+        seat_limit:
+          type: integer
+          maximum: 100000
+          minimum: 1
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renewal_interval:
+          $ref: '#/components/schemas/RenewalIntervalEnum'
+        auto_renew:
+          type: boolean
+        reference:
+          type: string
+          maxLength: 240
     PatchedLocationWrite:
       type: object
       properties:
@@ -8389,6 +8809,26 @@ components:
         phone:
           type: string
           maxLength: 64
+    PatchedSoftwareInstallationWrite:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/SoftwareInstallationWriteStatusEnum'
+        installed_version:
+          type: string
+          maxLength: 160
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        last_verified_on:
+          type: string
+          format: date
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
     PeopleResult:
       type: object
       properties:
@@ -8655,6 +9095,18 @@ components:
         * `source` - source
         * `placement` - placement
         * `listing` - listing
+    RenewalIntervalEnum:
+      enum:
+      - none
+      - monthly
+      - annual
+      - multi_year
+      type: string
+      description: |-
+        * `none` - none
+        * `monthly` - monthly
+        * `annual` - annual
+        * `multi_year` - multi_year
     ResolutionModeEnum:
       enum:
       - live
@@ -8863,6 +9315,17 @@ components:
       required:
       - role_id
       - user_id
+    SeatWrite:
+      type: object
+      properties:
+        person_id:
+          type: string
+          format: uuid
+          nullable: true
+        installation_id:
+          type: string
+          format: uuid
+          nullable: true
     SharedBlockUpdate:
       type: object
       properties:
@@ -8981,6 +9444,245 @@ components:
           maxLength: 64
       required:
       - name
+    SoftwareInstallation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        asset_id:
+          type: string
+          format: uuid
+        asset_name:
+          type: string
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+        model_name:
+          type: string
+        status:
+          type: string
+        installed_version:
+          type: string
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        last_verified_on:
+          type: string
+          format: date
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+      required:
+      - asset_id
+      - asset_name
+      - id
+      - installed_on
+      - installed_version
+      - last_verified_on
+      - model_name
+      - product_id
+      - product_name
+      - site_id
+      - site_name
+      - status
+    SoftwareInstallationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        installed_version:
+          type: string
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        last_verified_on:
+          type: string
+          format: date
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+      required:
+      - id
+      - installed_on
+      - installed_version
+      - last_verified_on
+      - site_id
+      - site_name
+      - status
+    SoftwareInstallationWriteStatusEnum:
+      enum:
+      - planned
+      - installed
+      - suspended
+      - uninstalled
+      type: string
+      description: |-
+        * `planned` - planned
+        * `installed` - installed
+        * `suspended` - suspended
+        * `uninstalled` - uninstalled
+    SoftwareLicense:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        supplier_name:
+          type: string
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+        model_name:
+          type: string
+          nullable: true
+        kind:
+          type: string
+        status:
+          type: string
+        seat_limit:
+          type: integer
+        active_seats:
+          type: integer
+          readOnly: true
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renewal_interval:
+          type: string
+        auto_renew:
+          type: boolean
+        reference:
+          type: string
+        installations:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareSeat'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareLicenseEvent'
+      required:
+      - active_seats
+      - auto_renew
+      - ends_on
+      - events
+      - id
+      - installations
+      - kind
+      - model_name
+      - name
+      - product_id
+      - product_name
+      - reference
+      - renewal_interval
+      - renews_on
+      - seat_limit
+      - seats
+      - starts_on
+      - status
+      - supplier_name
+    SoftwareLicenseEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        installation_name:
+          type: string
+          nullable: true
+        person_name:
+          type: string
+          nullable: true
+        seat_number:
+          type: integer
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - event_type
+      - id
+      - installation_name
+      - occurred_at
+      - person_name
+      - seat_number
+    SoftwareSeat:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        seat_number:
+          type: integer
+        person_id:
+          type: string
+          format: uuid
+          nullable: true
+        person_name:
+          type: string
+          nullable: true
+        installation_id:
+          type: string
+          format: uuid
+          nullable: true
+        installation_name:
+          type: string
+          nullable: true
+        assigned_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assigned_at
+      - id
+      - installation_id
+      - installation_name
+      - person_id
+      - person_name
+      - revoked_at
+      - seat_number
     SpecificationDefinition:
       type: object
       properties:

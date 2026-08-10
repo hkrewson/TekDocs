@@ -25,6 +25,11 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_clientassetdocumentprovenance",
     "core_clienthardwareasset",
     "core_clientassetlifecycleevent",
+    "core_clientsoftwareinstallation",
+    "core_softwarelicense",
+    "core_softwarelicenseinstallation",
+    "core_softwarelicenseseat",
+    "core_softwarelicenseevent",
 )
 
 TENANT_SCOPED_TABLES = (

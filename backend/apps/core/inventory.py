@@ -18,6 +18,7 @@ from .models import (
     ClientAssetDocumentProvenance,
     ClientAssetLifecycleEvent,
     ClientHardwareAsset,
+    ClientSoftwareInstallation,
     DocumentPublication,
     DocumentPublicationArtifact,
     Entity,
@@ -93,6 +94,8 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
             "hardware__assigned_person__person__entity",
             "hardware__assigned_site__entity",
             "hardware__assigned_location__entity",
+            "software_installation",
+            "software_installation__site__entity",
         )
         .prefetch_related(
             _document_prefetch(),
@@ -298,6 +301,12 @@ def create_client_asset(
             event_type=HardwareLifecycleEventType.CREATED,
             to_state=HardwareLifecycleState.IN_STOCK,
             actor_id=actor_id,
+        )
+    else:
+        ClientSoftwareInstallation.objects.create(
+            tenant=tenant,
+            organization=organization,
+            asset=asset,
         )
     associations = list(
         CatalogProductDocument.objects.filter(

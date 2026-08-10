@@ -53,7 +53,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -150,6 +150,39 @@ assert hardware.assigned_location == location
 assert list(ClientAssetLifecycleEvent.objects.filter(asset=asset).values_list("event_type", flat=True)) == [
     "assigned",
     "state_changed",
+    "created",
+]
+software_asset = ClientAsset.objects.select_related("entity", "supplier", "product", "model").get(
+    entity__display_name="Live endpoint protection"
+)
+assert software_asset.organization == organization
+assert software_asset.supplier == vendor
+assert software_asset.product.entity.display_name == "Live Secure Agent"
+assert software_asset.model.entity.display_name == "Live Secure Agent Business"
+software_installation = ClientSoftwareInstallation.objects.get(asset=software_asset)
+assert software_installation.status == "installed"
+assert software_installation.installed_version == "7.4.1"
+assert software_installation.installed_on.isoformat() == "2026-08-10"
+license_record = SoftwareLicense.objects.select_related("entity", "product", "model").get(
+    entity__display_name="Live Secure Agent subscription"
+)
+assert license_record.organization == organization
+assert license_record.product == software_asset.product
+assert license_record.model == software_asset.model
+assert license_record.seat_limit == 5
+assert license_record.renewal_interval == "annual"
+assert license_record.auto_renew is True
+assert license_record.renews_on.isoformat() == "2027-09-10"
+assert SoftwareLicenseInstallation.objects.filter(
+    license=license_record, installation=software_installation, archived_at__isnull=True
+).count() == 1
+license_seat = SoftwareLicenseSeat.objects.get(license=license_record, revoked_at__isnull=True)
+assert license_seat.seat_number == 1
+assert license_seat.person == association
+assert license_seat.installation == software_installation
+assert list(SoftwareLicenseEvent.objects.filter(license=license_record).values_list("event_type", flat=True)) == [
+    "details_updated",
+    "seat_assigned",
     "created",
 ]
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")

@@ -31,6 +31,7 @@ export type ClientAsset = {
   provenance_checksum: string
   documents: AssetDocument[]
   hardware: HardwareProfile | null
+  software_installation: SoftwareInstallation | null
   created_at: string
 }
 export type HardwareProfile = {
@@ -51,6 +52,11 @@ export type HardwareProfile = {
 }
 export type HardwareLifecycleEvent = { id: string; event_type: string; from_state: string; to_state: string; person_name: string | null; site_name: string | null; location_name: string | null; occurred_at: string }
 export type HardwareAssignmentChoices = { people: Array<{ id: string; name: string }>; sites: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; site_id: string }> }
+export type SoftwareInstallation = { id: string; asset_id?: string; asset_name?: string; product_id?: string; product_name?: string; model_name?: string; status: 'planned' | 'installed' | 'suspended' | 'uninstalled'; installed_version: string; installed_on: string | null; last_verified_on: string | null; site_id: string | null; site_name: string | null }
+export type SoftwareLicenseSeat = { id: string; seat_number: number; person_id: string | null; person_name: string | null; installation_id: string | null; installation_name: string | null; assigned_at: string; revoked_at: string | null }
+export type SoftwareLicenseEvent = { id: string; event_type: string; installation_name: string | null; person_name: string | null; seat_number: number | null; occurred_at: string }
+export type SoftwareLicense = { id: string; name: string; supplier_name: string; product_id: string; product_name: string; model_name: string | null; kind: 'subscription' | 'perpetual' | 'trial'; status: 'active' | 'suspended' | 'expired' | 'terminated'; seat_limit: number; active_seats: number; starts_on: string | null; renews_on: string | null; ends_on: string | null; renewal_interval: 'none' | 'monthly' | 'annual' | 'multi_year'; auto_renew: boolean; reference: string; installations: Array<{ id: string; name: string }>; seats: SoftwareLicenseSeat[]; events: SoftwareLicenseEvent[] }
+export type SoftwareChoices = { installations: SoftwareInstallation[]; people: Array<{ id: string; name: string }> }
 export type ModelChoice = {
   id: string
   name: string
@@ -83,6 +89,14 @@ export interface InventoryClient {
   assignHardware(workspace: WorkspaceContext, assetId: string, values: { person_id?: string | null; site_id?: string | null; location_id?: string | null }): Promise<HardwareProfile>
   unassignHardware(workspace: WorkspaceContext, assetId: string): Promise<HardwareProfile>
   disposeHardware(workspace: WorkspaceContext, assetId: string, values: { disposed_on: string; method: string; reason: string }): Promise<HardwareProfile>
+  updateSoftwareInstallation(workspace: WorkspaceContext, assetId: string, values: Partial<SoftwareInstallation>): Promise<SoftwareInstallation>
+  listLicenses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: SoftwareLicense[]; count: number; can_manage: boolean }>
+  createLicense(workspace: WorkspaceContext, values: object): Promise<SoftwareLicense>
+  updateLicense(workspace: WorkspaceContext, licenseId: string, values: object): Promise<SoftwareLicense>
+  softwareChoices(workspace: WorkspaceContext): Promise<SoftwareChoices>
+  linkLicenseInstallation(workspace: WorkspaceContext, licenseId: string, installationId: string): Promise<SoftwareLicense>
+  assignLicenseSeat(workspace: WorkspaceContext, licenseId: string, values: { person_id?: string | null; installation_id?: string | null }): Promise<SoftwareLicense>
+  revokeLicenseSeat(workspace: WorkspaceContext, licenseId: string, seatId: string): Promise<SoftwareLicense>
   loadDocument(workspace: WorkspaceContext, assetId: string, publicationId: string): Promise<AssetDocument & { sanitized_html: string }>
   listVendors(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: DerivedVendor[]; count: number }>
   artifactUrl(workspace: WorkspaceContext, assetId: string, publicationId: string, artifactId: string): string
@@ -135,6 +149,14 @@ export const browserInventoryClient: InventoryClient = {
   assignHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'POST', values),
   unassignHardware: (workspace, assetId) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'DELETE'),
   disposeHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/dispose`, 'POST', values),
+  updateSoftwareInstallation: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/software`, 'PATCH', values),
+  listLicenses: (workspace, signal) => get(`${basePath(workspace)}/licenses`, signal),
+  createLicense: (workspace, values) => mutate(`${basePath(workspace)}/licenses`, 'POST', values),
+  updateLicense: (workspace, licenseId, values) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}`, 'PATCH', values),
+  softwareChoices: (workspace) => get(`${basePath(workspace)}/licenses/choices`),
+  linkLicenseInstallation: (workspace, licenseId, installationId) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}/installations`, 'POST', { installation_id: installationId }),
+  assignLicenseSeat: (workspace, licenseId, values) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}/seats`, 'POST', values),
+  revokeLicenseSeat: (workspace, licenseId, seatId) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}/seats/${encodeURIComponent(seatId)}`, 'DELETE'),
   loadDocument: (workspace, assetId, publicationId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}`),
   listVendors: (workspace, signal) => get(`${basePath(workspace)}/vendors`, signal),
   artifactUrl: (workspace, assetId, publicationId, artifactId) => `${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,

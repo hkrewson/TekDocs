@@ -27,8 +27,8 @@ This document defines which navigation families belong to the MSP and organizati
 | Recycle bin | Archived organizations and MSP-owned domain records | Archived records owned by the exact organization | Archived records owned by the exact supplier | records and recovery available (`0.1.13`) |
 | Documentation | Categorized MSP documents and reusable templates | Categorized client-owned and explicitly referenced documents, templates, managed attachments, and Markdown transfer | Categorized supplier-owned product/support documentation and templates | categories/templates/attachments/import-export available (`0.2.6`) |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
-| Assets | MSP-owned equipment | Client-owned assets with retained supplier provenance; hardware identity, acquisition, warranty, assignment, disposal, and lifecycle history | — | provenance `0.3.4`; hardware lifecycle `0.3.5`; remaining inventory `0.3.6`–`0.3.8` |
-| Licenses | MSP entitlements | Client entitlements and seats | — | `0.3.6` |
+| Assets | MSP-owned equipment | Client-owned assets with retained supplier provenance; hardware lifecycle and software installation state | — | provenance `0.3.4`; hardware lifecycle `0.3.5`; software installations `0.3.6`; remaining inventory `0.3.7`–`0.3.8` |
+| Licenses | MSP entitlements | Addressable software entitlements, covered installations, seat allocations, and renewal terms | — | client workflow `0.3.6`; MSP-owned inventory remains a later topology extension |
 | Networks | MSP networks | Client networks | — | `0.5.x` |
 | Domains | MSP-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | Client-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | — | inventory `0.7.8`; hierarchy/renewals/monitoring `0.7.9`–`0.7.11` |
 | Certificates | MSP TLS endpoints and validation history related to managed domains/hostnames | Client TLS endpoints and validation history related to managed domains/hostnames | — | `0.7.12`–`0.7.13` |

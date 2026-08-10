@@ -15,7 +15,9 @@ from apps.core.models import (
     ClientAssetDocumentProvenance,
     ClientAssetLifecycleEvent,
     ClientHardwareAsset,
+    ClientSoftwareInstallation,
     InstallationState,
+    SoftwareLicenseEvent,
 )
 from apps.core.organizations import create_organization
 from apps.core.rls_contract import RUNTIME_ROLE
@@ -26,6 +28,13 @@ HARDWARE_SCHEMA = {
     "additionalProperties": False,
     "properties": {"ports": {"type": "integer", "minimum": 1}},
     "required": ["ports"],
+}
+
+SOFTWARE_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {"platform": {"type": "string"}},
 }
 
 
@@ -120,6 +129,33 @@ def _catalog(owner_client, supplier):  # type: ignore[no-untyped-def]
     )
     assert association.status_code == 201
     return definition, product, model, document, publication
+
+
+def _software_asset(owner_client, installation, supplier, client, name="Endpoint agent"):  # type: ignore[no-untyped-def]
+    base = {"organization_entity_id": supplier.entity_id}
+    definition = owner_client.post(
+        reverse("organization-catalog-specification-definition-list-create", kwargs=base),
+        {"name": "Software deployment", "product_kind": "software", "schema": SOFTWARE_SCHEMA},
+        content_type="application/json",
+    ).json()
+    product = owner_client.post(
+        reverse("organization-catalog-product-list-create", kwargs=base),
+        {"name": "Secure Agent", "kind": "software", "description": "Managed endpoint agent"},
+        content_type="application/json",
+    ).json()
+    model = owner_client.post(
+        reverse("organization-catalog-model-list-create", kwargs={**base, "product_entity_id": product["id"]}),
+        {
+            "name": "Secure Agent Desktop", "model_number": "SA-DESKTOP",
+            "specification_version_id": definition["versions"][0]["id"], "lifecycle": "active",
+            "specifications": {"platform": "desktop"}, "notes": "",
+        },
+        content_type="application/json",
+    ).json()
+    return owner_client.post(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"model_id": model["id"], "name": name}, content_type="application/json",
+    ).json()
 
 
 @pytest.mark.django_db
@@ -254,12 +290,12 @@ def test_hardware_identity_assignment_disposal_and_history_are_scoped(owner_clie
         {"name": "Main office", "code": "MAIN", "country_code": "US"},
         content_type="application/json",
     ).json()
-    person = owner_client.post(
+    person_response = owner_client.post(
         reverse("organization-people-list-create", kwargs={"organization_entity_id": client.entity_id}),
         {"full_name": "Morgan Ellis", "kind": "contact", "email": "morgan@example.invalid", "site_id": site["id"]},
         content_type="application/json",
     )
-    assert person.status_code == 201
+    assert person_response.status_code == 201
     sibling_site = owner_client.post(
         reverse("organization-site-list-create", kwargs={"organization_entity_id": sibling.entity_id}),
         {"name": "Sibling office", "code": "SIBLING", "country_code": "US"},
@@ -367,6 +403,175 @@ def test_software_asset_rejects_hardware_lifecycle(owner_client, installation):
         )
     )
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_software_installation_license_seats_renewal_and_isolation(owner_client, installation):
+    supplier = _organization(installation, "License Supplier", "vendor")
+    client = _organization(installation, "Licensed Client", "client")
+    sibling = _organization(installation, "Sibling License Client", "client")
+    asset = _software_asset(owner_client, installation, supplier, client)
+    assert asset["software_installation"]["status"] == "planned"
+    assert asset["hardware"] is None
+    asset_base = {"organization_entity_id": client.entity_id, "asset_entity_id": asset["id"]}
+    updated = owner_client.patch(
+        reverse("organization-client-software-detail", kwargs=asset_base),
+        {"status": "installed", "installed_version": "7.4.1", "installed_on": "2026-08-10"},
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    assert updated.json()["installed_version"] == "7.4.1"
+
+    person_response = owner_client.post(
+        reverse("organization-people-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"full_name": "Avery Chen", "kind": "contact", "email": "avery@example.invalid"},
+        content_type="application/json",
+    )
+    assert person_response.status_code == 201
+    license_record = owner_client.post(
+        reverse("organization-software-license-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {
+            "name": "Secure Agent annual entitlement", "asset_id": asset["id"], "kind": "subscription",
+            "seat_limit": 1, "starts_on": "2026-08-01", "renews_on": "2027-08-01",
+            "ends_on": "2027-08-31", "renewal_interval": "annual", "auto_renew": True,
+            "reference": "CONTRACT-REFERENCE",
+        },
+        content_type="application/json",
+    )
+    assert license_record.status_code == 201
+    payload = license_record.json()
+    assert payload["product_name"] == "Secure Agent"
+    assert payload["renewal_interval"] == "annual"
+    assert payload["reference"] == "CONTRACT-REFERENCE"
+    installation_id = payload["installations"][0]["id"]
+    second_asset = owner_client.post(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"model_id": asset["model_id"], "name": "Second secured endpoint"},
+        content_type="application/json",
+    ).json()
+    second_installation_id = second_asset["software_installation"]["id"]
+    linked = owner_client.post(
+        reverse(
+            "organization-software-license-installation",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"installation_id": second_installation_id},
+        content_type="application/json",
+    )
+    assert linked.status_code == 200
+    assert {item["id"] for item in linked.json()["installations"]} == {installation_id, second_installation_id}
+    choices = owner_client.get(
+        reverse("organization-software-license-choices", kwargs={"organization_entity_id": client.entity_id})
+    ).json()
+    person_id = choices["people"][0]["id"]
+    sibling_person = owner_client.post(
+        reverse("organization-people-list-create", kwargs={"organization_entity_id": sibling.entity_id}),
+        {"full_name": "Hidden License User", "kind": "contact", "email": "hidden-license@example.invalid"},
+        content_type="application/json",
+    ).json()
+    foreign_target = owner_client.post(
+        reverse(
+            "organization-software-license-seat",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"person_id": sibling_person["id"]},
+        content_type="application/json",
+    )
+    assert foreign_target.status_code == 400
+    assert b"Hidden License User" not in foreign_target.content
+
+    seat = owner_client.post(
+        reverse(
+            "organization-software-license-seat",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"person_id": person_id, "installation_id": installation_id},
+        content_type="application/json",
+    )
+    assert seat.status_code == 200
+    assert seat.json()["active_seats"] == 1
+    assert seat.json()["seats"][0]["person_name"] == "Avery Chen"
+    exhausted = owner_client.post(
+        reverse(
+            "organization-software-license-seat",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"installation_id": installation_id}, content_type="application/json",
+    )
+    assert exhausted.status_code == 400
+    assert b"No seats" in exhausted.content
+    lower_limit = owner_client.patch(
+        reverse(
+            "organization-software-license-detail",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"seat_limit": 0},
+        content_type="application/json",
+    )
+    assert lower_limit.status_code == 400
+    seat_id = seat.json()["seats"][0]["id"]
+    revoked = owner_client.delete(
+        reverse(
+            "organization-software-license-seat-detail",
+            kwargs={
+                "organization_entity_id": client.entity_id,
+                "license_entity_id": payload["id"],
+                "seat_id": seat_id,
+            },
+        )
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["active_seats"] == 0
+    changed = owner_client.patch(
+        reverse(
+            "organization-software-license-detail",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"name": "Secure Agent renewed entitlement", "renews_on": "2027-09-01", "status": "suspended"},
+        content_type="application/json",
+    )
+    assert changed.status_code == 200
+    assert changed.json()["name"] == "Secure Agent renewed entitlement"
+    assert changed.json()["renews_on"] == "2027-09-01"
+    inactive_assignment = owner_client.post(
+        reverse(
+            "organization-software-license-seat",
+            kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
+        ),
+        {"installation_id": second_installation_id},
+        content_type="application/json",
+    )
+    assert inactive_assignment.status_code == 400
+    assert b"active license" in inactive_assignment.content
+    sibling_read = owner_client.get(reverse(
+        "organization-software-license-detail",
+        kwargs={"organization_entity_id": sibling.entity_id, "license_entity_id": payload["id"]},
+    ))
+    assert sibling_read.status_code == 404
+    event_types = SoftwareLicenseEvent.objects.filter(license__entity_id=payload["id"]).values_list(
+        "event_type", flat=True
+    )
+    assert set(event_types) == {
+        "created", "installation_linked", "seat_assigned", "seat_revoked", "details_updated"
+    }
+    assert ClientSoftwareInstallation.objects.get(asset__entity_id=asset["id"]).status == "installed"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_postgres_rejects_software_license_history_mutation(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Software licensing database guards require PostgreSQL")
+    supplier = _organization(installation, "Software Guard Supplier", "manufacturer")
+    client = _organization(installation, "Software Guard Client", "client")
+    asset = _software_asset(owner_client, installation, supplier, client, "Guarded agent")
+    created = owner_client.post(
+        reverse("organization-software-license-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"name": "Guarded license", "asset_id": asset["id"], "kind": "perpetual", "seat_limit": 1},
+        content_type="application/json",
+    ).json()
+    event = SoftwareLicenseEvent.objects.get(license__entity_id=created["id"])
+    with pytest.raises(DatabaseError), transaction.atomic():
+        SoftwareLicenseEvent.objects.filter(pk=event.pk).update(event_type="details_updated")
 
 
 @pytest.mark.django_db(transaction=True)

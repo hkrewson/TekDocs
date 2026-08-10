@@ -589,9 +589,7 @@ class ClientHardwareAsset(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_hardware_assets")
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.PROTECT, related_name="client_hardware_assets"
-    )
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_hardware_assets")
     asset = models.OneToOneField(ClientAsset, on_delete=models.PROTECT, related_name="hardware")
     serial_number = models.CharField(max_length=160, blank=True)
     asset_tag = models.CharField(max_length=120, blank=True)
@@ -634,8 +632,7 @@ class ClientHardwareAsset(TimestampedModel):
                 name="hardware_acquisition_method_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(disposal_method="")
-                | models.Q(disposal_method__in=HardwareDisposalMethod.values),
+                condition=models.Q(disposal_method="") | models.Q(disposal_method__in=HardwareDisposalMethod.values),
                 name="hardware_disposal_method_valid",
             ),
             models.UniqueConstraint(
@@ -678,6 +675,7 @@ class ClientHardwareAsset(TimestampedModel):
                 raise ValidationError("Disposed hardware cannot retain a current assignment")
         elif self.disposed_on or self.disposal_method or self.disposal_reason:
             raise ValidationError("Disposal details require the disposed lifecycle state")
+
 
 class HardwareLifecycleEventType(models.TextChoices):
     CREATED = "created", "Created"
@@ -748,6 +746,313 @@ class ClientAssetLifecycleEvent(models.Model):
         location = self.location if self.location_id else None
         if location is not None and self.site_id != location.site_id:
             raise ValidationError("Lifecycle event location must belong to its selected site")
+
+
+class SoftwareInstallationStatus(models.TextChoices):
+    PLANNED = "planned", "Planned"
+    INSTALLED = "installed", "Installed"
+    SUSPENDED = "suspended", "Suspended"
+    UNINSTALLED = "uninstalled", "Uninstalled"
+
+
+class SoftwareLicenseKind(models.TextChoices):
+    SUBSCRIPTION = "subscription", "Subscription"
+    PERPETUAL = "perpetual", "Perpetual"
+    TRIAL = "trial", "Trial"
+
+
+class SoftwareLicenseStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    SUSPENDED = "suspended", "Suspended"
+    EXPIRED = "expired", "Expired"
+    TERMINATED = "terminated", "Terminated"
+
+
+class SoftwareRenewalInterval(models.TextChoices):
+    NONE = "none", "None"
+    MONTHLY = "monthly", "Monthly"
+    ANNUAL = "annual", "Annual"
+    MULTI_YEAR = "multi_year", "Multi-year"
+
+
+class ClientSoftwareInstallation(TimestampedModel):
+    """Current installation state for one client-owned software asset."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_software_installations")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_software_installations"
+    )
+    asset = models.OneToOneField(ClientAsset, on_delete=models.PROTECT, related_name="software_installation")
+    status = models.CharField(
+        max_length=20, choices=SoftwareInstallationStatus.choices, default=SoftwareInstallationStatus.PLANNED
+    )
+    installed_version = models.CharField(max_length=160, blank=True)
+    installed_on = models.DateField(null=True, blank=True)
+    last_verified_on = models.DateField(null=True, blank=True)
+    site = models.ForeignKey(
+        "Site", on_delete=models.PROTECT, null=True, blank=True, related_name="software_installations"
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=SoftwareInstallationStatus.values),
+                name="software_installation_status_valid",
+            )
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "status"), name="core_swinstall_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Software installation for {self.asset_id}"
+
+    def clean(self) -> None:
+        if self.asset_id and (
+            self.asset.tenant_id != self.tenant_id
+            or self.asset.organization_id != self.organization_id
+            or self.asset.product.kind != CatalogProductKind.SOFTWARE
+        ):
+            raise ValidationError("Software installation must use an exact client software asset scope")
+        site = self.site if self.site_id else None
+        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
+            raise ValidationError("Software installation site must use the asset's client scope")
+        if self.status == SoftwareInstallationStatus.INSTALLED and not self.installed_on:
+            raise ValidationError("Installed software requires an installation date")
+
+
+class SoftwareLicense(TimestampedModel):
+    """Addressable client entitlement related to one retained software product."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_licenses")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_licenses")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="software_license")
+    supplier = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="supplied_software_licenses")
+    product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="software_licenses")
+    model = models.ForeignKey(
+        CatalogModel, on_delete=models.PROTECT, null=True, blank=True, related_name="software_licenses"
+    )
+    kind = models.CharField(max_length=20, choices=SoftwareLicenseKind.choices)
+    status = models.CharField(
+        max_length=20, choices=SoftwareLicenseStatus.choices, default=SoftwareLicenseStatus.ACTIVE
+    )
+    seat_limit = models.PositiveIntegerField(default=1)
+    starts_on = models.DateField(null=True, blank=True)
+    renews_on = models.DateField(null=True, blank=True)
+    ends_on = models.DateField(null=True, blank=True)
+    renewal_interval = models.CharField(
+        max_length=20, choices=SoftwareRenewalInterval.choices, default=SoftwareRenewalInterval.NONE
+    )
+    auto_renew = models.BooleanField(default=False)
+    reference = models.CharField(max_length=240, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="software_licenses"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(seat_limit__gte=1), name="software_license_seat_limit_positive"),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=SoftwareLicenseKind.values), name="software_license_kind_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=SoftwareLicenseStatus.values), name="software_license_status_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(renewal_interval__in=SoftwareRenewalInterval.values),
+                name="software_renewal_interval_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "status", "renews_on"), name="core_swlicense_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Software license and entity scopes must match")
+        if self.product_id and (
+            self.product.tenant_id != self.tenant_id
+            or self.product.organization_id != self.supplier_id
+            or self.product.kind != CatalogProductKind.SOFTWARE
+        ):
+            raise ValidationError("Software license requires a retained supplier software product")
+        catalog_model = self.model if self.model_id else None
+        if catalog_model is not None and (
+            catalog_model.product_id != self.product_id or catalog_model.organization_id != self.supplier_id
+        ):
+            raise ValidationError("Software license model must belong to its supplier product")
+        if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
+            raise ValidationError("License end date cannot precede its start date")
+        if self.starts_on and self.renews_on and self.renews_on < self.starts_on:
+            raise ValidationError("Renewal date cannot precede the license start date")
+        if self.kind == SoftwareLicenseKind.PERPETUAL and (
+            self.auto_renew or self.renewal_interval != SoftwareRenewalInterval.NONE
+        ):
+            raise ValidationError("Perpetual licenses cannot auto-renew or use a renewal interval")
+
+
+class SoftwareLicenseInstallation(models.Model):
+    """Explicit relationship between an entitlement and a covered installation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_installations")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="software_license_installations"
+    )
+    license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="installation_links")
+    installation = models.ForeignKey(ClientSoftwareInstallation, on_delete=models.PROTECT, related_name="license_links")
+    created_at = models.DateTimeField(auto_now_add=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("license", "installation"), name="unique_license_installation")]
+        indexes = [models.Index(fields=("tenant", "organization", "license"), name="core_swlicinst_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.license_id}: {self.installation_id}"
+
+    def clean(self) -> None:
+        if (
+            self.license_id
+            and self.installation_id
+            and (
+                self.license.tenant_id != self.tenant_id
+                or self.license.organization_id != self.organization_id
+                or self.installation.tenant_id != self.tenant_id
+                or self.installation.organization_id != self.organization_id
+                or self.installation.asset.product_id != self.license.product_id
+            )
+        ):
+            raise ValidationError("License and installation must share client scope and software product")
+
+
+class SoftwareLicenseSeat(models.Model):
+    """One retained seat allocation within a client entitlement."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_seats")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_license_seats")
+    license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="seats")
+    seat_number = models.PositiveIntegerField()
+    person = models.ForeignKey(
+        "PersonAssociation", on_delete=models.PROTECT, null=True, blank=True, related_name="software_license_seats"
+    )
+    installation = models.ForeignKey(
+        ClientSoftwareInstallation, on_delete=models.PROTECT, null=True, blank=True, related_name="license_seats"
+    )
+    assigned_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("license", "seat_number"), name="unique_software_license_seat_number"),
+            models.CheckConstraint(
+                condition=models.Q(seat_number__gte=1), name="software_license_seat_number_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(person__isnull=False) | models.Q(installation__isnull=False),
+                name="software_seat_has_target",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "license", "revoked_at"), name="core_swseat_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.license_id}: seat {self.seat_number}"
+
+    def clean(self) -> None:
+        if self.license_id and (
+            self.license.tenant_id != self.tenant_id or self.license.organization_id != self.organization_id
+        ):
+            raise ValidationError("Software seat and license scopes must match")
+        for target in (self.person, self.installation):
+            if target is not None and (
+                target.tenant_id != self.tenant_id or target.organization_id != self.organization_id
+            ):
+                raise ValidationError("Software seat targets must use the license's client scope")
+        installation = self.installation if self.installation_id else None
+        if installation is not None and installation.asset.product_id != self.license.product_id:
+            raise ValidationError("Software seat installation must use the licensed product")
+
+
+class SoftwareLicenseEventType(models.TextChoices):
+    CREATED = "created", "Created"
+    DETAILS_UPDATED = "details_updated", "Details updated"
+    INSTALLATION_LINKED = "installation_linked", "Installation linked"
+    INSTALLATION_UNLINKED = "installation_unlinked", "Installation unlinked"
+    SEAT_ASSIGNED = "seat_assigned", "Seat assigned"
+    SEAT_REVOKED = "seat_revoked", "Seat revoked"
+
+
+class SoftwareLicenseEvent(models.Model):
+    """Append-only, value-minimized licensing lifecycle history."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_events")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_license_events")
+    license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="events")
+    event_type = models.CharField(max_length=32, choices=SoftwareLicenseEventType.choices)
+    installation = models.ForeignKey(ClientSoftwareInstallation, on_delete=models.PROTECT, null=True, blank=True)
+    person = models.ForeignKey("PersonAssociation", on_delete=models.PROTECT, null=True, blank=True)
+    seat_number = models.PositiveIntegerField(null=True, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "-id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(event_type__in=SoftwareLicenseEventType.values),
+                name="software_license_event_type_valid",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "license", "occurred_at"), name="core_swlicevent_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.license_id}: {self.event_type}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Software license events are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Software license events are append-only")
+
+    def clean(self) -> None:
+        if self.license_id and (
+            self.license.tenant_id != self.tenant_id or self.license.organization_id != self.organization_id
+        ):
+            raise ValidationError("Software license event must use its license scope")
+        for target in (self.installation, self.person):
+            if target is not None and (
+                target.tenant_id != self.tenant_id or target.organization_id != self.organization_id
+            ):
+                raise ValidationError("Software license event targets must use its client scope")
 
 
 class ClientAssetDocumentProvenance(models.Model):

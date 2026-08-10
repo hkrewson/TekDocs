@@ -147,6 +147,15 @@ from apps.core.site_views import (
     OrganizationSiteDetailView,
     OrganizationSiteListCreateView,
 )
+from apps.core.software_inventory_views import (
+    ClientSoftwareInstallationDetailView,
+    SoftwareLicenseChoiceView,
+    SoftwareLicenseDetailView,
+    SoftwareLicenseInstallationView,
+    SoftwareLicenseListCreateView,
+    SoftwareLicenseSeatDetailView,
+    SoftwareLicenseSeatView,
+)
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 from apps.core.workspace_views import (
     MSPWorkspaceContextView,
@@ -507,6 +516,41 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware/lifecycle",
         ClientHardwareLifecycleView.as_view(),
         name="organization-client-hardware-lifecycle",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/software",
+        ClientSoftwareInstallationDetailView.as_view(),
+        name="organization-client-software-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses",
+        SoftwareLicenseListCreateView.as_view(),
+        name="organization-software-license-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/choices",
+        SoftwareLicenseChoiceView.as_view(),
+        name="organization-software-license-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/<uuid:license_entity_id>",
+        SoftwareLicenseDetailView.as_view(),
+        name="organization-software-license-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/<uuid:license_entity_id>/installations",
+        SoftwareLicenseInstallationView.as_view(),
+        name="organization-software-license-installation",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/<uuid:license_entity_id>/seats",
+        SoftwareLicenseSeatView.as_view(),
+        name="organization-software-license-seat",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/<uuid:license_entity_id>/seats/<uuid:seat_id>",
+        SoftwareLicenseSeatDetailView.as_view(),
+        name="organization-software-license-seat-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/documents/<uuid:publication_entity_id>",

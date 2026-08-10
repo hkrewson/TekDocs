@@ -17,7 +17,22 @@ const asset: ClientAsset = {
     warranty_provider: 'Northwind', warranty_starts_on: '2026-08-01', warranty_ends_on: '2029-08-01', warranty_reference: '',
     assignment: { person_id: null, person_name: null, site_id: null, site_name: null, location_id: null, location_name: null, assigned_at: null },
     disposed_on: null, disposal_method: '', disposal_reason: '',
-  }, created_at: '2026-08-10T12:00:00Z',
+  }, software_installation: null, created_at: '2026-08-10T12:00:00Z',
+}
+const softwareAsset: ClientAsset = {
+  ...asset,
+  id: 'software-asset-1',
+  name: 'Reception endpoint protection',
+  kind: 'software',
+  product_name: 'Secure Agent',
+  model_name: 'Business',
+  model_number: 'SEC-BIZ',
+  documents: [],
+  hardware: null,
+  software_installation: {
+    id: 'installation-1', status: 'planned', installed_version: '', installed_on: null,
+    last_verified_on: null, site_id: null, site_name: null,
+  },
 }
 
 function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryClient {
@@ -31,6 +46,14 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     assignHardware: vi.fn().mockResolvedValue(asset.hardware),
     unassignHardware: vi.fn().mockResolvedValue(asset.hardware),
     disposeHardware: vi.fn().mockResolvedValue(asset.hardware),
+    updateSoftwareInstallation: vi.fn(),
+    listLicenses: vi.fn().mockResolvedValue({ results: [], count: 0, can_manage: true }),
+    createLicense: vi.fn(),
+    updateLicense: vi.fn(),
+    softwareChoices: vi.fn().mockResolvedValue({ installations: [], people: [] }),
+    linkLicenseInstallation: vi.fn(),
+    assignLicenseSeat: vi.fn(),
+    revokeLicenseSeat: vi.fn(),
     loadDocument: vi.fn().mockResolvedValue({ ...asset.documents[0], sanitized_html: '<h1>Installation guide</h1>' }),
     listVendors: vi.fn().mockResolvedValue({ results: [], count: 0 }),
     artifactUrl: vi.fn().mockReturnValue('/retained.pdf'),
@@ -79,5 +102,23 @@ describe('Assets', () => {
       'asset-1',
       expect.objectContaining({ serial_number: 'SN-002', lifecycle_state: 'in_service' }),
     ))
+  })
+
+  it('maintains software installation status and version', async () => {
+    const updated = { ...softwareAsset.software_installation!, status: 'installed' as const, installed_version: '7.4.1', installed_on: '2026-08-10' }
+    const updateSoftwareInstallation = vi.fn().mockResolvedValue(updated)
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({
+      listAssets: vi.fn().mockResolvedValue({ results: [softwareAsset], count: 1, can_manage: true }),
+      updateSoftwareInstallation,
+    })} />)
+    expect(await screen.findByRole('heading', { name: 'Software installation' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit installation' }))
+    await user.selectOptions(screen.getByLabelText('Status'), 'installed')
+    await user.type(screen.getByLabelText('Installed version'), '7.4.1')
+    await user.type(screen.getByLabelText('Installed on'), '2026-08-10')
+    await user.click(screen.getByRole('button', { name: 'Save installation' }))
+    await waitFor(() => expect(updateSoftwareInstallation).toHaveBeenCalledWith(workspace, 'software-asset-1', expect.objectContaining({ status: 'installed', installed_version: '7.4.1', installed_on: '2026-08-10' })))
+    expect(await screen.findByText('7.4.1')).toBeInTheDocument()
   })
 })

@@ -574,7 +574,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.3` | **Complete:** supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | **Complete:** supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | **Complete:** client hardware serials/tags, acquisition/disposal, warranty, current person/location assignment, and append-only lifecycle history. |
-| `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
+| `0.3.6` | **Complete:** client software installations, addressable licenses, bounded seat allocation, renewal terms, installation relationships, and append-only license history. |
 | `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
 | `0.3.8` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
 | `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
@@ -646,6 +646,19 @@ Evidence: `docs/releases/0.3.4.md` (created at slice closeout).
 - [x] OpenAPI, architecture, security baseline, threat model, risk register, migration/upgrade evidence, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.5`.
 
 Evidence: `docs/releases/0.3.5.md`.
+
+### `0.3.6` acceptance criteria
+
+- [x] Every client asset backed by a software catalog product receives one client-scoped installation profile; hardware assets fail closed at software routes.
+- [x] Installation state records planned, installed, suspended, or terminal uninstalled status plus bounded version, installation date, verification date, and optional exact-client site.
+- [x] An addressable client license retains its supplier software product/model relationship, subscription/perpetual/trial kind, status, seat limit, term, renewal date/interval, auto-renew choice, and bounded external reference without storing license keys or credentials.
+- [x] One license may cover multiple exact-client installations of the same retained product. Active seat allocations may target a person, a linked installation, or both; allocation rejects exhausted limits, duplicate active targets, sibling-client targets, and inactive licenses.
+- [x] License changes, installation relationships, assignments, and revocations append value-minimized immutable events. Audit metadata contains no renewal reference or assignment value.
+- [x] Reads use `assets.view`; every mutation uses centrally declared MFA/CSRF-protected `assets.edit`. Tenant/client scope is enforced through scoped queries, PostgreSQL relationship guards, forced RLS, and negative IDOR coverage.
+- [x] Client Assets exposes software installation state and Client Licenses exposes entitlement, seats, installations, renewals, history, loading, empty, denial, responsive, keyboard, and accessibility states.
+- [x] OpenAPI, architecture, security baseline, threat model, risk register, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.6`.
+
+Evidence: `docs/releases/0.3.6.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

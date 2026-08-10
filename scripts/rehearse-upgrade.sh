@@ -21,8 +21,14 @@ current_compose() {
 }
 
 cleanup() {
+  exit_status=$?
+  if [ "$exit_status" -ne 0 ]; then
+    echo "Upgrade rehearsal failed; migration and backend logs follow" >&2
+    current_compose logs --no-color migrate backend >&2 || true
+  fi
   current_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
+  exit "$exit_status"
 }
 trap cleanup EXIT HUP INT TERM
 

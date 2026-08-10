@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The documentation alpha is at version `0.2.9`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The reusable-documentation and immutable-publication foundation is certified at version `0.3.0`.
 
 ## Start locally
 
@@ -55,6 +55,7 @@ make test-e2e-all
 make test-e2e-live
 make test-stabilization
 make test-certification
+make test-documentation-certification
 make test-markdown
 make compose-doctor
 make production-image-rehearsal
@@ -70,7 +71,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 ## Current boundaries
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
-- Documentation is an alpha: persistence, revision/reuse, transfer, and STATIC-publication contracts are implemented, but the broader 1.0 capacity, concurrency, supported encrypted backup tooling, and public GitHub Wiki remain later milestones.
+- The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The broader 1.0 capacity, concurrency, supported encrypted backup tooling, malware quarantine, and public GitHub Wiki remain later milestones.
 - Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
 - TekDocs does not store customer credential values. Provider-neutral external credential references begin in `0.3.1`; deployment-key file injection follows in `0.3.2`.
 

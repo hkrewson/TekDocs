@@ -17,6 +17,18 @@ if [ -e "$target" ]; then
   if ! grep -q '^TEKDOCS_PUBLICATION_SIGNING_KEY=' "$target"; then
     echo "TEKDOCS_PUBLICATION_SIGNING_KEY=$(generate_url_safe_32_byte_key)" >> "$target"
     changed=true
+  else
+    existing_signing_key=$(sed -n 's/^TEKDOCS_PUBLICATION_SIGNING_KEY=//p' "$target" | head -n 1)
+    if printf '%s' "$existing_signing_key" | grep -Eq '^[A-Za-z0-9+/]{43}=$' \
+      && printf '%s' "$existing_signing_key" | grep -Eq '[+/]'; then
+      normalized_signing_key=$(printf '%s' "$existing_signing_key" | tr '+/' '-_')
+      temporary_target=$(mktemp "${target}.XXXXXX")
+      sed "s|^TEKDOCS_PUBLICATION_SIGNING_KEY=.*$|TEKDOCS_PUBLICATION_SIGNING_KEY=$normalized_signing_key|" \
+        "$target" > "$temporary_target"
+      chmod 0600 "$temporary_target"
+      mv "$temporary_target" "$target"
+      changed=true
+    fi
   fi
   if ! grep -q '^POSTGRES_OWNER_USER=' "$target"; then
     legacy_user=$(sed -n 's/^POSTGRES_USER=//p' "$target" | head -n 1)

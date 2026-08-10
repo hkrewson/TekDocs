@@ -8,6 +8,7 @@
 - Reference-dataset latency and query-count budgets pass without bypassing policy or workspace scope.
 - `make release-gate` passes, or each unavailable local gate has successful hosted evidence.
 - Authentication, RBAC, tenant/client isolation, secret redaction, static-publication integrity, and browser regression pass for the shipped scope.
+- A documentation certification release runs `make test-documentation-certification` plus its prior-alpha upgrade and database/media restore rehearsals.
 - Dependency, license, Gitleaks, CodeQL, Trivy, and DAST findings have no unresolved Critical or untriaged High issues.
 - Backup and restore include the database and artifacts; wrapping and publication keys are recovered separately.
 - Container digests, CycloneDX SBOMs, provenance attestations, signed tag, and release notes are ready.

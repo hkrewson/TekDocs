@@ -10,9 +10,10 @@ TekDocs treats performance as an authorization-preserving release property. A fa
 - 10,000 organization-distributed reference entities;
 - 250 people and organization associations;
 - 50 sites and 250 nested locations; and
-- 25 typed entity links.
+- 25 typed entity links; and
+- one reusable document with 2,500 immutable block revisions.
 
-The fixture contains 10,650 addressable entities before bootstrap-owned records. UUIDs and credentials remain randomly generated, while record counts, ownership distribution, searchable labels, and relationships are deterministic.
+The fixture contains at least 10,650 addressable entities before bootstrap-owned documentation records. UUIDs and credentials remain randomly generated, while record counts, ownership distribution, searchable labels, relationships, and revision depth are deterministic.
 
 The gate measures eight warmed HTTP requests for each ordinary read and rejects a p95 of 500 ms or greater. It separately captures Django query counts around the underlying authorized services so latency improvements cannot hide an N+1 regression.
 
@@ -24,8 +25,9 @@ The gate measures eight warmed HTTP requests for each ordinary read and rejects 
 | Client Sites list | 3 | 35.7 ms |
 | Client Entity search | 5 | 11.4 ms |
 | Client relationship discovery | 6 | 10.9 ms |
+| Document revision-history page | 3 | 20.6 ms (`0.2.9` evidence) |
 
-Observed service query counts were 3, 3, 2, 2, 3, and 2 in the same order. These values are evidence from one run, not a universal capacity promise.
+Observed service query counts for the original six paths were 3, 3, 2, 2, 3, and 2 in the same order. The document-history service ceiling is three queries. These values are evidence from local runs, not a universal capacity promise.
 
 ## Reference environment
 
@@ -35,6 +37,7 @@ Run the blocking cross-cutting suite with:
 
 ```sh
 make test-stabilization
+make test-documentation-certification
 ```
 
 Run the performance fixture alone when profiling:
@@ -48,5 +51,5 @@ docker compose run --rm migrate pytest apps/core/tests/test_stabilization_perfor
 - The 500 ms threshold applies to ordinary indexed reads on the documented reference environment, not imports, reports, or external integrations.
 - Query-count budgets are ceilings. A change that exceeds one must be optimized or explicitly reviewed with updated evidence; increasing the number to make a failure pass is not a fix.
 - Cold image startup and fixture construction are excluded from request timing.
-- The fixture exercises only domain families implemented by `0.1.15`. Documentation blocks/revisions and asset records join the reference dataset when those models ship, growing toward the 1.0 target of 100 clients, 100,000 entities, 250,000 block revisions, and 25,000 assets.
+- The fixture exercises the entity/RBAC foundation plus documentation history at the `0.3.0` certification boundary. Asset records join as their models ship, and the dataset still must grow toward the 1.0 target of 100 clients, 100,000 entities, 250,000 block revisions, and 25,000 assets.
 - Before 1.0, measurements require a quieter documented reference host, search-index coverage, concurrency/load testing, and retained trend artifacts. This baseline is an early regression tripwire, not a production sizing guide.

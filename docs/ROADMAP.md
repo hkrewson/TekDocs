@@ -429,7 +429,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.7` | **Complete:** immutable STATIC dependency resolution, canonical snapshot/manifest, content digest, and Ed25519 signing. |
 | `0.2.8` | **Complete:** deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
 | `0.2.9` | **Complete:** documentation-alpha stabilization, enforced editor/shell bundle budgets, paginated large history, accessibility, prior-alpha upgrade, and database/media restore evidence. |
-| `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
+| `0.3.0` | **Complete:** formally certified reusable Markdown documentation and immutable STATIC publication without expanding the domain surface. |
 
 ### `0.2.1` acceptance criteria
 
@@ -550,6 +550,20 @@ Evidence: `docs/releases/0.2.8.md`.
 - [x] Version, migration/OpenAPI drift, backend/frontend, Docker Compose, browser matrix, security, clean-install, production-image, upgrade, and documentation-specific recovery evidence agree at `0.2.9`.
 
 Evidence: `docs/releases/0.2.9.md`.
+
+### `0.3.0` acceptance criteria
+
+- [x] The release adds no document model, migration, route, dependency, Markdown extension, editor behavior, or publication format; it certifies the implemented `0.2.x` contract rather than broadening it.
+- [x] `make test-documentation-certification` runs the complete document/publication service and API suite with rendering abuse, authenticated-route/IDOR, raw runtime-role forced-RLS, migration-aware reference performance, and 2,500-revision history evidence against PostgreSQL.
+- [x] Every document mutation remains centrally authorized and MFA/CSRF protected; every direct identifier remains non-disclosing across anonymous, non-member, Read-only, sibling-client, assigned-only, malformed, and cross-tenant cases.
+- [x] Canonical Markdown, immutable revisions, live/pinned resolution, reuse impact, detach, entity mentions, templates, managed attachments, import/export, and server/client sanitization remain aligned with ADRs 0019 and 0021–0024.
+- [x] STATIC publication continues to freeze exact dependency revisions and retained bytes into append-only signed manifests, deterministic PDFs, lifecycle metadata, and one-successor correction chains under ADRs 0025–0026.
+- [x] Documentation-specific `0.2.8` upgrade and isolated PostgreSQL-plus-media restore rehearsals preserve identities, revision history, exact attachment bytes, signed manifests, and retained PDFs with deployment keys held separately.
+- [x] The shell/editor bundle budgets, 2,500-revision latency/query ceilings, keyboard and axe behavior, and the Chromium/Firefox/WebKit matrix remain blocking without claiming the later 250,000-revision or representative-device capacity target.
+- [x] Version, migration/OpenAPI drift, backend/frontend coverage, Docker Compose, production images, clean installation, oldest-supported upgrade, documentation upgrade/restore, security scans, architecture, threat model, security baseline, risk register, and release evidence agree at `0.3.0`.
+- [x] Hosted GitHub checks, tags, images, attestations, Wiki publication, and deployment remain explicitly unverified and unperformed until separately authorized.
+
+Evidence: `docs/releases/0.3.0.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

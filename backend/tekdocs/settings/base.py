@@ -7,6 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from tekdocs.version import VERSION
 
+from .secret_files import read_secret
 from .validation import oidc_provider_from_environment
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -30,13 +31,13 @@ def env_int(name: str, default: int) -> int:
         raise ImproperlyConfigured(f"{name} must be an integer") from exc
 
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-not-for-production")
-TEKDOCS_MASTER_KEY = os.getenv("TEKDOCS_MASTER_KEY", "")
-TEKDOCS_PUBLICATION_SIGNING_KEY = os.getenv("TEKDOCS_PUBLICATION_SIGNING_KEY", "")
-TEKDOCS_BOOTSTRAP_TOKEN = os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", "")
+SECRET_KEY = read_secret("DJANGO_SECRET_KEY", default="development-only-not-for-production")
+TEKDOCS_MASTER_KEY = read_secret("TEKDOCS_MASTER_KEY")
+TEKDOCS_PUBLICATION_SIGNING_KEY = read_secret("TEKDOCS_PUBLICATION_SIGNING_KEY")
+TEKDOCS_BOOTSTRAP_TOKEN = read_secret("TEKDOCS_BOOTSTRAP_TOKEN")
 TEKDOCS_DATABASE_ROLE = os.getenv("TEKDOCS_DATABASE_ROLE", "runtime")
 TEKDOCS_DATABASE_RUNTIME_ROLE = os.getenv("TEKDOCS_DATABASE_RUNTIME_ROLE", "tekdocs_runtime")
-TEKDOCS_DATABASE_RUNTIME_PASSWORD = os.getenv("TEKDOCS_DATABASE_RUNTIME_PASSWORD", "")
+TEKDOCS_DATABASE_RUNTIME_PASSWORD = read_secret("TEKDOCS_DATABASE_RUNTIME_PASSWORD")
 TEKDOCS_PUBLIC_URL = os.getenv("TEKDOCS_PUBLIC_URL", "http://localhost:3200").rstrip("/")
 TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL", False)
 INVITATION_TTL_HOURS = env_int("INVITATION_TTL_HOURS", 168)
@@ -48,7 +49,9 @@ if not 300 <= PASSWORD_RESET_TIMEOUT <= 86400:
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
-TEKDOCS_OIDC_PROVIDER = oidc_provider_from_environment(os.environ)
+_oidc_environment = dict(os.environ)
+_oidc_environment["TEKDOCS_OIDC_CLIENT_SECRET"] = read_secret("TEKDOCS_OIDC_CLIENT_SECRET")
+TEKDOCS_OIDC_PROVIDER = oidc_provider_from_environment(_oidc_environment)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -111,7 +114,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("POSTGRES_DB", "tekdocs"),
         "USER": os.getenv("POSTGRES_USER", "tekdocs"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+        "PASSWORD": read_secret("POSTGRES_PASSWORD"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": 60,
@@ -249,7 +252,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "TekDocs <noreply@localhost
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = env_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_HOST_PASSWORD = read_secret("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)

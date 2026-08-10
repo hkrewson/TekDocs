@@ -1,11 +1,13 @@
 from typing import Any
 
+from django.conf import settings
 from django.db import connection
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.models import InstallationState
 from tekdocs.version import VERSION
 
 
@@ -38,4 +40,12 @@ class ReadyHealthView(APIView):
                 cursor.fetchone()
         except Exception:  # noqa: BLE001
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
+        bootstrap_required = InstallationState.objects.filter(
+            pk=InstallationState.SINGLETON_ID, bootstrapped_at__isnull=True
+        ).exists()
+        if bootstrap_required and not settings.TEKDOCS_BOOTSTRAP_TOKEN:
+            return Response(
+                {"status": "unavailable", "database": "ready", "bootstrap": "unavailable", "version": VERSION},
+                status=503,
+            )
         return Response({"status": "ok", "database": "ready", "version": VERSION})

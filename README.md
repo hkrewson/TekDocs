@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.1` adds provider-neutral credential references with a strict 1Password Private Link boundary; TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.2` adds production runtime secret-file inputs while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 
@@ -16,6 +16,8 @@ Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with ge
 Compose runs schema changes through a one-shot migration container using the database owner. Web, worker, and scheduler containers connect as the fixed, non-owner `tekdocs_runtime` role and validate its forced-RLS policy inventory before startup. Python installs use reviewed hash locks; run `./scripts/update-python-locks.sh` after intentionally changing backend requirements.
 
 Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
+
+Production-capable secret files are configured with `.env.production.example`, `compose.production.yml`, and `compose.secret-files.yml`. Optional authenticated SMTP, OIDC, and first-owner bootstrap secrets use their own least-scope overlays. Direct and file sources are mutually exclusive; invalid files fail startup without echoing values or host paths. See `docs/SECRET_FILES_AND_PRODUCTION_IMAGES.md` and `docs/ONEPASSWORD_RUNTIME_INJECTION.md` before using this deployment boundary.
 
 Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
 
@@ -42,7 +44,7 @@ curl --fail-with-body http://localhost:3200/api/v1/bootstrap/owner \
   --data '{"tenant_name":"Example MSP","owner_email":"owner@example.com","owner_display_name":"Primary Owner","password":"use-a-unique-password-manager-generated-value"}'
 ```
 
-`GET /api/v1/bootstrap/status` returns only whether bootstrap is required. A successful claim creates one tenant and one normal product owner identity, records a value-free audit event, and permanently closes this endpoint. Rotate the deployment bootstrap token after success and retain the replacement in the deployment secret store because production validation requires it; changing it does not reopen the database state. Public registration remains closed. See `docs/AUTHENTICATION.md` for the session and CSRF contract.
+`GET /api/v1/bootstrap/status` returns only whether bootstrap is required. A successful claim creates one tenant and one normal product owner identity, records a value-free audit event, and permanently closes this endpoint. A production deployment may then remove `compose.bootstrap-secret.yml` and the bootstrap-token source file; readiness requires the token only while the installation is unclaimed. Public registration remains closed. See `docs/AUTHENTICATION.md` for the session and CSRF contract.
 
 Useful gates:
 
@@ -56,6 +58,7 @@ make test-e2e-live
 make test-stabilization
 make test-certification
 make test-documentation-certification
+make test-secret-files
 make test-markdown
 make compose-doctor
 make production-image-rehearsal
@@ -73,7 +76,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The broader 1.0 capacity, concurrency, supported encrypted backup tooling, malware quarantine, and public GitHub Wiki remain later milestones.
 - Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
-- TekDocs does not store customer credential values. Provider-neutral external credential references begin in `0.3.1`; deployment-key file injection follows in `0.3.2`.
+- TekDocs does not store customer credential values. Provider-neutral external credential references arrived in `0.3.1`; production runtime secret-file injection is implemented in `0.3.2`, with mandatory removal of environment fallback remaining assigned to `0.8.7`.
 
 ## License
 

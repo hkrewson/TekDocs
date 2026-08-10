@@ -4,12 +4,15 @@ set -eu
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-production-image.XXXXXX")
 environment_file="$work_directory/production-image.env"
+secret_directory="$work_directory/secrets"
 project_name="tekdocs_production_image_$$"
 
 production_compose() {
   docker compose --project-name "$project_name" --env-file "$environment_file" \
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" \
-    -f "$repository_root/compose.production-test.yml" "$@"
+    -f "$repository_root/compose.production.yml" -f "$repository_root/compose.secret-files.yml" \
+    -f "$repository_root/compose.smtp-secret.yml" -f "$repository_root/compose.oidc-secret.yml" \
+    -f "$repository_root/compose.bootstrap-secret.yml" "$@"
 }
 
 cleanup() {
@@ -24,9 +27,46 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
+mkdir -m 0700 "$secret_directory"
+
+copy_environment_secret() {
+  name="$1"
+  target="$2"
+  value=$(sed -n "s/^${name}=//p" "$environment_file" | head -n 1)
+  if [ -z "$value" ]; then
+    echo "Production rehearsal could not prepare $name" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value" > "$secret_directory/$target"
+  chmod 0600 "$secret_directory/$target"
+}
+
+copy_environment_secret DJANGO_SECRET_KEY django_secret_key
+copy_environment_secret POSTGRES_OWNER_PASSWORD postgres_owner_password
+copy_environment_secret POSTGRES_RUNTIME_PASSWORD postgres_runtime_password
+copy_environment_secret TEKDOCS_MASTER_KEY tekdocs_master_key
+copy_environment_secret TEKDOCS_PUBLICATION_SIGNING_KEY publication_signing_key
+copy_environment_secret TEKDOCS_BOOTSTRAP_TOKEN bootstrap_token
+sanitized_environment_file="$work_directory/production-image-sanitized.env"
+sed -E \
+  -e 's/^(DJANGO_SECRET_KEY|POSTGRES_OWNER_PASSWORD|POSTGRES_RUNTIME_PASSWORD|TEKDOCS_MASTER_KEY|TEKDOCS_PUBLICATION_SIGNING_KEY|TEKDOCS_BOOTSTRAP_TOKEN)=.*/\1=/' \
+  "$environment_file" > "$sanitized_environment_file"
+chmod 0600 "$sanitized_environment_file"
+mv "$sanitized_environment_file" "$environment_file"
+email_secret=$(openssl rand -hex 32)
+oidc_secret=$(openssl rand -hex 32)
+printf '%s\n' "$email_secret" > "$secret_directory/email_host_password"
+printf '%s\n' "$oidc_secret" > "$secret_directory/oidc_client_secret"
+chmod 0600 "$secret_directory/email_host_password" "$secret_directory/oidc_client_secret"
 {
   echo "TEKDOCS_PORT=0"
   echo "MAILPIT_UI_PORT=0"
+  echo "TEKDOCS_SECRET_DIRECTORY=$secret_directory"
+  echo "EMAIL_HOST_USER=production-rehearsal"
+  echo "TEKDOCS_OIDC_PROVIDER_ID=rehearsal-sso"
+  echo "TEKDOCS_OIDC_PROVIDER_NAME=Rehearsal SSO"
+  echo "TEKDOCS_OIDC_DISCOVERY_URL=https://identity.example.invalid/.well-known/openid-configuration"
+  echo "TEKDOCS_OIDC_CLIENT_ID=tekdocs-rehearsal"
 } >> "$environment_file"
 
 echo "Starting isolated production-target image rehearsal"
@@ -38,6 +78,60 @@ backend_id=$(production_compose ps -q backend)
 backend_user=$(docker inspect --format '{{.Config.User}}' "$backend_id")
 if [ "$backend_user" != "tekdocs" ] && [ "$backend_user" != "10001" ]; then
   echo "Production backend image must run as the unprivileged TekDocs user" >&2
+  exit 1
+fi
+
+echo "Verifying production secrets remain file-backed and value-free"
+for service in db migrate backend worker scheduler; do
+  container_id=$(production_compose ps -q --all "$service")
+  environment_output=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container_id")
+  image_id=$(docker inspect --format '{{.Image}}' "$container_id")
+  image_history=$(docker history --no-trunc "$image_id")
+  for secret_file in "$secret_directory"/*; do
+    secret_value=$(sed -n '1p' "$secret_file")
+    if printf '%s' "$environment_output" | grep -Fq "$secret_value"; then
+      echo "Production $service container environment contains a secret value" >&2
+      exit 1
+    fi
+    if printf '%s' "$image_history" | grep -Fq "$secret_value"; then
+      echo "Production $service image history contains a secret value" >&2
+      exit 1
+    fi
+  done
+done
+for secret_file in "$secret_directory"/*; do
+  secret_value=$(sed -n '1p' "$secret_file")
+  if grep -Fq "$secret_value" "$environment_file"; then
+    echo "Production environment file contains a secret value" >&2
+    exit 1
+  fi
+done
+production_compose exec -T backend sh -c 'test -r /run/secrets/django_secret_key && test ! -e /run/secrets/postgres_owner_password'
+production_compose run --rm --no-deps migrate sh -c 'test -r /run/secrets/postgres_owner_password && test ! -e /run/secrets/email_host_password'
+production_compose exec -T db sh -c 'test -r /run/secrets/postgres_owner_password && test ! -e /run/secrets/django_secret_key'
+
+combined_logs=$(production_compose logs --no-color)
+for secret_file in "$secret_directory"/*; do
+  secret_value=$(sed -n '1p' "$secret_file")
+  if printf '%s' "$combined_logs" | grep -Fq "$secret_value"; then
+    echo "Production service logs contain a secret value" >&2
+    exit 1
+  fi
+done
+if printf '%s' "$combined_logs" | grep -Fq "$secret_directory"; then
+  echo "Production service logs contain the host secret directory" >&2
+  exit 1
+fi
+
+failure_log="$work_directory/ambiguous-secret.log"
+if production_compose run --rm --no-deps -e DJANGO_SECRET_KEY=ambiguous-direct-value \
+  backend python manage.py check > "$failure_log" 2>&1; then
+  echo "Production startup accepted ambiguous direct and file secret sources" >&2
+  exit 1
+fi
+grep -q 'set either DJANGO_SECRET_KEY or DJANGO_SECRET_KEY_FILE, not both' "$failure_log"
+if grep -Fq 'ambiguous-direct-value' "$failure_log" || grep -Fq "$secret_directory" "$failure_log"; then
+  echo "Secret-source validation disclosed a value or host path" >&2
   exit 1
 fi
 echo "Production-target image rehearsal passed"

@@ -1,5 +1,3 @@
-import os
-
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
@@ -19,12 +17,11 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-_required = {
-    "DJANGO_SECRET_KEY": os.getenv("DJANGO_SECRET_KEY", ""),
-    "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-    "TEKDOCS_MASTER_KEY": os.getenv("TEKDOCS_MASTER_KEY", ""),
-    "TEKDOCS_PUBLICATION_SIGNING_KEY": os.getenv("TEKDOCS_PUBLICATION_SIGNING_KEY", ""),
-    "TEKDOCS_BOOTSTRAP_TOKEN": os.getenv("TEKDOCS_BOOTSTRAP_TOKEN", ""),
+_required: dict[str, str] = {
+    "DJANGO_SECRET_KEY": str(SECRET_KEY),  # noqa: F405
+    "POSTGRES_PASSWORD": str(DATABASES["default"]["PASSWORD"]),  # noqa: F405
+    "TEKDOCS_MASTER_KEY": str(TEKDOCS_MASTER_KEY),  # noqa: F405
+    "TEKDOCS_PUBLICATION_SIGNING_KEY": str(TEKDOCS_PUBLICATION_SIGNING_KEY),  # noqa: F405
 }
 _weak_values = {"", "changeme", "change-me", "replace-me", "development", "password", "secret"}
 _invalid = [

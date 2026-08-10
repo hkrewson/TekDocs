@@ -570,7 +570,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.3.1` | **Complete:** provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
-| `0.3.2` | Production runtime `*_FILE` inputs, secret-file precedence/validation, production-image tests, and an operator-owned 1Password CLI injection recipe that never gives TekDocs a vault-retrieval capability. |
+| `0.3.2` | **Complete:** production runtime `*_FILE` inputs, fail-closed secret-file validation, service-scoped Compose mounts, production-image leakage tests, removable bootstrap custody, and an operator-owned 1Password CLI injection recipe. |
 | `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
@@ -592,6 +592,19 @@ Evidence: `docs/releases/0.3.0.md`.
 - [x] Security baseline, threat model, custody ADR, information architecture, risk register, OpenAPI, release notes, and version metadata agree that customer secrets remain outside TekDocs.
 
 Evidence: `docs/releases/0.3.1.md`.
+
+### `0.3.2` acceptance criteria
+
+- [x] One configuration reader supports mutually exclusive direct or `*_FILE` sources for Django signing, owner/runtime PostgreSQL credentials, MFA wrapping, STATIC publication signing, first-owner bootstrap, SMTP authentication, and OIDC client authentication without printing a value or host source path.
+- [x] File inputs must resolve inside an approved root, identify a bounded regular UTF-8 file, have an expected owner and non-writable/non-executable group/other mode, and contain one printable value. Empty, oversized, multiline, outer-whitespace, non-UTF-8, relative, escaping-symlink, outside-root, unsafe-mode, missing, and ambiguous inputs fail closed.
+- [x] The production Compose overlays mount only the secrets each database/migration/runtime/auth service requires beneath `/run/secrets`; the ordinary production environment example contains no secret value. Direct environment fallback remains available for development and compatibility until production enforcement in `0.8.7`.
+- [x] The bootstrap secret is a separate one-time overlay. Readiness fails when an unclaimed installation has no token and succeeds after an owner claim when the token mount is removed.
+- [x] The production-target rehearsal uses file-only values and verifies successful database migration plus web/worker/scheduler startup, non-root runtime, absent development tools, least-scope mounts, and no secret values in container environments, image history, or service logs.
+- [x] Ambiguous direct-plus-file production startup is rejected with a value/path-free diagnostic. Local unit and Compose gates cover precedence, validation, conditional bootstrap, SMTP/OIDC resolution, and runtime-image behavior.
+- [x] The operator-owned 1Password recipe materializes deployment files outside the repository on a protected host runtime filesystem. TekDocs containers receive only mounted files and never receive a 1Password account session, service-account token, Connect token, vault reference, or retrieval capability.
+- [x] Security baseline, threat model, risk register, operator documentation, release notes, version metadata, and release gates agree at `0.3.2`; no schema or product API change is introduced.
+
+Evidence: `docs/releases/0.3.2.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

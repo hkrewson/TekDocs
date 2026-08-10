@@ -1,35 +1,57 @@
-# Secret-file injection and production-image plan
+# Secret-file injection and production-image contract
 
-Status: accepted `0.1.3` deployment plan. Implementation remains assigned to `TD-RISK-004` and `TD-RISK-007` in `docs/ENGINEERING_RISKS.md`.
+Status: implemented in `0.3.2` for production-capable file inputs and local production-image evidence. Removing direct environment compatibility and the remaining container hardening are assigned to `0.8.7`; exact published-image evidence remains `0.9.4`.
 
-## Current boundary
+## Configuration sources
 
-The local Compose profile supplies generated development values as environment variables and deliberately permits localhost HTTP and Mailpit SMTP. This is not the supported long-term production secret boundary. The production-target image now receives an isolated smoke rehearsal, but web startup still applies migrations and the default operator profile still needs later runtime hardening.
+Each supported sensitive setting accepts either its existing variable or a mutually exclusive `<NAME>_FILE` path. A non-empty direct value and a file source together fail startup. An empty variable emitted by Compose is treated as absent, which permits the file overlay to replace development-oriented environment keys.
 
-## Secret-file contract
-
-`0.3.1` will add a single configuration reader for sensitive settings. Each supported secret will accept either its existing variable or a mutually exclusive `<NAME>_FILE` path. Supplying both, neither where required, an empty/oversized file, a directory, a symlink outside the approved secret mount, or a file readable by unintended users will fail startup without printing the value or file contents.
-
-The initial file-backed set is:
+The file-backed set is:
 
 - `DJANGO_SECRET_KEY_FILE`;
-- `POSTGRES_PASSWORD_FILE`;
+- `POSTGRES_PASSWORD_FILE` for either the database owner or runtime connection, depending on the service;
+- `TEKDOCS_DATABASE_RUNTIME_PASSWORD_FILE` for the migration service's role provisioning;
 - `TEKDOCS_MASTER_KEY_FILE`;
 - `TEKDOCS_PUBLICATION_SIGNING_KEY_FILE`;
-- `TEKDOCS_BOOTSTRAP_TOKEN_FILE`;
-- `EMAIL_HOST_PASSWORD_FILE` when SMTP authentication is enabled;
+- `TEKDOCS_BOOTSTRAP_TOKEN_FILE` before the first-owner claim;
+- `EMAIL_HOST_PASSWORD_FILE` when authenticated SMTP is enabled;
 - `TEKDOCS_OIDC_CLIENT_SECRET_FILE` when OIDC is enabled.
 
-Docker Compose will mount individual secrets read-only below `/run/secrets`; Kubernetes-compatible deployments may project the same files. Secret values and resolved paths remain excluded from health responses, logs, audits, task arguments, image layers, support bundles, and browser configuration. Development may retain explicit environment values, while the supported production profile will require files by `0.8.7`.
+Files must use an absolute path, resolve beneath `TEKDOCS_SECRET_ROOT` (default `/run/secrets`), identify a regular file owned by root or the application user, be no larger than 4 KiB, and contain one printable UTF-8 value with at most one terminal newline. Relative paths, outside-root or escaping symlinks, directories, missing/empty/oversized/non-UTF-8/multiline values, outer whitespace, unexpected ownership, and group/other write or execute permission fail closed. Outside Docker's service-scoped `/run/secrets` mount, group/other read permission also fails. Diagnostics name only the setting and violated rule; they never include the value or configured host path.
 
-Rotation tests will distinguish reloadable connection credentials from process-start keys. MFA wrapping-key rotation will rewrap protected MFA material before the old key is retired. Django signing-key and publication-key rotation will retain documented verification/rollback windows. Removing the bootstrap token after the one-time claim must not make an already bootstrapped installation fail to start. The `0.3.2` slice implements this file-input contract; customer credential references delivered in `0.3.1` are not deployment secrets and never grant TekDocs access to provider values.
+## Compose overlays
 
-## Exact production-image testing
+`compose.secret-files.yml` supplies the required long-lived files. It gives the database only its owner password, the migration job the owner/runtime database credentials plus process keys, and web/worker/scheduler only the runtime database credential plus process keys.
 
-`make production-image-rehearsal` builds the backend, worker, and scheduler from the Dockerfile `production` target in a uniquely named Compose project with new volumes and generated ephemeral settings. It verifies proxy-to-backend readiness, completed migrations, absence of pytest from the runtime image, and the unprivileged runtime user. The rehearsal never reuses the ordinary development database.
+`compose.smtp-secret.yml` and `compose.oidc-secret.yml` are independent optional overlays for authenticated SMTP and OIDC. `compose.bootstrap-secret.yml` is added only until the first owner is created. After that successful claim, remove the bootstrap overlay and source file; readiness deliberately permits a bootstrapped installation without the token while failing an unclaimed installation that lacks it.
 
-Before beta, migrations move to an explicit one-shot deployment job; web and worker replicas start only after that job succeeds. `0.8.7` will also verify read-only filesystems where practical, dropped capabilities, resource limits, graceful shutdown, proxy/TLS behavior, and digest-pinned runtime bases. `0.9.4` will execute the same smoke contract against the exact signed release digest and retain its SBOM/provenance evidence.
+Use `.env.production.example` as the non-secret environment starting point. The `TEKDOCS_SECRET_DIRECTORY` source should be an absolute, root-owned runtime directory outside the repository, preferably on host tmpfs such as `/run/tekdocs-secrets`. Source files should be mode `0600`; Compose exposes them read-only and only to the named service under `/run/secrets`.
 
-## Failure and ownership
+Development may continue to use `make bootstrap` and direct values in the ignored `.env`. The supported production profile will prohibit direct sensitive environment values in `0.8.7`; the compatibility path remains until then so deployment migrations can be deliberate.
 
-Configuration parsing and production-image startup are release-blocking. A failed secret read, ambiguous source, migration, health check, or runtime-user assertion must stop deployment rather than fall back silently. Backend maintainers own the configuration reader and cryptographic rotation tests; deployment maintainers own secret mounts, migration jobs, and image policy; release evidence must demonstrate both sides together.
+## Rotation boundaries
+
+- Database passwords require coordinated database-role and service restart handling; they are not hot-reloaded.
+- `DJANGO_SECRET_KEY`, the MFA wrapping key, and the publication signing key are process-start values. Changing them without their separately documented continuity/rewrap procedure can invalidate sessions, MFA material, or publication expectations.
+- SMTP and OIDC secrets take effect after service recreation.
+- The bootstrap token can be removed, rather than rotated, after the immutable database claim closes first-owner setup.
+
+Automated rotation and key-loss recovery remain later operational work. `0.3.2` establishes safe injection and explicit process boundaries; it does not claim zero-downtime rotation.
+
+## Production-image evidence
+
+`make production-image-rehearsal` builds the migration, backend, worker, and scheduler from the Dockerfile `production` target in a unique Compose project with fresh volumes and generated file-only secrets. It verifies:
+
+- completed migrations and proxy-to-backend readiness;
+- healthy web, worker, scheduler, PostgreSQL, Valkey, Mailpit, and frontend services;
+- no pytest in the runtime image and an unprivileged backend user;
+- least-scope service mounts;
+- no secret values in container environments, image history, or combined service logs;
+- no host secret-directory path in service logs;
+- fail-closed direct-plus-file ambiguity without value/path disclosure.
+
+The rehearsal never reuses the ordinary development database. `0.8.7` will add explicit read-only filesystem/capability/resource/graceful-shutdown/TLS enforcement. `0.9.4` will run the smoke contract against the exact signed release digest and retain SBOM/provenance evidence.
+
+## Custody boundary
+
+Runtime deployment secrets are distinct from customer credential references. The operator may materialize runtime files from 1Password, another secret manager, or an offline process, but TekDocs receives only the mounted results. No 1Password session, service-account token, Connect token, vault reference, CLI binary, or retrieval permission enters the application containers. See `docs/ONEPASSWORD_RUNTIME_INJECTION.md` for the operator workflow.

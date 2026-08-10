@@ -1055,6 +1055,142 @@ class SoftwareLicenseEvent(models.Model):
                 raise ValidationError("Software license event targets must use its client scope")
 
 
+class CommercialContractKind(models.TextChoices):
+    SERVICE = "service", "Service"
+    SUPPORT = "support", "Support"
+    LEASE = "lease", "Lease"
+    SUBSCRIPTION = "subscription", "Subscription"
+    OTHER = "other", "Other"
+
+
+class CommercialContractStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    ACTIVE = "active", "Active"
+    EXPIRED = "expired", "Expired"
+    TERMINATED = "terminated", "Terminated"
+
+
+class CostBillingInterval(models.TextChoices):
+    ONE_TIME = "one_time", "One time"
+    MONTHLY = "monthly", "Monthly"
+    QUARTERLY = "quarterly", "Quarterly"
+    ANNUAL = "annual", "Annual"
+
+
+class CommercialContract(TimestampedModel):
+    """Client-scoped commercial agreement whose financial terms are projected separately."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="commercial_contracts")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="commercial_contracts")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="commercial_contract")
+    provider = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="provided_commercial_contracts")
+    kind = models.CharField(max_length=24, choices=CommercialContractKind.choices)
+    status = models.CharField(
+        max_length=24, choices=CommercialContractStatus.choices, default=CommercialContractStatus.DRAFT
+    )
+    description = models.CharField(max_length=1000, blank=True)
+    reference = models.CharField(max_length=240, blank=True)
+    starts_on = models.DateField(null=True, blank=True)
+    ends_on = models.DateField(null=True, blank=True)
+    renews_on = models.DateField(null=True, blank=True)
+    auto_renew = models.BooleanField(default=False)
+    renewal_notice_days = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="commercial_contracts"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(kind__in=CommercialContractKind.values), name="commercial_contract_kind_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=CommercialContractStatus.values),
+                name="commercial_contract_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(renewal_notice_days__lte=3650),
+                name="commercial_contract_notice_days_bounded",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "status", "renews_on"), name="core_contract_scope_idx"),
+            models.Index(fields=("tenant", "organization", "provider"), name="core_contract_provider_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "commercial_contract"
+            or self.entity.visibility != EntityVisibility.MSP_PRIVATE
+        ):
+            raise ValidationError("Commercial contract entity identity, scope, and visibility must match")
+        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+            raise ValidationError("Commercial contract organization must belong to its tenant")
+        if self.provider_id and (self.provider.tenant_id != self.tenant_id or self.provider_id == self.organization_id):
+            raise ValidationError("Commercial contract provider must be another organization in the same tenant")
+        if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
+            raise ValidationError("Contract end date cannot precede its start date")
+        if self.starts_on and self.renews_on and self.renews_on < self.starts_on:
+            raise ValidationError("Contract renewal date cannot precede its start date")
+
+
+class ContractCost(TimestampedModel):
+    """A sensitive commercial line item that is never projected without costs.view."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="contract_costs")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="contract_costs")
+    contract = models.ForeignKey(CommercialContract, on_delete=models.PROTECT, related_name="costs")
+    label = models.CharField(max_length=160)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=3)
+    billing_interval = models.CharField(max_length=16, choices=CostBillingInterval.choices)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=1)
+    starts_on = models.DateField(null=True, blank=True)
+    ends_on = models.DateField(null=True, blank=True)
+    reference = models.CharField(max_length=240, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("label", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount__gte=0), name="contract_cost_amount_nonnegative"),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name="contract_cost_quantity_positive"),
+            models.CheckConstraint(
+                condition=models.Q(billing_interval__in=CostBillingInterval.values),
+                name="contract_cost_interval_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "contract"), name="core_contract_cost_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.label
+
+    def clean(self) -> None:
+        if self.contract_id and (
+            self.contract.tenant_id != self.tenant_id or self.contract.organization_id != self.organization_id
+        ):
+            raise ValidationError("Contract cost must use its contract scope")
+        if self.currency and (len(self.currency) != 3 or not self.currency.isascii() or not self.currency.isalpha()):
+            raise ValidationError("Currency must be a three-letter currency code")
+        if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
+            raise ValidationError("Cost end date cannot precede its start date")
+
+
 class ClientAssetDocumentProvenance(models.Model):
     """Append-only client projection of one exact supplier STATIC publication."""
 

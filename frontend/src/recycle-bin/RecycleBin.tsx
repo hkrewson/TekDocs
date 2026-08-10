@@ -10,6 +10,7 @@ const typeLabels: Record<RecycleBinRecordType, string> = {
   site: 'Site',
   location: 'Location',
   custom_field_definition: 'Custom field',
+  commercial_contract: 'Commercial contract',
 }
 
 function messageFor(error: unknown) {

@@ -393,6 +393,38 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-commercial-contract-list-create",
+        ("GET", "POST"),
+        PermissionKey.ASSETS_VIEW,
+        (PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-commercial-contract-provider-choices",
+        ("GET",),
+        PermissionKey.ASSETS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-commercial-contract-detail",
+        ("GET", "PATCH", "DELETE"),
+        PermissionKey.ASSETS_VIEW,
+        (PermissionKey.ASSETS_EDIT, PermissionKey.ASSETS_EDIT),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-commercial-contract-cost-list-create",
+        ("POST",),
+        mutations=(PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-commercial-contract-cost-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.ASSETS_EDIT, PermissionKey.ASSETS_EDIT),
+        organization_scoped=True,
+    ),
+    route(
         "organization-client-asset-document-detail",
         ("GET",),
         PermissionKey.ASSETS_VIEW,

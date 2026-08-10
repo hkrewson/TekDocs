@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.6
+  version: 0.3.7
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2364,6 +2364,7 @@ paths:
           - site
           - location
           - custom_field_definition
+          - commercial_contract
           type: string
           default: ''
         description: |-
@@ -2373,6 +2374,7 @@ paths:
           * `site` - site
           * `location` - location
           * `custom_field_definition` - custom_field_definition
+          * `commercial_contract` - commercial_contract
       tags:
       - recycle-bin
       security:
@@ -3625,6 +3627,279 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecificationVersion'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/contracts:
+    get:
+      operationId: organization_commercial_contracts_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractResult'
+          description: ''
+    post:
+      operationId: organization_commercial_contracts_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/contracts/{contract_entity_id}:
+    get:
+      operationId: workspaces_organizations_contracts_retrieve
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_contracts_partial_update
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    delete:
+      operationId: workspaces_organizations_contracts_destroy
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/contracts/{contract_entity_id}/costs:
+    post:
+      operationId: workspaces_organizations_contracts_costs_create
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/contracts/{contract_entity_id}/costs/{cost_id}:
+    patch:
+      operationId: workspaces_organizations_contracts_costs_partial_update
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: cost_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    delete:
+      operationId: workspaces_organizations_contracts_costs_destroy
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: cost_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/contracts/providers:
+    get:
+      operationId: workspaces_organizations_contracts_providers_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderChoiceResult'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/credential-references:
     get:
@@ -5517,6 +5792,7 @@ paths:
           - site
           - location
           - custom_field_definition
+          - commercial_contract
           type: string
           default: ''
         description: |-
@@ -5526,6 +5802,7 @@ paths:
           * `site` - site
           * `location` - location
           * `custom_field_definition` - custom_field_definition
+          * `commercial_contract` - commercial_contract
       tags:
       - workspaces
       security:
@@ -6122,6 +6399,18 @@ components:
       - display_name
       - email
       - id
+    BillingIntervalEnum:
+      enum:
+      - one_time
+      - monthly
+      - quarterly
+      - annual
+      type: string
+      description: |-
+        * `one_time` - one_time
+        * `monthly` - monthly
+        * `quarterly` - quarterly
+        * `annual` - annual
     BlankEnum:
       enum:
       - ''
@@ -6642,6 +6931,212 @@ components:
           maxLength: 240
       required:
       - model_id
+    Contract:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        reference:
+          type: string
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        auto_renew:
+          type: boolean
+        renewal_notice_days:
+          type: integer
+        costs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cost'
+      required:
+      - auto_renew
+      - description
+      - ends_on
+      - id
+      - kind
+      - name
+      - provider_id
+      - provider_name
+      - reference
+      - renewal_notice_days
+      - renews_on
+      - starts_on
+      - status
+    ContractResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contract'
+        count:
+          type: integer
+        can_manage:
+          type: boolean
+        can_view_costs:
+          type: boolean
+      required:
+      - can_manage
+      - can_view_costs
+      - count
+      - results
+    ContractWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        provider_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ContractWriteKindEnum'
+        status:
+          $ref: '#/components/schemas/ContractWriteStatusEnum'
+        description:
+          type: string
+          maxLength: 1000
+        reference:
+          type: string
+          maxLength: 240
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        auto_renew:
+          type: boolean
+        renewal_notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+    ContractWriteKindEnum:
+      enum:
+      - service
+      - support
+      - lease
+      - subscription
+      - other
+      type: string
+      description: |-
+        * `service` - service
+        * `support` - support
+        * `lease` - lease
+        * `subscription` - subscription
+        * `other` - other
+    ContractWriteStatusEnum:
+      enum:
+      - draft
+      - active
+      - expired
+      - terminated
+      type: string
+      description: |-
+        * `draft` - draft
+        * `active` - active
+        * `expired` - expired
+        * `terminated` - terminated
+    Cost:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        currency:
+          type: string
+        billing_interval:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        reference:
+          type: string
+      required:
+      - amount
+      - billing_interval
+      - currency
+      - ends_on
+      - id
+      - label
+      - quantity
+      - reference
+      - starts_on
+    CostWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 160
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          pattern: ^[A-Za-z]{3}$
+        billing_interval:
+          $ref: '#/components/schemas/BillingIntervalEnum'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        reference:
+          type: string
+          maxLength: 240
     CredentialReference:
       type: object
       properties:
@@ -8513,6 +9008,73 @@ components:
           items:
             type: string
             format: uuid
+    PatchedContractWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        provider_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ContractWriteKindEnum'
+        status:
+          $ref: '#/components/schemas/ContractWriteStatusEnum'
+        description:
+          type: string
+          maxLength: 1000
+        reference:
+          type: string
+          maxLength: 240
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        renews_on:
+          type: string
+          format: date
+          nullable: true
+        auto_renew:
+          type: boolean
+        renewal_notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+    PatchedCostWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 160
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          pattern: ^[A-Za-z]{3}$
+        billing_interval:
+          $ref: '#/components/schemas/BillingIntervalEnum'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        starts_on:
+          type: string
+          format: date
+          nullable: true
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        reference:
+          type: string
+          maxLength: 240
     PatchedCredentialReferenceUpdate:
       type: object
       properties:
@@ -8994,6 +9556,26 @@ components:
       required:
       - kind
       - name
+    ProviderChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ProviderChoiceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderChoice'
+      required:
+      - results
     ProviderEnum:
       enum:
       - onepassword
@@ -9022,6 +9604,7 @@ components:
       - site
       - location
       - custom_field_definition
+      - commercial_contract
       type: string
       description: |-
         * `organization` - organization
@@ -9029,6 +9612,7 @@ components:
         * `site` - site
         * `location` - location
         * `custom_field_definition` - custom_field_definition
+        * `commercial_contract` - commercial_contract
     RecycleBinItem:
       type: object
       properties:

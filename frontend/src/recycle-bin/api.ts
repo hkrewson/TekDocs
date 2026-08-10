@@ -1,6 +1,6 @@
 import { AuthRequestError, browserCsrfToken } from '../auth/api'
 
-export type RecycleBinRecordType = 'organization' | 'person_association' | 'site' | 'location' | 'custom_field_definition'
+export type RecycleBinRecordType = 'organization' | 'person_association' | 'site' | 'location' | 'custom_field_definition' | 'commercial_contract'
 
 export type RecycleBinItem = {
   id: string

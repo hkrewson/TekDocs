@@ -575,7 +575,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.4` | **Complete:** supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | **Complete:** client hardware serials/tags, acquisition/disposal, warranty, current person/location assignment, and append-only lifecycle history. |
 | `0.3.6` | **Complete:** client software installations, addressable licenses, bounded seat allocation, renewal terms, installation relationships, and append-only license history. |
-| `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
+| `0.3.7` | **Complete:** client commercial contracts, provider and renewal lifecycle, fixed-precision cost lines, exact-scope field projection, and non-disclosing list/search behavior. |
 | `0.3.8` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
 | `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
 | `0.3.10` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
@@ -659,6 +659,19 @@ Evidence: `docs/releases/0.3.5.md`.
 - [x] OpenAPI, architecture, security baseline, threat model, risk register, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.6`.
 
 Evidence: `docs/releases/0.3.6.md`.
+
+### `0.3.7` acceptance criteria
+
+- [x] A client may create, search, open, edit, and archive an addressable commercial contract related to one eligible same-tenant vendor, manufacturer, or partner provider.
+- [x] Contract kind, lifecycle, description/reference, term, renewal date, auto-renew choice, and notice period remain operational fields readable through `assets.view`; mutations use MFA/CSRF-protected `assets.edit`.
+- [x] Fixed-precision cost lines support a bounded label, non-negative amount, normalized three-letter currency, positive quantity, billing interval, term, and reference without using floating-point storage.
+- [x] Every cost field is one centrally classified projection. Without exact-scope `costs.view`, the `costs` member is absent rather than null, masked, summarized, or counted; cost mutation additionally requires `assets.edit`.
+- [x] Contract list/search considers only non-cost contract and provider fields. Amounts, currency, quantities, cost labels/references, totals, ordering, highlighting, and result counts cannot act as a cost oracle.
+- [x] Contract/entity/provider/cost relationships enforce exact tenant/client scope through model validation, PostgreSQL guards, scoped managers, forced RLS, and allow/deny/sibling/cross-tenant IDOR tests.
+- [x] Audit events are value-free, and the Services UI exposes contracts, providers, terms, renewals, explicit hidden-cost guidance, loading/empty/error/denial, responsive, keyboard, and accessibility states.
+- [x] OpenAPI, architecture, security baseline, threat model, risk register, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.7`.
+
+Evidence: `docs/releases/0.3.7.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

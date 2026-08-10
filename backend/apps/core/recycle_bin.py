@@ -21,7 +21,17 @@ from apps.accounts.policy import (
 )
 
 from .custom_fields import latest_version
-from .models import AuditEvent, CustomFieldDefinition, Entity, Location, Organization, PersonAssociation, Site
+from .models import (
+    AuditEvent,
+    CommercialContract,
+    ContractCost,
+    CustomFieldDefinition,
+    Entity,
+    Location,
+    Organization,
+    PersonAssociation,
+    Site,
+)
 from .workspaces import ResolvedWorkspace
 
 
@@ -31,6 +41,7 @@ class RecoverableRecordType(StrEnum):
     SITE = "site"
     LOCATION = "location"
     CUSTOM_FIELD_DEFINITION = "custom_field_definition"
+    COMMERCIAL_CONTRACT = "commercial_contract"
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +64,10 @@ RECOVERY_POLICIES = {
     RecoverableRecordType.CUSTOM_FIELD_DEFINITION: RecoveryPolicy(
         PermissionKey.CUSTOM_FIELDS_VIEW,
         PermissionKey.CUSTOM_FIELDS_MANAGE,
+    ),
+    RecoverableRecordType.COMMERCIAL_CONTRACT: RecoveryPolicy(
+        PermissionKey.ASSETS_VIEW,
+        PermissionKey.ASSETS_EDIT,
     ),
 }
 
@@ -125,11 +140,7 @@ def _location_cascade_count(root: Location, records: list[Location]) -> int:
     while changed:
         changed = False
         for record in records:
-            if (
-                record.archived_at == root.archived_at
-                and record.parent_id in selected
-                and record.id not in selected
-            ):
+            if record.archived_at == root.archived_at and record.parent_id in selected and record.id not in selected:
                 selected.add(record.id)
                 changed = True
     return len(selected)
@@ -186,10 +197,14 @@ def recycle_bin_items(workspace: ResolvedWorkspace) -> list[RecycleBinItem]:
         organization=workspace.organization,
     )
     if can_view_people:
-        associations = _scope_records(
-            PersonAssociation.scoped.for_tenant(context.tenant),
-            workspace,
-        ).filter(archived_at__isnull=False).select_related("person__entity")
+        associations = (
+            _scope_records(
+                PersonAssociation.scoped.for_tenant(context.tenant),
+                workspace,
+            )
+            .filter(archived_at__isnull=False)
+            .select_related("person__entity")
+        )
         for association in associations:
             if association.archived_at is not None:
                 items.append(
@@ -281,6 +296,31 @@ def recycle_bin_items(workspace: ResolvedWorkspace) -> list[RecycleBinItem]:
                         archived_at=definition.archived_at,
                         cascade_count=1,
                         can_restore=can_restore_fields,
+                    )
+                )
+
+    can_view_contracts, can_restore_contracts = _has_permissions(
+        context,
+        RecoverableRecordType.COMMERCIAL_CONTRACT,
+        organization=workspace.organization,
+    )
+    if can_view_contracts and workspace.organization is not None:
+        contracts = (
+            _scope_records(CommercialContract.scoped.for_tenant(context.tenant), workspace)
+            .filter(archived_at__isnull=False)
+            .select_related("entity")
+        )
+        for contract in contracts:
+            if contract.archived_at is not None:
+                items.append(
+                    _item(
+                        workspace=workspace,
+                        record_id=contract.entity_id,
+                        record_type=RecoverableRecordType.COMMERCIAL_CONTRACT,
+                        label=contract.entity.display_name,
+                        archived_at=contract.archived_at,
+                        cascade_count=1 + contract.costs.filter(archived_at=contract.archived_at).count(),
+                        can_restore=can_restore_contracts,
                     )
                 )
 
@@ -429,6 +469,29 @@ def _restore_custom_field(*, workspace: ResolvedWorkspace, record_id: UUID) -> U
     return cast(UUID, definition.id)
 
 
+def _restore_commercial_contract(*, workspace: ResolvedWorkspace, record_id: UUID) -> UUID:
+    contract = (
+        _scope_records(CommercialContract.scoped.for_tenant(workspace.member.tenant), workspace)
+        .select_related("entity", "provider__entity")
+        .select_for_update()
+        .get(entity_id=record_id, archived_at__isnull=False)
+    )
+    if contract.provider.entity.archived_at is not None:
+        raise RecoveryConflict("Restore the provider organization before restoring this contract.")
+    archived_at = contract.archived_at
+    restored_at = timezone.now()
+    CommercialContract.scoped.for_tenant(workspace.member.tenant).filter(id=contract.id).update(
+        archived_at=None, updated_at=restored_at
+    )
+    ContractCost.scoped.for_tenant(workspace.member.tenant).filter(contract=contract, archived_at=archived_at).update(
+        archived_at=None, updated_at=restored_at
+    )
+    Entity.scoped.for_tenant(workspace.member.tenant).filter(id=contract.entity_id).update(
+        archived_at=None, updated_at=restored_at
+    )
+    return cast(UUID, contract.entity_id)
+
+
 @transaction.atomic
 def restore_recycle_bin_item(
     *,
@@ -446,6 +509,7 @@ def restore_recycle_bin_item(
             RecoverableRecordType.SITE: _restore_site,
             RecoverableRecordType.LOCATION: _restore_location,
             RecoverableRecordType.CUSTOM_FIELD_DEFINITION: _restore_custom_field,
+            RecoverableRecordType.COMMERCIAL_CONTRACT: _restore_commercial_contract,
         }
         entity_id = restorers[record_type](workspace=workspace, record_id=record_id)
     AuditEvent.objects.create(

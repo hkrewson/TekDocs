@@ -54,6 +54,7 @@ import { Documentation } from './documentation/Documentation'
 import { browserDocumentsClient } from './documentation/api'
 import type { DocumentsClient } from './documentation/api'
 import { browserInventoryClient } from './inventory/api'
+import { browserCommercialClient } from './commercial/api'
 import type { InventoryClient } from './inventory/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
@@ -76,6 +77,7 @@ import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
+const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 
 type NavigationItem = {
@@ -377,6 +379,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
   if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]

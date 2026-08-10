@@ -159,6 +159,18 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "license_entity_id",
             "seat_id",
         ),
+        "organization-commercial-contract-list-create": ("organization_entity_id",),
+        "organization-commercial-contract-provider-choices": ("organization_entity_id",),
+        "organization-commercial-contract-detail": ("organization_entity_id", "contract_entity_id"),
+        "organization-commercial-contract-cost-list-create": (
+            "organization_entity_id",
+            "contract_entity_id",
+        ),
+        "organization-commercial-contract-cost-detail": (
+            "organization_entity_id",
+            "contract_entity_id",
+            "cost_id",
+        ),
         "organization-client-asset-document-detail": (
             "organization_entity_id",
             "asset_entity_id",

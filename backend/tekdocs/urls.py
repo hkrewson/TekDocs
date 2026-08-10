@@ -39,6 +39,13 @@ from apps.core.catalog_views import (
     CatalogSpecificationDefinitionListCreateView,
     CatalogSpecificationDefinitionVersionView,
 )
+from apps.core.commercial_views import (
+    CommercialContractDetailView,
+    CommercialContractListCreateView,
+    CommercialProviderChoiceView,
+    ContractCostDetailView,
+    ContractCostListCreateView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -551,6 +558,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/licenses/<uuid:license_entity_id>/seats/<uuid:seat_id>",
         SoftwareLicenseSeatDetailView.as_view(),
         name="organization-software-license-seat-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/contracts",
+        CommercialContractListCreateView.as_view(),
+        name="organization-commercial-contract-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/contracts/providers",
+        CommercialProviderChoiceView.as_view(),
+        name="organization-commercial-contract-provider-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/contracts/<uuid:contract_entity_id>",
+        CommercialContractDetailView.as_view(),
+        name="organization-commercial-contract-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/contracts/<uuid:contract_entity_id>/costs",
+        ContractCostListCreateView.as_view(),
+        name="organization-commercial-contract-cost-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/contracts/<uuid:contract_entity_id>/costs/<uuid:cost_id>",
+        ContractCostDetailView.as_view(),
+        name="organization-commercial-contract-cost-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/documents/<uuid:publication_entity_id>",

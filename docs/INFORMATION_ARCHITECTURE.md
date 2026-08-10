@@ -33,8 +33,8 @@ This document defines which navigation families belong to the MSP and organizati
 | Domains | MSP-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | Client-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | — | inventory `0.7.8`; hierarchy/renewals/monitoring `0.7.9`–`0.7.11` |
 | Certificates | MSP TLS endpoints and validation history related to managed domains/hostnames | Client TLS endpoints and validation history related to managed domains/hostnames | — | `0.7.12`–`0.7.13` |
 | Credential references | Links to externally protected credentials; no values stored or revealed by TekDocs | Client-scoped links whose provider independently enforces vault access | — | references `0.3.1`; runtime secret injection `0.3.2` |
-| Services | MSP services and contracts | Client services, providers, and dependencies | — | relationship seam in `0.3.7` |
-| Vendors | MSP supplier directory/relationships | Suppliers derived from retained client-asset provenance; service-derived suppliers follow later | — | asset-derived list `0.3.4` |
+| Services | MSP services and contracts | Addressable client commercial contracts, providers, renewal terms, and permission-projected cost lines | Provider relationship only | client contracts and costs `0.3.7`; dependencies/reminders later |
+| Vendors | MSP supplier directory/relationships | Suppliers derived from retained client-asset provenance and explicit commercial-contract provider relationships | — | asset-derived list `0.3.4`; contract relationship `0.3.7` |
 | Products | Supplier-catalog entry point; aggregate view remains later | assets consume products through the Assets workflow | Supplier-owned product/model templates, versioned specifications, and client-visible STATIC publication associations | supplier workspace `0.3.3`; documentation/provenance `0.3.4` |
 | Tickets | MSP service queue | Client service requests | — | post-`1.0` placeholder |
 | Accounting | MSP billing, purchasing, quotes, recurring work, and expenses | — | — | post-`1.0` placeholder |

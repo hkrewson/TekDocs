@@ -31,6 +31,7 @@ from .models import (
     PublicationAudience,
     Site,
     Tenant,
+    workspace_for_owner,
 )
 from .publications import canonical_json, verify_publication
 from .scoping import DataScope
@@ -277,6 +278,7 @@ def create_client_asset(
     display_name = name.strip() or model.entity.display_name
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="client_asset",
         display_name=display_name,

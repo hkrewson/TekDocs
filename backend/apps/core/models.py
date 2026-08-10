@@ -3,10 +3,17 @@ from pathlib import PurePosixPath
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from .scoping import OrganizationScopedManager, TenantScopedManager
+
+WORKSPACE_UUID_NAMESPACE = uuid.UUID("6890dc87-8d91-4f76-a6eb-99dfd06904a5")
+
+
+def workspace_identity_uuid(*, tenant_id: uuid.UUID, organization_id: uuid.UUID | None) -> uuid.UUID:
+    owner = "msp" if organization_id is None else f"organization:{organization_id}"
+    return uuid.uuid5(WORKSPACE_UUID_NAMESPACE, f"tenant:{tenant_id}:{owner}")
 
 
 class TimestampedModel(models.Model):
@@ -25,6 +32,18 @@ class Tenant(TimestampedModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        creating = self._state.adding
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if creating:
+                Workspace.objects.get_or_create(
+                    id=workspace_identity_uuid(tenant_id=self.id, organization_id=None),
+                    tenant=self,
+                    kind=WorkspaceKind.MSP,
+                    organization=None,
+                )
 
 
 class InstallationState(models.Model):
@@ -81,9 +100,94 @@ class CredentialReferenceProvider(models.TextChoices):
     ONEPASSWORD = "onepassword", "1Password"
 
 
+class WorkspaceKind(models.TextChoices):
+    MSP = "msp", "MSP"
+    ORGANIZATION = "organization", "Organization"
+
+
+class Workspace(TimestampedModel):
+    """Stable, explicit owner identity for one MSP or organization workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="workspaces")
+    kind = models.CharField(max_length=20, choices=WorkspaceKind.choices)
+    organization = models.OneToOneField(
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="ownership_workspace",
+        null=True,
+        blank=True,
+    )
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind=WorkspaceKind.MSP, organization__isnull=True)
+                    | models.Q(kind=WorkspaceKind.ORGANIZATION, organization__isnull=False)
+                ),
+                name="workspace_kind_owner_shape",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant",),
+                condition=models.Q(kind=WorkspaceKind.MSP),
+                name="one_msp_workspace_per_tenant",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "kind"), name="core_workspace_tenant_kind_idx")]
+
+    def __str__(self) -> str:
+        if self.organization_id:
+            return f"{self.tenant}: {self.organization}"
+        return f"{self.tenant}: MSP"
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            previous = Workspace.objects.only("tenant_id", "kind", "organization_id").get(pk=self.pk)
+            if (
+                previous.tenant_id != self.tenant_id
+                or previous.kind != self.kind
+                or previous.organization_id != self.organization_id
+            ):
+                raise ValidationError("Workspace ownership identity is immutable")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Workspace ownership identities cannot be deleted")
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and organization.tenant_id != self.tenant_id:
+            raise ValidationError("Workspace organization must belong to its tenant")
+
+
+def workspace_for_owner(*, tenant: Tenant, organization: "Organization | None") -> Workspace:
+    if organization is None:
+        return Workspace.objects.get(tenant=tenant, kind=WorkspaceKind.MSP, organization__isnull=True)
+    if organization.tenant_id != tenant.id:
+        raise ValidationError("Workspace organization must belong to its tenant")
+    return Workspace.objects.get(tenant=tenant, kind=WorkspaceKind.ORGANIZATION, organization=organization)
+
+
+class EntityManager(models.Manager["Entity"]):
+    def create_owned(self, **kwargs):  # type: ignore[no-untyped-def]
+        """Create an entity only after resolving its explicit owner scope."""
+
+        tenant = kwargs.get("tenant")
+        organization = kwargs.get("organization")
+        if tenant is None:
+            raise ValidationError("Entity creation requires an explicit tenant")
+        kwargs["workspace"] = workspace_for_owner(tenant=tenant, organization=organization)
+        return self.create(**kwargs)
+
+
 class Entity(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entities")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="entities")
     entity_type = models.CharField(max_length=80)
     display_name = models.CharField(max_length=240)
     custom_fields = models.JSONField(default=dict, blank=True)
@@ -101,7 +205,7 @@ class Entity(TimestampedModel):
     )
     archived_at = models.DateTimeField(null=True, blank=True)
 
-    objects = models.Manager()
+    objects = EntityManager()
     scoped = OrganizationScopedManager()
 
     class Meta:
@@ -121,8 +225,23 @@ class Entity(TimestampedModel):
     def __str__(self) -> str:
         return self.display_name
 
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            previous = Entity.objects.only("tenant_id", "workspace_id", "organization_id").get(pk=self.pk)
+            if (
+                previous.tenant_id != self.tenant_id
+                or previous.workspace_id != self.workspace_id
+                or previous.organization_id != self.organization_id
+            ):
+                raise ValidationError("Entity ownership identity is immutable")
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         organization = self.organization if self.organization_id else None
+        if self.workspace_id and (
+            self.workspace.tenant_id != self.tenant_id or self.workspace.organization_id != self.organization_id
+        ):
+            raise ValidationError("Entity workspace must match its tenant and organization scope")
         if organization is not None and self.tenant_id != organization.tenant_id:
             raise ValidationError("Organization scope must belong to the entity tenant")
 
@@ -1313,6 +1432,18 @@ class Organization(TimestampedModel):
 
     def __str__(self) -> str:
         return self.entity.display_name
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        creating = self._state.adding
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if creating:
+                Workspace.objects.create(
+                    id=workspace_identity_uuid(tenant_id=self.tenant_id, organization_id=self.id),
+                    tenant=self.tenant,
+                    kind=WorkspaceKind.ORGANIZATION,
+                    organization=self,
+                )
 
     def clean(self) -> None:
         if self.entity_id and self.tenant_id != self.entity.tenant_id:

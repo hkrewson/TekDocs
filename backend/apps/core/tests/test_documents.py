@@ -62,7 +62,7 @@ def owner_client(installation):
 
 
 def organization(tenant, name):  # type: ignore[no-untyped-def]
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
@@ -476,7 +476,7 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
     malformed = DocumentPublication(
         tenant=publication.tenant,
         document=publication.document,
-        entity=Entity.objects.create(
+        entity=Entity.objects.create_owned(
             tenant=publication.tenant,
             entity_type="document_publication",
             display_name="Malformed publication",
@@ -1098,14 +1098,14 @@ def test_reuse_impact_shared_update_and_detach_preserve_live_and_local_semantics
 def test_entity_mentions_search_and_render_are_workspace_scoped(owner_client, installation):
     acme = organization(installation.tenant, "Acme")
     beta = organization(installation.tenant, "Beta")
-    acme_router = Entity.objects.create(
+    acme_router = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=acme,
         entity_type="hardware_asset",
         display_name="Acme Core Router",
         visibility="client_visible",
     )
-    beta_router = Entity.objects.create(
+    beta_router = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=beta,
         entity_type="hardware_asset",

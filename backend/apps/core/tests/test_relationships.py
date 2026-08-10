@@ -41,7 +41,7 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str, *classifications: str) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity)
     for kind in classifications or ("client",):
         OrganizationClassification.objects.create(tenant=tenant, organization=record, kind=kind)
@@ -89,21 +89,21 @@ def test_entity_search_respects_msp_and_organization_visibility(owner_client, in
     client_org = organization(installation.tenant, "Acme Client", "client")
     vendor_org = organization(installation.tenant, "Beacon Vendor", "vendor")
     sibling_org = organization(installation.tenant, "Cedar Client", "client")
-    msp_site = Entity.objects.create(tenant=installation.tenant, entity_type="site", display_name="MSP Office")
-    own_site = Entity.objects.create(
+    msp_site = Entity.objects.create_owned(tenant=installation.tenant, entity_type="site", display_name="MSP Office")
+    own_site = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_org,
         entity_type="site",
         display_name="Acme Office",
     )
-    Entity.objects.create(
+    Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=sibling_org,
         entity_type="site",
         display_name="Cedar Private Office",
     )
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign-relationship-search")
-    Entity.objects.create(tenant=foreign_tenant, entity_type="organization", display_name="Foreign Vendor")
+    Entity.objects.create_owned(tenant=foreign_tenant, entity_type="organization", display_name="Foreign Vendor")
 
     msp = owner_client.get(reverse("msp-entity-search"), {"entity_type": "site"}).json()
     organization_result = owner_client.get(
@@ -215,7 +215,7 @@ def test_symmetric_links_are_canonical_and_reject_duplicates_self_links_and_meta
 def test_relationship_type_enforces_target_kind_and_classification(owner_client, installation):
     client_org = organization(installation.tenant, "Typed Client", "client")
     partner_org = organization(installation.tenant, "Typed Partner", "partner")
-    site = Entity.objects.create(
+    site = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_org,
         entity_type="site",
@@ -242,14 +242,14 @@ def test_relationship_type_enforces_target_kind_and_classification(owner_client,
 def test_cross_workspace_and_foreign_relationship_targets_do_not_disclose_existence(owner_client, installation):
     first = organization(installation.tenant, "First Scope", "client")
     second = organization(installation.tenant, "Second Scope", "client")
-    second_private = Entity.objects.create(
+    second_private = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=second,
         entity_type="site",
         display_name="Second private site",
     )
     foreign_tenant = Tenant.objects.create(name="Foreign Scope", slug="foreign-link-target")
-    foreign = Entity.objects.create(tenant=foreign_tenant, entity_type="organization", display_name="Foreign")
+    foreign = Entity.objects.create_owned(tenant=foreign_tenant, entity_type="organization", display_name="Foreign")
 
     sibling = owner_client.post(
         organization_links_url(first),
@@ -331,7 +331,7 @@ def test_postgres_link_guards_reject_scope_identity_metadata_and_noncanonical_wr
     first = organization(installation.tenant, "Guard First", "partner")
     second = organization(installation.tenant, "Guard Second", "partner")
     foreign_tenant = Tenant.objects.create(name="Guard Foreign", slug="guard-foreign-link")
-    foreign = Entity.objects.create(tenant=foreign_tenant, entity_type="organization", display_name="Foreign")
+    foreign = Entity.objects.create_owned(tenant=foreign_tenant, entity_type="organization", display_name="Foreign")
 
     with pytest.raises(IntegrityError):
         with transaction.atomic():

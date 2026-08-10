@@ -295,7 +295,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.8 gives the MSP its own operational assets, licenses, contracts, costs, and vendor relationships without aggregating client records." />
+      <PageHeader title="Overview" description="TekDocs 0.3.9 gives every MSP and organization workspace an explicit, retained ownership identity without aggregating client records." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">

@@ -158,7 +158,7 @@ def test_organization_endpoints_deny_anonymous_non_owner_missing_mfa_and_foreign
     TOTP.activate(installation.owner, generate_totp_secret())
 
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign")
-    foreign_entity = Entity.objects.create(
+    foreign_entity = Entity.objects.create_owned(
         tenant=foreign_tenant,
         entity_type="organization",
         display_name="Foreign Client",

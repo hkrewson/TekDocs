@@ -28,6 +28,7 @@ from apps.core.models import (
     OrganizationClassification,
     Person,
     Site,
+    Workspace,
 )
 from apps.core.organizations import create_organization
 from apps.core.people import create_person
@@ -205,7 +206,9 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         "organizations": Organization.objects.filter(tenant=result.tenant).count(),
         "classifications": OrganizationClassification.objects.filter(tenant=result.tenant).count(),
         "audits": AuditEvent.objects.filter(tenant=result.tenant).count(),
+        "workspaces": Workspace.objects.filter(tenant=result.tenant).count(),
     }
+    workspace_ids = set(Workspace.objects.filter(tenant=result.tenant).values_list("id", flat=True))
 
     call_command("migrate", "accounts", "0011", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
@@ -232,7 +235,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     with connection.cursor() as cursor:
         cursor.execute("SELECT markdown FROM core_block WHERE id = %s", [block.id])
         assert cursor.fetchone() == ("# Preserved revision\n",)
-    call_command("migrate", "core", "0043", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0045", verbosity=0, interactive=False)
     preserved_revision = BlockRevision.objects.get(block_id=block.id)
     assert preserved_revision.markdown == "# Preserved revision\n"
     assert preserved_revision.checksum
@@ -247,7 +250,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0043", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0045", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]
@@ -262,6 +265,9 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     assert EntityLink.objects.filter(id=link.id).exists()
     assert ScopedRoleAssignment.objects.filter(id=assignment.id).exists()
     assert CustomRolePermission.objects.filter(role=role, permission="documents.view").exists()
+    assert Workspace.objects.filter(tenant=result.tenant).count() == counts["workspaces"]
+    assert set(Workspace.objects.filter(tenant=result.tenant).values_list("id", flat=True)) == workspace_ids
+    assert not Entity.objects.filter(tenant=result.tenant, workspace__isnull=True).exists()
 
     with connection.cursor() as cursor:
         cursor.execute(

@@ -577,9 +577,10 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.6` | **Complete:** client software installations, addressable licenses, bounded seat allocation, renewal terms, installation relationships, and append-only license history. |
 | `0.3.7` | **Complete:** client commercial contracts, provider and renewal lifecycle, fixed-precision cost lines, exact-scope field projection, and non-disclosing list/search behavior. |
 | `0.3.8` | **Complete:** MSP-owned operational parity for assets, hardware lifecycle, software installations/licenses, contracts/costs, and derived vendors without aggregating client records. |
-| `0.3.9` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
-| `0.3.10` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
-| `0.3.11` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
+| `0.3.9` | **Complete:** explicit immutable MSP/organization Workspace identities, non-null Entity ownership, data backfill, workspace-bound RLS input, and non-orphaning organization retention. |
+| `0.3.10` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
+| `0.3.11` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
+| `0.3.12` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
 
 ### `0.3.1` acceptance criteria
@@ -676,7 +677,7 @@ Evidence: `docs/releases/0.3.7.md`.
 
 ### `0.3.8` acceptance criteria
 
-- [x] The MSP is an operational owner represented by tenant scope (`organization IS NULL`), never a synthetic client organization and never an aggregate query over client-owned records.
+- [x] The MSP is an operational owner represented by its explicit Workspace (introduced in `0.3.9`); its `organization IS NULL` projection never represents a synthetic client or an aggregate query over client-owned records.
 - [x] MSP routes expose the existing asset, retained catalog/document provenance, hardware lifecycle, software installation/license, seat, contract/cost, and derived-vendor workflows through the same domain services used by client workspaces.
 - [x] Every operational row and related Entity carries one exact owner scope. Nullable PostgreSQL relationship guards use null-safe comparison, MSP serial/tag uniqueness remains database enforced, and forced RLS denies missing or mismatched scope.
 - [x] MSP catalog access is a narrow read-only projection of supplier catalogs and associated client-visible STATIC publications; it does not make client assets, client documents, licenses, contracts, people, sites, or costs visible in MSP scope.
@@ -685,6 +686,18 @@ Evidence: `docs/releases/0.3.7.md`.
 - [x] OpenAPI, architecture, information architecture, security/threat model, `TD-RISK-026`, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.8`.
 
 Evidence: `docs/releases/0.3.8.md`.
+
+### `0.3.9` acceptance criteria
+
+- [x] Each installation tenant has exactly one immutable MSP Workspace and every organization has exactly one immutable organization Workspace; this does not change the supported one-MSP-per-install topology.
+- [x] Every universal Entity has a non-null Workspace owner. The migration backfills existing MSP and organization records before enforcing the constraint.
+- [x] Entity creation resolves ownership explicitly and ordinary creation without a Workspace fails closed instead of silently treating a missing organization as MSP ownership.
+- [x] Django validation and PostgreSQL guards require exact tenant/workspace/organization agreement and reject Workspace identity mutation or deletion.
+- [x] Organization archival retains its organization, Entity, Workspace, and all child ownership links. Protected relationships prevent physical organization deletion and orphaned data.
+- [x] Transaction-local RLS scope includes the internal Workspace UUID; Entity writes require the bound owner while approved permission-aware document/catalog projections remain read-only.
+- [x] The ownership control-plane classification, runtime startup guard inventory, negative isolation tests, migration drift, architecture, threat model, security baseline, risk register, release notes, and version metadata agree at `0.3.9`.
+
+Evidence: `docs/releases/0.3.9.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

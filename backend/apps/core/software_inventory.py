@@ -24,6 +24,7 @@ from .models import (
     SoftwareLicenseInstallation,
     SoftwareLicenseSeat,
     Tenant,
+    workspace_for_owner,
 )
 from .scoping import DataScope
 
@@ -140,6 +141,7 @@ def create_license(
     installation = _installation(asset)
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="software_license",
         display_name=str(values.pop("name")).strip(),

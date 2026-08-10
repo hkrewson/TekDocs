@@ -47,21 +47,21 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str, *, access_mode: str = "all_authorized") -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity, access_mode=access_mode)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
 
 
 def site_with_locations(tenant: Tenant, organization_record: Organization | None, name: str):  # type: ignore[no-untyped-def]
-    site_entity = Entity.objects.create(
+    site_entity = Entity.objects.create_owned(
         tenant=tenant,
         organization=organization_record,
         entity_type="site",
         display_name=name,
     )
     site = Site.objects.create(tenant=tenant, organization=organization_record, entity=site_entity)
-    parent_entity = Entity.objects.create(
+    parent_entity = Entity.objects.create_owned(
         tenant=tenant,
         organization=organization_record,
         entity_type="location",
@@ -74,7 +74,7 @@ def site_with_locations(tenant: Tenant, organization_record: Organization | None
         site=site,
         kind="floor",
     )
-    child_entity = Entity.objects.create(
+    child_entity = Entity.objects.create_owned(
         tenant=tenant,
         organization=organization_record,
         entity_type="location",
@@ -92,7 +92,7 @@ def site_with_locations(tenant: Tenant, organization_record: Organization | None
 
 
 def person_association(tenant: Tenant, organization_record: Organization, site: Site, location: Location):
-    entity = Entity.objects.create(tenant=tenant, entity_type="person", display_name="Morgan Ellis")
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="person", display_name="Morgan Ellis")
     person = Person.objects.create(tenant=tenant, entity=entity)
     return PersonAssociation.objects.create(
         tenant=tenant,

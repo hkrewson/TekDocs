@@ -18,6 +18,7 @@ from .models import (
     EntityVisibility,
     Organization,
     Tenant,
+    workspace_for_owner,
 )
 from .scoping import DataScope
 
@@ -110,6 +111,7 @@ def create_credential_reference(
     canonical_url = normalize_credential_reference(provider, reference_url)
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="credential_reference",
         display_name=title,

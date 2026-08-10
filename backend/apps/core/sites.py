@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.utils import timezone
 
-from .models import AuditEvent, Entity, Location, Organization, Site, Tenant
+from .models import AuditEvent, Entity, Location, Organization, Site, Tenant, workspace_for_owner
 from .scoping import DataScope
 
 
@@ -67,6 +67,7 @@ def create_site(
 ) -> Site:
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="site",
         display_name=name,
@@ -109,7 +110,7 @@ def update_site(*, site: Site, actor_id: UUID, **values: str) -> Site:
 @transaction.atomic
 def archive_site(*, site: Site, actor_id: UUID) -> None:
     archived_at = timezone.now()
-    scope = DataScope(tenant_id=site.tenant_id, organization_id=site.organization_id)
+    scope = DataScope.owner(site.tenant, site.organization)
     locations = Location.scoped.for_scope(scope).filter(site=site, archived_at__isnull=True)
     Entity.scoped.for_scope(scope).filter(id__in=locations.values("entity_id")).update(
         archived_at=archived_at,
@@ -152,6 +153,7 @@ def create_location(
     parent = _parent_for_site(scope=scope, site=site, parent_entity_id=parent_id)
     entity = Entity.objects.create(
         tenant=site.tenant,
+        workspace=workspace_for_owner(tenant=site.tenant, organization=site.organization),
         organization=site.organization,
         entity_type="location",
         display_name=name,
@@ -214,7 +216,7 @@ def update_location(
 
 @transaction.atomic
 def archive_location(*, location: Location, actor_id: UUID) -> None:
-    scope = DataScope(tenant_id=location.tenant_id, organization_id=location.organization_id)
+    scope = DataScope.owner(location.tenant, location.organization)
     all_locations = list(
         Location.scoped.for_scope(scope)
         .filter(site=location.site, archived_at__isnull=True)

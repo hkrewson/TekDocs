@@ -43,7 +43,7 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
@@ -343,7 +343,7 @@ def test_postgres_guards_reject_malformed_cross_scope_and_mutable_versions(insta
         field_type="text",
         schema={"type": "string"},
     )
-    second_site = Entity.objects.create(
+    second_site = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=second,
         entity_type="site",
@@ -367,7 +367,7 @@ def test_postgres_guards_reject_malformed_cross_scope_and_mutable_versions(insta
             )
 
     CustomFieldDefinition.objects.filter(pk=definition.pk).update(archived_at=timezone.now())
-    first_site = Entity.objects.create(
+    first_site = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=first,
         entity_type="site",

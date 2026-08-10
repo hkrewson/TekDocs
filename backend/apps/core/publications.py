@@ -341,6 +341,7 @@ def publish_document(
             publication_entity = Entity.objects.create(
                 id=publication_entity_id,
                 tenant=locked_document.tenant,
+                workspace=locked_document.entity.workspace,
                 organization=locked_document.organization,
                 entity_type="document_publication",
                 display_name=locked_document.entity.display_name,
@@ -376,6 +377,7 @@ def publish_document(
                 artifact_entity = Entity.objects.create(
                     id=pending.entity_id,
                     tenant=publication.tenant,
+                    workspace=publication.entity.workspace,
                     organization=publication.organization,
                     entity_type="document_publication_artifact",
                     display_name=pending.filename,

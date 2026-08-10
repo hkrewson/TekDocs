@@ -73,7 +73,7 @@ def member(installation, email="reader@example.com"):
 
 
 def organization(tenant, name, access_mode="all_authorized"):
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity, access_mode=access_mode)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
@@ -420,13 +420,13 @@ def test_msp_private_visibility_and_cost_projection_are_hard_policy_boundaries(i
     user, _, _ = member(installation, "field-reader@example.com")
     client = organization(installation.tenant, "Client")
     sibling = organization(installation.tenant, "Sibling")
-    private = Entity.objects.create(
+    private = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client,
         entity_type="document",
         display_name="Private runbook",
     )
-    visible = Entity.objects.create(
+    visible = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client,
         entity_type="document",

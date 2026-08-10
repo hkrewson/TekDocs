@@ -24,6 +24,7 @@ from .models import (
     Organization,
     PlacementResolutionMode,
     Tenant,
+    workspace_for_owner,
 )
 from .rendering import attachment_ids_in_markdown
 from .scoping import DataScope
@@ -211,7 +212,11 @@ def create_document(
     is_template: bool = False,
 ) -> Document:
     document_entity = Entity.objects.create(
-        tenant=tenant, organization=organization, entity_type="document", display_name=title
+        tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
+        organization=organization,
+        entity_type="document",
+        display_name=title,
     )
     document = Document.objects.create(
         tenant=tenant,
@@ -221,7 +226,11 @@ def create_document(
         is_template=is_template,
     )
     block_entity = Entity.objects.create(
-        tenant=tenant, organization=organization, entity_type="document_block", display_name=f"{title} — content"
+        tenant=tenant,
+        workspace=document_entity.workspace,
+        organization=organization,
+        entity_type="document_block",
+        display_name=f"{title} — content",
     )
     block = Block.objects.create(tenant=tenant, organization=organization, entity=block_entity)
     revision = BlockRevision.objects.create(
@@ -396,6 +405,7 @@ def detach_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -
     source_name = locked.block.entity.display_name.removesuffix(" — content")
     entity = Entity.objects.create(
         tenant=locked.tenant,
+        workspace=locked.document.entity.workspace,
         organization=locked.document.organization,
         entity_type="document_block",
         display_name=f"{source_name} — detached content",

@@ -41,7 +41,7 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
@@ -257,7 +257,7 @@ def test_postgres_guards_reject_cross_scope_sites_locations_and_parents(installa
     client_organization = organization(installation.tenant, "Scoped Client")
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign-site-guards")
     foreign_organization = organization(foreign_tenant, "Foreign Client")
-    foreign_entity = Entity.objects.create(
+    foreign_entity = Entity.objects.create_owned(
         tenant=foreign_tenant,
         organization=foreign_organization,
         entity_type="site",
@@ -272,16 +272,16 @@ def test_postgres_guards_reject_cross_scope_sites_locations_and_parents(installa
                 entity=foreign_entity,
             )
 
-    site_entity = Entity.objects.create(
+    site_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_organization,
         entity_type="site",
         display_name="Client Site",
     )
     site = Site.objects.create(tenant=installation.tenant, organization=client_organization, entity=site_entity)
-    other_entity = Entity.objects.create(tenant=installation.tenant, entity_type="site", display_name="MSP Site")
+    other_entity = Entity.objects.create_owned(tenant=installation.tenant, entity_type="site", display_name="MSP Site")
     other_site = Site.objects.create(tenant=installation.tenant, entity=other_entity)
-    parent_entity = Entity.objects.create(
+    parent_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         entity_type="location",
         display_name="MSP Parent",
@@ -292,7 +292,7 @@ def test_postgres_guards_reject_cross_scope_sites_locations_and_parents(installa
         site=other_site,
         kind="building",
     )
-    location_entity = Entity.objects.create(
+    location_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_organization,
         entity_type="location",
@@ -310,7 +310,7 @@ def test_postgres_guards_reject_cross_scope_sites_locations_and_parents(installa
                 kind="office",
             )
 
-    root_entity = Entity.objects.create(
+    root_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_organization,
         entity_type="location",
@@ -323,7 +323,7 @@ def test_postgres_guards_reject_cross_scope_sites_locations_and_parents(installa
         site=site,
         kind="building",
     )
-    child_entity = Entity.objects.create(
+    child_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=client_organization,
         entity_type="location",

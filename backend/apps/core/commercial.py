@@ -7,7 +7,16 @@ from django.db import transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.utils import timezone
 
-from .models import AuditEvent, CommercialContract, ContractCost, Entity, EntityVisibility, Organization, Tenant
+from .models import (
+    AuditEvent,
+    CommercialContract,
+    ContractCost,
+    Entity,
+    EntityVisibility,
+    Organization,
+    Tenant,
+    workspace_for_owner,
+)
 from .scoping import DataScope
 
 
@@ -78,6 +87,7 @@ def create_contract(
     provider_id = values.pop("provider_id")
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="commercial_contract",
         display_name=str(values.pop("name")).strip(),

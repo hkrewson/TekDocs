@@ -14,11 +14,13 @@ class ScopeRequiredError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class DataScope:
     tenant_id: UUID
+    workspace_id: UUID
     organization_id: UUID | None = None
 
     @classmethod
     def tenant(cls, tenant: Any) -> DataScope:
-        return cls(tenant_id=_model_uuid(tenant, "tenant"))
+        tenant_id = _model_uuid(tenant, "tenant")
+        return cls(tenant_id=tenant_id, workspace_id=_workspace_uuid(tenant_id=tenant_id, organization_id=None))
 
     @classmethod
     def organization(cls, tenant: Any, organization: Any) -> DataScope:
@@ -28,8 +30,29 @@ class DataScope:
             raise ValueError("Organization scope must belong to the selected tenant.")
         return cls(
             tenant_id=tenant_id,
+            workspace_id=_workspace_uuid(
+                tenant_id=tenant_id,
+                organization_id=_model_uuid(organization, "organization"),
+            ),
             organization_id=_model_uuid(organization, "organization"),
         )
+
+    @classmethod
+    def owner(cls, tenant: Any, organization: Any | None) -> DataScope:
+        if organization is None:
+            return cls.tenant(tenant)
+        return cls.organization(tenant, organization)
+
+
+def _workspace_uuid(*, tenant_id: UUID, organization_id: UUID | None) -> UUID:
+    # Import through Django's registry to keep the model/scoping dependency acyclic.
+    from django.apps import apps
+
+    workspace = apps.get_model("core", "Workspace").objects.get(
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+    )
+    return _model_uuid(workspace, "workspace")
 
 
 def _model_uuid(value: Any, label: str) -> UUID:

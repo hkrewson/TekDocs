@@ -140,7 +140,7 @@ def test_postgres_control_plane_guards_reject_scope_retargeting_and_foreign_attr
             expires_at=timezone.now() + timedelta(days=1),
         )
 
-    organization_entity = Entity.objects.create(
+    organization_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         entity_type="organization",
         display_name="Certified client",

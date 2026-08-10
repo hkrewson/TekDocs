@@ -44,7 +44,7 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
@@ -256,7 +256,9 @@ def test_people_mutations_require_csrf(installation):
 @pytest.mark.django_db
 def test_one_person_identity_can_have_msp_and_organization_associations(installation):
     client_organization = organization(installation.tenant, "Shared Client")
-    entity = Entity.objects.create(tenant=installation.tenant, entity_type="person", display_name="Shared Person")
+    entity = Entity.objects.create_owned(
+        tenant=installation.tenant, entity_type="person", display_name="Shared Person"
+    )
     person = Person.objects.create(tenant=installation.tenant, entity=entity)
     msp = PersonAssociation.objects.create(tenant=installation.tenant, person=person, kind="employee")
     client_contact = PersonAssociation.objects.create(
@@ -344,7 +346,9 @@ def test_postgres_guards_reject_cross_tenant_person_associations(installation):
         pytest.skip("Database scope triggers require PostgreSQL")
     foreign_tenant = Tenant.objects.create(name="Foreign MSP", slug="foreign-person-guard")
     foreign_organization = organization(foreign_tenant, "Foreign Client")
-    entity = Entity.objects.create(tenant=installation.tenant, entity_type="person", display_name="Scoped Person")
+    entity = Entity.objects.create_owned(
+        tenant=installation.tenant, entity_type="person", display_name="Scoped Person"
+    )
     person = Person.objects.create(tenant=installation.tenant, entity=entity)
 
     with pytest.raises(IntegrityError):
@@ -356,7 +360,9 @@ def test_postgres_guards_reject_cross_tenant_person_associations(installation):
                 kind="contact",
             )
 
-    foreign_entity = Entity.objects.create(tenant=foreign_tenant, entity_type="person", display_name="Foreign Person")
+    foreign_entity = Entity.objects.create_owned(
+        tenant=foreign_tenant, entity_type="person", display_name="Foreign Person"
+    )
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             Person.objects.create(tenant=installation.tenant, entity=foreign_entity)

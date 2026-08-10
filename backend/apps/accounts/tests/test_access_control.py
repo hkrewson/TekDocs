@@ -34,7 +34,7 @@ def owner_client(installation):
 
 
 def organization(tenant: Tenant, name: str, *, access_mode: str = "all_authorized") -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=tenant, entity=entity, access_mode=access_mode)
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record

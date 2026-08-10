@@ -34,7 +34,7 @@ def owner_client(installation):
 
 
 def create_organization(tenant: Tenant, *, name: str, classifications: tuple[str, ...]) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     organization = Organization.objects.create(
         tenant=tenant,
         entity=entity,

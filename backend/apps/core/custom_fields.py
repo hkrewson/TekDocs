@@ -181,9 +181,7 @@ def create_definition(
         action="custom_field.definition.created",
         metadata={},
     )
-    return owned_definitions_for_scope(
-        scope=DataScope(tenant_id=tenant.id, organization_id=organization.id if organization else None)
-    ).get(id=definition.id)
+    return owned_definitions_for_scope(scope=DataScope.owner(tenant, organization)).get(id=definition.id)
 
 
 def _definition_values(definition: CustomFieldDefinition) -> list[Any]:
@@ -242,7 +240,7 @@ def create_definition_version(
         action="custom_field.definition.versioned",
         metadata={},
     )
-    scope = DataScope(tenant_id=locked.tenant_id, organization_id=locked.organization_id)
+    scope = DataScope.owner(locked.tenant, locked.organization)
     refreshed = owned_definitions_for_scope(scope=scope).get(id=locked.id)
     return refreshed, MigrationImpact(total=len(values), compatible=compatible, incompatible=len(values) - compatible)
 

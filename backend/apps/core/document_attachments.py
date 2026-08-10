@@ -97,6 +97,7 @@ def create_document_attachment(
             entity = Entity.objects.create(
                 id=entity_id or uuid4(),
                 tenant=document.tenant,
+                workspace=document.entity.workspace,
                 organization=document.organization,
                 entity_type="document_attachment",
                 display_name=validated.filename,

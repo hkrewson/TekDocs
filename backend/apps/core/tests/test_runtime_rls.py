@@ -25,7 +25,7 @@ from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
 
 
 def _organization(tenant: Tenant, name: str) -> Organization:
-    anchor = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    anchor = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
     return Organization.objects.create(tenant=tenant, entity=anchor)
 
 
@@ -41,6 +41,12 @@ def _runtime_connection():
 
 def _bind(cursor, tenant_id, mode, organization_id=None):
     cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(tenant_id)])
+    cursor.execute(
+        "SELECT id FROM core_workspace WHERE tenant_id = %s AND organization_id IS NOT DISTINCT FROM %s",
+        [tenant_id, organization_id],
+    )
+    workspace_id = cursor.fetchone()[0]
+    cursor.execute("SELECT set_config('tekdocs.workspace_id', %s, true)", [str(workspace_id)])
     cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(organization_id or "")])
     cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [mode])
 
@@ -53,7 +59,7 @@ def test_runtime_credential_references_are_forced_to_the_selected_workspace():
     tenant = Tenant.objects.create(name="Credential RLS tenant", slug=f"credential-{uuid.uuid4()}")
     first_org = _organization(tenant, "First credential client")
     sibling_org = _organization(tenant, "Sibling credential client")
-    entity = Entity.objects.create(
+    entity = Entity.objects.create_owned(
         tenant=tenant,
         organization=first_org,
         entity_type="credential_reference",
@@ -126,20 +132,20 @@ def test_runtime_raw_sql_denies_missing_cross_tenant_sibling_write_and_all_mode(
     first_org = _organization(first, "First client")
     sibling_org = _organization(first, "Sibling client")
     foreign_org = _organization(second, "Foreign client")
-    msp = Entity.objects.create(tenant=first, entity_type="document", display_name="MSP runbook")
-    selected = Entity.objects.create(
+    msp = Entity.objects.create_owned(tenant=first, entity_type="document", display_name="MSP runbook")
+    selected = Entity.objects.create_owned(
         tenant=first,
         organization=first_org,
         entity_type="document",
         display_name="Selected client runbook",
     )
-    Entity.objects.create(
+    Entity.objects.create_owned(
         tenant=first,
         organization=sibling_org,
         entity_type="document",
         display_name="Sibling client runbook",
     )
-    Entity.objects.create(
+    Entity.objects.create_owned(
         tenant=second,
         organization=foreign_org,
         entity_type="document",
@@ -160,7 +166,7 @@ def test_runtime_raw_sql_denies_missing_cross_tenant_sibling_write_and_all_mode(
         _bind(cursor, first.id, "organization", first_org.id)
         cursor.execute("SELECT id FROM core_entity WHERE entity_type = 'document'")
         assert {row[0] for row in cursor.fetchall()} == {selected.id}
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        with pytest.raises((psycopg.errors.InsufficientPrivilege, psycopg.errors.CheckViolation)):
             cursor.execute(
                 "UPDATE core_entity SET organization_id = %s WHERE id = %s",
                 [sibling_org.id, selected.id],
@@ -180,9 +186,13 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     tenant = Tenant.objects.create(name="Document RLS tenant", slug=f"documents-{uuid.uuid4()}")
     selected_org = _organization(tenant, "Selected client")
     sibling_org = _organization(tenant, "Sibling client")
-    document_entity = Entity.objects.create(tenant=tenant, entity_type="document", display_name="Shared runbook")
+    document_entity = Entity.objects.create_owned(
+        tenant=tenant, entity_type="document", display_name="Shared runbook"
+    )
     document = Document.objects.create(tenant=tenant, entity=document_entity)
-    block_entity = Entity.objects.create(tenant=tenant, entity_type="document_block", display_name="Shared block")
+    block_entity = Entity.objects.create_owned(
+        tenant=tenant, entity_type="document_block", display_name="Shared block"
+    )
     block = Block.objects.create(tenant=tenant, entity=block_entity)
     revision = BlockRevision.objects.create(
         tenant=tenant,
@@ -197,7 +207,7 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     reference = DocumentationListingReference.objects.create(
         tenant=tenant, organization=selected_org, document=document
     )
-    attachment_entity = Entity.objects.create(
+    attachment_entity = Entity.objects.create_owned(
         tenant=tenant,
         entity_type="document_attachment",
         display_name="reference.txt",
@@ -212,14 +222,14 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         size=1,
         checksum=sha256(b"x").hexdigest(),
     )
-    publication_entity = Entity.objects.create(
+    publication_entity = Entity.objects.create_owned(
         tenant=tenant,
         entity_type="document_publication",
         display_name="Shared runbook STATIC",
     )
     publication_id = uuid.uuid4()
     artifact_id = uuid.uuid4()
-    artifact_entity = Entity.objects.create(
+    artifact_entity = Entity.objects.create_owned(
         tenant=tenant,
         entity_type="document_publication_artifact",
         display_name="Shared runbook STATIC.pdf",

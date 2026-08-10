@@ -35,6 +35,7 @@ def bind_local_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLS
     organization_id = "" if scope.organization_id is None else str(scope.organization_id)
     with connection.cursor() as cursor:
         cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(scope.tenant_id)])
+        cursor.execute("SELECT set_config('tekdocs.workspace_id', %s, true)", [str(scope.workspace_id)])
         cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [organization_id])
         cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [organization_mode.value])
 

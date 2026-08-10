@@ -27,6 +27,7 @@ from .models import (
     Organization,
     OrganizationKind,
     Tenant,
+    workspace_for_owner,
 )
 from .scoping import DataScope
 
@@ -196,6 +197,7 @@ def create_product(
     require_supplier(organization)
     entity = Entity.objects.create(
         tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,
         entity_type="catalog_product",
         display_name=name,
@@ -335,6 +337,7 @@ def create_model(
     values = validate_specifications(schema=specification_version.schema, values=specifications)
     entity = Entity.objects.create(
         tenant=locked_product.tenant,
+        workspace=locked_product.entity.workspace,
         organization=locked_product.organization,
         entity_type="catalog_model",
         display_name=name,

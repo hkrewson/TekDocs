@@ -77,7 +77,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The broader 1.0 capacity, concurrency, supported encrypted backup tooling, malware quarantine, and public GitHub Wiki remain later milestones.
-- Organizations, People, Sites, Locations, versioned custom fields, typed Entity relationships, and supplier product/model catalogs are active entity-backed foundations. Client-owned assets and other domain families remain scheduled slices.
+- Organizations, People, Sites, Locations, versioned custom fields, typed Entity relationships, supplier catalogs, and MSP/client operational inventory are active entity-backed foundations. Every Entity has a non-null immutable MSP/organization Workspace owner; `Tenant` remains the supported one-MSP installation boundary and future hosted seam.
 - TekDocs does not store customer credential values. Provider-neutral external credential references arrived in `0.3.1`; production runtime secret-file injection is implemented in `0.3.2`, with mandatory removal of environment fallback remaining assigned to `0.8.7`.
 
 ## License

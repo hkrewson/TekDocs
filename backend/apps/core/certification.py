@@ -27,6 +27,11 @@ TENANT_MODEL_CONTRACTS = tuple(
     for table in RLS_TABLES
 ) + (
     TenantModelContract(
+        "core_workspace",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "The stable owner identity is resolved before workspace-scoped domain data can be selected.",
+    ),
+    TenantModelContract(
         "accounts_invitation",
         IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
         "Pre-authentication token redemption must discover its tenant from a digest.",
@@ -80,6 +85,7 @@ AUTHORIZATION_CONTROL_PLANE_TABLES = tuple(
 )
 
 CONTROL_PLANE_GUARD_TRIGGERS = (
+    "core_workspace_identity_guard",
     "accounts_tenant_membership_guard",
     "accounts_invitation_scope_guard",
     "accounts_organization_access_assignment_actor_guard",

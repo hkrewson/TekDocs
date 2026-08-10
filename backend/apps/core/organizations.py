@@ -16,6 +16,7 @@ from .models import (
     OrganizationClassification,
     OrganizationKind,
     Tenant,
+    workspace_for_owner,
 )
 from .scoping import DataScope
 
@@ -65,7 +66,12 @@ def create_organization(
     website: str,
     classifications: Iterable[OrganizationKind],
 ) -> Organization:
-    entity = Entity.objects.create(tenant=tenant, entity_type="organization", display_name=name)
+    entity = Entity.objects.create(
+        tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=None),
+        entity_type="organization",
+        display_name=name,
+    )
     organization = Organization.objects.create(
         tenant=tenant,
         entity=entity,

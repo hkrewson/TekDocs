@@ -1,11 +1,11 @@
 # ADR 0034: MSP operational ownership parity without client aggregation
 
-- Status: Accepted for `0.3.8`
+- Status: Superseded in ownership identity by ADR 0035; operational parity remains accepted
 - Date: 2026-08-10
 
 ## Decision
 
-The installation MSP is an operational data owner but is not modeled as a client organization. An MSP-owned operational record carries the installation tenant and a null organization; a client-owned record carries the same tenant plus exactly one client organization. The existing `DataScope.tenant` contract means `organization IS NULL`, not every row in the tenant.
+The installation MSP is an operational data owner but is not modeled as a client organization. In `0.3.8`, an MSP-owned operational record carried the installation tenant and a null organization, while a client-owned record carried the same tenant plus exactly one client organization. ADR 0035 subsequently made both owners explicit Workspaces. The `organization IS NULL` predicate is now only the guarded projection of the MSP Workspace, not the owner identity and not every row in the tenant.
 
 Assets, retained supplier provenance, hardware lifecycle, software installations and licenses, commercial contracts and protected costs use one owner-neutral service and persistence contract. Existing internal `Client*` model names remain temporarily for migration compatibility, but do not define ownership semantics. New public routes use `/api/v1/workspaces/msp/...` or `/api/v1/workspaces/organizations/{id}/...`, and the browser selects the route family from the explicit workspace kind.
 

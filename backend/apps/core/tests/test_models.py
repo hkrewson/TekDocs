@@ -8,8 +8,8 @@ from apps.core.models import AuditEvent, Entity, EntityLink, InstallationState, 
 def test_entity_link_rejects_cross_tenant_relationships():
     first = Tenant.objects.create(name="First MSP", slug="first")
     second = Tenant.objects.create(name="Second MSP", slug="second")
-    source = Entity.objects.create(tenant=first, entity_type="document", display_name="Runbook")
-    target = Entity.objects.create(tenant=second, entity_type="asset", display_name="Router")
+    source = Entity.objects.create_owned(tenant=first, entity_type="document", display_name="Runbook")
+    target = Entity.objects.create_owned(tenant=second, entity_type="asset", display_name="Router")
     link = EntityLink(tenant=first, source=source, target=target, link_type="documents")
 
     with pytest.raises(ValidationError, match="Target entity"):
@@ -20,7 +20,7 @@ def test_entity_link_rejects_cross_tenant_relationships():
 def test_organization_anchor_rejects_cross_tenant_entity():
     first = Tenant.objects.create(name="First MSP", slug="first")
     second = Tenant.objects.create(name="Second MSP", slug="second")
-    foreign_entity = Entity.objects.create(tenant=second, entity_type="organization", display_name="Foreign")
+    foreign_entity = Entity.objects.create_owned(tenant=second, entity_type="organization", display_name="Foreign")
 
     with pytest.raises(ValidationError, match="Organization entity"):
         Organization(tenant=first, entity=foreign_entity).full_clean()

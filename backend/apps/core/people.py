@@ -6,7 +6,17 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
-from .models import AuditEvent, Entity, Location, Organization, Person, PersonAssociation, Site, Tenant
+from .models import (
+    AuditEvent,
+    Entity,
+    Location,
+    Organization,
+    Person,
+    PersonAssociation,
+    Site,
+    Tenant,
+    workspace_for_owner,
+)
 from .scoping import DataScope
 
 FILTER_LOOKUPS = {
@@ -108,7 +118,12 @@ def create_person(
         location = site.entity.display_name
     if structured_location is not None:
         office = structured_location.entity.display_name
-    entity = Entity.objects.create(tenant=tenant, entity_type="person", display_name=full_name)
+    entity = Entity.objects.create(
+        tenant=tenant,
+        workspace=workspace_for_owner(tenant=tenant, organization=None),
+        entity_type="person",
+        display_name=full_name,
+    )
     person = Person.objects.create(
         tenant=tenant,
         entity=entity,

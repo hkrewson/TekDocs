@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 from uuid import UUID
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Prefetch, Q, QuerySet
+from django.utils import timezone
 
 from .models import (
     AuditEvent,
@@ -14,12 +16,19 @@ from .models import (
     CatalogProductDocument,
     ClientAsset,
     ClientAssetDocumentProvenance,
+    ClientAssetLifecycleEvent,
+    ClientHardwareAsset,
     DocumentPublication,
     DocumentPublicationArtifact,
     Entity,
     EntityVisibility,
+    HardwareLifecycleEventType,
+    HardwareLifecycleState,
+    Location,
     Organization,
+    PersonAssociation,
     PublicationAudience,
+    Site,
     Tenant,
 )
 from .publications import canonical_json, verify_publication
@@ -79,8 +88,18 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
             "specification_version",
             "specification_version__definition",
             "created_by",
+            "hardware",
+            "hardware__assigned_person",
+            "hardware__assigned_person__person__entity",
+            "hardware__assigned_site__entity",
+            "hardware__assigned_location__entity",
         )
-        .prefetch_related(_document_prefetch())
+        .prefetch_related(
+            _document_prefetch(),
+            "lifecycle_events__person__person__entity",
+            "lifecycle_events__site__entity",
+            "lifecycle_events__location__entity",
+        )
     )
 
 
@@ -270,6 +289,16 @@ def create_client_asset(
         provenance_checksum=_checksum(payload),
         created_by_id=actor_id,
     )
+    if model.product.kind == "hardware":
+        ClientHardwareAsset.objects.create(tenant=tenant, organization=organization, asset=asset)
+        ClientAssetLifecycleEvent.objects.create(
+            tenant=tenant,
+            organization=organization,
+            asset=asset,
+            event_type=HardwareLifecycleEventType.CREATED,
+            to_state=HardwareLifecycleState.IN_STOCK,
+            actor_id=actor_id,
+        )
     associations = list(
         CatalogProductDocument.objects.filter(
             tenant=tenant,
@@ -307,6 +336,225 @@ def create_client_asset(
         metadata={},
     )
     return assets_for_scope(DataScope.organization(tenant, organization)).get(pk=asset.pk)
+
+
+def _hardware(asset: ClientAsset, *, lock: bool = False) -> ClientHardwareAsset:
+    if asset.product.kind != "hardware":
+        raise InventoryError("Hardware lifecycle is available only for hardware assets.")
+    query = ClientHardwareAsset.objects.select_for_update(of=("self",)) if lock else ClientHardwareAsset.objects
+    try:
+        return query.select_related(
+            "asset__product", "assigned_person__person__entity", "assigned_site__entity", "assigned_location__entity"
+        ).get(asset=asset)
+    except ClientHardwareAsset.DoesNotExist as exc:
+        raise InventoryError("The hardware profile is unavailable.") from exc
+
+
+def lifecycle_events(asset: ClientAsset) -> QuerySet[ClientAssetLifecycleEvent]:
+    return ClientAssetLifecycleEvent.objects.filter(asset=asset).select_related(
+        "person__person__entity", "site__entity", "location__entity", "actor"
+    )
+
+
+def assignment_choices(asset: ClientAsset) -> tuple[QuerySet[PersonAssociation], QuerySet[Site], QuerySet[Location]]:
+    base = {"tenant": asset.tenant, "organization": asset.organization, "archived_at__isnull": True}
+    people = PersonAssociation.objects.filter(
+        **base, person__entity__archived_at__isnull=True
+    ).select_related("person__entity")
+    sites = Site.objects.filter(**base, entity__archived_at__isnull=True).select_related("entity")
+    locations = Location.objects.filter(**base, entity__archived_at__isnull=True).select_related(
+        "entity", "site__entity"
+    )
+    return (
+        people.order_by("person__entity__display_name"),
+        sites.order_by("entity__display_name"),
+        locations.order_by("site__entity__display_name", "entity__display_name"),
+    )
+
+
+def _normalize_identifier(value: str) -> str:
+    return " ".join(value.strip().split()).upper()
+
+
+def _validate_profile(profile: ClientHardwareAsset) -> None:
+    try:
+        profile.full_clean()
+    except ValidationError as exc:
+        raise InventoryError(" ".join(exc.messages)) from exc
+
+
+def _append_event(  # type: ignore[no-untyped-def]
+    profile: ClientHardwareAsset,
+    event_type: str,
+    actor_id: UUID,
+    *,
+    from_state: str = "",
+    person=None,
+    site=None,
+    location=None,
+) -> None:
+    event = ClientAssetLifecycleEvent(
+        tenant=profile.tenant,
+        organization=profile.organization,
+        asset=profile.asset,
+        event_type=event_type,
+        from_state=from_state,
+        to_state=profile.lifecycle_state,
+        person=person,
+        site=site,
+        location=location,
+        actor_id=actor_id,
+    )
+    event.full_clean()
+    event.save()  # type: ignore[no-untyped-call]
+
+
+@transaction.atomic
+def update_hardware_details(*, asset: ClientAsset, actor_id: UUID, values: dict[str, object]) -> ClientHardwareAsset:
+    profile = _hardware(ClientAsset.objects.select_for_update().get(pk=asset.pk), lock=True)
+    if profile.lifecycle_state == HardwareLifecycleState.DISPOSED:
+        raise InventoryError("Disposed hardware cannot be edited.")
+    old_state = profile.lifecycle_state
+    for field, value in values.items():
+        if field in {"serial_number", "asset_tag"}:
+            value = _normalize_identifier(str(value))
+        setattr(profile, field, value)
+    _validate_profile(profile)
+    try:
+        profile.save()
+    except IntegrityError as exc:
+        raise InventoryError("Serial number and asset tag must be unique within this client.") from exc
+    event_type = (
+        HardwareLifecycleEventType.STATE_CHANGED
+        if profile.lifecycle_state != old_state
+        else HardwareLifecycleEventType.DETAILS_UPDATED
+    )
+    _append_event(profile, event_type, actor_id, from_state=old_state)
+    AuditEvent.objects.create(
+        tenant=profile.tenant,
+        actor_id=actor_id,
+        action=f"asset.hardware.{event_type}",
+        entity_id=asset.entity_id,
+        metadata={},
+    )
+    return _hardware(asset)
+
+
+@transaction.atomic
+def assign_hardware(  # type: ignore[no-untyped-def]
+    *, asset: ClientAsset, actor_id: UUID, person_id=None, site_id=None, location_id=None
+) -> ClientHardwareAsset:
+    profile = _hardware(ClientAsset.objects.select_for_update().get(pk=asset.pk), lock=True)
+    if profile.lifecycle_state == HardwareLifecycleState.DISPOSED:
+        raise InventoryError("Disposed hardware cannot be assigned.")
+    if not any((person_id, site_id, location_id)):
+        raise InventoryError("Choose a person, site, or location for this assignment.")
+    scope = {"tenant": asset.tenant, "organization": asset.organization, "archived_at__isnull": True}
+    person = (
+        PersonAssociation.objects.filter(
+            **scope, id=person_id, person__entity__archived_at__isnull=True
+        ).first()
+        if person_id
+        else None
+    )
+    site = Site.objects.filter(**scope, id=site_id, entity__archived_at__isnull=True).first() if site_id else None
+    location = (
+        Location.objects.filter(**scope, id=location_id, entity__archived_at__isnull=True).first()
+        if location_id
+        else None
+    )
+    if (person_id and person is None) or (site_id and site is None) or (location_id and location is None):
+        raise InventoryError("The assignment target is unavailable.")
+    if location is not None:
+        if site is None:
+            site = location.site
+        elif location.site_id != site.id:
+            raise InventoryError("The location does not belong to the selected site.")
+    if profile.assigned_person_id or profile.assigned_site_id or profile.assigned_location_id:
+        _append_event(
+            profile,
+            HardwareLifecycleEventType.UNASSIGNED,
+            actor_id,
+            person=profile.assigned_person,
+            site=profile.assigned_site,
+            location=profile.assigned_location,
+        )
+    profile.assigned_person, profile.assigned_site, profile.assigned_location = person, site, location
+    profile.assigned_at = timezone.now()
+    if profile.lifecycle_state == HardwareLifecycleState.IN_STOCK:
+        profile.lifecycle_state = HardwareLifecycleState.IN_SERVICE
+    _validate_profile(profile)
+    profile.save()
+    _append_event(profile, HardwareLifecycleEventType.ASSIGNED, actor_id, person=person, site=site, location=location)
+    AuditEvent.objects.create(
+        tenant=profile.tenant,
+        actor_id=actor_id,
+        action="asset.hardware.assigned",
+        entity_id=asset.entity_id,
+        metadata={},
+    )
+    return _hardware(asset)
+
+
+@transaction.atomic
+def unassign_hardware(*, asset: ClientAsset, actor_id: UUID) -> ClientHardwareAsset:
+    profile = _hardware(ClientAsset.objects.select_for_update().get(pk=asset.pk), lock=True)
+    if not (profile.assigned_person_id or profile.assigned_site_id or profile.assigned_location_id):
+        return profile
+    _append_event(
+        profile,
+        HardwareLifecycleEventType.UNASSIGNED,
+        actor_id,
+        person=profile.assigned_person,
+        site=profile.assigned_site,
+        location=profile.assigned_location,
+    )
+    profile.assigned_person = profile.assigned_site = profile.assigned_location = None
+    profile.assigned_at = None
+    _validate_profile(profile)
+    profile.save()
+    AuditEvent.objects.create(
+        tenant=profile.tenant,
+        actor_id=actor_id,
+        action="asset.hardware.unassigned",
+        entity_id=asset.entity_id,
+        metadata={},
+    )
+    return _hardware(asset)
+
+
+@transaction.atomic
+def dispose_hardware(  # type: ignore[no-untyped-def]
+    *, asset: ClientAsset, actor_id: UUID, disposed_on, method: str, reason: str
+) -> ClientHardwareAsset:
+    profile = _hardware(ClientAsset.objects.select_for_update().get(pk=asset.pk), lock=True)
+    if profile.lifecycle_state == HardwareLifecycleState.DISPOSED:
+        raise InventoryError("Hardware is already disposed.")
+    old_state = profile.lifecycle_state
+    if profile.assigned_person_id or profile.assigned_site_id or profile.assigned_location_id:
+        _append_event(
+            profile,
+            HardwareLifecycleEventType.UNASSIGNED,
+            actor_id,
+            person=profile.assigned_person,
+            site=profile.assigned_site,
+            location=profile.assigned_location,
+        )
+    profile.assigned_person = profile.assigned_site = profile.assigned_location = None
+    profile.assigned_at = None
+    profile.lifecycle_state = HardwareLifecycleState.DISPOSED
+    profile.disposed_on, profile.disposal_method, profile.disposal_reason = disposed_on, method, reason.strip()
+    _validate_profile(profile)
+    profile.save()
+    _append_event(profile, HardwareLifecycleEventType.DISPOSED, actor_id, from_state=old_state)
+    AuditEvent.objects.create(
+        tenant=profile.tenant,
+        actor_id=actor_id,
+        action="asset.hardware.disposed",
+        entity_id=asset.entity_id,
+        metadata={},
+    )
+    return _hardware(asset)
 
 
 def vendors_for_scope(scope: DataScope) -> QuerySet[Organization]:

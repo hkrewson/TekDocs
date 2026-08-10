@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.4
+  version: 0.3.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2871,6 +2871,229 @@ paths:
       responses:
         '200':
           description: Retained publication artifact
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware:
+    get:
+      operationId: organization_client_hardware_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_assets_hardware_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/assignment:
+    post:
+      operationId: workspaces_organizations_assets_hardware_assignment_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+    delete:
+      operationId: workspaces_organizations_assets_hardware_assignment_destroy
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/assignment-choices:
+    get:
+      operationId: organization_client_hardware_assignment_choices
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareAssignmentChoices'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/dispose:
+    post:
+      operationId: workspaces_organizations_assets_hardware_dispose_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/lifecycle:
+    get:
+      operationId: organization_client_hardware_lifecycle_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HardwareLifecycleEvent'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
     get:
       operationId: organization_client_asset_model_choices_list
@@ -5429,6 +5652,18 @@ components:
       - custom_assignable_permissions
       - permissions
       - roles
+    AcquisitionMethodEnum:
+      enum:
+      - purchase
+      - lease
+      - rental
+      - transfer
+      - donation
+      - other
+      type: string
+      description: "* `` - \n* `purchase` - purchase\n* `lease` - lease\n* `rental`\
+        \ - rental\n* `transfer` - transfer\n* `donation` - donation\n* `other` -\
+        \ other"
     AssetDocumentDetail:
       type: object
       properties:
@@ -5602,6 +5837,9 @@ components:
       - display_name
       - email
       - id
+    BlankEnum:
+      enum:
+      - ''
     BlockRevision:
       type: object
       properties:
@@ -6046,12 +6284,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AssetDocumentSummary'
+        hardware:
+          allOf:
+          - $ref: '#/components/schemas/HardwareProfile'
+          nullable: true
         created_at:
           type: string
           format: date-time
       required:
       - created_at
       - documents
+      - hardware
       - id
       - kind
       - model_id
@@ -7249,6 +7492,175 @@ components:
         * `email` - Email
         * `choice` - Choice
         * `multi_choice` - Multiple choice
+    HardwareAssignment:
+      type: object
+      properties:
+        person_id:
+          type: string
+          format: uuid
+          nullable: true
+        person_name:
+          type: string
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        assigned_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assigned_at
+      - location_id
+      - location_name
+      - person_id
+      - person_name
+      - site_id
+      - site_name
+    HardwareAssignmentChoices:
+      type: object
+      properties:
+        people:
+          type: array
+          items: {}
+        sites:
+          type: array
+          items: {}
+        locations:
+          type: array
+          items: {}
+      required:
+      - locations
+      - people
+      - sites
+    HardwareAssignmentWrite:
+      type: object
+      properties:
+        person_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+    HardwareDisposalWrite:
+      type: object
+      properties:
+        disposed_on:
+          type: string
+          format: date
+        method:
+          $ref: '#/components/schemas/MethodEnum'
+        reason:
+          type: string
+          default: ''
+          maxLength: 500
+      required:
+      - disposed_on
+      - method
+    HardwareLifecycleEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        from_state:
+          type: string
+        to_state:
+          type: string
+        person_name:
+          type: string
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - event_type
+      - from_state
+      - id
+      - location_name
+      - occurred_at
+      - person_name
+      - site_name
+      - to_state
+    HardwareProfile:
+      type: object
+      properties:
+        serial_number:
+          type: string
+        asset_tag:
+          type: string
+        lifecycle_state:
+          type: string
+        acquired_on:
+          type: string
+          format: date
+          nullable: true
+        acquisition_method:
+          type: string
+        acquisition_reference:
+          type: string
+        warranty_provider:
+          type: string
+        warranty_starts_on:
+          type: string
+          format: date
+          nullable: true
+        warranty_ends_on:
+          type: string
+          format: date
+          nullable: true
+        warranty_reference:
+          type: string
+        assignment:
+          $ref: '#/components/schemas/HardwareAssignment'
+        disposed_on:
+          type: string
+          format: date
+          nullable: true
+        disposal_method:
+          type: string
+        disposal_reason:
+          type: string
+      required:
+      - acquired_on
+      - acquisition_method
+      - acquisition_reference
+      - asset_tag
+      - assignment
+      - disposal_method
+      - disposal_reason
+      - disposed_on
+      - lifecycle_state
+      - serial_number
+      - warranty_ends_on
+      - warranty_provider
+      - warranty_reference
+      - warranty_starts_on
     Invitation:
       type: object
       properties:
@@ -7337,6 +7749,18 @@ components:
       description: |-
         * `msp` - msp
         * `organization` - organization
+    LifecycleStateEnum:
+      enum:
+      - in_stock
+      - in_service
+      - repair
+      - retired
+      type: string
+      description: |-
+        * `in_stock` - in_stock
+        * `in_service` - in_service
+        * `repair` - repair
+        * `retired` - retired
     Location:
       type: object
       properties:
@@ -7477,6 +7901,24 @@ components:
       - is_owner
       - joined_at
       - role
+    MethodEnum:
+      enum:
+      - recycled
+      - returned
+      - sold
+      - donated
+      - destroyed
+      - lost
+      - other
+      type: string
+      description: |-
+        * `recycled` - recycled
+        * `returned` - returned
+        * `sold` - sold
+        * `donated` - donated
+        * `destroyed` - destroyed
+        * `lost` - lost
+        * `other` - other
     MigrationImpact:
       type: object
       properties:
@@ -7752,6 +8194,42 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedHardwareDetailWrite:
+      type: object
+      properties:
+        serial_number:
+          type: string
+          maxLength: 160
+        asset_tag:
+          type: string
+          maxLength: 120
+        lifecycle_state:
+          $ref: '#/components/schemas/LifecycleStateEnum'
+        acquired_on:
+          type: string
+          format: date
+          nullable: true
+        acquisition_method:
+          oneOf:
+          - $ref: '#/components/schemas/AcquisitionMethodEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        acquisition_reference:
+          type: string
+          maxLength: 240
+        warranty_provider:
+          type: string
+          maxLength: 160
+        warranty_starts_on:
+          type: string
+          format: date
+          nullable: true
+        warranty_ends_on:
+          type: string
+          format: date
+          nullable: true
+        warranty_reference:
+          type: string
+          maxLength: 240
     PatchedLocationWrite:
       type: object
       properties:

@@ -292,7 +292,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.4 connects supplier catalogs and STATIC product documentation to client assets with retained provenance." />
+      <PageHeader title="Overview" description="TekDocs 0.3.5 adds client hardware identity, acquisition, warranty, assignment, disposal, and retained lifecycle history." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -347,7 +347,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   custom_fields: { title: 'Custom fields', description: 'Versioned extensions scoped to this organization or inherited from the MSP.', release: '0.1.7' },
   documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.8' },
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
-  assets: { title: 'Assets', description: 'Hardware and software created from retained supplier provenance.', release: '0.3.4' },
+  assets: { title: 'Assets', description: 'Hardware lifecycle and software records created from retained supplier provenance.', release: '0.3.5' },
   licenses: { title: 'Licenses', description: 'Software entitlements and assignments scoped to this organization.', release: '0.3.6' },
   networks: { title: 'Networks', description: 'Network records scoped to this organization.', release: '0.4.1' },
   domains: { title: 'Domains', description: 'Domain registration and DNS records scoped to this organization.', release: '0.7.8' },

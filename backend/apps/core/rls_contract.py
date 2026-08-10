@@ -23,6 +23,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_catalogproductdocument",
     "core_clientasset",
     "core_clientassetdocumentprovenance",
+    "core_clienthardwareasset",
+    "core_clientassetlifecycleevent",
 )
 
 TENANT_SCOPED_TABLES = (

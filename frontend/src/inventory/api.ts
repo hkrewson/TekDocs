@@ -30,8 +30,27 @@ export type ClientAsset = {
   specifications: Record<string, unknown>
   provenance_checksum: string
   documents: AssetDocument[]
+  hardware: HardwareProfile | null
   created_at: string
 }
+export type HardwareProfile = {
+  serial_number: string
+  asset_tag: string
+  lifecycle_state: 'in_stock' | 'in_service' | 'repair' | 'retired' | 'disposed'
+  acquired_on: string | null
+  acquisition_method: string
+  acquisition_reference: string
+  warranty_provider: string
+  warranty_starts_on: string | null
+  warranty_ends_on: string | null
+  warranty_reference: string
+  assignment: { person_id: string | null; person_name: string | null; site_id: string | null; site_name: string | null; location_id: string | null; location_name: string | null; assigned_at: string | null }
+  disposed_on: string | null
+  disposal_method: string
+  disposal_reason: string
+}
+export type HardwareLifecycleEvent = { id: string; event_type: string; from_state: string; to_state: string; person_name: string | null; site_name: string | null; location_name: string | null; occurred_at: string }
+export type HardwareAssignmentChoices = { people: Array<{ id: string; name: string }>; sites: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; site_id: string }> }
 export type ModelChoice = {
   id: string
   name: string
@@ -58,6 +77,12 @@ export interface InventoryClient {
   listAssets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: ClientAsset[]; count: number; can_manage: boolean }>
   listModelChoices(workspace: WorkspaceContext, query: string, signal?: AbortSignal): Promise<{ results: ModelChoice[] }>
   createAsset(workspace: WorkspaceContext, modelId: string, name: string): Promise<ClientAsset>
+  updateHardware(workspace: WorkspaceContext, assetId: string, values: Partial<HardwareProfile>): Promise<HardwareProfile>
+  listHardwareLifecycle(workspace: WorkspaceContext, assetId: string): Promise<HardwareLifecycleEvent[]>
+  assignmentChoices(workspace: WorkspaceContext, assetId: string): Promise<HardwareAssignmentChoices>
+  assignHardware(workspace: WorkspaceContext, assetId: string, values: { person_id?: string | null; site_id?: string | null; location_id?: string | null }): Promise<HardwareProfile>
+  unassignHardware(workspace: WorkspaceContext, assetId: string): Promise<HardwareProfile>
+  disposeHardware(workspace: WorkspaceContext, assetId: string, values: { disposed_on: string; method: string; reason: string }): Promise<HardwareProfile>
   loadDocument(workspace: WorkspaceContext, assetId: string, publicationId: string): Promise<AssetDocument & { sanitized_html: string }>
   listVendors(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: DerivedVendor[]; count: number }>
   artifactUrl(workspace: WorkspaceContext, assetId: string, publicationId: string, artifactId: string): string
@@ -90,18 +115,26 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return parse(await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
 }
 
+async function mutate<T>(path: string, method: string, body?: object): Promise<T> {
+  await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+  return parse(await fetch(path, {
+    method, credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  }))
+}
+
 export const browserInventoryClient: InventoryClient = {
   listAssets: (workspace, signal) => get(`${basePath(workspace)}/assets`, signal),
   listModelChoices: (workspace, query, signal) => get(`${basePath(workspace)}/assets/model-choices?q=${encodeURIComponent(query)}`, signal),
   async createAsset(workspace, modelId, name) {
-    await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-    return parse(await fetch(`${basePath(workspace)}/assets`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
-      body: JSON.stringify({ model_id: modelId, name }),
-    }))
+    return mutate(`${basePath(workspace)}/assets`, 'POST', { model_id: modelId, name })
   },
+  updateHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware`, 'PATCH', values),
+  listHardwareLifecycle: (workspace, assetId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/lifecycle`),
+  assignmentChoices: (workspace, assetId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment-choices`),
+  assignHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'POST', values),
+  unassignHardware: (workspace, assetId) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'DELETE'),
+  disposeHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/dispose`, 'POST', values),
   loadDocument: (workspace, assetId, publicationId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}`),
   listVendors: (workspace, signal) => get(`${basePath(workspace)}/vendors`, signal),
   artifactUrl: (workspace, assetId, publicationId, artifactId) => `${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,

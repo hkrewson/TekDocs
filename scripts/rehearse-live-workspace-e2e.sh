@@ -53,7 +53,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -140,6 +140,18 @@ asset_document = ClientAssetDocumentProvenance.objects.get(asset=asset)
 assert asset_document.catalog_document == catalog_document
 assert asset_document.publication == catalog_document.publication
 assert asset_document.content_digest == catalog_document.publication.content_digest
+hardware = ClientHardwareAsset.objects.get(asset=asset)
+assert hardware.serial_number == "LIVE-SN-100"
+assert hardware.asset_tag == "LIVE-SW-100"
+assert hardware.lifecycle_state == "in_service"
+assert hardware.assigned_person == association
+assert hardware.assigned_site == site
+assert hardware.assigned_location == location
+assert list(ClientAssetLifecycleEvent.objects.filter(asset=asset).values_list("event_type", flat=True)) == [
+    "assigned",
+    "state_changed",
+    "created",
+]
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

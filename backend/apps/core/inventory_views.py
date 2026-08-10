@@ -16,9 +16,15 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 from .inventory import (
     InventoryError,
     assets_for_scope,
+    assign_hardware,
+    assignment_choices,
     create_client_asset,
+    dispose_hardware,
+    lifecycle_events,
     model_choices_for_client,
     require_client,
+    unassign_hardware,
+    update_hardware_details,
     vendors_for_scope,
 )
 from .models import (
@@ -26,7 +32,11 @@ from .models import (
     CatalogModelRevision,
     ClientAsset,
     ClientAssetDocumentProvenance,
+    ClientHardwareAsset,
     DocumentPublicationArtifact,
+    HardwareAcquisitionMethod,
+    HardwareDisposalMethod,
+    HardwareLifecycleState,
     Organization,
 )
 from .publications import PublicationConflict, read_publication_artifact, verify_publication
@@ -112,6 +122,80 @@ class AssetDocumentDetailSerializer(AssetDocumentSummarySerializer):
     sanitized_html = serializers.CharField(source="publication.sanitized_html")
 
 
+class HardwareAssignmentSerializer(serializers.Serializer):
+    person_id = serializers.UUIDField(source="assigned_person_id", allow_null=True)
+    person_name = serializers.CharField(source="assigned_person.person.entity.display_name", allow_null=True)
+    site_id = serializers.UUIDField(source="assigned_site_id", allow_null=True)
+    site_name = serializers.CharField(source="assigned_site.entity.display_name", allow_null=True)
+    location_id = serializers.UUIDField(source="assigned_location_id", allow_null=True)
+    location_name = serializers.CharField(source="assigned_location.entity.display_name", allow_null=True)
+    assigned_at = serializers.DateTimeField(allow_null=True)
+
+
+class HardwareProfileSerializer(serializers.Serializer):
+    serial_number = serializers.CharField()
+    asset_tag = serializers.CharField()
+    lifecycle_state = serializers.CharField()
+    acquired_on = serializers.DateField(allow_null=True)
+    acquisition_method = serializers.CharField()
+    acquisition_reference = serializers.CharField()
+    warranty_provider = serializers.CharField()
+    warranty_starts_on = serializers.DateField(allow_null=True)
+    warranty_ends_on = serializers.DateField(allow_null=True)
+    warranty_reference = serializers.CharField()
+    assignment = HardwareAssignmentSerializer(source="*")
+    disposed_on = serializers.DateField(allow_null=True)
+    disposal_method = serializers.CharField()
+    disposal_reason = serializers.CharField()
+
+
+class HardwareLifecycleEventSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    event_type = serializers.CharField()
+    from_state = serializers.CharField()
+    to_state = serializers.CharField()
+    person_name = serializers.CharField(source="person.person.entity.display_name", allow_null=True)
+    site_name = serializers.CharField(source="site.entity.display_name", allow_null=True)
+    location_name = serializers.CharField(source="location.entity.display_name", allow_null=True)
+    occurred_at = serializers.DateTimeField()
+
+
+class HardwareDetailWriteSerializer(StrictSerializer):
+    serial_number = serializers.CharField(max_length=160, allow_blank=True, required=False)
+    asset_tag = serializers.CharField(max_length=120, allow_blank=True, required=False)
+    lifecycle_state = serializers.ChoiceField(
+        choices=[
+            choice for choice in HardwareLifecycleState.values if choice != HardwareLifecycleState.DISPOSED
+        ],
+        required=False,
+    )
+    acquired_on = serializers.DateField(allow_null=True, required=False)
+    acquisition_method = serializers.ChoiceField(choices=["", *HardwareAcquisitionMethod.values], required=False)
+    acquisition_reference = serializers.CharField(max_length=240, allow_blank=True, required=False)
+    warranty_provider = serializers.CharField(max_length=160, allow_blank=True, required=False)
+    warranty_starts_on = serializers.DateField(allow_null=True, required=False)
+    warranty_ends_on = serializers.DateField(allow_null=True, required=False)
+    warranty_reference = serializers.CharField(max_length=240, allow_blank=True, required=False)
+
+
+class HardwareAssignmentWriteSerializer(StrictSerializer):
+    person_id = serializers.UUIDField(allow_null=True, required=False)
+    site_id = serializers.UUIDField(allow_null=True, required=False)
+    location_id = serializers.UUIDField(allow_null=True, required=False)
+
+
+class HardwareDisposalWriteSerializer(StrictSerializer):
+    disposed_on = serializers.DateField()
+    method = serializers.ChoiceField(choices=HardwareDisposalMethod.values)
+    reason = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+
+
+class HardwareAssignmentChoicesSerializer(serializers.Serializer):
+    people = serializers.ListField()
+    sites = serializers.ListField()
+    locations = serializers.ListField()
+
+
 class ClientAssetSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
@@ -131,6 +215,7 @@ class ClientAssetSerializer(serializers.Serializer):
     specifications = serializers.JSONField()
     provenance_checksum = serializers.CharField()
     documents = AssetDocumentSummarySerializer(source="document_provenance", many=True)
+    hardware = HardwareProfileSerializer(allow_null=True)
     created_at = serializers.DateTimeField()
 
 
@@ -216,6 +301,106 @@ class ClientAssetDetailView(APIView):
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         return Response(ClientAssetSerializer(_asset(workspace, asset_entity_id)).data)
+
+
+class ClientHardwareDetailView(APIView):
+    @extend_schema(operation_id="organization_client_hardware_retrieve", responses={200: HardwareProfileSerializer})
+    def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        asset = _asset(workspace, asset_entity_id)
+        try:
+            return Response(HardwareProfileSerializer(asset.hardware).data)
+        except ClientHardwareAsset.DoesNotExist as exc:
+            raise serializers.ValidationError({"detail": "Hardware lifecycle is unavailable for this asset."}) from exc
+
+    @extend_schema(request=HardwareDetailWriteSerializer, responses={200: HardwareProfileSerializer})
+    def patch(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = HardwareDetailWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            profile = update_hardware_details(
+                asset=_asset(workspace, asset_entity_id),
+                actor_id=request.user.pk,
+                values=serializer.validated_data,
+            )
+        except InventoryError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(HardwareProfileSerializer(profile).data)
+
+
+class ClientHardwareAssignmentChoicesView(APIView):
+    @extend_schema(
+        operation_id="organization_client_hardware_assignment_choices",
+        responses={200: HardwareAssignmentChoicesSerializer},
+    )
+    def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        people, sites, locations = assignment_choices(_asset(workspace, asset_entity_id))
+        return Response(
+            {
+                "people": [{"id": item.id, "name": item.person.entity.display_name} for item in people],
+                "sites": [{"id": item.id, "name": item.entity.display_name} for item in sites],
+                "locations": [
+                    {"id": item.id, "name": item.entity.display_name, "site_id": item.site_id}
+                    for item in locations
+                ],
+            }
+        )
+
+
+class ClientHardwareAssignmentView(APIView):
+    @extend_schema(request=HardwareAssignmentWriteSerializer, responses={200: HardwareProfileSerializer})
+    def post(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = HardwareAssignmentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            profile = assign_hardware(
+                asset=_asset(workspace, asset_entity_id),
+                actor_id=request.user.pk,
+                **serializer.validated_data,
+            )
+        except InventoryError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(HardwareProfileSerializer(profile).data)
+
+    @extend_schema(responses={200: HardwareProfileSerializer})
+    def delete(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        try:
+            profile = unassign_hardware(asset=_asset(workspace, asset_entity_id), actor_id=request.user.pk)
+        except InventoryError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(HardwareProfileSerializer(profile).data)
+
+
+class ClientHardwareDisposalView(APIView):
+    @extend_schema(request=HardwareDisposalWriteSerializer, responses={200: HardwareProfileSerializer})
+    def post(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = HardwareDisposalWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            profile = dispose_hardware(
+                asset=_asset(workspace, asset_entity_id),
+                actor_id=request.user.pk,
+                **serializer.validated_data,
+            )
+        except InventoryError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(HardwareProfileSerializer(profile).data)
+
+
+class ClientHardwareLifecycleView(APIView):
+    @extend_schema(
+        operation_id="organization_client_hardware_lifecycle_list",
+        responses={200: HardwareLifecycleEventSerializer(many=True)},
+    )
+    def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        events = lifecycle_events(_asset(workspace, asset_entity_id))
+        return Response(HardwareLifecycleEventSerializer(events, many=True).data)
 
 
 class ClientAssetModelChoiceListView(APIView):

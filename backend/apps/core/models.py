@@ -557,6 +557,199 @@ class ClientAsset(TimestampedModel):
             raise ValidationError("Client asset specification version must match its retained model revision")
 
 
+class HardwareLifecycleState(models.TextChoices):
+    IN_STOCK = "in_stock", "In stock"
+    IN_SERVICE = "in_service", "In service"
+    REPAIR = "repair", "Repair"
+    RETIRED = "retired", "Retired"
+    DISPOSED = "disposed", "Disposed"
+
+
+class HardwareAcquisitionMethod(models.TextChoices):
+    PURCHASE = "purchase", "Purchase"
+    LEASE = "lease", "Lease"
+    RENTAL = "rental", "Rental"
+    TRANSFER = "transfer", "Transfer"
+    DONATION = "donation", "Donation"
+    OTHER = "other", "Other"
+
+
+class HardwareDisposalMethod(models.TextChoices):
+    RECYCLED = "recycled", "Recycled"
+    RETURNED = "returned", "Returned"
+    SOLD = "sold", "Sold"
+    DONATED = "donated", "Donated"
+    DESTROYED = "destroyed", "Destroyed"
+    LOST = "lost", "Lost"
+    OTHER = "other", "Other"
+
+
+class ClientHardwareAsset(TimestampedModel):
+    """Mutable current-state projection for one client-owned hardware asset."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_hardware_assets")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_hardware_assets"
+    )
+    asset = models.OneToOneField(ClientAsset, on_delete=models.PROTECT, related_name="hardware")
+    serial_number = models.CharField(max_length=160, blank=True)
+    asset_tag = models.CharField(max_length=120, blank=True)
+    lifecycle_state = models.CharField(
+        max_length=24, choices=HardwareLifecycleState.choices, default=HardwareLifecycleState.IN_STOCK
+    )
+    acquired_on = models.DateField(null=True, blank=True)
+    acquisition_method = models.CharField(max_length=24, choices=HardwareAcquisitionMethod.choices, blank=True)
+    acquisition_reference = models.CharField(max_length=240, blank=True)
+    warranty_provider = models.CharField(max_length=160, blank=True)
+    warranty_starts_on = models.DateField(null=True, blank=True)
+    warranty_ends_on = models.DateField(null=True, blank=True)
+    warranty_reference = models.CharField(max_length=240, blank=True)
+    assigned_person = models.ForeignKey(
+        "PersonAssociation", on_delete=models.PROTECT, related_name="assigned_hardware", null=True, blank=True
+    )
+    assigned_site = models.ForeignKey(
+        "Site", on_delete=models.PROTECT, related_name="assigned_hardware", null=True, blank=True
+    )
+    assigned_location = models.ForeignKey(
+        "Location", on_delete=models.PROTECT, related_name="assigned_hardware", null=True, blank=True
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    disposed_on = models.DateField(null=True, blank=True)
+    disposal_method = models.CharField(max_length=24, choices=HardwareDisposalMethod.choices, blank=True)
+    disposal_reason = models.CharField(max_length=500, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(lifecycle_state__in=HardwareLifecycleState.values),
+                name="hardware_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(acquisition_method="")
+                | models.Q(acquisition_method__in=HardwareAcquisitionMethod.values),
+                name="hardware_acquisition_method_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(disposal_method="")
+                | models.Q(disposal_method__in=HardwareDisposalMethod.values),
+                name="hardware_disposal_method_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "serial_number"),
+                condition=~models.Q(serial_number=""),
+                name="unique_hardware_serial_in_org",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "asset_tag"),
+                condition=~models.Q(asset_tag=""),
+                name="unique_hardware_tag_in_org",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "lifecycle_state"), name="core_hwasset_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Hardware profile for {self.asset_id}"
+
+    def clean(self) -> None:
+        if self.asset_id and (
+            self.asset.tenant_id != self.tenant_id
+            or self.asset.organization_id != self.organization_id
+            or self.asset.product.kind != CatalogProductKind.HARDWARE
+        ):
+            raise ValidationError("Hardware profile must use an exact client hardware asset scope")
+        if self.warranty_starts_on and self.warranty_ends_on and self.warranty_ends_on < self.warranty_starts_on:
+            raise ValidationError("Warranty end date cannot precede its start date")
+        for target in (self.assigned_person, self.assigned_site, self.assigned_location):
+            if target is not None and (
+                target.tenant_id != self.tenant_id or target.organization_id != self.organization_id
+            ):
+                raise ValidationError("Hardware assignment targets must use the asset's client scope")
+        assigned_location = self.assigned_location if self.assigned_location_id else None
+        if assigned_location is not None and self.assigned_site_id != assigned_location.site_id:
+            raise ValidationError("Hardware assignment location must belong to its selected site")
+        if self.lifecycle_state == HardwareLifecycleState.DISPOSED:
+            if not self.disposed_on or not self.disposal_method:
+                raise ValidationError("Disposed hardware requires a date and method")
+            if self.assigned_person_id or self.assigned_site_id or self.assigned_location_id or self.assigned_at:
+                raise ValidationError("Disposed hardware cannot retain a current assignment")
+        elif self.disposed_on or self.disposal_method or self.disposal_reason:
+            raise ValidationError("Disposal details require the disposed lifecycle state")
+
+class HardwareLifecycleEventType(models.TextChoices):
+    CREATED = "created", "Created"
+    DETAILS_UPDATED = "details_updated", "Details updated"
+    STATE_CHANGED = "state_changed", "State changed"
+    ASSIGNED = "assigned", "Assigned"
+    UNASSIGNED = "unassigned", "Unassigned"
+    DISPOSED = "disposed", "Disposed"
+
+
+class ClientAssetLifecycleEvent(models.Model):
+    """Append-only, value-minimized history for one client hardware asset."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_asset_lifecycle_events")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_asset_lifecycle_events"
+    )
+    asset = models.ForeignKey(ClientAsset, on_delete=models.PROTECT, related_name="lifecycle_events")
+    event_type = models.CharField(max_length=32, choices=HardwareLifecycleEventType.choices)
+    from_state = models.CharField(max_length=24, blank=True)
+    to_state = models.CharField(max_length=24, blank=True)
+    person = models.ForeignKey("PersonAssociation", on_delete=models.PROTECT, null=True, blank=True)
+    site = models.ForeignKey("Site", on_delete=models.PROTECT, null=True, blank=True)
+    location = models.ForeignKey("Location", on_delete=models.PROTECT, null=True, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "-id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(event_type__in=HardwareLifecycleEventType.values),
+                name="hardware_event_type_valid",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "asset", "occurred_at"),
+                name="core_hwevent_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.asset_id}: {self.event_type}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Hardware lifecycle events are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Hardware lifecycle events are append-only")
+
+    def clean(self) -> None:
+        if self.asset_id and (
+            self.asset.tenant_id != self.tenant_id or self.asset.organization_id != self.organization_id
+        ):
+            raise ValidationError("Hardware lifecycle event must use its asset scope")
+        for target in (self.person, self.site, self.location):
+            if target is not None and (
+                target.tenant_id != self.tenant_id or target.organization_id != self.organization_id
+            ):
+                raise ValidationError("Lifecycle assignment targets must use the asset's client scope")
+        location = self.location if self.location_id else None
+        if location is not None and self.site_id != location.site_id:
+            raise ValidationError("Lifecycle event location must belong to its selected site")
+
+
 class ClientAssetDocumentProvenance(models.Model):
     """Append-only client projection of one exact supplier STATIC publication."""
 

@@ -318,6 +318,37 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-client-hardware-detail",
+        ("GET", "PATCH"),
+        PermissionKey.ASSETS_VIEW,
+        (PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-hardware-assignment-choices",
+        ("GET",),
+        PermissionKey.ASSETS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-hardware-assignment",
+        ("POST", "DELETE"),
+        mutations=(PermissionKey.ASSETS_EDIT, PermissionKey.ASSETS_EDIT),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-hardware-disposal",
+        ("POST",),
+        mutations=(PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-hardware-lifecycle",
+        ("GET",),
+        PermissionKey.ASSETS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
         "organization-client-asset-document-detail",
         ("GET",),
         PermissionKey.ASSETS_VIEW,

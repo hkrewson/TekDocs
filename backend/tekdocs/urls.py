@@ -107,6 +107,11 @@ from apps.core.inventory_views import (
     ClientAssetDocumentDetailView,
     ClientAssetListCreateView,
     ClientAssetModelChoiceListView,
+    ClientHardwareAssignmentChoicesView,
+    ClientHardwareAssignmentView,
+    ClientHardwareDetailView,
+    ClientHardwareDisposalView,
+    ClientHardwareLifecycleView,
     ClientVendorListView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
@@ -477,6 +482,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>",
         ClientAssetDetailView.as_view(),
         name="organization-client-asset-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware",
+        ClientHardwareDetailView.as_view(),
+        name="organization-client-hardware-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware/assignment-choices",
+        ClientHardwareAssignmentChoicesView.as_view(),
+        name="organization-client-hardware-assignment-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware/assignment",
+        ClientHardwareAssignmentView.as_view(),
+        name="organization-client-hardware-assignment",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware/dispose",
+        ClientHardwareDisposalView.as_view(),
+        name="organization-client-hardware-disposal",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware/lifecycle",
+        ClientHardwareLifecycleView.as_view(),
+        name="organization-client-hardware-lifecycle",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/documents/<uuid:publication_entity_id>",

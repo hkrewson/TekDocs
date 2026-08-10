@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-inventory test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -80,6 +80,9 @@ test-credential-references:
 
 test-catalogs:
 	docker compose run --rm migrate pytest apps/core/tests/test_catalogs.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+
+test-inventory:
+	docker compose run --rm migrate pytest apps/core/tests/test_inventory.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-secret-files:
 	docker compose run --rm migrate pytest apps/core/tests/test_secret_files.py apps/core/tests/test_health.py apps/core/tests/test_email_settings.py -q

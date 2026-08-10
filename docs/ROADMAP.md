@@ -573,7 +573,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.2` | **Complete:** production runtime `*_FILE` inputs, fail-closed secret-file validation, service-scoped Compose mounts, production-image leakage tests, removable bootstrap custody, and an operator-owned 1Password CLI injection recipe. |
 | `0.3.3` | **Complete:** supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | **Complete:** supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
-| `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
+| `0.3.5` | **Complete:** client hardware serials/tags, acquisition/disposal, warranty, current person/location assignment, and append-only lifecycle history. |
 | `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
 | `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
 | `0.3.8` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
@@ -632,6 +632,20 @@ Evidence: `docs/releases/0.3.3.md`.
 - [x] OpenAPI, architecture, security baseline, threat model, `TD-RISK-022`, migration/upgrade evidence, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.4`; serials, acquisition/disposal, warranty, assignment, costs, and mutable asset lifecycle remain later slices.
 
 Evidence: `docs/releases/0.3.4.md` (created at slice closeout).
+
+### `0.3.5` acceptance criteria
+
+- [x] Every client asset backed by a hardware catalog product has one client-scoped hardware profile; software assets fail closed at every lifecycle route and remain owned by `0.3.6`.
+- [x] Serial numbers and asset tags are optional, normalized identifiers that are unique within one client organization when present. Acquisition method/date/reference and warranty provider/start/end/reference are bounded, validated fields; costs and contracts remain deferred to `0.3.7`.
+- [x] Hardware follows an explicit in-stock, in-service, repair, retired, or disposed lifecycle. Disposal records method/date/reason, clears current assignment, and is terminal through ordinary application workflows.
+- [x] Current assignment may identify an active person association and/or structured site/location from the exact client organization. Reassignment and unassignment preserve history; sibling-client and cross-tenant targets fail without disclosure.
+- [x] Creation, material detail changes, assignment changes, state changes, and disposal update current state and append an immutable lifecycle event in one locked transaction. Events are protected against application and direct PostgreSQL update/delete.
+- [x] Hardware profile, assignment, and lifecycle relationships enforce tenant/client scope through model validation, PostgreSQL guards, scoped managers, forced RLS, and allow/deny/sibling/cross-tenant IDOR coverage.
+- [x] Reads use `assets.view`; every mutation uses centrally declared MFA/CSRF-protected `assets.edit`. Audit events contain identifiers and action names but no serial, acquisition reference, warranty reference, assignment note, or disposal reason.
+- [x] The client Assets experience exposes restrained hardware identity, acquisition, warranty, assignment, lifecycle, loading, empty, error, denial, responsive, keyboard, and accessibility states; one non-mocked browser-to-Django-to-PostgreSQL journey proves retained history.
+- [x] OpenAPI, architecture, security baseline, threat model, risk register, migration/upgrade evidence, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.5`.
+
+Evidence: `docs/releases/0.3.5.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

@@ -12,7 +12,12 @@ const asset: ClientAsset = {
   specifications: { ports: 24 }, provenance_checksum: 'a'.repeat(64), documents: [{
     publication_id: 'publication-1', source_document_id: 'document-1', title: 'Installation guide', category: 'guide', reason: 'Approved', content_digest: 'b'.repeat(64), published_at: '2026-08-10T12:00:00Z',
     verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, artifacts: [],
-  }], created_at: '2026-08-10T12:00:00Z',
+  }], hardware: {
+    serial_number: 'SN-001', asset_tag: 'SW-001', lifecycle_state: 'in_service', acquired_on: '2026-08-01', acquisition_method: 'purchase', acquisition_reference: '',
+    warranty_provider: 'Northwind', warranty_starts_on: '2026-08-01', warranty_ends_on: '2029-08-01', warranty_reference: '',
+    assignment: { person_id: null, person_name: null, site_id: null, site_name: null, location_id: null, location_name: null, assigned_at: null },
+    disposed_on: null, disposal_method: '', disposal_reason: '',
+  }, created_at: '2026-08-10T12:00:00Z',
 }
 
 function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryClient {
@@ -20,6 +25,12 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     listAssets: vi.fn().mockResolvedValue({ results: [asset], count: 1, can_manage: true }),
     listModelChoices: vi.fn().mockResolvedValue({ results: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', product_id: 'product-1', product_name: 'EdgeSwitch', kind: 'hardware', supplier_id: 'supplier-1', supplier_name: 'Northwind', revision: 1, specification_version_id: 'version-1', specifications: { ports: 24 } }] }),
     createAsset: vi.fn().mockResolvedValue(asset),
+    updateHardware: vi.fn().mockResolvedValue(asset.hardware),
+    listHardwareLifecycle: vi.fn().mockResolvedValue([{ id: 'event-1', event_type: 'created', from_state: '', to_state: 'in_stock', person_name: null, site_name: null, location_name: null, occurred_at: '2026-08-10T12:00:00Z' }]),
+    assignmentChoices: vi.fn().mockResolvedValue({ people: [], sites: [], locations: [] }),
+    assignHardware: vi.fn().mockResolvedValue(asset.hardware),
+    unassignHardware: vi.fn().mockResolvedValue(asset.hardware),
+    disposeHardware: vi.fn().mockResolvedValue(asset.hardware),
     loadDocument: vi.fn().mockResolvedValue({ ...asset.documents[0], sanitized_html: '<h1>Installation guide</h1>' }),
     listVendors: vi.fn().mockResolvedValue({ results: [], count: 0 }),
     artifactUrl: vi.fn().mockReturnValue('/retained.pdf'),
@@ -34,6 +45,9 @@ describe('Assets', () => {
     expect(await screen.findByRole('heading', { name: 'Core switch' })).toBeInTheDocument()
     expect(screen.getByText('Northwind / EdgeSwitch / EdgeSwitch 24')).toBeInTheDocument()
     expect(screen.getByText('24')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Hardware lifecycle' })).toBeInTheDocument()
+    expect(screen.getByText('SN-001')).toBeInTheDocument()
+    expect(await screen.findByText('created')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Installation guide/ }))
     expect(await screen.findByText('Approved')).toBeInTheDocument()
   })
@@ -49,5 +63,21 @@ describe('Assets', () => {
     await user.type(within(form).getByLabelText('Asset name (optional)'), 'Reception switch')
     await user.click(within(form).getByRole('button', { name: 'Create asset' }))
     await waitFor(() => expect(createAsset).toHaveBeenCalledWith(workspace, 'model-1', 'Reception switch'))
+  })
+
+  it('edits hardware identity through the lifecycle service', async () => {
+    const updateHardware = vi.fn().mockResolvedValue({ ...asset.hardware!, serial_number: 'SN-002' })
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ updateHardware })} />)
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    const serial = screen.getByLabelText('Serial number')
+    await user.clear(serial)
+    await user.type(serial, 'SN-002')
+    await user.click(screen.getByRole('button', { name: 'Save details' }))
+    await waitFor(() => expect(updateHardware).toHaveBeenCalledWith(
+      workspace,
+      'asset-1',
+      expect.objectContaining({ serial_number: 'SN-002', lifecycle_state: 'in_service' }),
+    ))
   })
 })

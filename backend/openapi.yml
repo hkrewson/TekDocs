@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.0
+  version: 0.3.1
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -580,6 +580,115 @@ paths:
               schema:
                 $ref: '#/components/schemas/BootstrapStatus'
           description: ''
+  /api/v1/credential-references:
+    get:
+      operationId: credential_references_retrieve
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - credential-references
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReferenceResult'
+          description: ''
+    post:
+      operationId: credential_references_create
+      tags:
+      - credential-references
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReference'
+          description: ''
+  /api/v1/credential-references/{credential_reference_entity_id}:
+    patch:
+      operationId: credential_references_partial_update
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - credential-references
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReference'
+          description: ''
+    delete:
+      operationId: credential_references_destroy
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - credential-references
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Credential reference archived
+  /api/v1/credential-references/{credential_reference_entity_id}/open:
+    get:
+      operationId: credential_references_open_retrieve
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - credential-references
+      security:
+      - cookieAuth: []
+      responses:
+        '302':
+          description: Redirect to the validated external provider link
   /api/v1/custom-field-definitions:
     get:
       operationId: custom_fields_msp_list
@@ -2614,6 +2723,146 @@ paths:
           description: Organization workspace not found
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations/{organization_entity_id}/credential-references:
+    get:
+      operationId: workspaces_organizations_credential_references_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReferenceResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_credential_references_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CredentialReferenceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReference'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/credential-references/{credential_reference_entity_id}:
+    patch:
+      operationId: workspaces_organizations_credential_references_partial_update
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialReference'
+          description: ''
+    delete:
+      operationId: workspaces_organizations_credential_references_destroy
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Credential reference archived
+  /api/v1/workspaces/organizations/{organization_entity_id}/credential-references/{credential_reference_entity_id}/open:
+    get:
+      operationId: workspaces_organizations_credential_references_open_retrieve
+      parameters:
+      - in: path
+        name: credential_reference_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '302':
+          description: Redirect to the validated external provider link
   /api/v1/workspaces/organizations/{organization_entity_id}/custom-field-definitions:
     get:
       operationId: custom_fields_organization_list
@@ -4739,6 +4988,61 @@ components:
         * `procedure` - Procedure
         * `guide` - Guide
         * `reference` - Reference
+    CredentialReference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        provider:
+          $ref: '#/components/schemas/ProviderEnum'
+        provider_label:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        can_manage:
+          type: boolean
+        can_open:
+          type: boolean
+      required:
+      - can_manage
+      - can_open
+      - id
+      - provider
+      - provider_label
+      - title
+      - updated_at
+    CredentialReferenceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CredentialReference'
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - results
+    CredentialReferenceWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        provider:
+          $ref: '#/components/schemas/ProviderEnum'
+        reference_url:
+          type: string
+          writeOnly: true
+          maxLength: 1000
+      required:
+      - provider
+      - reference_url
+      - title
     CustomFieldDefinition:
       type: object
       properties:
@@ -6159,6 +6463,16 @@ components:
           items:
             type: string
             format: uuid
+    PatchedCredentialReferenceUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        reference_url:
+          type: string
+          writeOnly: true
+          maxLength: 1000
     PatchedCustomFieldValueWrite:
       type: object
       properties:
@@ -6491,6 +6805,11 @@ components:
       required:
       - full_name
       - kind
+    ProviderEnum:
+      enum:
+      - onepassword
+      type: string
+      description: '* `onepassword` - 1Password'
     PublicationVerification:
       type: object
       properties:

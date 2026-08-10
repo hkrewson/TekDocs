@@ -77,6 +77,10 @@ class EntityVisibility(models.TextChoices):
     CLIENT_VISIBLE = "client_visible", "Client visible"
 
 
+class CredentialReferenceProvider(models.TextChoices):
+    ONEPASSWORD = "onepassword", "1Password"
+
+
 class Entity(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="entities")
@@ -121,6 +125,49 @@ class Entity(TimestampedModel):
         organization = self.organization if self.organization_id else None
         if organization is not None and self.tenant_id != organization.tenant_id:
             raise ValidationError("Organization scope must belong to the entity tenant")
+
+
+class CredentialReference(TimestampedModel):
+    """A scoped pointer to a credential held and revealed by an external provider."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="credential_references")
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="credential_references",
+        null=True,
+        blank=True,
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="credential_reference")
+    provider = models.CharField(max_length=32, choices=CredentialReferenceProvider.choices)
+    reference_url = models.CharField(max_length=1000)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(provider__in=CredentialReferenceProvider.values),
+                name="credential_reference_provider_valid",
+            )
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "archived_at"), name="core_credref_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        organization = self.organization if self.organization_id else None
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Credential reference and entity scopes must match")
+        if organization is not None and organization.tenant_id != self.tenant_id:
+            raise ValidationError("Credential reference organization must belong to its tenant")
 
 
 class OrganizationAccessMode(models.TextChoices):
@@ -958,8 +1005,7 @@ class DocumentPublicationArtifact(models.Model):
 
     def clean(self) -> None:
         if self.publication_id and (
-            self.publication.tenant_id != self.tenant_id
-            or self.publication.organization_id != self.organization_id
+            self.publication.tenant_id != self.tenant_id or self.publication.organization_id != self.organization_id
         ):
             raise ValidationError("Publication artifact must use its publication workspace scope")
         if self.entity_id and (

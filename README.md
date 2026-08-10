@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The reusable-documentation and immutable-publication foundation is certified at version `0.3.0`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.1` adds provider-neutral credential references with a strict 1Password Private Link boundary; TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 

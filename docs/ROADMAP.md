@@ -569,7 +569,7 @@ Evidence: `docs/releases/0.3.0.md`.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.3.1` | Provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
+| `0.3.1` | **Complete:** provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
 | `0.3.2` | Production runtime `*_FILE` inputs, secret-file precedence/validation, production-image tests, and an operator-owned 1Password CLI injection recipe that never gives TekDocs a vault-retrieval capability. |
 | `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
@@ -580,6 +580,18 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
 | `0.3.10` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
+
+### `0.3.1` acceptance criteria
+
+- [x] Credential records contain only a scoped entity title, provider identifier, provider-owned Private Link, lifecycle timestamps, and workspace ownership; no username, password, token, note, retrieval configuration, or revealed value is accepted.
+- [x] A provider-neutral adapter boundary supplies the first strict 1Password implementation. It accepts only the canonical `https://start.1password.com/open/i` Copy Private Link shape and rejects share links, arbitrary hosts/schemes, fragments, duplicate/extra/malformed parameters, invalid provider identifiers, and modified link serialization.
+- [x] List and search responses omit the Private Link, search only titles, and return no secret-shaped fields. Opening uses a centrally authorized, audited same-origin handoff that revalidates the stored target before redirecting to 1Password.
+- [x] Independent view, manage, and open permissions compose through built-in and custom roles at tenant, organization, and collection scope. Read-only/document permissions do not imply credential-reference access; client reachability and exact workspace scope remain hard constraints.
+- [x] Create, update, archive, and open events carry the reference entity identifier but empty metadata. TekDocs does not call 1Password APIs, retrieve values, proxy provider content, or infer that possession of a reference grants provider access.
+- [x] The credential-reference model has scoped managers, same-tenant/entity database guards, forced PostgreSQL RLS, negative sibling-client/MSP/tenant IDOR coverage, migration inventory coverage, and browser/component accessibility states.
+- [x] Security baseline, threat model, custody ADR, information architecture, risk register, OpenAPI, release notes, and version metadata agree that customer secrets remain outside TekDocs.
+
+Evidence: `docs/releases/0.3.1.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

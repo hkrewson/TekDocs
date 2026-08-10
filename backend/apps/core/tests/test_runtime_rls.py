@@ -10,6 +10,7 @@ from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
     Block,
     BlockRevision,
+    CredentialReference,
     Document,
     DocumentationListingReference,
     DocumentAttachment,
@@ -42,6 +43,48 @@ def _bind(cursor, tenant_id, mode, organization_id=None):
     cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(tenant_id)])
     cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(organization_id or "")])
     cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [mode])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_credential_references_are_forced_to_the_selected_workspace():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Credential RLS tenant", slug=f"credential-{uuid.uuid4()}")
+    first_org = _organization(tenant, "First credential client")
+    sibling_org = _organization(tenant, "Sibling credential client")
+    entity = Entity.objects.create(
+        tenant=tenant,
+        organization=first_org,
+        entity_type="credential_reference",
+        display_name="Firewall administrator",
+    )
+    reference = CredentialReference.objects.create(
+        tenant=tenant,
+        organization=first_org,
+        entity=entity,
+        provider="onepassword",
+        reference_url=(
+            "https://start.1password.com/open/i?"
+            "a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&"
+            "i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com"
+        ),
+    )
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, tenant.id, "organization", first_org.id)
+        cursor.execute("SELECT id FROM core_credentialreference")
+        assert cursor.fetchall() == [(reference.id,)]
+        runtime.commit()
+
+        _bind(cursor, tenant.id, "organization", sibling_org.id)
+        cursor.execute("SELECT id FROM core_credentialreference")
+        assert cursor.fetchall() == []
+        cursor.execute(
+            "UPDATE core_credentialreference SET organization_id = %s WHERE id = %s",
+            [sibling_org.id, reference.id],
+        )
+        assert cursor.rowcount == 0
 
 
 @pytest.mark.django_db(transaction=True)

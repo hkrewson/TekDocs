@@ -86,7 +86,7 @@ def test_permission_and_role_catalogs_are_complete_unique_and_bounded():
     assert set(ROLE_BY_VALUE) == set(BuiltInRole)
     assert ROLE_BY_VALUE[BuiltInRole.OWNER].permissions == frozenset(PermissionKey)
     assert CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS < frozenset(PermissionKey)
-    assert PermissionKey.SECRETS_REVEAL not in CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS
+    assert PermissionKey.CREDENTIAL_REFERENCES_MANAGE in CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS
     assert PermissionKey.MEMBERSHIPS_ASSIGN_ROLE not in CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS
     for definition in ROLE_DEFINITIONS:
         assert definition.permissions <= frozenset(PermissionKey)

@@ -28,6 +28,14 @@ from apps.accounts.views import (
     OwnerBootstrapView,
     ProfileView,
 )
+from apps.core.credential_reference_views import (
+    MSPCredentialReferenceDetailView,
+    MSPCredentialReferenceListCreateView,
+    MSPCredentialReferenceOpenView,
+    OrganizationCredentialReferenceDetailView,
+    OrganizationCredentialReferenceListCreateView,
+    OrganizationCredentialReferenceOpenView,
+)
 from apps.core.custom_field_views import (
     MSPCustomFieldDefinitionDetailView,
     MSPCustomFieldDefinitionListCreateView,
@@ -189,6 +197,21 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path(
+        "api/v1/credential-references",
+        MSPCredentialReferenceListCreateView.as_view(),
+        name="msp-credential-reference-list-create",
+    ),
+    path(
+        "api/v1/credential-references/<uuid:credential_reference_entity_id>",
+        MSPCredentialReferenceDetailView.as_view(),
+        name="msp-credential-reference-detail",
+    ),
+    path(
+        "api/v1/credential-references/<uuid:credential_reference_entity_id>/open",
+        MSPCredentialReferenceOpenView.as_view(),
+        name="msp-credential-reference-open",
+    ),
     path(
         "api/v1/documents/from-template",
         MSPDocumentTemplateInstantiateView.as_view(),
@@ -355,6 +378,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/credential-references",
+        OrganizationCredentialReferenceListCreateView.as_view(),
+        name="organization-credential-reference-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/credential-references/<uuid:credential_reference_entity_id>",
+        OrganizationCredentialReferenceDetailView.as_view(),
+        name="organization-credential-reference-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/credential-references/<uuid:credential_reference_entity_id>/open",
+        OrganizationCredentialReferenceOpenView.as_view(),
+        name="organization-credential-reference-open",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents",

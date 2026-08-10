@@ -12,6 +12,8 @@ TekDocs stores credential references, never customer credential values. The firs
 
 Only provider-specific, strictly validated reference formats are accepted. Public 1Password share links and arbitrary URLs are rejected. A reference has its own TekDocs scope, RBAC, lifecycle, and value-free audit events; possession of a TekDocs reference does not grant access to the referenced vault item.
 
+For the first adapter, TekDocs accepts only the canonical HTTPS link currently produced by **Copy Private Link**: host `start.1password.com`, path `/open/i`, and exactly one account (`a`), vault (`v`), item (`i`), and 1Password account-host (`h`) parameter in canonical order. This grammar is an intentionally strict compatibility contract inferred from current provider output because 1Password documents the feature semantics but does not publish a stable machine-readable URL grammar. Provider changes therefore fail closed until fixtures and the adapter are deliberately reviewed.
+
 Application runtime secrets remain a separate deployment concern. They must be supplied through files or a deployment secret manager and are never modeled as customer credentials. A documented 1Password CLI/operator workflow may inject those runtime values, but TekDocs itself receives only the resulting deployment inputs.
 
 ## Consequences

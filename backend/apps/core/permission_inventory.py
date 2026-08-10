@@ -28,6 +28,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("auth-profile", ("PATCH",)),
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
     route(
+        "msp-credential-reference-list-create",
+        ("GET", "POST"),
+        PermissionKey.CREDENTIAL_REFERENCES_VIEW,
+        (PermissionKey.CREDENTIAL_REFERENCES_MANAGE,),
+    ),
+    route(
+        "msp-credential-reference-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.CREDENTIAL_REFERENCES_MANAGE, PermissionKey.CREDENTIAL_REFERENCES_MANAGE),
+    ),
+    route("msp-credential-reference-open", ("GET",), PermissionKey.CREDENTIAL_REFERENCES_OPEN),
+    route(
         "msp-document-list-create",
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
@@ -228,6 +240,25 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("workspace-msp", ("GET",), PermissionKey.WORKSPACES_VIEW),
     route("workspace-organization-search", ("GET",), PermissionKey.ORGANIZATIONS_VIEW),
     route("workspace-organization", ("GET",), PermissionKey.WORKSPACES_VIEW, organization_scoped=True),
+    route(
+        "organization-credential-reference-list-create",
+        ("GET", "POST"),
+        PermissionKey.CREDENTIAL_REFERENCES_VIEW,
+        (PermissionKey.CREDENTIAL_REFERENCES_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-credential-reference-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.CREDENTIAL_REFERENCES_MANAGE, PermissionKey.CREDENTIAL_REFERENCES_MANAGE),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-credential-reference-open",
+        ("GET",),
+        PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+        organization_scoped=True,
+    ),
     route(
         "organization-people-list-create",
         ("GET", "POST"),

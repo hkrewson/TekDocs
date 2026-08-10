@@ -22,7 +22,7 @@ The initial file-backed set is:
 
 Docker Compose will mount individual secrets read-only below `/run/secrets`; Kubernetes-compatible deployments may project the same files. Secret values and resolved paths remain excluded from health responses, logs, audits, task arguments, image layers, support bundles, and browser configuration. Development may retain explicit environment values, while the supported production profile will require files by `0.8.7`.
 
-Rotation tests will distinguish reloadable connection credentials from process-start keys. Wrapping-key rotation will rewrap data keys before the old key is retired. Django signing-key and publication-key rotation will retain documented verification/rollback windows. Removing the bootstrap token after the one-time claim must not make an already bootstrapped installation fail to start.
+Rotation tests will distinguish reloadable connection credentials from process-start keys. MFA wrapping-key rotation will rewrap protected MFA material before the old key is retired. Django signing-key and publication-key rotation will retain documented verification/rollback windows. Removing the bootstrap token after the one-time claim must not make an already bootstrapped installation fail to start. The `0.3.2` slice implements this file-input contract; customer credential references delivered in `0.3.1` are not deployment secrets and never grant TekDocs access to provider values.
 
 ## Exact production-image testing
 

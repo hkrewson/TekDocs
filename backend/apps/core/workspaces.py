@@ -89,7 +89,7 @@ CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
     "networks": PermissionKey.NETWORKS_VIEW,
     "domains": PermissionKey.NETWORKS_VIEW,
     "certificates": PermissionKey.NETWORKS_VIEW,
-    "credentials": PermissionKey.SECRETS_VIEW,
+    "credentials": PermissionKey.CREDENTIAL_REFERENCES_VIEW,
     "services": PermissionKey.WORKSPACES_VIEW,
     "tickets": PermissionKey.WORKSPACES_VIEW,
     "vendors": PermissionKey.ASSETS_VIEW,

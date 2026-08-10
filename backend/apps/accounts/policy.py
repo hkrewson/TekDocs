@@ -80,8 +80,9 @@ class PermissionKey(StrEnum):
     NETWORKS_VIEW = "networks.view"
     NETWORKS_EDIT = "networks.edit"
     COSTS_VIEW = "costs.view"
-    SECRETS_VIEW = "secrets.view"
-    SECRETS_REVEAL = "secrets.reveal"
+    CREDENTIAL_REFERENCES_VIEW = "credential_references.view"
+    CREDENTIAL_REFERENCES_MANAGE = "credential_references.manage"
+    CREDENTIAL_REFERENCES_OPEN = "credential_references.open"
     COMPLIANCE_VIEW = "compliance.view"
     COMPLIANCE_EDIT = "compliance.edit"
     INTEGRATIONS_VIEW = "integrations.view"
@@ -159,8 +160,14 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.NETWORKS_VIEW, "View networks", "Networks"),
     _permission(PermissionKey.NETWORKS_EDIT, "Edit networks", "Networks", mfa=True),
     _permission(PermissionKey.COSTS_VIEW, "View costs", "Sensitive data"),
-    _permission(PermissionKey.SECRETS_VIEW, "View secret metadata", "Sensitive data"),
-    _permission(PermissionKey.SECRETS_REVEAL, "Reveal secret values", "Sensitive data", mfa=True),
+    _permission(PermissionKey.CREDENTIAL_REFERENCES_VIEW, "View credential references", "Credential references"),
+    _permission(
+        PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
+        "Manage credential references",
+        "Credential references",
+        mfa=True,
+    ),
+    _permission(PermissionKey.CREDENTIAL_REFERENCES_OPEN, "Open credential references", "Credential references"),
     _permission(PermissionKey.COMPLIANCE_VIEW, "View compliance evidence", "Compliance"),
     _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
     _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
@@ -197,6 +204,7 @@ TECHNICIAN_MUTATIONS = frozenset(
         PermissionKey.RELATIONSHIPS_ARCHIVE,
         PermissionKey.RECYCLE_BIN_RESTORE,
         PermissionKey.DOCUMENTS_EDIT,
+        PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
         PermissionKey.ASSETS_EDIT,
         PermissionKey.NETWORKS_EDIT,
         PermissionKey.COMPLIANCE_EDIT,
@@ -214,13 +222,12 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
         PermissionKey.ACCESS_COLLECTIONS_MANAGE,
         PermissionKey.ORGANIZATIONS_ASSIGN_STAFF,
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,
-        PermissionKey.SECRETS_REVEAL,
     }
 )
 
 # This explicit allowlist is the privilege ceiling for custom roles. Sensitive
 # field policy deliberately permits only cost visibility; access-control and
-# secret administration remain outside the custom-role ceiling.
+# credential-reference grants stay provider-neutral and never authorize secret retrieval.
 CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
     IMPLEMENTED_READS
     | TECHNICIAN_MUTATIONS
@@ -231,6 +238,9 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.CUSTOM_FIELDS_MANAGE,
         PermissionKey.DOCUMENTS_PUBLISH,
         PermissionKey.COSTS_VIEW,
+        PermissionKey.CREDENTIAL_REFERENCES_VIEW,
+        PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
+        PermissionKey.CREDENTIAL_REFERENCES_OPEN,
     }
 )
 
@@ -287,7 +297,9 @@ ROLE_DEFINITIONS = (
         "Technician",
         "Operational read and change access across authorized MSP and client workspaces.",
         "tenant",
-        IMPLEMENTED_READS | TECHNICIAN_MUTATIONS,
+        IMPLEMENTED_READS
+        | TECHNICIAN_MUTATIONS
+        | {PermissionKey.CREDENTIAL_REFERENCES_VIEW, PermissionKey.CREDENTIAL_REFERENCES_OPEN},
     ),
     RoleDefinition(
         BuiltInRole.CONTRIBUTOR,
@@ -384,10 +396,14 @@ def _organization_allowed(context: InstallationMemberContext, organization: Orga
         return True
     if context.is_owner:
         return True
-    return OrganizationAccessAssignment.scoped.for_tenant(context.tenant).filter(
-        organization=organization,
-        membership__user=context.user,
-    ).exists()
+    return (
+        OrganizationAccessAssignment.scoped.for_tenant(context.tenant)
+        .filter(
+            organization=organization,
+            membership__user=context.user,
+        )
+        .exists()
+    )
 
 
 def _archived_organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:
@@ -395,10 +411,14 @@ def _archived_organization_allowed(context: InstallationMemberContext, organizat
         return False
     if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED or context.is_owner:
         return True
-    return OrganizationAccessAssignment.scoped.for_tenant(context.tenant).filter(
-        organization=organization,
-        membership__user=context.user,
-    ).exists()
+    return (
+        OrganizationAccessAssignment.scoped.for_tenant(context.tenant)
+        .filter(
+            organization=organization,
+            membership__user=context.user,
+        )
+        .exists()
+    )
 
 
 def context_has_permission(
@@ -452,10 +472,13 @@ def require_archived_organization_permission(
     context = require_installation_member(user)
     if not context_has_archived_organization_permission(context, permission, organization=organization):
         raise PermissionDenied("Your account is not authorized for this action.")
-    if PERMISSION_BY_KEY[permission].requires_mfa and not Authenticator.objects.filter(
-        user=user,
-        type=Authenticator.Type.TOTP,
-    ).exists():
+    if (
+        PERMISSION_BY_KEY[permission].requires_mfa
+        and not Authenticator.objects.filter(
+            user=user,
+            type=Authenticator.Type.TOTP,
+        ).exists()
+    ):
         raise PrivilegedMFARequired()
     return context
 
@@ -486,8 +509,7 @@ def accessible_organizations(
         )
     if not context.is_owner:
         organizations = organizations.filter(
-            Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED)
-            | Q(access_assignments__membership__user=context.user)
+            Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED) | Q(access_assignments__membership__user=context.user)
         ).distinct()
     return organizations
 

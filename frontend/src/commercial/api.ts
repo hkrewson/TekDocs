@@ -48,7 +48,9 @@ export interface CommercialClient {
 }
 
 function basePath(workspace: WorkspaceContext) {
-  return `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/contracts`
+  return workspace.kind === 'msp'
+    ? '/api/v1/workspaces/msp/contracts'
+    : `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/contracts`
 }
 
 function csrfToken() {

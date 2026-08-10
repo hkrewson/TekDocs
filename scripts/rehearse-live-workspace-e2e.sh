@@ -140,6 +140,20 @@ asset_document = ClientAssetDocumentProvenance.objects.get(asset=asset)
 assert asset_document.catalog_document == catalog_document
 assert asset_document.publication == catalog_document.publication
 assert asset_document.content_digest == catalog_document.publication.content_digest
+msp_asset = ClientAsset.objects.select_related("entity", "supplier", "product", "model").get(
+    entity__display_name="Live MSP core switch"
+)
+assert msp_asset.organization is None
+assert msp_asset.entity.organization_id is None
+assert msp_asset.tenant == organization.tenant
+assert msp_asset.supplier == vendor
+assert msp_asset.product == catalog_product
+assert msp_asset.model == catalog_model
+assert ClientAssetLifecycleEvent.objects.filter(
+    asset=msp_asset,
+    organization__isnull=True,
+    event_type="created",
+).count() == 1
 hardware = ClientHardwareAsset.objects.get(asset=asset)
 assert hardware.serial_number == "LIVE-SN-100"
 assert hardware.asset_tag == "LIVE-SW-100"

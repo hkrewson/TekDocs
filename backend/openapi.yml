@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.7
+  version: 0.3.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2643,6 +2643,780 @@ paths:
           description: Installation membership required
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/msp/assets:
+    get:
+      operationId: workspaces_msp_assets_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAssetResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_assets_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAsset'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}:
+    get:
+      operationId: workspaces_msp_assets_retrieve_2
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAsset'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/documents/{publication_entity_id}:
+    get:
+      operationId: workspaces_msp_assets_documents_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDocumentDetail'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/documents/{publication_entity_id}/artifacts/{artifact_entity_id}/download:
+    get:
+      operationId: workspaces_msp_assets_documents_artifacts_download_retrieve
+      parameters:
+      - in: path
+        name: artifact_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Retained publication artifact
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/hardware:
+    get:
+      operationId: workspaces_msp_assets_hardware_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+    patch:
+      operationId: workspaces_msp_assets_hardware_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedHardwareDetailWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/hardware/assignment:
+    post:
+      operationId: workspaces_msp_assets_hardware_assignment_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HardwareAssignmentWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+    delete:
+      operationId: workspaces_msp_assets_hardware_assignment_destroy
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/hardware/assignment-choices:
+    get:
+      operationId: workspaces_msp_assets_hardware_assignment_choices_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareAssignmentChoices'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/hardware/dispose:
+    post:
+      operationId: workspaces_msp_assets_hardware_dispose_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HardwareDisposalWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardwareProfile'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/hardware/lifecycle:
+    get:
+      operationId: workspaces_msp_assets_hardware_lifecycle_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HardwareLifecycleEvent'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/software:
+    patch:
+      operationId: workspaces_msp_assets_software_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareInstallation'
+          description: ''
+  /api/v1/workspaces/msp/assets/model-choices:
+    get:
+      operationId: workspaces_msp_assets_model_choices_retrieve
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogModelChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/contracts:
+    get:
+      operationId: workspaces_msp_contracts_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_contracts_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContractWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/msp/contracts/{contract_entity_id}:
+    get:
+      operationId: workspaces_msp_contracts_retrieve_2
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    patch:
+      operationId: workspaces_msp_contracts_partial_update
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedContractWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    delete:
+      operationId: workspaces_msp_contracts_destroy
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/workspaces/msp/contracts/{contract_entity_id}/costs:
+    post:
+      operationId: workspaces_msp_contracts_costs_create
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CostWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/msp/contracts/{contract_entity_id}/costs/{cost_id}:
+    patch:
+      operationId: workspaces_msp_contracts_costs_partial_update
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: cost_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCostWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+    delete:
+      operationId: workspaces_msp_contracts_costs_destroy
+      parameters:
+      - in: path
+        name: contract_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: cost_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+          description: ''
+  /api/v1/workspaces/msp/contracts/providers:
+    get:
+      operationId: workspaces_msp_contracts_providers_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/licenses:
+    get:
+      operationId: workspaces_msp_licenses_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_licenses_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LicenseWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/msp/licenses/{license_entity_id}:
+    get:
+      operationId: workspaces_msp_licenses_retrieve_2
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+    patch:
+      operationId: workspaces_msp_licenses_partial_update
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLicenseWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/msp/licenses/{license_entity_id}/installations:
+    post:
+      operationId: workspaces_msp_licenses_installations_create
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InstallationLinkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/msp/licenses/{license_entity_id}/seats:
+    post:
+      operationId: workspaces_msp_licenses_seats_create
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SeatWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/msp/licenses/{license_entity_id}/seats/{seat_id}:
+    delete:
+      operationId: workspaces_msp_licenses_seats_destroy
+      parameters:
+      - in: path
+        name: license_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: seat_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareLicense'
+          description: ''
+  /api/v1/workspaces/msp/licenses/choices:
+    get:
+      operationId: workspaces_msp_licenses_choices_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/vendors:
+    get:
+      operationId: workspaces_msp_vendors_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DerivedVendorResult'
+          description: ''
   /api/v1/workspaces/organizations:
     get:
       operationId: workspaces_organizations_search
@@ -2727,7 +3501,7 @@ paths:
           description: Installation context unavailable
   /api/v1/workspaces/organizations/{organization_entity_id}/assets:
     get:
-      operationId: organization_client_assets_list
+      operationId: workspaces_organizations_assets_retrieve
       parameters:
       - in: path
         name: organization_entity_id
@@ -2780,7 +3554,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}:
     get:
-      operationId: organization_client_assets_retrieve
+      operationId: workspaces_organizations_assets_retrieve_2
       parameters:
       - in: path
         name: asset_entity_id
@@ -2807,7 +3581,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/documents/{publication_entity_id}:
     get:
-      operationId: organization_client_asset_document_retrieve
+      operationId: workspaces_organizations_assets_documents_retrieve
       parameters:
       - in: path
         name: asset_entity_id
@@ -2840,7 +3614,7 @@ paths:
           description: ''
   ? /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/documents/{publication_entity_id}/artifacts/{artifact_entity_id}/download
   : get:
-      operationId: organization_client_asset_document_artifact_download
+      operationId: workspaces_organizations_assets_documents_artifacts_download_retrieve
       parameters:
       - in: path
         name: artifact_entity_id
@@ -2875,7 +3649,7 @@ paths:
           description: Retained publication artifact
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware:
     get:
-      operationId: organization_client_hardware_retrieve
+      operationId: workspaces_organizations_assets_hardware_retrieve
       parameters:
       - in: path
         name: asset_entity_id
@@ -3003,7 +3777,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/assignment-choices:
     get:
-      operationId: organization_client_hardware_assignment_choices
+      operationId: workspaces_organizations_assets_hardware_assignment_choices_retrieve
       parameters:
       - in: path
         name: asset_entity_id
@@ -3069,7 +3843,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/hardware/lifecycle:
     get:
-      operationId: organization_client_hardware_lifecycle_list
+      operationId: workspaces_organizations_assets_hardware_lifecycle_list
       parameters:
       - in: path
         name: asset_entity_id
@@ -3136,7 +3910,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
     get:
-      operationId: organization_client_asset_model_choices_list
+      operationId: workspaces_organizations_assets_model_choices_retrieve
       parameters:
       - in: path
         name: organization_entity_id
@@ -3630,7 +4404,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/contracts:
     get:
-      operationId: organization_commercial_contracts_list
+      operationId: workspaces_organizations_contracts_retrieve
       parameters:
       - in: path
         name: organization_entity_id
@@ -3650,7 +4424,7 @@ paths:
                 $ref: '#/components/schemas/ContractResult'
           description: ''
     post:
-      operationId: organization_commercial_contracts_create
+      operationId: workspaces_organizations_contracts_create
       parameters:
       - in: path
         name: organization_entity_id
@@ -3682,7 +4456,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/contracts/{contract_entity_id}:
     get:
-      operationId: workspaces_organizations_contracts_retrieve
+      operationId: workspaces_organizations_contracts_retrieve_2
       parameters:
       - in: path
         name: contract_entity_id
@@ -5333,7 +6107,7 @@ paths:
           description: Organization workspace not found
   /api/v1/workspaces/organizations/{organization_entity_id}/licenses:
     get:
-      operationId: organization_software_licenses_list
+      operationId: workspaces_organizations_licenses_retrieve
       parameters:
       - in: path
         name: organization_entity_id
@@ -5353,7 +6127,7 @@ paths:
                 $ref: '#/components/schemas/LicenseResult'
           description: ''
     post:
-      operationId: organization_software_licenses_create
+      operationId: workspaces_organizations_licenses_create
       parameters:
       - in: path
         name: organization_entity_id
@@ -5385,7 +6159,7 @@ paths:
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}:
     get:
-      operationId: organization_software_licenses_retrieve
+      operationId: workspaces_organizations_licenses_retrieve_2
       parameters:
       - in: path
         name: license_entity_id
@@ -5411,7 +6185,7 @@ paths:
                 $ref: '#/components/schemas/SoftwareLicense'
           description: ''
     patch:
-      operationId: organization_software_licenses_update
+      operationId: workspaces_organizations_licenses_partial_update
       parameters:
       - in: path
         name: license_entity_id
@@ -6110,7 +6884,7 @@ paths:
           description: No response body
   /api/v1/workspaces/organizations/{organization_entity_id}/vendors:
     get:
-      operationId: organization_client_vendors_list
+      operationId: workspaces_organizations_vendors_retrieve
       parameters:
       - in: path
         name: organization_entity_id

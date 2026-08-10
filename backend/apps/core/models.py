@@ -491,7 +491,9 @@ class ClientAsset(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_assets")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_assets")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_assets", null=True, blank=True
+    )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="client_asset")
     supplier = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="supplied_client_assets")
     product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="client_assets")
@@ -531,7 +533,8 @@ class ClientAsset(TimestampedModel):
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Client asset and entity scopes must match")
-        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and organization.tenant_id != self.tenant_id:
             raise ValidationError("Client asset organization must belong to its tenant")
         if self.supplier_id and self.supplier.tenant_id != self.tenant_id:
             raise ValidationError("Client asset supplier must belong to its tenant")
@@ -589,7 +592,9 @@ class ClientHardwareAsset(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_hardware_assets")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_hardware_assets")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_hardware_assets", null=True, blank=True
+    )
     asset = models.OneToOneField(ClientAsset, on_delete=models.PROTECT, related_name="hardware")
     serial_number = models.CharField(max_length=160, blank=True)
     asset_tag = models.CharField(max_length=120, blank=True)
@@ -639,11 +644,13 @@ class ClientHardwareAsset(TimestampedModel):
                 fields=("tenant", "organization", "serial_number"),
                 condition=~models.Q(serial_number=""),
                 name="unique_hardware_serial_in_org",
+                nulls_distinct=False,
             ),
             models.UniqueConstraint(
                 fields=("tenant", "organization", "asset_tag"),
                 condition=~models.Q(asset_tag=""),
                 name="unique_hardware_tag_in_org",
+                nulls_distinct=False,
             ),
         ]
         indexes = [models.Index(fields=("tenant", "organization", "lifecycle_state"), name="core_hwasset_scope_idx")]
@@ -692,7 +699,11 @@ class ClientAssetLifecycleEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_asset_lifecycle_events")
     organization = models.ForeignKey(
-        "Organization", on_delete=models.PROTECT, related_name="client_asset_lifecycle_events"
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="client_asset_lifecycle_events",
+        null=True,
+        blank=True,
     )
     asset = models.ForeignKey(ClientAsset, on_delete=models.PROTECT, related_name="lifecycle_events")
     event_type = models.CharField(max_length=32, choices=HardwareLifecycleEventType.choices)
@@ -781,7 +792,11 @@ class ClientSoftwareInstallation(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_software_installations")
     organization = models.ForeignKey(
-        "Organization", on_delete=models.PROTECT, related_name="client_software_installations"
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="client_software_installations",
+        null=True,
+        blank=True,
     )
     asset = models.OneToOneField(ClientAsset, on_delete=models.PROTECT, related_name="software_installation")
     status = models.CharField(
@@ -828,7 +843,9 @@ class SoftwareLicense(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_licenses")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_licenses")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="software_licenses", null=True, blank=True
+    )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="software_license")
     supplier = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="supplied_software_licenses")
     product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="software_licenses")
@@ -909,7 +926,11 @@ class SoftwareLicenseInstallation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_installations")
     organization = models.ForeignKey(
-        "Organization", on_delete=models.PROTECT, related_name="software_license_installations"
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="software_license_installations",
+        null=True,
+        blank=True,
     )
     license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="installation_links")
     installation = models.ForeignKey(ClientSoftwareInstallation, on_delete=models.PROTECT, related_name="license_links")
@@ -946,7 +967,9 @@ class SoftwareLicenseSeat(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_seats")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_license_seats")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="software_license_seats", null=True, blank=True
+    )
     license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="seats")
     seat_number = models.PositiveIntegerField()
     person = models.ForeignKey(
@@ -1008,7 +1031,9 @@ class SoftwareLicenseEvent(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="software_license_events")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="software_license_events")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="software_license_events", null=True, blank=True
+    )
     license = models.ForeignKey(SoftwareLicense, on_delete=models.PROTECT, related_name="events")
     event_type = models.CharField(max_length=32, choices=SoftwareLicenseEventType.choices)
     installation = models.ForeignKey(ClientSoftwareInstallation, on_delete=models.PROTECT, null=True, blank=True)
@@ -1082,7 +1107,9 @@ class CommercialContract(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="commercial_contracts")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="commercial_contracts")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="commercial_contracts", null=True, blank=True
+    )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="commercial_contract")
     provider = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="provided_commercial_contracts")
     kind = models.CharField(max_length=24, choices=CommercialContractKind.choices)
@@ -1135,7 +1162,8 @@ class CommercialContract(TimestampedModel):
             or self.entity.visibility != EntityVisibility.MSP_PRIVATE
         ):
             raise ValidationError("Commercial contract entity identity, scope, and visibility must match")
-        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+        organization = self.organization if self.organization_id else None
+        if organization is not None and organization.tenant_id != self.tenant_id:
             raise ValidationError("Commercial contract organization must belong to its tenant")
         if self.provider_id and (self.provider.tenant_id != self.tenant_id or self.provider_id == self.organization_id):
             raise ValidationError("Commercial contract provider must be another organization in the same tenant")
@@ -1150,7 +1178,9 @@ class ContractCost(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="contract_costs")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="contract_costs")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="contract_costs", null=True, blank=True
+    )
     contract = models.ForeignKey(CommercialContract, on_delete=models.PROTECT, related_name="costs")
     label = models.CharField(max_length=160)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
@@ -1196,7 +1226,9 @@ class ClientAssetDocumentProvenance(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_asset_documents")
-    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_asset_documents")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="client_asset_documents", null=True, blank=True
+    )
     asset = models.ForeignKey(ClientAsset, on_delete=models.PROTECT, related_name="document_provenance")
     catalog_document = models.ForeignKey(
         CatalogProductDocument, on_delete=models.PROTECT, related_name="client_asset_provenance"

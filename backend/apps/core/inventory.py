@@ -40,10 +40,15 @@ class InventoryError(Exception):
     pass
 
 
-def require_client(organization: Organization) -> None:
+def require_operational_owner(organization: Organization | None) -> None:
+    if organization is None:
+        return
     classifications = {item.kind for item in organization.classifications.all()}
     if "client" not in classifications:
         raise InventoryError("Client assets require a client organization workspace.")
+
+
+require_client = require_operational_owner
 
 
 def _checksum(value: object) -> str:
@@ -107,8 +112,6 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
 
 
 def model_choices_for_client(scope: DataScope, *, query: str = "") -> QuerySet[CatalogModel]:
-    if scope.organization_id is None:
-        return CatalogModel.objects.none()
     records = (
         CatalogModel.objects.filter(
             tenant_id=scope.tenant_id,
@@ -233,12 +236,12 @@ def archive_product_document(*, association: CatalogProductDocument, actor_id: U
 def create_client_asset(
     *,
     tenant: Tenant,
-    organization: Organization,
+    organization: Organization | None,
     actor_id: UUID,
     model_entity_id: UUID,
     name: str,
 ) -> ClientAsset:
-    require_client(organization)
+    require_operational_owner(organization)
     # Supplier catalog rows are a read-only RLS projection in client context.
     # Revisions and publication manifests are immutable, so exact identifiers and
     # checksums provide the snapshot boundary without cross-workspace write locks.
@@ -344,7 +347,8 @@ def create_client_asset(
         entity_id=asset.entity_id,
         metadata={},
     )
-    return assets_for_scope(DataScope.organization(tenant, organization)).get(pk=asset.pk)
+    scope = DataScope.organization(tenant, organization) if organization is not None else DataScope.tenant(tenant)
+    return assets_for_scope(scope).get(pk=asset.pk)
 
 
 def _hardware(asset: ClientAsset, *, lock: bool = False) -> ClientHardwareAsset:
@@ -432,7 +436,7 @@ def update_hardware_details(*, asset: ClientAsset, actor_id: UUID, values: dict[
     try:
         profile.save()
     except IntegrityError as exc:
-        raise InventoryError("Serial number and asset tag must be unique within this client.") from exc
+        raise InventoryError("Serial number and asset tag must be unique within this workspace.") from exc
     event_type = (
         HardwareLifecycleEventType.STATE_CHANGED
         if profile.lifecycle_state != old_state

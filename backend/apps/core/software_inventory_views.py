@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
 from uuid import UUID
 
 from django.shortcuts import get_object_or_404
@@ -12,10 +11,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
-from .inventory import InventoryError, assets_for_scope, require_client
+from .inventory import InventoryError, assets_for_scope, require_operational_owner
 from .models import (
     ClientAsset,
-    Organization,
     SoftwareInstallationStatus,
     SoftwareLicense,
     SoftwareLicenseKind,
@@ -33,7 +31,7 @@ from .software_inventory import (
     update_installation,
     update_license,
 )
-from .workspaces import ResolvedWorkspace, resolve_organization_workspace
+from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
 class StrictSerializer(serializers.Serializer):
@@ -155,13 +153,15 @@ class ChoiceResultSerializer(serializers.Serializer):
     people = serializers.ListField()
 
 
-def _workspace(request, organization_entity_id: UUID, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    workspace = (
+        resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+        if organization_entity_id is not None
+        else resolve_msp_workspace(request.user)
+    )
     require_permission(request.user, permission, organization=workspace.organization)
-    if workspace.organization is None:
-        raise PermissionDenied("A client organization workspace is required.")
     try:
-        require_client(workspace.organization)
+        require_operational_owner(workspace.organization)
     except InventoryError as exc:
         raise PermissionDenied(str(exc)) from exc
     return workspace
@@ -193,7 +193,7 @@ class ClientSoftwareInstallationDetailView(APIView):
 
 
 class SoftwareLicenseListCreateView(APIView):
-    @extend_schema(operation_id="organization_software_licenses_list", responses={200: LicenseResultSerializer})
+    @extend_schema(responses={200: LicenseResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         records = licenses_for_scope(workspace.data_scope)
@@ -210,7 +210,6 @@ class SoftwareLicenseListCreateView(APIView):
         )
 
     @extend_schema(
-        operation_id="organization_software_licenses_create",
         request=LicenseWriteSerializer,
         responses={201: SoftwareLicenseSerializer},
     )
@@ -230,7 +229,7 @@ class SoftwareLicenseListCreateView(APIView):
         try:
             record = create_license(
                 tenant=workspace.member.tenant,
-                organization=cast(Organization, workspace.organization),
+                organization=workspace.organization,
                 actor_id=request.user.pk,
                 asset=asset,
                 values=values,
@@ -241,13 +240,12 @@ class SoftwareLicenseListCreateView(APIView):
 
 
 class SoftwareLicenseDetailView(APIView):
-    @extend_schema(operation_id="organization_software_licenses_retrieve", responses={200: SoftwareLicenseSerializer})
+    @extend_schema(responses={200: SoftwareLicenseSerializer})
     def get(self, request, organization_entity_id, license_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         return Response(SoftwareLicenseSerializer(_license(workspace, license_entity_id)).data)
 
     @extend_schema(
-        operation_id="organization_software_licenses_update",
         request=LicenseWriteSerializer,
         responses={200: SoftwareLicenseSerializer},
     )

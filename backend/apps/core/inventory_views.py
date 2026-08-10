@@ -22,7 +22,7 @@ from .inventory import (
     dispose_hardware,
     lifecycle_events,
     model_choices_for_client,
-    require_client,
+    require_operational_owner,
     unassign_hardware,
     update_hardware_details,
     vendors_for_scope,
@@ -40,7 +40,7 @@ from .models import (
     Organization,
 )
 from .publications import PublicationConflict, read_publication_artifact, verify_publication
-from .workspaces import ResolvedWorkspace, resolve_organization_workspace
+from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
 class StrictSerializer(serializers.Serializer):
@@ -254,13 +254,15 @@ class DerivedVendorResultSerializer(serializers.Serializer):
     count = serializers.IntegerField()
 
 
-def _workspace(request, organization_entity_id: UUID, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    workspace = (
+        resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+        if organization_entity_id is not None
+        else resolve_msp_workspace(request.user)
+    )
     require_permission(request.user, permission, organization=workspace.organization)
-    if workspace.organization is None:
-        raise PermissionDenied("A client organization workspace is required.")
     try:
-        require_client(workspace.organization)
+        require_operational_owner(workspace.organization)
     except InventoryError as exc:
         raise PermissionDenied(str(exc)) from exc
     return workspace
@@ -271,7 +273,7 @@ def _asset(workspace: ResolvedWorkspace, asset_entity_id: UUID) -> ClientAsset:
 
 
 class ClientAssetListCreateView(APIView):
-    @extend_schema(operation_id="organization_client_assets_list", responses={200: ClientAssetResultSerializer})
+    @extend_schema(responses={200: ClientAssetResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         assets = assets_for_scope(workspace.data_scope)
@@ -292,8 +294,6 @@ class ClientAssetListCreateView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
         serializer = ClientAssetWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if workspace.organization is None:
-            raise PermissionDenied("A client organization workspace is required.")
         try:
             asset = create_client_asset(
                 tenant=workspace.member.tenant,
@@ -308,14 +308,14 @@ class ClientAssetListCreateView(APIView):
 
 
 class ClientAssetDetailView(APIView):
-    @extend_schema(operation_id="organization_client_assets_retrieve", responses={200: ClientAssetSerializer})
+    @extend_schema(responses={200: ClientAssetSerializer})
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         return Response(ClientAssetSerializer(_asset(workspace, asset_entity_id)).data)
 
 
 class ClientHardwareDetailView(APIView):
-    @extend_schema(operation_id="organization_client_hardware_retrieve", responses={200: HardwareProfileSerializer})
+    @extend_schema(responses={200: HardwareProfileSerializer})
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         asset = _asset(workspace, asset_entity_id)
@@ -342,7 +342,6 @@ class ClientHardwareDetailView(APIView):
 
 class ClientHardwareAssignmentChoicesView(APIView):
     @extend_schema(
-        operation_id="organization_client_hardware_assignment_choices",
         responses={200: HardwareAssignmentChoicesSerializer},
     )
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
@@ -405,7 +404,6 @@ class ClientHardwareDisposalView(APIView):
 
 class ClientHardwareLifecycleView(APIView):
     @extend_schema(
-        operation_id="organization_client_hardware_lifecycle_list",
         responses={200: HardwareLifecycleEventSerializer(many=True)},
     )
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
@@ -416,7 +414,6 @@ class ClientHardwareLifecycleView(APIView):
 
 class ClientAssetModelChoiceListView(APIView):
     @extend_schema(
-        operation_id="organization_client_asset_model_choices_list",
         parameters=[OpenApiParameter("q", str)],
         responses={200: CatalogModelChoiceResultSerializer},
     )
@@ -429,7 +426,7 @@ class ClientAssetModelChoiceListView(APIView):
 
 class ClientAssetDocumentDetailView(APIView):
     @extend_schema(
-        operation_id="organization_client_asset_document_retrieve", responses={200: AssetDocumentDetailSerializer}
+        responses={200: AssetDocumentDetailSerializer}
     )
     def get(self, request, organization_entity_id, asset_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
@@ -445,7 +442,6 @@ class ClientAssetDocumentDetailView(APIView):
 
 class ClientAssetDocumentArtifactDownloadView(APIView):
     @extend_schema(
-        operation_id="organization_client_asset_document_artifact_download",
         responses={200: OpenApiResponse(description="Retained publication artifact")},
     )
     def get(  # type: ignore[no-untyped-def]
@@ -480,7 +476,7 @@ class ClientAssetDocumentArtifactDownloadView(APIView):
 
 
 class ClientVendorListView(APIView):
-    @extend_schema(operation_id="organization_client_vendors_list", responses={200: DerivedVendorResultSerializer})
+    @extend_schema(responses={200: DerivedVendorResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         vendors = vendors_for_scope(workspace.data_scope)

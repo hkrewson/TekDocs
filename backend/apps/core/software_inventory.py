@@ -76,6 +76,10 @@ def licenses_for_scope(scope: DataScope) -> QuerySet[SoftwareLicense]:
     )
 
 
+def _record_scope(tenant: Tenant, organization: Organization | None) -> DataScope:
+    return DataScope.organization(tenant, organization) if organization is not None else DataScope.tenant(tenant)
+
+
 def installation_choices(scope: DataScope) -> tuple[QuerySet[ClientSoftwareInstallation], QuerySet[PersonAssociation]]:
     installations = installations_for_scope(scope)
     people = (
@@ -131,7 +135,7 @@ def update_installation(*, asset: ClientAsset, actor_id: UUID, values: dict[str,
 
 @transaction.atomic
 def create_license(
-    *, tenant: Tenant, organization: Organization, actor_id: UUID, asset: ClientAsset, values: dict[str, object]
+    *, tenant: Tenant, organization: Organization | None, actor_id: UUID, asset: ClientAsset, values: dict[str, object]
 ) -> SoftwareLicense:
     installation = _installation(asset)
     entity = Entity.objects.create(
@@ -169,7 +173,7 @@ def create_license(
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="software_license.created", entity_id=entity.id, metadata={}
     )
-    return licenses_for_scope(DataScope.organization(tenant, organization)).get(pk=license_record.pk)
+    return licenses_for_scope(_record_scope(tenant, organization)).get(pk=license_record.pk)
 
 
 @transaction.atomic
@@ -202,7 +206,7 @@ def update_license(*, license_record: SoftwareLicense, actor_id: UUID, values: d
         entity_id=locked.entity_id,
         metadata={},
     )
-    return licenses_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return licenses_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -223,7 +227,7 @@ def link_installation(*, license_record: SoftwareLicense, installation_id: UUID,
         defaults={"tenant": locked.tenant, "organization": locked.organization},
     )
     if not created and link.archived_at is None:
-        return licenses_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+        return licenses_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
     link.archived_at = None
     _validate(link)
     link.save()
@@ -235,7 +239,7 @@ def link_installation(*, license_record: SoftwareLicense, installation_id: UUID,
         installation=installation,
         actor_id=actor_id,
     )
-    return licenses_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return licenses_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -309,7 +313,7 @@ def assign_seat(
         entity_id=locked.entity_id,
         metadata={},
     )
-    return licenses_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return licenses_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -337,4 +341,4 @@ def revoke_seat(*, license_record: SoftwareLicense, seat_id: UUID, actor_id: UUI
         entity_id=locked.entity_id,
         metadata={},
     )
-    return licenses_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return licenses_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)

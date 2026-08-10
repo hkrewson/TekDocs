@@ -7,6 +7,7 @@ import type { AuthClient } from './auth/api'
 import type { WorkspaceClient } from './workspaces/api'
 import type { PeopleClient } from './people/api'
 import type { SitesClient } from './sites/api'
+import type { InventoryClient } from './inventory/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -57,7 +58,12 @@ const sitesClient = {
   updateLocation: vi.fn(),
   archiveLocation: vi.fn(),
 } as unknown as SitesClient
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} />
+const listAssets = vi.fn().mockResolvedValue({ results: [], count: 0, can_manage: true })
+const inventoryClient = {
+  listAssets,
+  listModelChoices: vi.fn().mockResolvedValue({ results: [] }),
+} as unknown as InventoryClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />
 
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -69,6 +75,17 @@ describe('application shell', () => {
     expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Compliance' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+  })
+
+  it('renders MSP-owned assets instead of an aggregate placeholder', async () => {
+    render(app('/assets'))
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
+    expect(await screen.findByText('No assets have been created for this MSP workspace.')).toBeInTheDocument()
+    expect(listAssets).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'msp', id: authContext.tenant.id, organization: null }),
+      expect.any(AbortSignal),
+    )
   })
 
   it('provides profile routes through the account menu', async () => {

@@ -11,7 +11,7 @@ describe('commercial API client', () => {
   })
 
   it('uses exact client routes, encoded identifiers, CSRF, and every mutation contract', async () => {
-    const workspace = { id: 'client/1' } as never
+    const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserCommercialClient.listContracts(workspace, 'managed support')
     await browserCommercialClient.providerChoices(workspace)
     await browserCommercialClient.createContract(workspace, { name: 'Managed support' })
@@ -33,11 +33,19 @@ describe('commercial API client', () => {
     expect((costPatch?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('commercial-csrf')
   })
 
+  it('uses the explicit MSP contracts boundary', async () => {
+    await browserCommercialClient.listContracts({ kind: 'msp', id: 'tenant/1' } as never, '')
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      '/api/v1/workspaces/msp/contracts?q=',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+  })
+
   it('surfaces nested validation responses', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ amount: ['A non-negative amount is required.'] }), { status: 400 }),
     )
-    await expect(browserCommercialClient.listContracts({ id: 'client' } as never, '')).rejects.toThrow(
+    await expect(browserCommercialClient.listContracts({ kind: 'organization', id: 'client' } as never, '')).rejects.toThrow(
       'A non-negative amount is required.',
     )
   })

@@ -159,6 +159,98 @@ def _software_asset(owner_client, installation, supplier, client, name="Endpoint
 
 
 @pytest.mark.django_db
+def test_msp_assets_are_owned_not_aggregated_and_cannot_cross_workspace(owner_client, installation):
+    supplier = _organization(installation, "Parity Hardware", "manufacturer")
+    client = _organization(installation, "Parity Client", "client")
+    _definition, _product, model, _document, _publication = _catalog(owner_client, supplier)
+
+    client_asset = owner_client.post(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"model_id": model["id"], "name": "Client switch"},
+        content_type="application/json",
+    )
+    msp_asset = owner_client.post(
+        reverse("msp-asset-list-create"),
+        {"model_id": model["id"], "name": "MSP switch"},
+        content_type="application/json",
+    )
+    assert client_asset.status_code == 201
+    assert msp_asset.status_code == 201
+
+    msp_list = owner_client.get(reverse("msp-asset-list-create"))
+    client_list = owner_client.get(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id})
+    )
+    assert [record["name"] for record in msp_list.json()["results"]] == ["MSP switch"]
+    assert [record["name"] for record in client_list.json()["results"]] == ["Client switch"]
+    assert owner_client.get(
+        reverse("msp-asset-detail", kwargs={"asset_entity_id": client_asset.json()["id"]})
+    ).status_code == 404
+    assert owner_client.get(
+        reverse(
+            "organization-client-asset-detail",
+            kwargs={"organization_entity_id": client.entity_id, "asset_entity_id": msp_asset.json()["id"]},
+        )
+    ).status_code == 404
+
+    msp_hardware = ClientAsset.objects.select_related("hardware").get(entity_id=msp_asset.json()["id"])
+    assert msp_hardware.organization_id is None
+    assert msp_hardware.hardware.organization_id is None
+    assert ClientAssetLifecycleEvent.objects.get(asset=msp_hardware).organization_id is None
+
+
+@pytest.mark.django_db
+def test_msp_software_license_retains_exact_null_owner_scope(owner_client, installation):
+    supplier = _organization(installation, "Parity Software", "vendor")
+    base = {"organization_entity_id": supplier.entity_id}
+    definition = owner_client.post(
+        reverse("organization-catalog-specification-definition-list-create", kwargs=base),
+        {"name": "MSP software", "product_kind": "software", "schema": SOFTWARE_SCHEMA},
+        content_type="application/json",
+    ).json()
+    product = owner_client.post(
+        reverse("organization-catalog-product-list-create", kwargs=base),
+        {"name": "MSP Agent", "kind": "software", "description": "Internal endpoint agent"},
+        content_type="application/json",
+    ).json()
+    model = owner_client.post(
+        reverse("organization-catalog-model-list-create", kwargs={**base, "product_entity_id": product["id"]}),
+        {
+            "name": "MSP Agent Desktop",
+            "model_number": "MSP-AGENT",
+            "specification_version_id": definition["versions"][0]["id"],
+            "lifecycle": "active",
+            "specifications": {"platform": "desktop"},
+            "notes": "",
+        },
+        content_type="application/json",
+    ).json()
+    asset = owner_client.post(
+        reverse("msp-asset-list-create"),
+        {"model_id": model["id"], "name": "MSP managed agent"},
+        content_type="application/json",
+    )
+    assert asset.status_code == 201
+    license_response = owner_client.post(
+        reverse("msp-software-license-list-create"),
+        {
+            "name": "MSP Agent entitlement",
+            "asset_id": asset.json()["id"],
+            "kind": "subscription",
+            "status": "active",
+            "seat_limit": 5,
+            "renewal_interval": "annual",
+            "auto_renew": True,
+        },
+        content_type="application/json",
+    )
+    assert license_response.status_code == 201
+    stored = ClientSoftwareInstallation.objects.get(asset__entity_id=asset.json()["id"])
+    assert stored.organization_id is None
+    assert SoftwareLicenseEvent.objects.get(license__entity_id=license_response.json()["id"]).organization_id is None
+
+
+@pytest.mark.django_db
 def test_client_asset_retains_catalog_and_static_document_provenance(owner_client, installation):
     supplier = _organization(installation, "Northwind Networks", "manufacturer")
     client = _organization(installation, "Contoso Clinic", "client")
@@ -617,9 +709,27 @@ def test_postgres_rejects_client_asset_provenance_mutation(owner_client, install
             [provenance.publication_id, installation.tenant.id],
         )
         assert cursor.fetchone() == (True,)
+        cursor.execute("SELECT set_config('tekdocs.organization_id', '', true)")
+        cursor.execute("SELECT set_config('tekdocs.organization_mode', 'msp', true)")
+        cursor.execute("SELECT id FROM core_entity WHERE id = %s", [supplier.entity_id])
+        assert cursor.fetchone() == (supplier.entity_id,)
+        cursor.execute("SELECT id FROM core_documentpublication WHERE id = %s", [provenance.publication_id])
+        assert cursor.fetchone() == (provenance.publication_id,)
+        cursor.execute("SELECT id FROM core_entity WHERE display_name = 'Supplier internal notes'")
+        assert cursor.fetchall() == []
+        cursor.execute(
+            "SELECT tekdocs_msp_catalog_publication_visible(%s, %s)",
+            [provenance.publication_id, installation.tenant.id],
+        )
+        assert cursor.fetchone() == (True,)
         cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(uuid.uuid4())])
         cursor.execute(
             "SELECT tekdocs_client_catalog_publication_visible(%s, %s)",
+            [provenance.publication_id, installation.tenant.id],
+        )
+        assert cursor.fetchone() == (False,)
+        cursor.execute(
+            "SELECT tekdocs_msp_catalog_publication_visible(%s, %s)",
             [provenance.publication_id, installation.tenant.id],
         )
         assert cursor.fetchone() == (False,)

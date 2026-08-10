@@ -64,6 +64,40 @@ def create_contract(owner_client, client, provider):  # type: ignore[no-untyped-
 
 
 @pytest.mark.django_db
+def test_msp_contracts_are_not_an_aggregate_of_client_contracts(owner_client, installation):
+    client = organization(installation, "Scoped Client", "client")
+    provider = organization(installation, "Parity Provider", "vendor")
+    client_contract = create_contract(owner_client, client, provider)
+    msp_contract = owner_client.post(
+        reverse("msp-commercial-contract-list-create"),
+        {
+            "name": "MSP support agreement",
+            "provider_id": str(provider.entity_id),
+            "kind": "support",
+            "status": "active",
+        },
+        content_type="application/json",
+    )
+    assert client_contract.status_code == 201
+    assert msp_contract.status_code == 201
+    cost = owner_client.post(
+        reverse(
+            "msp-commercial-contract-cost-list-create",
+            kwargs={"contract_entity_id": msp_contract.json()["id"]},
+        ),
+        {"label": "Internal seats", "amount": "12.50", "currency": "USD", "billing_interval": "monthly"},
+        content_type="application/json",
+    )
+    assert cost.status_code == 201
+    assert cost.json()["costs"][0]["amount"] == "12.50"
+    msp_results = owner_client.get(reverse("msp-commercial-contract-list-create")).json()["results"]
+    assert [item["name"] for item in msp_results] == ["MSP support agreement"]
+    assert owner_client.get(
+        reverse("msp-commercial-contract-detail", kwargs={"contract_entity_id": client_contract.json()["id"]})
+    ).status_code == 404
+
+
+@pytest.mark.django_db
 def test_contract_cost_crud_and_search_never_use_financial_values(owner_client, installation):
     client = organization(installation, "Commercial Client", "client")
     provider = organization(installation, "Managed Provider", "vendor")

@@ -45,6 +45,10 @@ def contracts_for_scope(
     return records
 
 
+def _record_scope(tenant: Tenant, organization: Organization | None) -> DataScope:
+    return DataScope.organization(tenant, organization) if organization is not None else DataScope.tenant(tenant)
+
+
 def provider_choices(tenant: Tenant, *, query: str = "") -> QuerySet[Organization]:
     records = (
         Organization.objects.filter(
@@ -69,7 +73,7 @@ def _provider(tenant: Tenant, provider_id: UUID) -> Organization:
 
 @transaction.atomic
 def create_contract(
-    *, tenant: Tenant, organization: Organization, actor_id: UUID, values: dict[str, object]
+    *, tenant: Tenant, organization: Organization | None, actor_id: UUID, values: dict[str, object]
 ) -> CommercialContract:
     provider_id = values.pop("provider_id")
     entity = Entity.objects.create(
@@ -92,7 +96,7 @@ def create_contract(
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="commercial_contract.created", entity_id=entity.id, metadata={}
     )
-    return contracts_for_scope(DataScope.organization(tenant, organization)).get(pk=record.pk)
+    return contracts_for_scope(_record_scope(tenant, organization)).get(pk=record.pk)
 
 
 @transaction.atomic
@@ -115,7 +119,7 @@ def update_contract(*, record: CommercialContract, actor_id: UUID, values: dict[
         entity_id=locked.entity_id,
         metadata={},
     )
-    return contracts_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return contracts_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -150,7 +154,7 @@ def create_cost(*, contract: CommercialContract, actor_id: UUID, values: dict[st
         entity_id=locked.entity_id,
         metadata={"cost_id": str(cost.id)},
     )
-    return contracts_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return contracts_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -184,7 +188,7 @@ def update_cost(
         entity_id=locked.entity_id,
         metadata={"cost_id": str(cost.id)},
     )
-    return contracts_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return contracts_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic
@@ -212,4 +216,4 @@ def archive_cost(*, contract: CommercialContract, cost_id: UUID, actor_id: UUID)
         entity_id=locked.entity_id,
         metadata={"cost_id": str(cost.id)},
     )
-    return contracts_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
+    return contracts_for_scope(_record_scope(locked.tenant, locked.organization)).get(pk=locked.pk)

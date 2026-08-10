@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import cast
 from uuid import UUID
 
 from django.shortcuts import get_object_or_404
@@ -30,16 +29,15 @@ from .commercial import (
     update_contract,
     update_cost,
 )
-from .inventory import InventoryError, require_client
+from .inventory import InventoryError, require_operational_owner
 from .models import (
     CommercialContract,
     CommercialContractKind,
     CommercialContractStatus,
     CostBillingInterval,
-    Organization,
 )
 from .software_inventory_views import StrictSerializer
-from .workspaces import ResolvedWorkspace, resolve_organization_workspace
+from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
 class ContractWriteSerializer(StrictSerializer):
@@ -131,13 +129,15 @@ class ProviderChoiceResultSerializer(serializers.Serializer):
     results = ProviderChoiceSerializer(many=True)
 
 
-def _workspace(request, organization_entity_id: UUID, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
-    workspace = resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
+    workspace = (
+        resolve_organization_workspace(request.user, entity_id=organization_entity_id)
+        if organization_entity_id is not None
+        else resolve_msp_workspace(request.user)
+    )
     require_permission(request.user, permission, organization=workspace.organization)
-    if workspace.organization is None:
-        raise PermissionDenied("A client organization workspace is required.")
     try:
-        require_client(workspace.organization)
+        require_operational_owner(workspace.organization)
     except InventoryError as exc:
         raise PermissionDenied(str(exc)) from exc
     return workspace
@@ -162,7 +162,7 @@ def _require_cost_access(workspace: ResolvedWorkspace) -> None:
 
 
 class CommercialContractListCreateView(APIView):
-    @extend_schema(operation_id="organization_commercial_contracts_list", responses={200: ContractResultSerializer})
+    @extend_schema(responses={200: ContractResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         can_manage = context_has_permission(
@@ -186,7 +186,6 @@ class CommercialContractListCreateView(APIView):
         )
 
     @extend_schema(
-        operation_id="organization_commercial_contracts_create",
         request=ContractWriteSerializer,
         responses={201: ContractSerializer},
     )
@@ -205,7 +204,7 @@ class CommercialContractListCreateView(APIView):
         try:
             record = create_contract(
                 tenant=workspace.member.tenant,
-                organization=cast(Organization, workspace.organization),
+                organization=workspace.organization,
                 actor_id=request.user.pk,
                 values=values,
             )

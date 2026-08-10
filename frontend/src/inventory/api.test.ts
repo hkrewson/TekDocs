@@ -8,7 +8,7 @@ describe('inventory API client', () => {
   })
 
   it('uses exact client routes and CSRF for asset creation', async () => {
-    const workspace = { id: 'client/1' } as never
+    const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserInventoryClient.listAssets(workspace)
     await browserInventoryClient.listModelChoices(workspace, 'edge switch')
     await browserInventoryClient.createAsset(workspace, 'model/1', 'Core switch')
@@ -20,5 +20,16 @@ describe('inventory API client', () => {
     const post = vi.mocked(fetch).mock.calls.find(([, options]) => options?.method === 'POST')
     expect(post?.[0]).toBe('/api/v1/workspaces/organizations/client%2F1/assets')
     expect((post?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('inventory-csrf')
+  })
+
+  it('uses dedicated MSP-owned routes without an organization identifier', async () => {
+    const workspace = { kind: 'msp', id: 'tenant/1' } as never
+    await browserInventoryClient.listAssets(workspace)
+    await browserInventoryClient.listLicenses(workspace)
+    await browserInventoryClient.listVendors(workspace)
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors', expect.any(Object))
   })
 })

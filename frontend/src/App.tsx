@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
 import {
@@ -295,7 +295,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.6 adds client software installations, entitlements, seat assignments, and renewal tracking." />
+      <PageHeader title="Overview" description="TekDocs 0.3.8 gives the MSP its own operational assets, licenses, contracts, costs, and vendor relationships without aggregating client records." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -320,6 +320,7 @@ function Overview() {
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],
             ['Software installations and licensing', 'Available'],
+            ['MSP-owned operational inventory', 'Available'],
             ['Derived client vendors', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
@@ -433,6 +434,10 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
       ? { phase: 'loading' as const }
       : organizationWorkspace
   const selectedWorkspace = visibleWorkspaceState.phase === 'ready' ? visibleWorkspaceState.workspace : null
+  const mspWorkspace = useMemo<WorkspaceContext>(() => ({
+    kind: 'msp', id: shellContext.tenant.id, name: shellContext.tenant.name,
+    classifications: [], capabilities: [], organization: null,
+  }), [shellContext.tenant.id, shellContext.tenant.name])
   const activeArea = workspaceAreaFromPath(location.pathname)
 
   useEffect(() => {
@@ -463,7 +468,11 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <AccessControl client={accessControlClient} /> : <Navigate to="/overview" replace />} />
-            {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
+            <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} />} />)}

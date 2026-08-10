@@ -103,7 +103,9 @@ export interface InventoryClient {
 }
 
 function basePath(workspace: WorkspaceContext) {
-  return `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}`
+  return workspace.kind === 'msp'
+    ? '/api/v1/workspaces/msp'
+    : `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}`
 }
 
 function csrfToken() {

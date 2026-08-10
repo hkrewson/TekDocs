@@ -14,7 +14,7 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 | `0.1.0` | Secure identity, authentication, owner administration, and tenant shell. |
 | `0.2.0` | Addressable entities, selectable MSP/organization workspaces, scoped RBAC, and isolation. |
 | `0.3.0` | Reusable Markdown documentation and immutable STATIC publication. |
-| `0.4.0` | External credential references, supplier catalogs, and client hardware/software inventory. |
+| `0.4.0` | External credential references, supplier catalogs, and MSP/client operational inventory. |
 | `0.5.0` | Network inventory and relationship-derived views. |
 | `0.6.0` | Controlled client portal, publication workflow, and notifications. |
 | `0.7.0` | Stable integration API, provider runtime, webhooks, and reconciliation. |
@@ -576,9 +576,10 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.5` | **Complete:** client hardware serials/tags, acquisition/disposal, warranty, current person/location assignment, and append-only lifecycle history. |
 | `0.3.6` | **Complete:** client software installations, addressable licenses, bounded seat allocation, renewal terms, installation relationships, and append-only license history. |
 | `0.3.7` | **Complete:** client commercial contracts, provider and renewal lifecycle, fixed-precision cost lines, exact-scope field projection, and non-disclosing list/search behavior. |
-| `0.3.8` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
-| `0.3.9` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
-| `0.3.10` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
+| `0.3.8` | **Complete:** MSP-owned operational parity for assets, hardware lifecycle, software installations/licenses, contracts/costs, and derived vendors without aggregating client records. |
+| `0.3.9` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
+| `0.3.10` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
+| `0.3.11` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
 
 ### `0.3.1` acceptance criteria
@@ -672,6 +673,18 @@ Evidence: `docs/releases/0.3.6.md`.
 - [x] OpenAPI, architecture, security baseline, threat model, risk register, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.7`.
 
 Evidence: `docs/releases/0.3.7.md`.
+
+### `0.3.8` acceptance criteria
+
+- [x] The MSP is an operational owner represented by tenant scope (`organization IS NULL`), never a synthetic client organization and never an aggregate query over client-owned records.
+- [x] MSP routes expose the existing asset, retained catalog/document provenance, hardware lifecycle, software installation/license, seat, contract/cost, and derived-vendor workflows through the same domain services used by client workspaces.
+- [x] Every operational row and related Entity carries one exact owner scope. Nullable PostgreSQL relationship guards use null-safe comparison, MSP serial/tag uniqueness remains database enforced, and forced RLS denies missing or mismatched scope.
+- [x] MSP catalog access is a narrow read-only projection of supplier catalogs and associated client-visible STATIC publications; it does not make client assets, client documents, licenses, contracts, people, sites, or costs visible in MSP scope.
+- [x] The central route inventory covers every new MSP endpoint. Negative tests prove MSP lists exclude client records, client lists exclude MSP records, and direct identifiers cannot cross either boundary.
+- [x] MSP navigation renders Assets, Licenses, Services, and Vendors as real surfaces with workspace-aware wording, loading, empty, error, responsive, keyboard, and accessibility behavior.
+- [x] OpenAPI, architecture, information architecture, security/threat model, `TD-RISK-026`, migrations, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.8`.
+
+Evidence: `docs/releases/0.3.8.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

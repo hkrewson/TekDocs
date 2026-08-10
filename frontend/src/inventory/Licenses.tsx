@@ -125,12 +125,12 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
 
   return <>
     <header className="page-header">
-      <div><h1>Licenses</h1><p>Client software entitlements, covered installations, seats, and renewal dates.</p></div>
+      <div><h1>Licenses</h1><p>{workspace.kind === 'msp' ? 'MSP' : 'Client'} software entitlements, covered installations, seats, and renewal dates.</p></div>
       {canManage && <button type="button" className="primary-button" onClick={() => { setForm(blank); setMode('create') }}><Plus size={16} />New license</button>}
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && <section className="content-section" role="status">Loading software licenses…</section>}
-    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Licenses unavailable</h2><p>The client license inventory could not be loaded.</p></section>}
+    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Licenses unavailable</h2><p>The workspace license inventory could not be loaded.</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
       <section className="content-section inventory-index">
         {records.length === 0 ? <p className="empty-state">No software licenses have been recorded.</p> : <ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => { setSelectedId(record.id); setMode('read') }}><strong>{record.name}</strong><span>{record.product_name} · {record.active_seats}/{record.seat_limit} seats</span></button></li>)}</ul>}

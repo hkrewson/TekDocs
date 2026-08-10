@@ -28,6 +28,13 @@ from .catalogs import (
     revise_model,
     update_product,
 )
+from .inventory import (
+    InventoryError,
+    archive_product_document,
+    associate_product_document,
+    eligible_publications_for_supplier,
+    product_documents,
+)
 from .models import (
     CatalogModel,
     CatalogModelLifecycle,
@@ -132,6 +139,36 @@ class CatalogModelSerializer(serializers.Serializer):
         return CatalogModelRevisionSerializer(item.revisions.all(), many=True).data
 
 
+class CatalogProductDocumentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    model_id = serializers.UUIDField(source="model.entity_id", allow_null=True)
+    model_name = serializers.CharField(source="model.entity.display_name", allow_null=True)
+    publication_id = serializers.UUIDField(source="publication.entity_id")
+    source_document_id = serializers.UUIDField(source="publication.document.entity_id")
+    title = serializers.CharField(source="publication.title")
+    category = serializers.CharField(source="publication.category")
+    content_digest = serializers.CharField(source="publication.content_digest")
+    published_at = serializers.DateTimeField(source="publication.published_at")
+
+
+class CatalogProductDocumentWriteSerializer(StrictSerializer):
+    publication_id = serializers.UUIDField()
+    model_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class EligibleCatalogPublicationSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    source_document_id = serializers.UUIDField(source="document.entity_id")
+    title = serializers.CharField()
+    category = serializers.CharField()
+    content_digest = serializers.CharField()
+    published_at = serializers.DateTimeField()
+
+
+class EligibleCatalogPublicationResultSerializer(serializers.Serializer):
+    results = EligibleCatalogPublicationSerializer(many=True)
+
+
 class CatalogProductSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
@@ -139,6 +176,13 @@ class CatalogProductSerializer(serializers.Serializer):
     description = serializers.CharField()
     updated_at = serializers.DateTimeField()
     models = CatalogModelSerializer(many=True)
+    documents = serializers.SerializerMethodField()
+
+    @extend_schema_field(CatalogProductDocumentSerializer(many=True))
+    def get_documents(self, item):  # type: ignore[no-untyped-def]
+        if not self.context.get("include_documents", False):
+            return []
+        return CatalogProductDocumentSerializer(item.document_associations.all(), many=True).data
 
 
 class CatalogProductResultSerializer(serializers.Serializer):
@@ -203,7 +247,12 @@ def _products(workspace: ResolvedWorkspace, request) -> Response:  # type: ignor
             {
                 "results": products_for_scope(workspace.data_scope, query=query, kind=kind),
                 "can_manage": _can_manage(workspace),
-            }
+            },
+            context={
+                "include_documents": context_has_permission(
+                    workspace.member, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization
+                )
+            },
         ).data
     )
 
@@ -389,3 +438,67 @@ class CatalogSpecificationDefinitionVersionView(APIView):
         except (CatalogError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(SpecificationVersionSerializer(version).data, status=201)
+
+
+class CatalogPublicationChoiceListView(APIView):
+    @extend_schema(
+        operation_id="organization_catalog_publication_choices_list",
+        responses={200: EligibleCatalogPublicationResultSerializer},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+        return Response(
+            EligibleCatalogPublicationResultSerializer(
+                {"results": eligible_publications_for_supplier(workspace.data_scope)}
+            ).data
+        )
+
+
+class CatalogProductDocumentListCreateView(APIView):
+    @extend_schema(
+        operation_id="organization_catalog_product_documents_list",
+        responses={200: CatalogProductDocumentSerializer(many=True)},
+    )
+    def get(self, request, organization_entity_id, product_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+        return Response(
+            CatalogProductDocumentSerializer(product_documents(_product(workspace, product_entity_id)), many=True).data
+        )
+
+    @extend_schema(request=CatalogProductDocumentWriteSerializer, responses={201: CatalogProductDocumentSerializer})
+    def post(self, request, organization_entity_id, product_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+        serializer = CatalogProductDocumentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = _product(workspace, product_entity_id)
+        publication = get_object_or_404(
+            eligible_publications_for_supplier(workspace.data_scope),
+            entity_id=serializer.validated_data["publication_id"],
+        )
+        model_id = serializer.validated_data.get("model_id")
+        model = _model(workspace, product, model_id) if model_id is not None else None
+        try:
+            association = associate_product_document(
+                product=product,
+                publication=publication,
+                model=model,
+                actor_id=request.user.pk,
+            )
+        except (InventoryError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        association = product_documents(product).get(pk=association.pk)
+        return Response(CatalogProductDocumentSerializer(association).data, status=201)
+
+
+class CatalogProductDocumentDetailView(APIView):
+    @extend_schema(
+        request=None, responses={204: OpenApiResponse(description="Product publication association archived")}
+    )
+    def delete(self, request, organization_entity_id, product_entity_id, association_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+        product = _product(workspace, product_entity_id)
+        association = get_object_or_404(product_documents(product), id=association_id)
+        archive_product_document(association=association, actor_id=request.user.pk)
+        return Response(status=204)

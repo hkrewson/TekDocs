@@ -572,7 +572,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.1` | **Complete:** provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
 | `0.3.2` | **Complete:** production runtime `*_FILE` inputs, fail-closed secret-file validation, service-scoped Compose mounts, production-image leakage tests, removable bootstrap custody, and an operator-owned 1Password CLI injection recipe. |
 | `0.3.3` | **Complete:** supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
-| `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
+| `0.3.4` | **Complete:** supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
 | `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
 | `0.3.7` | Costs and contracts with field-level permissions and non-disclosing list/search behavior. |
@@ -618,6 +618,20 @@ Evidence: `docs/releases/0.3.2.md`.
 - [x] OpenAPI, architecture, security baseline, threat model, risk register, migration/upgrade evidence, backend/frontend tests, Docker Compose, and one non-mocked browser-to-Django-to-PostgreSQL supplier catalog journey agree at `0.3.3`.
 
 Evidence: `docs/releases/0.3.3.md`.
+
+### `0.3.4` acceptance criteria
+
+- [x] Supplier product documentation associates a product and optional model with one exact immutable `client_visible` STATIC publication owned by the same supplier; live documents, MSP-internal publications, sibling-supplier records, and browser-supplied ownership fail closed.
+- [x] A client asset is a new client-owned Entity created from one active supplier model. The server derives and retains the exact supplier, product, model, current model revision, specification-definition version, validated specification values, and server-calculated provenance checksum.
+- [x] Asset creation captures every applicable active product-level and model-level publication association as immutable document-provenance rows. Later model revisions, specification versions, publication corrections, association archival, or label changes do not rewrite an existing asset.
+- [x] Client asset reads expose the retained supplier/model/specification/publication identities and verified STATIC document projections without granting access to the supplier workspace or accepting a generic cross-organization document identifier.
+- [x] The client Vendors page is derived from active client asset provenance, returns each supplier once with an asset count, and does not create a second vendor record, mutable label match, or implicit EntityLink.
+- [x] Catalog-document association uses `documents.view` plus MFA/CSRF-protected `assets.edit`; client asset/model discovery and reads use `assets.view`, while creation uses MFA/CSRF-protected `assets.edit`. Every decision remains in the central policy service.
+- [x] Product-document, client-asset, and asset-document relationships enforce same-tenant and exact supplier/client scope through Django validation, PostgreSQL guards, scoped managers, forced RLS, append-only provenance triggers, and allow/deny/sibling/cross-tenant IDOR coverage.
+- [x] Supplier Products, client Assets, and client Vendors provide restrained loading, empty, error, denial, responsive, keyboard, and accessibility states; one non-mocked browser journey proves supplier publication association through client asset creation and retained database provenance.
+- [x] OpenAPI, architecture, security baseline, threat model, `TD-RISK-022`, migration/upgrade evidence, tests, Compose runtime, roadmap, release notes, and version metadata agree at `0.3.4`; serials, acquisition/disposal, warranty, assignment, costs, and mutable asset lifecycle remain later slices.
+
+Evidence: `docs/releases/0.3.4.md` (created at slice closeout).
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

@@ -19,6 +19,7 @@ from .models import (
     CatalogModel,
     CatalogModelRevision,
     CatalogProduct,
+    CatalogProductDocument,
     CatalogSpecificationDefinition,
     CatalogSpecificationDefinitionVersion,
     Entity,
@@ -153,7 +154,13 @@ def products_for_scope(scope: DataScope, *, query: str = "", kind: str = "") -> 
                         ).order_by("revision"),
                     )
                 ),
-            )
+            ),
+            Prefetch(
+                "document_associations",
+                queryset=CatalogProductDocument.objects.filter(archived_at__isnull=True).select_related(
+                    "model", "model__entity", "publication", "publication__entity", "publication__document__entity"
+                ),
+            ),
         )
     )
     if query:

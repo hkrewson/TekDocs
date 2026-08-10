@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.3` adds supplier-owned product and model catalogs with immutable, versioned specification sets while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.4` creates client assets from exact supplier catalog revisions, retains applicable client-visible STATIC product documentation, and derives each client's vendor list from immutable provenance while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 

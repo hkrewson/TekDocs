@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.3
+  version: 0.3.4
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2723,6 +2723,179 @@ paths:
           description: Organization workspace not found
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets:
+    get:
+      operationId: organization_client_assets_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAssetResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_assets_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientAssetWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAsset'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}:
+    get:
+      operationId: organization_client_assets_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAsset'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/documents/{publication_entity_id}:
+    get:
+      operationId: organization_client_asset_document_retrieve
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDocumentDetail'
+          description: ''
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/documents/{publication_entity_id}/artifacts/{artifact_entity_id}/download
+  : get:
+      operationId: organization_client_asset_document_artifact_download
+      parameters:
+      - in: path
+        name: artifact_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Retained publication artifact
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
+    get:
+      operationId: organization_client_asset_model_choices_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogModelChoiceResult'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products:
     get:
       operationId: organization_catalog_products_list
@@ -2870,6 +3043,102 @@ paths:
       responses:
         '204':
           description: Product archived
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}/documents:
+    get:
+      operationId: organization_catalog_product_documents_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogProductDocument'
+          description: ''
+    post:
+      operationId: workspaces_organizations_catalog_products_documents_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogProductDocumentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CatalogProductDocumentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CatalogProductDocumentWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogProductDocument'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}/documents/{association_id}:
+    delete:
+      operationId: workspaces_organizations_catalog_products_documents_destroy
+      parameters:
+      - in: path
+        name: association_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Product publication association archived
   /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}/models:
     post:
       operationId: workspaces_organizations_catalog_products_models_create
@@ -2983,6 +3252,27 @@ paths:
       responses:
         '204':
           description: Model archived
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/publication-choices:
+    get:
+      operationId: organization_catalog_publication_choices_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibleCatalogPublicationResult'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/catalog/specification-definitions:
     get:
       operationId: workspaces_organizations_catalog_specification_definitions_retrieve
@@ -5033,6 +5323,27 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/workspaces/organizations/{organization_entity_id}/vendors:
+    get:
+      operationId: organization_client_vendors_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DerivedVendorResult'
+          description: ''
 components:
   schemas:
     AccessCollection:
@@ -5118,6 +5429,110 @@ components:
       - custom_assignable_permissions
       - permissions
       - roles
+    AssetDocumentDetail:
+      type: object
+      properties:
+        publication_id:
+          type: string
+          format: uuid
+        source_document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          type: string
+        reason:
+          type: string
+        content_digest:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+        verification:
+          type: object
+          additionalProperties:
+            type: boolean
+          readOnly: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetPublicationArtifact'
+        sanitized_html:
+          type: string
+      required:
+      - artifacts
+      - category
+      - content_digest
+      - publication_id
+      - published_at
+      - reason
+      - sanitized_html
+      - source_document_id
+      - title
+      - verification
+    AssetDocumentSummary:
+      type: object
+      properties:
+        publication_id:
+          type: string
+          format: uuid
+        source_document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          type: string
+        reason:
+          type: string
+        content_digest:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+        verification:
+          type: object
+          additionalProperties:
+            type: boolean
+          readOnly: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetPublicationArtifact'
+      required:
+      - artifacts
+      - category
+      - content_digest
+      - publication_id
+      - published_at
+      - reason
+      - source_document_id
+      - title
+      - verification
+    AssetPublicationArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+      required:
+      - checksum
+      - filename
+      - id
+      - kind
+      - media_type
+      - size
     AssignableScopeEnum:
       enum:
       - installation
@@ -5352,6 +5767,60 @@ components:
       - model_number
       - name
       - revisions
+    CatalogModelChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        model_number:
+          type: string
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+        kind:
+          type: string
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_name:
+          type: string
+        revision:
+          type: integer
+          nullable: true
+          readOnly: true
+        specification_version_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        specifications:
+          readOnly: true
+      required:
+      - id
+      - kind
+      - model_number
+      - name
+      - product_id
+      - product_name
+      - revision
+      - specification_version_id
+      - specifications
+      - supplier_id
+      - supplier_name
+    CatalogModelChoiceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogModelChoice'
+      required:
+      - results
     CatalogModelLifecycleEnum:
       enum:
       - active
@@ -5433,13 +5902,69 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CatalogModel'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogProductDocument'
+          readOnly: true
       required:
       - description
+      - documents
       - id
       - kind
       - models
       - name
       - updated_at
+    CatalogProductDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+          nullable: true
+        model_name:
+          type: string
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+        source_document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          type: string
+        content_digest:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+      required:
+      - category
+      - content_digest
+      - id
+      - model_id
+      - model_name
+      - publication_id
+      - published_at
+      - source_document_id
+      - title
+    CatalogProductDocumentWrite:
+      type: object
+      properties:
+        publication_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - publication_id
     CatalogProductKindEnum:
       enum:
       - hardware
@@ -5474,6 +5999,103 @@ components:
         * `procedure` - Procedure
         * `guide` - Guide
         * `reference` - Reference
+    ClientAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_name:
+          type: string
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+        model_id:
+          type: string
+          format: uuid
+        model_name:
+          type: string
+        model_number:
+          type: string
+        model_revision_id:
+          type: string
+          format: uuid
+        model_revision:
+          type: integer
+        specification_version_id:
+          type: string
+          format: uuid
+        specification_definition_id:
+          type: string
+          format: uuid
+        specification_version:
+          type: integer
+        specifications: {}
+        provenance_checksum:
+          type: string
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetDocumentSummary'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - documents
+      - id
+      - kind
+      - model_id
+      - model_name
+      - model_number
+      - model_revision
+      - model_revision_id
+      - name
+      - product_id
+      - product_name
+      - provenance_checksum
+      - specification_definition_id
+      - specification_version
+      - specification_version_id
+      - specifications
+      - supplier_id
+      - supplier_name
+    ClientAssetResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAsset'
+        count:
+          type: integer
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - results
+    ClientAssetWrite:
+      type: object
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          default: ''
+          maxLength: 240
+      required:
+      - model_id
     CredentialReference:
       type: object
       properties:
@@ -5753,6 +6375,44 @@ components:
       - name
       - product_kind
       - schema
+    DerivedVendor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        legal_name:
+          type: string
+        website:
+          type: string
+        classifications:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        asset_count:
+          type: integer
+      required:
+      - asset_count
+      - classifications
+      - id
+      - legal_name
+      - name
+      - website
+    DerivedVendorResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DerivedVendor'
+        count:
+          type: integer
+      required:
+      - count
+      - results
     DirectionEnum:
       enum:
       - outgoing
@@ -6298,6 +6958,40 @@ components:
           format: uuid
       required:
       - organization_id
+    EligibleCatalogPublication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          type: string
+        content_digest:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+      required:
+      - category
+      - content_digest
+      - id
+      - published_at
+      - source_document_id
+      - title
+    EligibleCatalogPublicationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EligibleCatalogPublication'
+      required:
+      - results
     EntityCustomField:
       type: object
       properties:

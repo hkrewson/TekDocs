@@ -52,6 +52,25 @@ export type CatalogModel = {
   current_revision: ModelRevision
   revisions: ModelRevision[]
 }
+export type CatalogProductDocument = {
+  id: string
+  model_id: string | null
+  model_name: string | null
+  publication_id: string
+  source_document_id: string
+  title: string
+  category: string
+  content_digest: string
+  published_at: string
+}
+export type CatalogPublicationChoice = {
+  id: string
+  source_document_id: string
+  title: string
+  category: string
+  content_digest: string
+  published_at: string
+}
 export type CatalogProduct = {
   id: string
   name: string
@@ -59,6 +78,7 @@ export type CatalogProduct = {
   description: string
   updated_at: string
   models: CatalogModel[]
+  documents: CatalogProductDocument[]
 }
 export type ProductDraft = { name: string; kind: ProductKind; description: string }
 export type DefinitionDraft = { name: string; product_kind: ProductKind; schema: SpecificationSchema }
@@ -82,6 +102,9 @@ export interface CatalogClient {
   createModel(workspace: WorkspaceContext, productId: string, draft: ModelDraft): Promise<CatalogModel>
   reviseModel(workspace: WorkspaceContext, productId: string, modelId: string, draft: ModelDraft & { base_revision_id: string }): Promise<CatalogModel>
   archiveModel(workspace: WorkspaceContext, productId: string, modelId: string): Promise<void>
+  listPublicationChoices(workspace: WorkspaceContext): Promise<{ results: CatalogPublicationChoice[] }>
+  associateDocument(workspace: WorkspaceContext, productId: string, publicationId: string, modelId: string | null): Promise<CatalogProductDocument>
+  archiveDocumentAssociation(workspace: WorkspaceContext, productId: string, associationId: string): Promise<void>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -139,4 +162,9 @@ export const browserCatalogClient: CatalogClient = {
   createModel: (workspace, productId, draft) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}/models`, 'POST', draft),
   reviseModel: (workspace, productId, modelId, draft) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}/models/${encodeURIComponent(modelId)}`, 'PATCH', draft),
   archiveModel: (workspace, productId, modelId) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}/models/${encodeURIComponent(modelId)}`, 'DELETE'),
+  async listPublicationChoices(workspace) {
+    return parse(await fetch(`${basePath(workspace)}/publication-choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  associateDocument: (workspace, productId, publicationId, modelId) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}/documents`, 'POST', { publication_id: publicationId, model_id: modelId }),
+  archiveDocumentAssociation: (workspace, productId, associationId) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}/documents/${encodeURIComponent(associationId)}`, 'DELETE'),
 }

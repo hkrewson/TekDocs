@@ -32,7 +32,10 @@ from apps.core.catalog_views import (
     CatalogModelDetailView,
     CatalogModelListCreateView,
     CatalogProductDetailView,
+    CatalogProductDocumentDetailView,
+    CatalogProductDocumentListCreateView,
     CatalogProductListCreateView,
+    CatalogPublicationChoiceListView,
     CatalogSpecificationDefinitionListCreateView,
     CatalogSpecificationDefinitionVersionView,
 )
@@ -97,6 +100,14 @@ from apps.core.document_views import (
     OrganizationDocumentRevisionListView,
     OrganizationDocumentTemplateInstantiateView,
     OrganizationMarkdownImportView,
+)
+from apps.core.inventory_views import (
+    ClientAssetDetailView,
+    ClientAssetDocumentArtifactDownloadView,
+    ClientAssetDocumentDetailView,
+    ClientAssetListCreateView,
+    ClientAssetModelChoiceListView,
+    ClientVendorListView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
@@ -393,6 +404,11 @@ urlpatterns = [
         name="organization-catalog-product-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/publication-choices",
+        CatalogPublicationChoiceListView.as_view(),
+        name="organization-catalog-publication-choices",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>",
         CatalogProductDetailView.as_view(),
         name="organization-catalog-product-detail",
@@ -401,6 +417,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/models",
         CatalogModelListCreateView.as_view(),
         name="organization-catalog-model-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/documents",
+        CatalogProductDocumentListCreateView.as_view(),
+        name="organization-catalog-product-document-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/documents/<uuid:association_id>",
+        CatalogProductDocumentDetailView.as_view(),
+        name="organization-catalog-product-document-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/models/<uuid:model_entity_id>",
@@ -436,6 +462,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents",
         OrganizationDocumentListCreateView.as_view(),
         name="organization-document-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/model-choices",
+        ClientAssetModelChoiceListView.as_view(),
+        name="organization-client-asset-model-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets",
+        ClientAssetListCreateView.as_view(),
+        name="organization-client-asset-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>",
+        ClientAssetDetailView.as_view(),
+        name="organization-client-asset-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/documents/<uuid:publication_entity_id>",
+        ClientAssetDocumentDetailView.as_view(),
+        name="organization-client-asset-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/documents/<uuid:publication_entity_id>/artifacts/<uuid:artifact_entity_id>/download",
+        ClientAssetDocumentArtifactDownloadView.as_view(),
+        name="organization-client-asset-document-artifact-download",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/vendors",
+        ClientVendorListView.as_view(),
+        name="organization-client-vendor-list",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/from-template",

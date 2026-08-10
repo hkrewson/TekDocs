@@ -29,6 +29,7 @@ const product: CatalogProduct = {
   kind: 'hardware',
   description: 'Managed switching family',
   updated_at: '2026-08-09T12:00:00Z',
+  documents: [],
   models: [{
     id: 'model-1',
     name: 'EdgeSwitch 24',
@@ -54,6 +55,9 @@ function catalogClient(overrides: Partial<CatalogClient> = {}): CatalogClient {
     createModel: vi.fn().mockResolvedValue(product.models[0]),
     reviseModel: vi.fn().mockResolvedValue(product.models[0]),
     archiveModel: vi.fn().mockResolvedValue(undefined),
+    listPublicationChoices: vi.fn().mockResolvedValue({ results: [] }),
+    associateDocument: vi.fn().mockResolvedValue({}),
+    archiveDocumentAssociation: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -133,6 +137,24 @@ describe('Products', () => {
     await user.type(within(editor).getByLabelText('Revision notes'), 'Reviewed specification')
     await user.click(within(editor).getByRole('button', { name: 'Create revision' }))
     await waitFor(() => expect(reviseModel).toHaveBeenCalledWith(workspace, 'product-1', 'model-1', expect.objectContaining({ base_revision_id: 'revision-1', notes: 'Reviewed specification' })))
+  })
+
+  it('associates a client-visible STATIC publication with an exact model', async () => {
+    const associateDocument = vi.fn().mockResolvedValue({})
+    const api = catalogClient({
+      associateDocument,
+      listPublicationChoices: vi.fn().mockResolvedValue({ results: [{
+        id: 'publication-1', source_document_id: 'document-1',
+        title: 'Installation guide', category: 'guide', content_digest: 'c'.repeat(64), published_at: '2026-08-10T12:00:00Z',
+      }] }),
+    })
+    const user = userEvent.setup()
+    render(<Products workspace={workspace} client={api} />)
+    await user.click(await screen.findByRole('button', { name: 'Add publication' }))
+    await user.selectOptions(screen.getByLabelText('STATIC publication'), 'publication-1')
+    await user.selectOptions(screen.getByLabelText('Applies to'), 'model-1')
+    await user.click(screen.getByRole('button', { name: 'Associate' }))
+    await waitFor(() => expect(associateDocument).toHaveBeenCalledWith(workspace, 'product-1', 'publication-1', 'model-1'))
   })
 
   it('renders empty, denial, loading failure, and mutation failure states', async () => {

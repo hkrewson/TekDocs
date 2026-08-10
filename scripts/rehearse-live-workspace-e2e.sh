@@ -53,7 +53,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -121,6 +121,25 @@ assert catalog_revisions[1].parent_id == catalog_revisions[0].id
 assert catalog_revisions[1].specification_version == catalog_version
 assert catalog_revisions[1].specifications == {"port_count": 24}
 assert catalog_revisions[0].checksum != catalog_revisions[1].checksum
+catalog_document = CatalogProductDocument.objects.select_related("publication", "model").get(
+    product=catalog_product, archived_at__isnull=True
+)
+assert catalog_document.model == catalog_model
+assert catalog_document.publication.audience == "client_visible"
+asset = ClientAsset.objects.select_related("entity", "supplier", "product", "model", "model_revision").get(
+    entity__display_name="Live core switch"
+)
+assert asset.organization == organization
+assert asset.supplier == vendor
+assert asset.product == catalog_product
+assert asset.model == catalog_model
+assert asset.model_revision == catalog_revisions[1]
+assert asset.specifications == {"port_count": 24}
+assert len(asset.provenance_checksum) == 64
+asset_document = ClientAssetDocumentProvenance.objects.get(asset=asset)
+assert asset_document.catalog_document == catalog_document
+assert asset_document.publication == catalog_document.publication
+assert asset_document.content_digest == catalog_document.publication.content_digest
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

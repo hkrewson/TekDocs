@@ -1,0 +1,24 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { browserInventoryClient } from './api'
+
+describe('inventory API client', () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=inventory-csrf' })
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200 }))))
+  })
+
+  it('uses exact client routes and CSRF for asset creation', async () => {
+    const workspace = { id: 'client/1' } as never
+    await browserInventoryClient.listAssets(workspace)
+    await browserInventoryClient.listModelChoices(workspace, 'edge switch')
+    await browserInventoryClient.createAsset(workspace, 'model/1', 'Core switch')
+    await browserInventoryClient.listVendors(workspace)
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/assets/model-choices?q=edge%20switch',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    const post = vi.mocked(fetch).mock.calls.find(([, options]) => options?.method === 'POST')
+    expect(post?.[0]).toBe('/api/v1/workspaces/organizations/client%2F1/assets')
+    expect((post?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('inventory-csrf')
+  })
+})

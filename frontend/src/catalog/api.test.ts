@@ -26,6 +26,9 @@ describe('catalog API client', () => {
     await browserCatalogClient.createModel(workspace, 'product/1', model)
     await browserCatalogClient.reviseModel(workspace, 'product/1', 'model/1', { ...model, base_revision_id: 'r1' })
     await browserCatalogClient.archiveModel(workspace, 'product/1', 'model/1')
+    await browserCatalogClient.listPublicationChoices(workspace)
+    await browserCatalogClient.associateDocument(workspace, 'product/1', 'publication/1', 'model/1')
+    await browserCatalogClient.archiveDocumentAssociation(workspace, 'product/1', 'association/1')
     await browserCatalogClient.archiveProduct(workspace, 'product/1')
     const mutationCall = fetchMock.mock.calls.find(([path]) => {
       const value = typeof path === 'string' ? path : path instanceof URL ? path.href : path.url

@@ -50,6 +50,9 @@ DOCUMENT_RLS_TABLES = {
     "core_catalogspecificationdefinition",
     "core_catalogspecificationdefinitionversion",
     "core_catalogmodelrevision",
+    "core_catalogproductdocument",
+    "core_clientasset",
+    "core_clientassetdocumentprovenance",
 }
 
 
@@ -220,7 +223,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     with connection.cursor() as cursor:
         cursor.execute("SELECT markdown FROM core_block WHERE id = %s", [block.id])
         assert cursor.fetchone() == ("# Preserved revision\n",)
-    call_command("migrate", "core", "0035", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0037", verbosity=0, interactive=False)
     preserved_revision = BlockRevision.objects.get(block_id=block.id)
     assert preserved_revision.markdown == "# Preserved revision\n"
     assert preserved_revision.checksum
@@ -230,13 +233,12 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     call_command("migrate", "core", "0019", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT relname FROM pg_class WHERE relname = ANY(%s) "
-            "AND relrowsecurity AND relforcerowsecurity",
+            "SELECT relname FROM pg_class WHERE relname = ANY(%s) AND relrowsecurity AND relforcerowsecurity",
             [list(RLS_TABLES)],
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0035", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0037", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

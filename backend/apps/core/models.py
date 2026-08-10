@@ -413,6 +413,204 @@ class CatalogModelRevision(models.Model):
             raise ValidationError("Catalog model revision and specification scopes must match")
 
 
+class CatalogProductDocument(TimestampedModel):
+    """A supplier-owned association to one exact client-visible STATIC publication."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_product_documents")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="catalog_product_documents")
+    product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="document_associations")
+    model = models.ForeignKey(
+        CatalogModel,
+        on_delete=models.PROTECT,
+        related_name="document_associations",
+        null=True,
+        blank=True,
+    )
+    publication = models.ForeignKey(
+        "DocumentPublication", on_delete=models.PROTECT, related_name="catalog_associations"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="catalog_product_documents",
+        null=True,
+        blank=True,
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("publication__title", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("product", "publication"),
+                condition=models.Q(archived_at__isnull=True, model__isnull=True),
+                name="unique_active_product_document",
+            ),
+            models.UniqueConstraint(
+                fields=("product", "model", "publication"),
+                condition=models.Q(archived_at__isnull=True, model__isnull=False),
+                name="unique_active_model_document",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "product", "model", "archived_at"),
+                name="core_catdoc_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id}: {self.publication_id}"
+
+    def clean(self) -> None:
+        if self.product_id and (
+            self.product.tenant_id != self.tenant_id or self.product.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog document and product scopes must match")
+        model = self.model if self.model_id else None
+        if model is not None and (
+            model.tenant_id != self.tenant_id
+            or model.organization_id != self.organization_id
+            or model.product_id != self.product_id
+        ):
+            raise ValidationError("Catalog document model must belong to its product and supplier")
+        if self.publication_id and (
+            self.publication.tenant_id != self.tenant_id
+            or self.publication.organization_id != self.organization_id
+            or self.publication.audience != PublicationAudience.CLIENT_VISIBLE
+        ):
+            raise ValidationError("Catalog documentation requires a client-visible supplier publication")
+
+
+class ClientAsset(TimestampedModel):
+    """A client-owned asset retaining the exact supplier model provenance present at creation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_assets")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_assets")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="client_asset")
+    supplier = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="supplied_client_assets")
+    product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="client_assets")
+    model = models.ForeignKey(CatalogModel, on_delete=models.PROTECT, related_name="client_assets")
+    model_revision = models.ForeignKey(CatalogModelRevision, on_delete=models.PROTECT, related_name="client_assets")
+    specification_version = models.ForeignKey(
+        CatalogSpecificationDefinitionVersion,
+        on_delete=models.PROTECT,
+        related_name="client_assets",
+    )
+    specifications = models.JSONField(default=dict)
+    provenance_checksum = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_client_assets",
+        null=True,
+        blank=True,
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        indexes = [
+            models.Index(fields=("tenant", "organization", "archived_at"), name="core_asset_scope_idx"),
+            models.Index(fields=("tenant", "organization", "supplier"), name="core_asset_supplier_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Client asset and entity scopes must match")
+        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+            raise ValidationError("Client asset organization must belong to its tenant")
+        if self.supplier_id and self.supplier.tenant_id != self.tenant_id:
+            raise ValidationError("Client asset supplier must belong to its tenant")
+        if self.product_id and (
+            self.product.tenant_id != self.tenant_id or self.product.organization_id != self.supplier_id
+        ):
+            raise ValidationError("Client asset product must belong to its retained supplier")
+        if self.model_id and (
+            self.model.tenant_id != self.tenant_id
+            or self.model.organization_id != self.supplier_id
+            or self.model.product_id != self.product_id
+        ):
+            raise ValidationError("Client asset model must belong to its retained product")
+        if self.model_revision_id and (
+            self.model_revision.tenant_id != self.tenant_id
+            or self.model_revision.organization_id != self.supplier_id
+            or self.model_revision.model_id != self.model_id
+        ):
+            raise ValidationError("Client asset revision must belong to its retained model")
+        if self.specification_version_id and (
+            self.specification_version_id != self.model_revision.specification_version_id
+        ):
+            raise ValidationError("Client asset specification version must match its retained model revision")
+
+
+class ClientAssetDocumentProvenance(models.Model):
+    """Append-only client projection of one exact supplier STATIC publication."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="client_asset_documents")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="client_asset_documents")
+    asset = models.ForeignKey(ClientAsset, on_delete=models.PROTECT, related_name="document_provenance")
+    catalog_document = models.ForeignKey(
+        CatalogProductDocument, on_delete=models.PROTECT, related_name="client_asset_provenance"
+    )
+    publication = models.ForeignKey(
+        "DocumentPublication", on_delete=models.PROTECT, related_name="client_asset_provenance"
+    )
+    content_digest = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("publication__title", "id")
+        constraints = [models.UniqueConstraint(fields=("asset", "publication"), name="unique_client_asset_publication")]
+        indexes = [models.Index(fields=("tenant", "organization", "asset"), name="core_assetdoc_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.asset_id}: {self.publication_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Client asset document provenance is append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Client asset document provenance is append-only")
+
+    def clean(self) -> None:
+        if self.asset_id and (
+            self.asset.tenant_id != self.tenant_id or self.asset.organization_id != self.organization_id
+        ):
+            raise ValidationError("Asset document provenance must use its asset scope")
+        if self.catalog_document_id and (
+            self.catalog_document.tenant_id != self.tenant_id
+            or self.catalog_document.organization_id != self.asset.supplier_id
+            or self.catalog_document.product_id != self.asset.product_id
+            or self.catalog_document.model_id not in {None, self.asset.model_id}
+        ):
+            raise ValidationError("Asset document provenance does not apply to the retained model")
+        if self.publication_id and (
+            self.publication_id != self.catalog_document.publication_id
+            or self.publication.content_digest != self.content_digest
+        ):
+            raise ValidationError("Asset document publication identity or digest does not match")
+
+
 class OrganizationAccessMode(models.TextChoices):
     ALL_AUTHORIZED = "all_authorized", "All authorized MSP staff"
     ASSIGNED_ONLY = "assigned_only", "Assigned MSP staff only"

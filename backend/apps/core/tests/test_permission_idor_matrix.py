@@ -116,6 +116,16 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         ),
         "organization-catalog-product-list-create": ("organization_entity_id",),
         "organization-catalog-product-detail": ("organization_entity_id", "product_entity_id"),
+        "organization-catalog-publication-choices": ("organization_entity_id",),
+        "organization-catalog-product-document-list-create": (
+            "organization_entity_id",
+            "product_entity_id",
+        ),
+        "organization-catalog-product-document-detail": (
+            "organization_entity_id",
+            "product_entity_id",
+            "association_id",
+        ),
         "organization-catalog-model-list-create": ("organization_entity_id", "product_entity_id"),
         "organization-catalog-model-detail": (
             "organization_entity_id",
@@ -127,6 +137,21 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "organization_entity_id",
             "definition_id",
         ),
+        "organization-client-asset-list-create": ("organization_entity_id",),
+        "organization-client-asset-model-choices": ("organization_entity_id",),
+        "organization-client-asset-detail": ("organization_entity_id", "asset_entity_id"),
+        "organization-client-asset-document-detail": (
+            "organization_entity_id",
+            "asset_entity_id",
+            "publication_entity_id",
+        ),
+        "organization-client-asset-document-artifact-download": (
+            "organization_entity_id",
+            "asset_entity_id",
+            "publication_entity_id",
+            "artifact_entity_id",
+        ),
+        "organization-client-vendor-list": ("organization_entity_id",),
         "organization-person-detail": ("organization_entity_id", "person_entity_id"),
         "organization-site-list-create": ("organization_entity_id",),
         "organization-document-list-create": ("organization_entity_id",),

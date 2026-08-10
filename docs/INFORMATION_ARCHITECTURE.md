@@ -27,15 +27,15 @@ This document defines which navigation families belong to the MSP and organizati
 | Recycle bin | Archived organizations and MSP-owned domain records | Archived records owned by the exact organization | Archived records owned by the exact supplier | records and recovery available (`0.1.13`) |
 | Documentation | Categorized MSP documents and reusable templates | Categorized client-owned and explicitly referenced documents, templates, managed attachments, and Markdown transfer | Categorized supplier-owned product/support documentation and templates | categories/templates/attachments/import-export available (`0.2.6`) |
 | Files | MSP-owned managed files | Client-owned and explicitly referenced files | Supplier-owned files | `0.3.8` |
-| Assets | MSP-owned equipment | Client equipment and software | — | `0.3.5`–`0.3.8` |
+| Assets | MSP-owned equipment | Client-owned assets created from exact supplier model/document provenance | — | provenance creation `0.3.4`; lifecycle fields `0.3.5`–`0.3.8` |
 | Licenses | MSP entitlements | Client entitlements and seats | — | `0.3.6` |
 | Networks | MSP networks | Client networks | — | `0.5.x` |
 | Domains | MSP-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | Client-owned registrations, renewal responsibility, managed subdomains, DNS observations, and monitoring | — | inventory `0.7.8`; hierarchy/renewals/monitoring `0.7.9`–`0.7.11` |
 | Certificates | MSP TLS endpoints and validation history related to managed domains/hostnames | Client TLS endpoints and validation history related to managed domains/hostnames | — | `0.7.12`–`0.7.13` |
 | Credential references | Links to externally protected credentials; no values stored or revealed by TekDocs | Client-scoped links whose provider independently enforces vault access | — | references `0.3.1`; runtime secret injection `0.3.2` |
 | Services | MSP services and contracts | Client services, providers, and dependencies | — | relationship seam in `0.3.7` |
-| Vendors | MSP supplier directory/relationships | Vendors related to the client through assets or services | — | `0.3.4` |
-| Products | Supplier-catalog entry point; aggregate view follows provenance work | — | Supplier-owned product/model templates with versioned specifications | supplier workspace `0.3.3`; aggregate/provenance `0.3.4` |
+| Vendors | MSP supplier directory/relationships | Suppliers derived from retained client-asset provenance; service-derived suppliers follow later | — | asset-derived list `0.3.4` |
+| Products | Supplier-catalog entry point; aggregate view remains later | assets consume products through the Assets workflow | Supplier-owned product/model templates, versioned specifications, and client-visible STATIC publication associations | supplier workspace `0.3.3`; documentation/provenance `0.3.4` |
 | Tickets | MSP service queue | Client service requests | — | post-`1.0` placeholder |
 | Accounting | MSP billing, purchasing, quotes, recurring work, and expenses | — | — | post-`1.0` placeholder |
 | Compliance, activity, integrations | MSP governance and provider administration | only explicitly client-capable governance views when introduced | only explicitly supplier-capable views when introduced | later roadmap slices |

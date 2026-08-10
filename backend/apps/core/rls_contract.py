@@ -20,6 +20,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_catalogspecificationdefinition",
     "core_catalogspecificationdefinitionversion",
     "core_catalogmodelrevision",
+    "core_catalogproductdocument",
+    "core_clientasset",
+    "core_clientassetdocumentprovenance",
 )
 
 TENANT_SCOPED_TABLES = (

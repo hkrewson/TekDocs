@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
 import {
@@ -53,6 +53,8 @@ import type { CredentialReferencesClient } from './credential-references/api'
 import { Documentation } from './documentation/Documentation'
 import { browserDocumentsClient } from './documentation/api'
 import type { DocumentsClient } from './documentation/api'
+import { browserInventoryClient } from './inventory/api'
+import type { InventoryClient } from './inventory/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
@@ -71,6 +73,9 @@ import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
+
+const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
+const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 
 type NavigationItem = {
   label: string
@@ -270,7 +275,7 @@ function PlannedPage({ path }: { path: string }) {
   if (path === '/products') {
     return <>
       <PageHeader title="Products" description="Reusable supplier product and model definitions." />
-      <section className="content-section"><div className="section-heading"><div><h2>Supplier catalogs are available</h2><p>Open a vendor or manufacturer from Organizations, then choose Products to manage its hardware and software templates. MSP-wide aggregation and client asset provenance arrive in 0.3.4.</p></div><span>0.3.3</span></div><Link className="secondary-button" to="/organizations">Browse organizations</Link></section>
+      <section className="content-section"><div className="section-heading"><div><h2>Supplier catalogs are available</h2><p>Open a vendor or manufacturer to manage its templates and product publications. Open a client to create assets from those exact supplier models.</p></div><span>0.3.4</span></div><Link className="secondary-button" to="/organizations">Browse organizations</Link></section>
     </>
   }
   return (
@@ -287,7 +292,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.3 adds supplier-owned product and model catalogs with immutable specification history." />
+      <PageHeader title="Overview" description="TekDocs 0.3.4 connects supplier catalogs and STATIC product documentation to client assets with retained provenance." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -310,6 +315,8 @@ function Overview() {
             ['Reusable documentation', 'Milestone 0.3.0'],
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
+            ['Client asset catalog provenance', 'Available'],
+            ['Derived client vendors', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
       </section>
@@ -340,7 +347,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   custom_fields: { title: 'Custom fields', description: 'Versioned extensions scoped to this organization or inherited from the MSP.', release: '0.1.7' },
   documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.8' },
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
-  assets: { title: 'Assets', description: 'Hardware and software assigned to this organization.', release: '0.3.5' },
+  assets: { title: 'Assets', description: 'Hardware and software created from retained supplier provenance.', release: '0.3.4' },
   licenses: { title: 'Licenses', description: 'Software entitlements and assignments scoped to this organization.', release: '0.3.6' },
   networks: { title: 'Networks', description: 'Network records scoped to this organization.', release: '0.4.1' },
   domains: { title: 'Domains', description: 'Domain registration and DNS records scoped to this organization.', release: '0.7.8' },
@@ -353,7 +360,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -366,6 +373,8 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'documentation') return <Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} />
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
+  if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -377,7 +386,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -390,6 +399,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   documentsClient: DocumentsClient
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
+  inventoryClient?: InventoryClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -450,7 +460,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
@@ -460,7 +470,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -473,6 +483,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   documentsClient?: DocumentsClient
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
+  inventoryClient?: InventoryClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -491,6 +502,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           documentsClient={documentsClient}
           credentialReferencesClient={credentialReferencesClient}
           catalogClient={catalogClient}
+          inventoryClient={inventoryClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

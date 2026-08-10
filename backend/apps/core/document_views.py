@@ -50,6 +50,7 @@ from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
     BlockRevisionDetailSerializer,
+    BlockRevisionListQuerySerializer,
     BlockRevisionResultSerializer,
     DocumentationReferenceSerializer,
     DocumentationReferenceWriteSerializer,
@@ -378,12 +379,30 @@ def _publication_manifest(
     return response
 
 
-def _revision_list(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
+def _revision_list(request: Request, workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
     document = _document(workspace, document_entity_id)
-    records = list(revisions_for_document(document)[:200])
+    query = BlockRevisionListQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    page = query.validated_data["page"]
+    page_size = query.validated_data["page_size"]
+    records_query = revisions_for_document(document)
+    count = records_query.count()
+    offset = (page - 1) * page_size
+    records = list(records_query[offset : offset + page_size])
     current_id = document.active_placements[0].block.current_revision_id
     context = {"current_revision_id": current_id}
-    return Response(BlockRevisionResultSerializer({"results": records, "count": len(records)}, context=context).data)
+    return Response(
+        BlockRevisionResultSerializer(
+            {
+                "results": records,
+                "count": count,
+                "page": page,
+                "page_size": page_size,
+                "has_more": offset + len(records) < count,
+            },
+            context=context,
+        ).data
+    )
 
 
 def _revision_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, revision_id: UUID) -> Response:
@@ -1081,9 +1100,13 @@ class OrganizationDocumentMentionSearchView(APIView):
 
 
 class MSPDocumentRevisionListView(APIView):
-    @extend_schema(operation_id="document_revisions_msp_list", responses={200: BlockRevisionResultSerializer})
+    @extend_schema(
+        operation_id="document_revisions_msp_list",
+        parameters=[BlockRevisionListQuerySerializer],
+        responses={200: BlockRevisionResultSerializer},
+    )
     def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
-        return _revision_list(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
+        return _revision_list(request, _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
 
 
 class MSPDocumentRevisionDetailView(APIView):
@@ -1093,9 +1116,14 @@ class MSPDocumentRevisionDetailView(APIView):
 
 
 class OrganizationDocumentRevisionListView(APIView):
-    @extend_schema(operation_id="document_revisions_organization_list", responses={200: BlockRevisionResultSerializer})
+    @extend_schema(
+        operation_id="document_revisions_organization_list",
+        parameters=[BlockRevisionListQuerySerializer],
+        responses={200: BlockRevisionResultSerializer},
+    )
     def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
         return _revision_list(
+            request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
         )

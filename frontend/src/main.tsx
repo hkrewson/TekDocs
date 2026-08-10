@@ -1,6 +1,4 @@
 import '@fontsource-variable/ibm-plex-sans'
-import '@milkdown/crepe/theme/common/style.css'
-import '@milkdown/crepe/theme/frame.css'
 import './styles.css'
 
 import { StrictMode } from 'react'

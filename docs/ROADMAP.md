@@ -428,7 +428,7 @@ The maintained MSP/client/supplier route and navigation matrix is `docs/INFORMAT
 | `0.2.6` | **Complete:** document categories, reusable templates, managed private attachments, and deterministic Markdown import/export. |
 | `0.2.7` | **Complete:** immutable STATIC dependency resolution, canonical snapshot/manifest, content digest, and Ed25519 signing. |
 | `0.2.8` | **Complete:** deterministic PDF artifacts, supersession/correction workflow, retention, and publication security corpus. |
-| `0.2.9` | Documentation alpha stabilization, editor chunk/performance remediation (`TD-RISK-013`), large-history performance, accessibility, upgrade, and backup evidence. |
+| `0.2.9` | **Complete:** documentation-alpha stabilization, enforced editor/shell bundle budgets, paginated large history, accessibility, prior-alpha upgrade, and database/media restore evidence. |
 | `0.3.0` | Stabilize and certify reusable documentation and immutable publication. |
 
 ### `0.2.1` acceptance criteria
@@ -536,6 +536,20 @@ Evidence: `docs/releases/0.2.7.md`.
 - [x] Migration, OpenAPI, backend/frontend, PDF rendering, Docker Compose, browser matrix, real PostgreSQL journey, security, clean-install, upgrade, and production-image evidence agree at `0.2.8`.
 
 Evidence: `docs/releases/0.2.8.md`.
+
+### `0.2.9` acceptance criteria
+
+- [x] Revision history is fully countable and navigable through validated 50-row pages with a 100-row server maximum; no fixed truncation silently hides retained revisions.
+- [x] The PostgreSQL reference fixture includes 2,500 immutable revisions and proves authorized history pages remain below the 500 ms p95 target with a fixed query ceiling.
+- [x] Documentation history, diffs, editor modes, and Markdown help retain keyboard, responsive, focus, live-status, and automated WCAG checks.
+- [x] The editor remains route-lazy; its styles and optional syntax assets do not enter the initial shell, and executable build budgets cap the shell at 500 KiB and the current editor at 1,200 KiB minified.
+- [x] ADR 0019, the fixed round-trip corpus, sanitizer/renderer tests, and internally hosted Formatting help agree. GitHub Wiki publication remains explicitly deferred until external publication is authorized.
+- [x] A dedicated `0.2.8` to `0.2.9` rehearsal preserves document/block/publication identities, revision history, managed attachment bytes, signed manifest verification, and retained PDF bytes.
+- [x] An isolated backup/restore rehearsal captures PostgreSQL and the media volume independently, restores both into clean volumes with deployment keys retained separately, and verifies canonical revisions, attachments, signatures, and PDF artifacts.
+- [x] The backup rehearsal is evidence, not supported encrypted backup tooling; destructive safeguards, encryption, scheduling, remote storage, and key-loss recovery remain owned by `TD-RISK-006` in `0.8.1`/`0.9.3`.
+- [x] Version, migration/OpenAPI drift, backend/frontend, Docker Compose, browser matrix, security, clean-install, production-image, upgrade, and documentation-specific recovery evidence agree at `0.2.9`.
+
+Evidence: `docs/releases/0.2.9.md`.
 
 ## Credentials and inventory: `0.3.x` → `0.4.0`
 

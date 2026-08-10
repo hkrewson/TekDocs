@@ -9,7 +9,9 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.policy import PermissionKey, require_permission
+from apps.core.documents import create_document, markdown_checksum, revisions_for_document
 from apps.core.models import (
+    BlockRevision,
     Entity,
     EntityLink,
     InstallationState,
@@ -31,6 +33,7 @@ REFERENCE_ENTITIES = 10_000
 REFERENCE_PEOPLE = 250
 REFERENCE_SITES = 50
 REFERENCE_LOCATIONS_PER_SITE = 5
+REFERENCE_DOCUMENT_REVISIONS = 2_500
 P95_TARGET_SECONDS = 0.5
 
 
@@ -194,7 +197,33 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
             )
         )
     EntityLink.objects.bulk_create(links)
-    return result, selected, distributed_entities[0]
+    document = create_document(
+        tenant=result.tenant,
+        organization=None,
+        actor_id=result.owner.id,
+        title="Long-history reference runbook",
+        markdown="Revision 1",
+    )
+    block = document.placements.select_related("block__current_revision").get(parent__isnull=True, position=0).block
+    parent = block.current_revision
+    revisions = []
+    for revision_number in range(2, REFERENCE_DOCUMENT_REVISIONS + 1):
+        markdown = f"Revision {revision_number}"
+        parent = BlockRevision(
+            tenant=result.tenant,
+            organization=None,
+            block=block,
+            parent=parent,
+            revision_number=revision_number,
+            markdown=markdown,
+            checksum=markdown_checksum(markdown),
+            created_by=result.owner,
+        )
+        revisions.append(parent)
+    BlockRevision.objects.bulk_create(revisions, batch_size=100)
+    block.current_revision = parent
+    block.save(update_fields=("current_revision", "updated_at"))
+    return result, selected, distributed_entities[0], document
 
 
 @pytest.mark.django_db(transaction=True)
@@ -202,7 +231,7 @@ def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
     if connection.vendor != "postgresql":
         pytest.skip("Reference performance certification requires PostgreSQL")
 
-    result, selected, linked_entity = _create_reference_fixture()
+    result, selected, linked_entity, document = _create_reference_fixture()
     assert Entity.objects.filter(tenant=result.tenant).count() >= REFERENCE_ENTITIES
 
     client = Client()
@@ -228,6 +257,10 @@ def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
                 kwargs={"organization_entity_id": selected.entity_id, "entity_id": linked_entity.id},
             ),
             {},
+        ),
+        (
+            reverse("msp-document-revision-list", kwargs={"document_entity_id": document.entity_id}),
+            {"page": 25, "page_size": 50},
         ),
     )
 
@@ -288,6 +321,11 @@ def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
             "relationship discovery",
             lambda: relationships_for_entity(workspace=workspace, entity_id=linked_entity.id),
             6,
+        ),
+        (
+            "document revision history",
+            lambda: list(revisions_for_document(document)[1_200:1_250]),
+            3,
         ),
     )
     for label, operation, budget in operations:

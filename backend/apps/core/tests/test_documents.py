@@ -734,6 +734,10 @@ def test_revision_history_is_scoped_and_noop_content_does_not_add_revision(owner
     history = owner_client.get(history_url)
     assert history.status_code == 200
     assert history.json()["count"] == 1
+    assert history.json()["page"] == 1
+    assert history.json()["page_size"] == 50
+    assert history.json()["has_more"] is False
+    assert len(history.json()["results"]) == 1
     revision_url = reverse(
         "organization-document-revision-detail",
         kwargs={
@@ -748,6 +752,33 @@ def test_revision_history_is_scoped_and_noop_content_does_not_add_revision(owner
         kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": created["id"]},
     )
     assert owner_client.get(beta_history).status_code == 404
+
+
+@pytest.mark.django_db
+def test_revision_history_is_paginated_and_rejects_unbounded_pages(owner_client, installation):
+    collection = reverse("msp-document-list-create")
+    record = owner_client.post(
+        collection, {"title": "Long-lived runbook", "markdown": "Revision 1"}, content_type="application/json"
+    ).json()
+    detail = reverse("msp-document-detail", kwargs={"document_entity_id": record["id"]})
+    for revision_number in range(2, 53):
+        record = owner_client.put(
+            detail,
+            {
+                "title": record["title"],
+                "markdown": f"Revision {revision_number}",
+                "base_revision_id": record["current_revision_id"],
+            },
+            content_type="application/json",
+        ).json()
+    history_url = reverse("msp-document-revision-list", kwargs={"document_entity_id": record["id"]})
+    first = owner_client.get(history_url).json()
+    second = owner_client.get(history_url, {"page": 2, "page_size": 50}).json()
+    assert (first["count"], first["page"], first["has_more"], len(first["results"])) == (52, 1, True, 50)
+    assert first["results"][0]["revision_number"] == 52
+    assert [item["revision_number"] for item in second["results"]] == [2, 1]
+    assert second["has_more"] is False
+    assert owner_client.get(history_url, {"page_size": 101}).status_code == 400
 
 
 @pytest.mark.django_db(transaction=True)

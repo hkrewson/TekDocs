@@ -247,9 +247,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .revision-history li button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 6px; text-align: left; color: var(--text); background: transparent; border: 0; cursor: pointer; }
 .revision-history li button:hover, .revision-history li button[aria-current="true"] { background: #eceae4; }
 .revision-history li small, .revision-history li code { color: var(--muted); font-size: 11px; }
+.revision-history li button:hover small, .revision-history li button:hover code, .revision-history li button[aria-current="true"] small, .revision-history li button[aria-current="true"] code { color: #595951; }
 .revision-history li small { grid-column: 1 / -1; }
+.history-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.history-pagination span { color: var(--muted); font-size: 12px; text-align: center; }
 .revision-diff h3 { margin: 0 0 8px; font-size: 14px; }
-@media (max-width: 700px) { .revision-history-body { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .revision-history-body { grid-template-columns: 1fr; } .history-pagination { flex-wrap: wrap; } .history-pagination span { order: -1; width: 100%; } }
 .document-composition { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .document-composition .section-heading > div { min-width: 0; }
 .document-composition .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }

@@ -39,7 +39,7 @@ function clients() {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
     update: updateDocument,
-    listRevisions: vi.fn().mockResolvedValue({ results: [{ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true }], count: 1 }),
+    listRevisions: vi.fn().mockResolvedValue({ results: [{ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true }], count: 1, page: 1, page_size: 50, has_more: false }),
     getRevision: vi.fn().mockResolvedValue({ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true, markdown: '# Firewall', diff_from_parent: '+# Firewall' }),
     addPlacement,
     updatePlacement,
@@ -89,6 +89,22 @@ it('loads revision history and a selected diff', async () => {
   await user.click(screen.getByRole('button', { name: 'Revision history' }))
   await user.click(await screen.findByRole('button', { name: /Revision 1/ }))
   expect(await screen.findByText('+# Firewall')).toBeInTheDocument()
+})
+
+it('navigates large revision histories without loading every revision', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const listRevisions = vi.fn()
+    .mockResolvedValueOnce({ results: [{ id: 'revision-75', parent_id: 'revision-74', revision_number: 75, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true }], count: 75, page: 1, page_size: 50, has_more: true })
+    .mockResolvedValueOnce({ results: [{ id: 'revision-25', parent_id: 'revision-24', revision_number: 25, checksum: 'def456', created_by: 'Primary Owner', created_at: '2026-08-08T00:00:00Z', is_current: false }], count: 75, page: 2, page_size: 50, has_more: false })
+  documents.listRevisions = listRevisions
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Revision history' }))
+  expect(await screen.findByText('Showing 1–50 of 75')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Older revisions' }))
+  expect(await screen.findByText('Showing 51–75 of 75')).toBeInTheDocument()
+  expect(listRevisions).toHaveBeenLastCalledWith({}, 'doc-1', 2)
 })
 
 it('keeps the draft visible when a stale revision is rejected', async () => {

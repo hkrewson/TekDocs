@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const context = {
@@ -42,7 +42,17 @@ async function mockAuthenticated(page: Page) {
     json: { status: 200, meta: { is_authenticated: true }, data: { user: context.user } },
   }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
-  await page.route('**/api/v1/documents*', (route) => route.fulfill({ json: { results: [document], count: 1 } }))
+  const documentsRoute = (route: Route) => {
+    if (route.request().url().includes('/revisions')) {
+      if (new URL(route.request().url()).pathname.endsWith(documentRevisionId)) {
+        return route.fulfill({ json: { id: documentRevisionId, parent_id: null, revision_number: 1, checksum: document.checksum, created_by: 'Primary Owner', created_at: document.created_at, is_current: true, markdown: document.markdown, diff_from_parent: '+# UniFi Network Setup Guide' } })
+      }
+      return route.fulfill({ json: { results: [{ id: documentRevisionId, parent_id: null, revision_number: 1, checksum: document.checksum, created_by: 'Primary Owner', created_at: document.created_at, is_current: true }], count: 51, page: 1, page_size: 50, has_more: true } })
+    }
+    return route.fulfill({ json: { results: [document], count: 1 } })
+  }
+  await page.route('**/api/v1/documents/**', documentsRoute)
+  await page.route('**/api/v1/documents*', documentsRoute)
 }
 
 test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }) => {
@@ -106,6 +116,20 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await expect(page.getByRole('heading', { name: 'TekDocs Markdown' })).toBeVisible()
   await expect(page.getByText('==verify this==')).toBeVisible()
   await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
+})
+
+test('revision history pagination and diffs remain keyboard-accessible', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/documentation')
+  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
+  await page.getByRole('button', { name: 'Revision history' }).click()
+  await expect(page.getByText('Showing 1–50 of 51')).toBeVisible()
+  await page.getByRole('button', { name: /Revision 1/ }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Revision 1 changes' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Newer revisions' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Older revisions' })).toBeEnabled()
+  expect((await new AxeBuilder({ page }).include('.revision-history').analyze()).violations).toEqual([])
 })
 
 test('mobile authenticated navigation is operable', async ({ page }) => {

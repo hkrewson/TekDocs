@@ -695,6 +695,14 @@ class BlockRevisionDetailSerializer(BlockRevisionSerializer):
 class BlockRevisionResultSerializer(serializers.Serializer):
     results = BlockRevisionSerializer(many=True)
     count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
+class BlockRevisionListQuerySerializer(serializers.Serializer):
+    page = serializers.IntegerField(min_value=1, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, default=50)
 
 
 class RevisionConflictSerializer(serializers.Serializer):

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.2.8
+  version: 0.2.9
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1351,6 +1351,19 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - documents
       security:
@@ -3452,6 +3465,19 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - workspaces
       security:
@@ -4640,8 +4666,17 @@ components:
             $ref: '#/components/schemas/BlockRevision'
         count:
           type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
       required:
       - count
+      - has_more
+      - page
+      - page_size
       - results
     BootstrapOwnerResult:
       type: object

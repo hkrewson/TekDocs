@@ -4,6 +4,12 @@ import { browserDocumentsClient } from './api'
 describe('documentation placement API client', () => {
   afterEach(() => vi.restoreAllMocks())
 
+  it('requests bounded revision-history pages', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 3, page_size: 50, has_more: false }), { status: 200 }))
+    await browserDocumentsClient.listRevisions({ organizationId: 'org' }, 'doc', 3)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/revisions?page=3&page_size=50')
+  })
+
   it('adds a pinned placement inside the selected organization route with CSRF', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     const fetchMock = vi

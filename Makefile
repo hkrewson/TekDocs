@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -104,7 +104,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal
+release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh
@@ -117,6 +117,12 @@ clean-install-rehearsal:
 
 upgrade-rehearsal:
 	./scripts/rehearse-upgrade.sh
+
+documentation-backup-rehearsal:
+	./scripts/rehearse-documentation-backup.sh
+
+documentation-upgrade-rehearsal:
+	./scripts/rehearse-documentation-upgrade.sh
 
 schema:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py spectacular --validate > backend/openapi.yml

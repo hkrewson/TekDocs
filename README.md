@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The project is pre-alpha at version `0.2.8`.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. The documentation alpha is at version `0.2.9`.
 
 ## Start locally
 
@@ -27,7 +27,7 @@ The installation owner can open **Organizations** to create, classify, edit, fil
 
 The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
 
-The **Documentation** area now proves the final safe Markdown dialect before persistence is added. It offers visual block controls, selection formatting, raw Markdown, a server-rendered preview, and page-local formatting help. Semantic highlight uses `==important context==`; NOTE, TIP, IMPORTANT, WARNING, and CAUTION callouts use the portable blockquote form `> [!WARNING]`. Raw HTML, MDX, scripts, inline styles, and document-authored CSS are intentionally unsupported.
+The **Documentation** area persists workspace-owned Markdown in immutable, reusable block revisions. It offers visual block controls, raw Markdown, secure preview, revision history, live/pinned reuse, references, templates, managed attachments, and immutable signed STATIC publications with retained PDFs. Semantic highlight uses `==important context==`; NOTE, TIP, IMPORTANT, WARNING, and CAUTION callouts use the portable blockquote form `> [!WARNING]`. Raw HTML, MDX, scripts, inline styles, and document-authored CSS are intentionally unsupported.
 
 ### First-owner bootstrap
 
@@ -60,6 +60,8 @@ make compose-doctor
 make production-image-rehearsal
 make clean-install-rehearsal
 make upgrade-rehearsal
+make documentation-upgrade-rehearsal
+make documentation-backup-rehearsal
 make security
 ```
 
@@ -68,9 +70,9 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 ## Current boundaries
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
-- The documentation route contains the certified Markdown/editor contract; it does not persist content yet. Public end-user documentation will live in the repository's GitHub Wiki once publication is authorized, while the current page-local formatting reference is available directly in the editor.
+- Documentation is an alpha: persistence, revision/reuse, transfer, and STATIC-publication contracts are implemented, but the broader 1.0 capacity, concurrency, supported encrypted backup tooling, and public GitHub Wiki remain later milestones.
 - Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
-- Secret encryption and PDF rendering are feasibility primitives with tests, not user-facing vault/publication features.
+- TekDocs does not store customer credential values. Provider-neutral external credential references begin in `0.3.1`; deployment-key file injection follows in `0.3.2`.
 
 ## License
 

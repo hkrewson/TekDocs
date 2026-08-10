@@ -38,6 +38,9 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [shareOptions, setShareOptions] = useState<WorkspaceOption[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<BlockRevision[]>([])
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyCount, setHistoryCount] = useState(0)
+  const [historyHasMore, setHistoryHasMore] = useState(false)
   const [historyPhase, setHistoryPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [viewedRevision, setViewedRevision] = useState<BlockRevisionDetail | null>(null)
   const [conflict, setConflict] = useState<RevisionConflictError | null>(null)
@@ -133,10 +136,13 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     try { await client.addReference(selected.id, organization.id); setMessage(`Reference added to ${organization.name}.`); setShareQuery(''); setShareOptions([]) }
     catch (shareError) { setError(errorMessage(shareError)) } finally { setSaving(false) }
   }
-  const loadHistory = async (document = selected) => {
+  const loadHistory = async (document = selected, page = 1) => {
     if (!document || document === 'new') return
     setHistoryOpen(true); setHistoryPhase('loading'); setViewedRevision(null)
-    try { const result = await client.listRevisions(scope, document.id); setHistory(result.results); setHistoryPhase('ready') }
+    try {
+      const result = await client.listRevisions(scope, document.id, page)
+      setHistory(result.results); setHistoryPage(result.page); setHistoryCount(result.count); setHistoryHasMore(result.has_more); setHistoryPhase('ready')
+    }
     catch (historyError) { setHistoryPhase('error'); setError(errorMessage(historyError)) }
   }
   const inspectRevision = async (revisionRecord: BlockRevision) => {
@@ -330,7 +336,16 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         <div className="composition-add"><label>Document block<select value={sourceDocumentId} onChange={(event) => setSourceDocumentId(event.target.value)}><option value="">Choose a visible document</option>{results.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.title}{item.is_reference ? ' — MSP reference' : ''}</option>)}</select></label><label>Resolution<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">Live</option><option value="pinned">Pinned at current revision</option></select></label><button className="secondary-button" type="button" disabled={saving || !sourceDocumentId} onClick={() => { void addPlacement() }}><Plus size={15} />Add block</button></div>
         {selected.placement_count > 1 && <details className="resolved-markdown"><summary>View assembled Markdown</summary><pre>{selected.resolved_markdown}</pre></details>}
       </section>}
-      {historyOpen && selected !== 'new' && <section className="revision-history" aria-labelledby="revision-history-heading"><div className="section-heading"><h2 id="revision-history-heading">Revision history</h2><span>Latest first</span></div>{historyPhase === 'loading' && <p role="status">Loading revision history…</p>}{historyPhase === 'error' && <p>Revision history is unavailable.</p>}{historyPhase === 'ready' && history.length === 0 && <p>No revisions are available.</p>}{historyPhase === 'ready' && history.length > 0 && <div className="revision-history-body"><ol>{history.map((item) => <li key={item.id}><button type="button" onClick={() => { void inspectRevision(item) }} aria-current={viewedRevision?.id === item.id ? 'true' : undefined}><strong>Revision {item.revision_number}</strong>{item.is_current && <span>Current</span>}<small>{item.created_by ?? 'System'} · {new Date(item.created_at).toLocaleString()}</small><code>{item.checksum.slice(0, 12)}</code></button></li>)}</ol><div className="revision-diff">{viewedRevision ? <><h3>Revision {viewedRevision.revision_number} changes</h3><pre>{viewedRevision.diff_from_parent || 'No line changes.'}</pre></> : <p>Select a revision to inspect its diff.</p>}</div></div>}</section>}
+      {historyOpen && selected !== 'new' && <section className="revision-history" aria-labelledby="revision-history-heading">
+        <div className="section-heading"><div><h2 id="revision-history-heading">Revision history</h2><p>{historyCount} retained revision{historyCount === 1 ? '' : 's'} · latest first</p></div><span>Page {historyPage}</span></div>
+        {historyPhase === 'loading' && <p role="status">Loading revision history…</p>}
+        {historyPhase === 'error' && <p role="alert">Revision history is unavailable.</p>}
+        {historyPhase === 'ready' && history.length === 0 && <p>No revisions are available.</p>}
+        {historyPhase === 'ready' && history.length > 0 && <>
+          <div className="revision-history-body"><ol>{history.map((item) => <li key={item.id}><button type="button" onClick={() => { void inspectRevision(item) }} aria-current={viewedRevision?.id === item.id ? 'true' : undefined}><strong>Revision {item.revision_number}</strong>{item.is_current && <span>Current</span>}<small>{item.created_by ?? 'System'} · {new Date(item.created_at).toLocaleString()}</small><code>{item.checksum.slice(0, 12)}</code></button></li>)}</ol><div className="revision-diff" aria-live="polite">{viewedRevision ? <><h3>Revision {viewedRevision.revision_number} changes</h3><pre tabIndex={0}>{viewedRevision.diff_from_parent || 'No line changes.'}</pre></> : <p>Select a revision to inspect its diff.</p>}</div></div>
+          <nav className="history-pagination" aria-label="Revision history pages"><button className="secondary-button" type="button" disabled={historyPage === 1} onClick={() => { void loadHistory(selected, historyPage - 1) }}>Newer revisions</button><span>Showing {((historyPage - 1) * 50) + 1}–{Math.min(historyPage * 50, historyCount)} of {historyCount}</span><button className="secondary-button" type="button" disabled={!historyHasMore} onClick={() => { void loadHistory(selected, historyPage + 1) }}>Older revisions</button></nav>
+        </>}
+      </section>}
       {!workspace && selected !== 'new' && <div className="document-share"><div><Share2 size={16} /><span><strong>List in a client workspace</strong><small>The MSP remains the owner; no document is copied.</small></span></div><label><span className="sr-only">Find client organization</span><input type="search" placeholder="Find a client" value={shareQuery} onChange={(event) => setShareQuery(event.target.value)} /></label>{shareOptions.length > 0 && <ul>{shareOptions.map((organization) => <li key={organization.id}><button type="button" disabled={saving} onClick={() => { void share(organization) }}>{organization.name}<ExternalLink size={14} /></button></li>)}</ul>}</div>}
     </section>}
   </>

@@ -89,7 +89,7 @@ export type BlockRevision = {
   is_current: boolean
 }
 export type BlockRevisionDetail = BlockRevision & { markdown: string; diff_from_parent: string }
-export type RevisionResult = { results: BlockRevision[]; count: number }
+export type RevisionResult = { results: BlockRevision[]; count: number; page: number; page_size: number; has_more: boolean }
 export type RevisionConflictPayload = {
   code: 'revision_conflict'
   detail: string
@@ -153,7 +153,7 @@ export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
-  listRevisions(scope: DocumentScope, id: string): Promise<RevisionResult>
+  listRevisions(scope: DocumentScope, id: string, page?: number): Promise<RevisionResult>
   getRevision(scope: DocumentScope, id: string, revisionId: string): Promise<BlockRevisionDetail>
   addPlacement(scope: DocumentScope, id: string, input: PlacementInput): Promise<DocumentRecord>
   updatePlacement(scope: DocumentScope, id: string, placementId: string, input: PlacementUpdateInput): Promise<DocumentRecord>
@@ -241,8 +241,8 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
   update: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'PUT', input),
-  async listRevisions(scope, id) {
-    return parse<RevisionResult>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/revisions`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  async listRevisions(scope, id, page = 1) {
+    return parse<RevisionResult>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/revisions?page=${page}&page_size=50`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   async getRevision(scope, id, revisionId) {
     return parse<BlockRevisionDetail>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/revisions/${encodeURIComponent(revisionId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))

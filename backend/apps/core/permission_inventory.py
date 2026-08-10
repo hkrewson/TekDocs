@@ -299,6 +299,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route("msp-asset-list-create", ("GET", "POST"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
+    route("msp-asset-bulk", ("POST",), mutations=(PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-model-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-detail", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
@@ -344,6 +345,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "POST"),
         PermissionKey.ASSETS_VIEW,
         (PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-asset-bulk",
+        ("POST",),
+        mutations=(PermissionKey.ASSETS_EDIT,),
         organization_scoped=True,
     ),
     route(

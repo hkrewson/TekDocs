@@ -21,6 +21,10 @@ from apps.core.models import (
     Person,
     PersonAssociation,
     Site,
+    Workspace,
+    WorkspaceKind,
+    workspace_for_owner,
+    workspace_identity_uuid,
 )
 from apps.core.organization_views import _organizations_for_context
 from apps.core.people import query_people
@@ -68,9 +72,11 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
         owner_display_name="Stabilization Owner",
         password=f"{secrets.token_urlsafe(24)}Aa7!",
     )
+    msp_workspace = workspace_for_owner(tenant=result.tenant, organization=None)
     anchors = [
         Entity(
             tenant=result.tenant,
+            workspace=msp_workspace,
             entity_type="organization",
             display_name=f"Reference Client {index:03d}",
         )
@@ -86,6 +92,21 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
         for anchor in anchors
     ]
     Organization.objects.bulk_create(organizations)
+    Workspace.objects.bulk_create(
+        [
+            Workspace(
+                id=workspace_identity_uuid(tenant_id=result.tenant.id, organization_id=organization.id),
+                tenant=result.tenant,
+                kind=WorkspaceKind.ORGANIZATION,
+                organization=organization,
+            )
+            for organization in organizations
+        ]
+    )
+    organization_workspaces = {
+        workspace.organization_id: workspace
+        for workspace in Workspace.objects.filter(tenant=result.tenant, kind=WorkspaceKind.ORGANIZATION)
+    }
     OrganizationClassification.objects.bulk_create(
         [
             OrganizationClassification(tenant=result.tenant, organization=organization, kind="client")
@@ -97,6 +118,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
         Entity(
             tenant=result.tenant,
             organization=organizations[index % REFERENCE_ORGANIZATIONS],
+            workspace=organization_workspaces[organizations[index % REFERENCE_ORGANIZATIONS].id],
             entity_type="reference_record",
             display_name=f"Reference Record {index:05d}",
         )
@@ -108,6 +130,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
     person_entities = [
         Entity(
             tenant=result.tenant,
+            workspace=msp_workspace,
             entity_type="person",
             display_name=f"Reference Person {index:03d}",
         )
@@ -141,6 +164,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
         Entity(
             tenant=result.tenant,
             organization=selected,
+            workspace=organization_workspaces[selected.id],
             entity_type="site",
             display_name=f"Reference Site {index:03d}",
         )
@@ -162,6 +186,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
         Entity(
             tenant=result.tenant,
             organization=selected,
+            workspace=organization_workspaces[selected.id],
             entity_type="location",
             display_name=f"Site {site_index:03d} Room {location_index:02d}",
         )

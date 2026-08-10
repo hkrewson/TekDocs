@@ -154,6 +154,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "definition_id",
         ),
         "organization-client-asset-list-create": ("organization_entity_id",),
+        "organization-client-asset-bulk": ("organization_entity_id",),
         "organization-client-asset-model-choices": ("organization_entity_id",),
         "organization-client-asset-detail": ("organization_entity_id", "asset_entity_id"),
         "organization-client-hardware-detail": ("organization_entity_id", "asset_entity_id"),

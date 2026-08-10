@@ -17,6 +17,7 @@ from .document_attachments import (
     MAX_MARKDOWN_IMPORT_BYTES,
     archive_document_attachment,
     create_document_attachment,
+    open_document_attachment,
 )
 from .document_reuse import reuse_impact_for_placement
 from .documents import (
@@ -221,6 +222,7 @@ def _attachment(
             tenant=workspace.member.tenant,
             document=document,
             archived_at__isnull=True,
+            scan_status="clean",
         ),
         entity_id=attachment_entity_id,
     )
@@ -245,7 +247,7 @@ def _download_attachment(
 ) -> FileResponse:
     _document_record, attachment = _attachment(workspace, document_entity_id, attachment_entity_id)
     response = FileResponse(
-        attachment.file.storage.open(attachment.file.name, "rb"),
+        open_document_attachment(attachment),
         as_attachment=True,
         filename=attachment.original_filename,
         content_type="application/octet-stream",

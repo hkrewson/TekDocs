@@ -14,7 +14,7 @@ export type EntityLinkType =
 export type EntityReference = {
   id: string
   display_name: string
-  entity_type: 'organization' | 'person' | 'site' | 'location'
+  entity_type: 'organization' | 'person' | 'site' | 'location' | 'client_asset'
   visibility: 'msp_private' | 'client_visible'
   workspace_label: string
   eligible_link_types: EntityLinkType[]

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.9
+  version: 0.3.10
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1786,6 +1786,7 @@ paths:
           - person
           - site
           - location
+          - client_asset
           - ''
           type: string
           default: ''
@@ -1794,6 +1795,7 @@ paths:
           * `person` - person
           * `site` - site
           * `location` - location
+          * `client_asset` - client_asset
       - in: query
         name: page
         schema:
@@ -2365,6 +2367,7 @@ paths:
           - location
           - custom_field_definition
           - commercial_contract
+          - client_asset
           type: string
           default: ''
         description: |-
@@ -2375,6 +2378,7 @@ paths:
           * `location` - location
           * `custom_field_definition` - custom_field_definition
           * `commercial_contract` - commercial_contract
+          * `client_asset` - client_asset
       tags:
       - recycle-bin
       security:
@@ -2971,6 +2975,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SoftwareInstallation'
+          description: ''
+  /api/v1/workspaces/msp/assets/bulk:
+    post:
+      operationId: workspaces_msp_assets_bulk_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAssetBulkResult'
           description: ''
   /api/v1/workspaces/msp/assets/model-choices:
     get:
@@ -3907,6 +3937,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SoftwareInstallation'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/bulk:
+    post:
+      operationId: workspaces_organizations_assets_bulk_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientAssetBulkWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAssetBulkResult'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
     get:
@@ -6054,6 +6117,7 @@ paths:
           - person
           - site
           - location
+          - client_asset
           - ''
           type: string
           default: ''
@@ -6062,6 +6126,7 @@ paths:
           * `person` - person
           * `site` - site
           * `location` - location
+          * `client_asset` - client_asset
       - in: path
         name: organization_entity_id
         schema:
@@ -6567,6 +6632,7 @@ paths:
           - location
           - custom_field_definition
           - commercial_contract
+          - client_asset
           type: string
           default: ''
         description: |-
@@ -6577,6 +6643,7 @@ paths:
           * `location` - location
           * `custom_field_definition` - custom_field_definition
           * `commercial_contract` - commercial_contract
+          * `client_asset` - client_asset
       tags:
       - workspaces
       security:
@@ -7000,6 +7067,14 @@ components:
       description: "* `` - \n* `purchase` - purchase\n* `lease` - lease\n* `rental`\
         \ - rental\n* `transfer` - transfer\n* `donation` - donation\n* `other` -\
         \ other"
+    ActionEnum:
+      enum:
+      - set_hardware_state
+      - archive
+      type: string
+      description: |-
+        * `set_hardware_state` - set_hardware_state
+        * `archive` - archive
     AssetDocumentDetail:
       type: object
       properties:
@@ -7678,6 +7753,35 @@ components:
       - specifications
       - supplier_id
       - supplier_name
+    ClientAssetBulkResult:
+      type: object
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+        processed:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - action
+      - processed
+    ClientAssetBulkWrite:
+      type: object
+      properties:
+        asset_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 1
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+        lifecycle_state:
+          $ref: '#/components/schemas/LifecycleStateEnum'
+      required:
+      - action
+      - asset_ids
     ClientAssetResult:
       type: object
       properties:
@@ -7689,8 +7793,17 @@ components:
           type: integer
         can_manage:
           type: boolean
+        can_view_relationships:
+          type: boolean
+        can_create_relationships:
+          type: boolean
+        can_archive_relationships:
+          type: boolean
       required:
+      - can_archive_relationships
+      - can_create_relationships
       - can_manage
+      - can_view_relationships
       - count
       - results
     ClientAssetWrite:
@@ -8063,12 +8176,24 @@ components:
           minLength: 1
           pattern: ^[a-z][a-z0-9_-]*$
         entity_type:
-          $ref: '#/components/schemas/EntityTypeEnum'
+          $ref: '#/components/schemas/CustomFieldDefinitionWriteEntityTypeEnum'
       required:
       - entity_type
       - field_type
       - key
       - label
+    CustomFieldDefinitionWriteEntityTypeEnum:
+      enum:
+      - organization
+      - person
+      - site
+      - location
+      type: string
+      description: |-
+        * `organization` - organization
+        * `person` - person
+        * `site` - site
+        * `location` - location
     CustomFieldVersion:
       type: object
       properties:
@@ -8351,6 +8476,13 @@ components:
           type: integer
         checksum:
           type: string
+        scan_status:
+          type: string
+        scan_engine:
+          type: string
+        scanned_at:
+          type: string
+          format: date-time
         created_at:
           type: string
           format: date-time
@@ -8360,6 +8492,9 @@ components:
       - filename
       - id
       - media_type
+      - scan_engine
+      - scan_status
+      - scanned_at
       - size
     DocumentAttachmentWrite:
       type: object
@@ -8952,7 +9087,7 @@ components:
         display_name:
           type: string
         entity_type:
-          $ref: '#/components/schemas/EntityTypeEnum'
+          $ref: '#/components/schemas/EntityReferenceEntityTypeEnum'
         visibility:
           $ref: '#/components/schemas/VisibilityEnum'
         workspace_label:
@@ -8968,6 +9103,20 @@ components:
       - id
       - visibility
       - workspace_label
+    EntityReferenceEntityTypeEnum:
+      enum:
+      - organization
+      - person
+      - site
+      - location
+      - client_asset
+      type: string
+      description: |-
+        * `organization` - organization
+        * `person` - person
+        * `site` - site
+        * `location` - location
+        * `client_asset` - client_asset
     EntityRelationship:
       type: object
       properties:
@@ -9030,18 +9179,6 @@ components:
       - page
       - page_size
       - results
-    EntityTypeEnum:
-      enum:
-      - organization
-      - person
-      - site
-      - location
-      type: string
-      description: |-
-        * `organization` - organization
-        * `person` - person
-        * `site` - site
-        * `location` - location
     FieldTypeEnum:
       enum:
       - text
@@ -10379,6 +10516,7 @@ components:
       - location
       - custom_field_definition
       - commercial_contract
+      - client_asset
       type: string
       description: |-
         * `organization` - organization
@@ -10387,6 +10525,7 @@ components:
         * `location` - location
         * `custom_field_definition` - custom_field_definition
         * `commercial_contract` - commercial_contract
+        * `client_asset` - client_asset
     RecycleBinItem:
       type: object
       properties:

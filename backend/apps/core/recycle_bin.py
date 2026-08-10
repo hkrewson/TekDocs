@@ -23,6 +23,7 @@ from apps.accounts.policy import (
 from .custom_fields import latest_version
 from .models import (
     AuditEvent,
+    ClientAsset,
     CommercialContract,
     ContractCost,
     CustomFieldDefinition,
@@ -42,6 +43,7 @@ class RecoverableRecordType(StrEnum):
     LOCATION = "location"
     CUSTOM_FIELD_DEFINITION = "custom_field_definition"
     COMMERCIAL_CONTRACT = "commercial_contract"
+    CLIENT_ASSET = "client_asset"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +68,10 @@ RECOVERY_POLICIES = {
         PermissionKey.CUSTOM_FIELDS_MANAGE,
     ),
     RecoverableRecordType.COMMERCIAL_CONTRACT: RecoveryPolicy(
+        PermissionKey.ASSETS_VIEW,
+        PermissionKey.ASSETS_EDIT,
+    ),
+    RecoverableRecordType.CLIENT_ASSET: RecoveryPolicy(
         PermissionKey.ASSETS_VIEW,
         PermissionKey.ASSETS_EDIT,
     ),
@@ -324,6 +330,31 @@ def recycle_bin_items(workspace: ResolvedWorkspace) -> list[RecycleBinItem]:
                     )
                 )
 
+    can_view_assets, can_restore_assets = _has_permissions(
+        context,
+        RecoverableRecordType.CLIENT_ASSET,
+        organization=workspace.organization,
+    )
+    if can_view_assets:
+        assets = (
+            _scope_records(ClientAsset.scoped.for_tenant(context.tenant), workspace)
+            .filter(archived_at__isnull=False)
+            .select_related("entity")
+        )
+        for asset in assets:
+            if asset.archived_at is not None:
+                items.append(
+                    _item(
+                        workspace=workspace,
+                        record_id=asset.entity_id,
+                        record_type=RecoverableRecordType.CLIENT_ASSET,
+                        label=asset.entity.display_name,
+                        archived_at=asset.archived_at,
+                        cascade_count=1,
+                        can_restore=can_restore_assets,
+                    )
+                )
+
     return sorted(items, key=lambda item: (item.archived_at, str(item.id)), reverse=True)
 
 
@@ -492,6 +523,33 @@ def _restore_commercial_contract(*, workspace: ResolvedWorkspace, record_id: UUI
     return cast(UUID, contract.entity_id)
 
 
+def _restore_client_asset(*, workspace: ResolvedWorkspace, record_id: UUID) -> UUID:
+    asset = (
+        _scope_records(ClientAsset.scoped.for_tenant(workspace.member.tenant), workspace)
+        .select_related("entity", "supplier__entity", "product__entity", "model__entity")
+        .select_for_update()
+        .get(entity_id=record_id, archived_at__isnull=False)
+    )
+    if (
+        asset.supplier.entity.archived_at is not None
+        or asset.product.archived_at is not None
+        or asset.product.entity.archived_at is not None
+        or asset.model.archived_at is not None
+        or asset.model.entity.archived_at is not None
+    ):
+        raise RecoveryConflict("Restore the retained supplier product and model before restoring this asset.")
+    restored_at = timezone.now()
+    ClientAsset.scoped.for_tenant(workspace.member.tenant).filter(pk=asset.pk).update(
+        archived_at=None,
+        updated_at=restored_at,
+    )
+    Entity.scoped.for_tenant(workspace.member.tenant).filter(pk=asset.entity_id).update(
+        archived_at=None,
+        updated_at=restored_at,
+    )
+    return cast(UUID, asset.entity_id)
+
+
 @transaction.atomic
 def restore_recycle_bin_item(
     *,
@@ -510,6 +568,7 @@ def restore_recycle_bin_item(
             RecoverableRecordType.LOCATION: _restore_location,
             RecoverableRecordType.CUSTOM_FIELD_DEFINITION: _restore_custom_field,
             RecoverableRecordType.COMMERCIAL_CONTRACT: _restore_commercial_contract,
+            RecoverableRecordType.CLIENT_ASSET: _restore_client_asset,
         }
         entity_id = restorers[record_type](workspace=workspace, record_id=record_id)
     AuditEvent.objects.create(

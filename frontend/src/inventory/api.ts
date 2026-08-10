@@ -80,9 +80,10 @@ export type DerivedVendor = {
 }
 
 export interface InventoryClient {
-  listAssets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: ClientAsset[]; count: number; can_manage: boolean }>
+  listAssets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: ClientAsset[]; count: number; can_manage: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }>
   listModelChoices(workspace: WorkspaceContext, query: string, signal?: AbortSignal): Promise<{ results: ModelChoice[] }>
   createAsset(workspace: WorkspaceContext, modelId: string, name: string): Promise<ClientAsset>
+  bulkAssets(workspace: WorkspaceContext, assetIds: string[], action: 'set_hardware_state' | 'archive', lifecycleState?: HardwareProfile['lifecycle_state']): Promise<{ action: string; processed: number }>
   updateHardware(workspace: WorkspaceContext, assetId: string, values: Partial<HardwareProfile>): Promise<HardwareProfile>
   listHardwareLifecycle(workspace: WorkspaceContext, assetId: string): Promise<HardwareLifecycleEvent[]>
   assignmentChoices(workspace: WorkspaceContext, assetId: string): Promise<HardwareAssignmentChoices>
@@ -145,6 +146,11 @@ export const browserInventoryClient: InventoryClient = {
   async createAsset(workspace, modelId, name) {
     return mutate(`${basePath(workspace)}/assets`, 'POST', { model_id: modelId, name })
   },
+  bulkAssets: (workspace, assetIds, action, lifecycleState) => mutate(
+    `${basePath(workspace)}/assets/bulk`,
+    'POST',
+    { asset_ids: assetIds, action, ...(lifecycleState ? { lifecycle_state: lifecycleState } : {}) },
+  ),
   updateHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware`, 'PATCH', values),
   listHardwareLifecycle: (workspace, assetId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/lifecycle`),
   assignmentChoices: (workspace, assetId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment-choices`),

@@ -200,6 +200,109 @@ def test_msp_assets_are_owned_not_aggregated_and_cannot_cross_workspace(owner_cl
 
 
 @pytest.mark.django_db
+def test_asset_relationships_and_atomic_bulk_actions_remain_exact_workspace(owner_client, installation):
+    supplier = _organization(installation, "Bulk Supplier", "manufacturer")
+    client = _organization(installation, "Bulk Client", "client")
+    sibling = _organization(installation, "Bulk Sibling", "client")
+    _definition, _product, model, _document, _publication = _catalog(owner_client, supplier)
+    collection = reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id})
+    first = owner_client.post(
+        collection,
+        {"model_id": model["id"], "name": "Core switch"},
+        content_type="application/json",
+    ).json()
+    second = owner_client.post(
+        collection,
+        {"model_id": model["id"], "name": "Access switch"},
+        content_type="application/json",
+    ).json()
+    sibling_asset = owner_client.post(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": sibling.entity_id}),
+        {"model_id": model["id"], "name": "Sibling switch"},
+        content_type="application/json",
+    ).json()
+
+    listed = owner_client.get(collection).json()
+    assert listed["can_view_relationships"] is True
+    search = owner_client.get(
+        reverse("organization-entity-search", kwargs={"organization_entity_id": client.entity_id}),
+        {"entity_type": "client_asset", "q": "switch"},
+    ).json()
+    assert {item["display_name"] for item in search["results"]} == {"Core switch", "Access switch"}
+    relationship_url = reverse(
+        "organization-entity-relationship-list-create",
+        kwargs={"organization_entity_id": client.entity_id, "entity_id": first["id"]},
+    )
+    linked = owner_client.post(
+        relationship_url,
+        {"target_id": second["id"], "link_type": "depends_on"},
+        content_type="application/json",
+    )
+    assert linked.status_code == 201
+    assert linked.json()["related_entity"]["id"] == second["id"]
+
+    bulk_url = reverse("organization-client-asset-bulk", kwargs={"organization_entity_id": client.entity_id})
+    changed = owner_client.post(
+        bulk_url,
+        {"asset_ids": [first["id"], second["id"]], "action": "set_hardware_state", "lifecycle_state": "repair"},
+        content_type="application/json",
+    )
+    assert changed.status_code == 200
+    assert changed.json() == {"action": "set_hardware_state", "processed": 2}
+    assert set(
+        ClientHardwareAsset.objects.filter(asset__entity_id__in=(first["id"], second["id"])).values_list(
+            "lifecycle_state", flat=True
+        )
+    ) == {"repair"}
+
+    software = _software_asset(owner_client, installation, supplier, client, name="Managed agent")
+    mixed = owner_client.post(
+        bulk_url,
+        {
+            "asset_ids": [first["id"], software["id"]],
+            "action": "set_hardware_state",
+            "lifecycle_state": "in_service",
+        },
+        content_type="application/json",
+    )
+    assert mixed.status_code == 400
+    assert ClientHardwareAsset.objects.get(asset__entity_id=first["id"]).lifecycle_state == "repair"
+
+    cross_scope = owner_client.post(
+        bulk_url,
+        {"asset_ids": [first["id"], sibling_asset["id"]], "action": "archive"},
+        content_type="application/json",
+    )
+    assert cross_scope.status_code == 400
+    assert ClientAsset.objects.get(entity_id=first["id"]).archived_at is None
+
+    archived = owner_client.post(
+        bulk_url,
+        {"asset_ids": [first["id"], second["id"]], "action": "archive"},
+        content_type="application/json",
+    )
+    assert archived.status_code == 200
+    assert [item["name"] for item in owner_client.get(collection).json()["results"]] == ["Managed agent"]
+    recycle = owner_client.get(
+        reverse("organization-recycle-bin", kwargs={"organization_entity_id": client.entity_id})
+    ).json()
+    assert {item["record_type"] for item in recycle["results"]} == {"client_asset"}
+    restored = owner_client.post(
+        reverse(
+            "organization-recycle-bin-restore",
+            kwargs={
+                "organization_entity_id": client.entity_id,
+                "record_type": "client_asset",
+                "record_id": first["id"],
+            },
+        ),
+        content_type="application/json",
+    )
+    assert restored.status_code == 204
+    assert owner_client.get(collection).json()["count"] == 2
+
+
+@pytest.mark.django_db
 def test_msp_software_license_retains_exact_null_owner_scope(owner_client, installation):
     supplier = _organization(installation, "Parity Software", "vendor")
     base = {"organization_entity_id": supplier.entity_id}

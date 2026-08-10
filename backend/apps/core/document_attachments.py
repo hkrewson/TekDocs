@@ -5,7 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import PurePath
-from typing import BinaryIO
 from uuid import UUID, uuid4
 
 from django.core.files.base import ContentFile
@@ -15,6 +14,11 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from .attachment_security import (
+    AttachmentSecurityError,
+    attachment_scanner,
+    attachment_storage_provider,
+)
 from .models import AuditEvent, Document, DocumentAttachment, Entity
 from .rendering import RenderedAttachment, attachment_ids_in_markdown
 from .workspaces import ResolvedWorkspace
@@ -90,12 +94,41 @@ def create_document_attachment(
     *, document: Document, actor_id: UUID, upload: UploadedFile, entity_id: UUID | None = None
 ) -> DocumentAttachment:
     validated = validate_attachment_upload(upload)
-    attachment: DocumentAttachment | None = None
+    attachment_id = uuid4()
+    attachment_entity_id = entity_id or uuid4()
+    provider = attachment_storage_provider()
+    quarantine_key = provider.quarantine(intake_id=str(uuid4()), content=validated.content)
     stored_name = ""
+    clean_key = ""
+    try:
+        scan = attachment_scanner().scan(
+            filename=validated.filename,
+            media_type=validated.media_type,
+            content=validated.content,
+        )
+        clean_key = "/".join(
+            ("document-attachments", str(document.tenant_id), str(document.id), str(attachment_id))
+        )
+        stored_name = provider.promote(
+            quarantine_key=quarantine_key,
+            clean_key=clean_key,
+            expected_checksum=validated.checksum,
+        )
+        quarantine_key = ""
+    except AttachmentSecurityError as exc:
+        provider.delete(key=quarantine_key)
+        provider.delete(key=stored_name or clean_key)
+        raise ValidationError({"file": "The attachment was rejected by the security policy."}) from exc
+    except Exception as exc:
+        provider.delete(key=quarantine_key)
+        provider.delete(key=stored_name or clean_key)
+        raise ValidationError({"file": "Attachment scanning did not complete; the upload was discarded."}) from exc
+
+    attachment: DocumentAttachment | None = None
     try:
         with transaction.atomic():
             entity = Entity.objects.create(
-                id=entity_id or uuid4(),
+                id=attachment_entity_id,
                 tenant=document.tenant,
                 workspace=document.entity.workspace,
                 organization=document.organization,
@@ -103,6 +136,7 @@ def create_document_attachment(
                 display_name=validated.filename,
             )
             attachment = DocumentAttachment(
+                id=attachment_id,
                 tenant=document.tenant,
                 organization=document.organization,
                 document=document,
@@ -111,10 +145,13 @@ def create_document_attachment(
                 media_type=validated.media_type,
                 size=len(validated.content),
                 checksum=validated.checksum,
+                storage_provider=provider.provider_id,
+                scan_status="clean",
+                scan_engine=scan.engine,
+                scanned_at=timezone.now(),
                 created_by_id=actor_id,
             )
-            attachment.file.save("managed", ContentFile(validated.content), save=False)
-            stored_name = attachment.file.name
+            attachment.file.name = stored_name
             attachment.full_clean()
             attachment.save()
             AuditEvent.objects.create(
@@ -125,8 +162,7 @@ def create_document_attachment(
                 metadata={"document_id": str(document.entity_id)},
             )
     except Exception:
-        if attachment is not None and stored_name:
-            attachment.file.storage.delete(stored_name)
+        provider.delete(key=stored_name)
         raise
     if attachment is None:  # pragma: no cover - defensive invariant
         raise RuntimeError("Attachment creation completed without a record.")
@@ -151,12 +187,27 @@ def archive_document_attachment(*, attachment: DocumentAttachment, actor_id: UUI
 
 
 def copy_attachment_content(attachment: DocumentAttachment) -> bytes:
-    file_handle: BinaryIO
-    with attachment.file.storage.open(attachment.file.name, "rb") as file_handle:
-        content = file_handle.read(MAX_ATTACHMENT_BYTES + 1)
+    if attachment.scan_status != "clean":
+        raise ValidationError("Only clean attachments can be copied.")
+    provider = attachment_storage_provider()
+    if provider.provider_id != attachment.storage_provider:
+        raise ValidationError("The attachment storage provider is unavailable.")
+    content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
     if len(content) != attachment.size or sha256(content).hexdigest() != attachment.checksum:
         raise ValidationError("A template attachment failed its integrity check.")
     return content
+
+
+def open_document_attachment(attachment: DocumentAttachment) -> ContentFile[bytes]:
+    if attachment.scan_status != "clean":
+        raise ValidationError("The attachment is not available for download.")
+    provider = attachment_storage_provider()
+    if provider.provider_id != attachment.storage_provider:
+        raise ValidationError("The attachment storage provider is unavailable.")
+    content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
+    if len(content) != attachment.size or sha256(content).hexdigest() != attachment.checksum:
+        raise ValidationError("The stored attachment failed its integrity check.")
+    return ContentFile(content)
 
 
 def copy_document_attachment(
@@ -190,6 +241,7 @@ def resolve_rendered_attachments(
         document=document,
         entity_id__in=requested,
         archived_at__isnull=True,
+        scan_status="clean",
     )
     result: dict[str, RenderedAttachment] = {}
     for attachment in records:

@@ -42,7 +42,7 @@ export type DocumentRecord = {
   created_at: string
   updated_at: string
 }
-export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; created_at: string }
+export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; scan_status: 'clean'; scan_engine: string; scanned_at: string; created_at: string }
 export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
 export type PublicationAudience = 'msp_internal' | 'client_visible'
 export type PublicationRetention = 'permanent' | 'review_on'

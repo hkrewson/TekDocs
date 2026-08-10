@@ -11,7 +11,7 @@ from django.utils import timezone
 from .models import AuditEvent, Entity, EntityLink, EntityLinkType, Organization
 from .workspaces import ResolvedWorkspace
 
-SEARCHABLE_ENTITY_TYPES = ("organization", "person", "site", "location")
+SEARCHABLE_ENTITY_TYPES = ("organization", "person", "site", "location", "client_asset")
 
 
 class EntityRelationshipError(ValueError):

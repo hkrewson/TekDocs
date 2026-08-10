@@ -341,6 +341,9 @@ class DocumentAttachmentSerializer(serializers.Serializer):
     media_type = serializers.CharField()
     size = serializers.IntegerField()
     checksum = serializers.CharField()
+    scan_status = serializers.CharField()
+    scan_engine = serializers.CharField()
+    scanned_at = serializers.DateTimeField()
     created_at = serializers.DateTimeField()
 
 

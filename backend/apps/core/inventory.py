@@ -41,6 +41,9 @@ class InventoryError(Exception):
     pass
 
 
+MAX_BULK_ASSETS = 100
+
+
 def require_operational_owner(organization: Organization | None) -> None:
     if organization is None:
         return
@@ -110,6 +113,88 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
             "lifecycle_events__location__entity",
         )
     )
+
+
+@transaction.atomic
+def bulk_update_assets(
+    *,
+    scope: DataScope,
+    actor_id: UUID,
+    asset_entity_ids: list[UUID],
+    action: str,
+    lifecycle_state: str | None = None,
+) -> int:
+    requested = set(asset_entity_ids)
+    if not requested or len(requested) != len(asset_entity_ids) or len(requested) > MAX_BULK_ASSETS:
+        raise InventoryError("Choose between 1 and 100 unique assets.")
+    assets = list(
+        assets_for_scope(scope)
+        .select_for_update(of=("self",))
+        .filter(entity_id__in=requested)
+        .order_by("entity_id")
+    )
+    if len(assets) != len(requested):
+        raise InventoryError("One or more selected assets are unavailable in this workspace.")
+
+    if action == "set_hardware_state":
+        if lifecycle_state not in {
+            HardwareLifecycleState.IN_STOCK,
+            HardwareLifecycleState.IN_SERVICE,
+            HardwareLifecycleState.REPAIR,
+            HardwareLifecycleState.RETIRED,
+        }:
+            raise InventoryError("Choose a supported non-disposal hardware state.")
+        profiles: list[ClientHardwareAsset] = []
+        for asset in assets:
+            profile = _hardware(asset, lock=True)
+            if profile.lifecycle_state == HardwareLifecycleState.DISPOSED:
+                raise InventoryError("Disposed hardware cannot be changed by a bulk action.")
+            profiles.append(profile)
+        for asset, profile in zip(assets, profiles, strict=True):
+            previous = profile.lifecycle_state
+            if previous == lifecycle_state:
+                continue
+            profile.lifecycle_state = lifecycle_state
+            _validate_profile(profile)
+            profile.save(update_fields=("lifecycle_state", "updated_at"))
+            _append_event(profile, HardwareLifecycleEventType.STATE_CHANGED, actor_id, from_state=previous)
+            AuditEvent.objects.create(
+                tenant=asset.tenant,
+                actor_id=actor_id,
+                action="asset.hardware.state_changed",
+                entity_id=asset.entity_id,
+                metadata={},
+            )
+        return len(assets)
+
+    if action == "archive":
+        for asset in assets:
+            installation = getattr(asset, "software_installation", None)
+            if installation is not None and (
+                installation.license_links.filter(archived_at__isnull=True).exists()
+                or installation.license_seats.filter(revoked_at__isnull=True).exists()
+            ):
+                raise InventoryError("Unlink active license coverage and seats before archiving software assets.")
+        archived_at = timezone.now()
+        for asset in assets:
+            ClientAsset.objects.filter(pk=asset.pk, archived_at__isnull=True).update(
+                archived_at=archived_at,
+                updated_at=archived_at,
+            )
+            Entity.objects.filter(pk=asset.entity_id, archived_at__isnull=True).update(
+                archived_at=archived_at,
+                updated_at=archived_at,
+            )
+            AuditEvent.objects.create(
+                tenant=asset.tenant,
+                actor_id=actor_id,
+                action="asset.archived",
+                entity_id=asset.entity_id,
+                metadata={},
+            )
+        return len(assets)
+
+    raise InventoryError("Unsupported bulk asset action.")
 
 
 def model_choices_for_client(scope: DataScope, *, query: str = "") -> QuerySet[CatalogModel]:

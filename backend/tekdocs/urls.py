@@ -109,6 +109,7 @@ from apps.core.document_views import (
     OrganizationMarkdownImportView,
 )
 from apps.core.inventory_views import (
+    ClientAssetBulkView,
     ClientAssetDetailView,
     ClientAssetDocumentArtifactDownloadView,
     ClientAssetDocumentDetailView,
@@ -497,6 +498,12 @@ urlpatterns = [
         name="msp-asset-list-create",
     ),
     path(
+        "api/v1/workspaces/msp/assets/bulk",
+        ClientAssetBulkView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-bulk",
+    ),
+    path(
         "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>",
         ClientAssetDetailView.as_view(),
         {"organization_entity_id": None},
@@ -631,6 +638,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets",
         ClientAssetListCreateView.as_view(),
         name="organization-client-asset-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/bulk",
+        ClientAssetBulkView.as_view(),
+        name="organization-client-asset-bulk",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>",

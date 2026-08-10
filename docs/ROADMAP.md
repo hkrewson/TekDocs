@@ -578,7 +578,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.7` | **Complete:** client commercial contracts, provider and renewal lifecycle, fixed-precision cost lines, exact-scope field projection, and non-disclosing list/search behavior. |
 | `0.3.8` | **Complete:** MSP-owned operational parity for assets, hardware lifecycle, software installations/licenses, contracts/costs, and derived vendors without aggregating client records. |
 | `0.3.9` | **Complete:** explicit immutable MSP/organization Workspace identities, non-null Entity ownership, data backfill, workspace-bound RLS input, and non-orphaning organization retention. |
-| `0.3.10` | Attachment-provider hardening, malware-scanning/quarantine boundary, asset relationships, bulk operations, and safe file-processing corpus. |
+| `0.3.10` | **Complete:** attachment-provider/scanner quarantine boundary, hostile-file corpus, exact-workspace asset relationships, and atomic bounded bulk operations. |
 | `0.3.11` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
 | `0.3.12` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
@@ -698,6 +698,20 @@ Evidence: `docs/releases/0.3.8.md`.
 - [x] The ownership control-plane classification, runtime startup guard inventory, negative isolation tests, migration drift, architecture, threat model, security baseline, risk register, release notes, and version metadata agree at `0.3.9`.
 
 Evidence: `docs/releases/0.3.9.md`.
+
+### `0.3.10` acceptance criteria
+
+- [x] Attachment storage and scanning use replaceable interfaces; opaque quarantine precedes checksum-verified promotion, and failed intake leaves no managed record or downloadable bytes.
+- [x] Only clean attachments are addressable. Records retain provider/scanner identity and scan time; download, template copy, and STATIC reads recheck stored size and SHA-256.
+- [x] The built-in scanner rejects executable/polyglot signatures, the standard AV test marker, active PDFs, malformed image containers, unsafe text controls, and ZIP traversal, encryption, symlinks, nested archives, excessive entries, expansion, or compression ratio without extracting content.
+- [x] Scanner/provider failure is non-disclosing and fail-closed. The built-in scanner is documented as defense in depth rather than a maintained external malware-signature engine.
+- [x] Asset relationship search, links, and backlinks reuse `EntityLink`, relationship permissions/MFA, and exact MSP/client workspace visibility; sibling-client targets remain unavailable.
+- [x] Bulk asset requests accept 1–100 unique IDs and lock the complete exact-workspace set before an atomic hardware-state or recoverable archive action. Invalid, foreign, mixed, disposed, or dependency-blocked input rolls back the entire request.
+- [x] Hardware bulk state changes retain lifecycle/audit evidence. Archive refuses active software license relationships and enters the scoped recycle bin without losing provenance or ownership.
+- [x] The Assets and Documentation surfaces expose restrained selection, scan status, relationship, bulk confirmation/error, loading, empty, responsive, keyboard, and accessibility states while treating server denial as authoritative.
+- [x] Permission inventory, IDOR/RLS tests, migration/upgrade evidence, OpenAPI, architecture, security/threat model, risks, Compose, release notes, and version metadata agree at `0.3.10`.
+
+Evidence: `docs/releases/0.3.10.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

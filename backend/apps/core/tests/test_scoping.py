@@ -205,7 +205,7 @@ def test_postgres_constraints_reject_scope_bypass_through_direct_writes():
     valid_organization = _organization(first, "Valid Client")
     with pytest.raises(IntegrityError):
         with transaction.atomic():
-            Workspace.objects.filter(pk=valid_organization.ownership_workspace_id).update(
+            Workspace.objects.filter(pk=valid_organization.ownership_workspace.id).update(
                 tenant=second
             )
 
@@ -214,7 +214,7 @@ def test_postgres_constraints_reject_scope_bypass_through_direct_writes():
             with connection.cursor() as cursor:
                 cursor.execute(
                     "DELETE FROM core_workspace WHERE id = %s",
-                    [str(valid_organization.ownership_workspace_id)],
+                    [str(valid_organization.ownership_workspace.id)],
                 )
 
     with pytest.raises(IntegrityError):

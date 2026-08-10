@@ -1971,6 +1971,10 @@ class DocumentAttachment(TimestampedModel):
     media_type = models.CharField(max_length=120)
     size = models.PositiveBigIntegerField()
     checksum = models.CharField(max_length=64)
+    storage_provider = models.CharField(max_length=80, default="django-default")
+    scan_status = models.CharField(max_length=20, default="clean")
+    scan_engine = models.CharField(max_length=120, default="legacy-validation")
+    scanned_at = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -1984,6 +1988,9 @@ class DocumentAttachment(TimestampedModel):
     scoped = OrganizationScopedManager()
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(scan_status="clean"), name="document_attachment_clean_only"),
+        ]
         indexes = [
             models.Index(
                 fields=["tenant", "organization", "document", "archived_at"],
@@ -2004,6 +2011,8 @@ class DocumentAttachment(TimestampedModel):
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Attachment entity must use the attachment workspace scope")
+        if self.scan_status != "clean" or not self.scan_engine or not self.storage_provider or not self.scanned_at:
+            raise ValidationError("Only clean, scanned attachments may enter managed storage")
 
 
 class PublicationAudience(models.TextChoices):

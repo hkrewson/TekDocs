@@ -18,6 +18,7 @@ from .inventory import (
     assets_for_scope,
     assign_hardware,
     assignment_choices,
+    bulk_update_assets,
     create_client_asset,
     dispose_hardware,
     lifecycle_events,
@@ -54,6 +55,40 @@ class StrictSerializer(serializers.Serializer):
 class ClientAssetWriteSerializer(StrictSerializer):
     model_id = serializers.UUIDField()
     name = serializers.CharField(max_length=240, allow_blank=True, required=False, default="", trim_whitespace=True)
+
+
+class ClientAssetBulkWriteSerializer(StrictSerializer):
+    asset_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        max_length=100,
+        allow_empty=False,
+    )
+    action = serializers.ChoiceField(choices=("set_hardware_state", "archive"))
+    lifecycle_state = serializers.ChoiceField(
+        choices=[
+            HardwareLifecycleState.IN_STOCK,
+            HardwareLifecycleState.IN_SERVICE,
+            HardwareLifecycleState.REPAIR,
+            HardwareLifecycleState.RETIRED,
+        ],
+        required=False,
+    )
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        attrs = super().validate(attrs)
+        if len(set(attrs["asset_ids"])) != len(attrs["asset_ids"]):
+            raise serializers.ValidationError({"asset_ids": "Choose each asset only once."})
+        if attrs["action"] == "set_hardware_state" and "lifecycle_state" not in attrs:
+            raise serializers.ValidationError({"lifecycle_state": "Choose a hardware lifecycle state."})
+        if attrs["action"] == "archive" and "lifecycle_state" in attrs:
+            raise serializers.ValidationError({"lifecycle_state": "Archive does not accept a lifecycle state."})
+        return attrs
+
+
+class ClientAssetBulkResultSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=("set_hardware_state", "archive"))
+    processed = serializers.IntegerField(min_value=1, max_value=100)
 
 
 class CatalogModelChoiceSerializer(serializers.Serializer):
@@ -234,6 +269,9 @@ class ClientAssetResultSerializer(serializers.Serializer):
     results = ClientAssetSerializer(many=True)
     count = serializers.IntegerField()
     can_manage = serializers.BooleanField()
+    can_view_relationships = serializers.BooleanField()
+    can_create_relationships = serializers.BooleanField()
+    can_archive_relationships = serializers.BooleanField()
 
 
 class DerivedVendorSerializer(serializers.Serializer):
@@ -285,6 +323,15 @@ class ClientAssetListCreateView(APIView):
                     "can_manage": context_has_permission(
                         workspace.member, PermissionKey.ASSETS_EDIT, organization=workspace.organization
                     ),
+                    "can_view_relationships": context_has_permission(
+                        workspace.member, PermissionKey.RELATIONSHIPS_VIEW, organization=workspace.organization
+                    ),
+                    "can_create_relationships": context_has_permission(
+                        workspace.member, PermissionKey.RELATIONSHIPS_CREATE, organization=workspace.organization
+                    ),
+                    "can_archive_relationships": context_has_permission(
+                        workspace.member, PermissionKey.RELATIONSHIPS_ARCHIVE, organization=workspace.organization
+                    ),
                 }
             ).data
         )
@@ -305,6 +352,26 @@ class ClientAssetListCreateView(APIView):
         except (InventoryError, CatalogModel.DoesNotExist) as exc:
             raise serializers.ValidationError({"detail": "The selected supplier model is unavailable."}) from exc
         return Response(ClientAssetSerializer(asset).data, status=201)
+
+
+class ClientAssetBulkView(APIView):
+    @extend_schema(request=ClientAssetBulkWriteSerializer, responses={200: ClientAssetBulkResultSerializer})
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = ClientAssetBulkWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        try:
+            processed = bulk_update_assets(
+                scope=workspace.data_scope,
+                actor_id=request.user.pk,
+                asset_entity_ids=values["asset_ids"],
+                action=values["action"],
+                lifecycle_state=values.get("lifecycle_state"),
+            )
+        except InventoryError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(ClientAssetBulkResultSerializer({"action": values["action"], "processed": processed}).data)
 
 
 class ClientAssetDetailView(APIView):

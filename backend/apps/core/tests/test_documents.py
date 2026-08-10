@@ -5,6 +5,7 @@ from hashlib import sha256
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.db.models.deletion import ProtectedError
@@ -520,7 +521,7 @@ def test_template_instantiation_copies_owned_attachments_and_rewrites_markdown(o
         ).json()
         upload = owner_client.post(
             reverse("msp-document-attachment-list-create", kwargs={"document_entity_id": template["id"]}),
-            {"file": SimpleUploadedFile("router.pdf", b"%PDF-1.4\nTekDocs fixture", content_type="text/html")},
+            {"file": SimpleUploadedFile("router.pdf", b"%PDF-1.4\nTekDocs fixture\n%%EOF", content_type="text/html")},
         )
         assert upload.status_code == 201
         attachment_id = upload.json()["id"]
@@ -582,6 +583,9 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
         attachment = DocumentAttachment.objects.get(entity_id=uploaded.json()["id"])
         assert "notes.txt" not in attachment.file.name
         assert attachment.media_type == "text/plain"
+        assert attachment.scan_status == "clean"
+        assert attachment.scan_engine == "tekdocs-strict-content/1"
+        assert attachment.storage_provider == "django-default"
         download = owner_client.get(
             reverse(
                 "organization-document-attachment-download",
@@ -596,6 +600,19 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
         assert download["Content-Type"] == "application/octet-stream"
         assert download["Cache-Control"] == "private, no-store"
         assert download["X-Content-Type-Options"] == "nosniff"
+        stored_name = attachment.file.name
+        attachment.file.storage.delete(stored_name)
+        assert attachment.file.storage.save(stored_name, ContentFile(b"tampered bytes")) == stored_name
+        assert owner_client.get(
+            reverse(
+                "organization-document-attachment-download",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": created["id"],
+                    "attachment_entity_id": attachment.entity_id,
+                },
+            )
+        ).status_code == 400
         sibling = reverse(
             "organization-document-attachment-download",
             kwargs={

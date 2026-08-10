@@ -73,7 +73,7 @@ test-certification:
 	docker compose run --rm migrate pytest apps/core/tests/test_entity_rbac_certification.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
 
 test-documentation-certification:
-	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
 
 test-credential-references:
 	docker compose run --rm migrate pytest apps/core/tests/test_credential_references.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q

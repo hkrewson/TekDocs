@@ -37,9 +37,10 @@ const softwareAsset: ClientAsset = {
 
 function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryClient {
   return {
-    listAssets: vi.fn().mockResolvedValue({ results: [asset], count: 1, can_manage: true }),
+    listAssets: vi.fn().mockResolvedValue({ results: [asset], count: 1, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
     listModelChoices: vi.fn().mockResolvedValue({ results: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', product_id: 'product-1', product_name: 'EdgeSwitch', kind: 'hardware', supplier_id: 'supplier-1', supplier_name: 'Northwind', revision: 1, specification_version_id: 'version-1', specifications: { ports: 24 } }] }),
     createAsset: vi.fn().mockResolvedValue(asset),
+    bulkAssets: vi.fn().mockResolvedValue({ action: 'set_hardware_state', processed: 1 }),
     updateHardware: vi.fn().mockResolvedValue(asset.hardware),
     listHardwareLifecycle: vi.fn().mockResolvedValue([{ id: 'event-1', event_type: 'created', from_state: '', to_state: 'in_stock', person_name: null, site_name: null, location_name: null, occurred_at: '2026-08-10T12:00:00Z' }]),
     assignmentChoices: vi.fn().mockResolvedValue({ people: [], sites: [], locations: [] }),
@@ -86,6 +87,29 @@ describe('Assets', () => {
     await user.type(within(form).getByLabelText('Asset name (optional)'), 'Reception switch')
     await user.click(within(form).getByRole('button', { name: 'Create asset' }))
     await waitFor(() => expect(createAsset).toHaveBeenCalledWith(workspace, 'model-1', 'Reception switch'))
+  })
+
+  it('applies a bounded bulk hardware state change', async () => {
+    const bulkAssets = vi.fn().mockResolvedValue({ action: 'set_hardware_state', processed: 1 })
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />)
+    await user.click(await screen.findByRole('checkbox', { name: 'Select Core switch' }))
+    await user.selectOptions(screen.getByLabelText('State'), 'repair')
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(bulkAssets).toHaveBeenCalledWith(workspace, ['asset-1'], 'set_hardware_state', 'repair'))
+  })
+
+  it('requires explicit confirmation before bulk archiving', async () => {
+    const bulkAssets = vi.fn().mockResolvedValue({ action: 'archive', processed: 1 })
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />)
+    await user.click(await screen.findByRole('checkbox', { name: 'Select Core switch' }))
+    await user.selectOptions(screen.getByLabelText('Action'), 'archive')
+    await user.click(screen.getByRole('button', { name: 'Review archive' }))
+    expect(bulkAssets).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Archive 1 selected assets?')
+    await user.click(screen.getByRole('button', { name: 'Confirm archive' }))
+    await waitFor(() => expect(bulkAssets).toHaveBeenCalledWith(workspace, ['asset-1'], 'archive', undefined))
   })
 
   it('edits hardware identity through the lifecycle service', async () => {

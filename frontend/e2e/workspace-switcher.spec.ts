@@ -167,6 +167,8 @@ async function mockWorkspaceApplication(page: Page) {
     }
     if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
     if (url.pathname.endsWith('/documents')) return route.fulfill({ json: { results: [], count: 0 } })
+    if (url.pathname.endsWith('/products')) return route.fulfill({ json: { results: [], count: 0 } })
+    if (url.pathname.endsWith('/specification-definitions')) return route.fulfill({ json: { results: [], count: 0 } })
     const id = url.pathname.split('/').at(-1)
     if (id === clientWorkspace.id) return route.fulfill({ json: clientWorkspace })
     if (id === secondClientWorkspace.id) return route.fulfill({ json: secondClientWorkspace })
@@ -234,6 +236,7 @@ test('workspace switcher preserves routes, capability navigation, history, and a
 
   await page.getByRole('link', { name: 'Products' }).click()
   await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${supplierWorkspace.id}/products$`))
+  await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible()
   await page.getByRole('button', { name: /Current workspace: Northwind Supply/ }).click()
   await page.getByRole('button', { name: 'Back to Example MSP. MSP workspace' }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/products')

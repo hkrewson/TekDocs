@@ -3,10 +3,23 @@ from __future__ import annotations
 from collections.abc import Iterable
 from uuid import UUID
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AuditEvent, Entity, Organization, OrganizationClassification, OrganizationKind, Tenant
+from .models import (
+    AuditEvent,
+    CatalogProduct,
+    CatalogSpecificationDefinition,
+    Entity,
+    Organization,
+    OrganizationClassification,
+    OrganizationKind,
+    Tenant,
+)
+from .scoping import DataScope
+
+SUPPLIER_KINDS = {OrganizationKind.VENDOR, OrganizationKind.MANUFACTURER}
 
 
 def _replace_classifications(
@@ -15,7 +28,19 @@ def _replace_classifications(
     classifications: Iterable[OrganizationKind],
 ) -> None:
     kinds = tuple(dict.fromkeys(classifications))
-    OrganizationClassification.scoped.for_tenant(organization.tenant).filter(organization=organization).delete()
+    scope = DataScope.organization(organization.tenant, organization)
+    if not SUPPLIER_KINDS.intersection(kinds) and (
+        CatalogProduct.scoped.for_scope(scope).exists()
+        or CatalogSpecificationDefinition.scoped.for_scope(scope).exists()
+    ):
+        raise ValidationError(
+            "An organization with catalog records must remain classified as a vendor or manufacturer."
+        )
+
+    existing = OrganizationClassification.scoped.for_tenant(organization.tenant).filter(
+        organization=organization
+    )
+    existing_kinds = set(existing.values_list("kind", flat=True))
     OrganizationClassification.objects.bulk_create(
         [
             OrganizationClassification(
@@ -24,8 +49,10 @@ def _replace_classifications(
                 kind=kind,
             )
             for kind in kinds
+            if kind not in existing_kinds
         ]
     )
+    existing.exclude(kind__in=kinds).delete()
 
 
 @transaction.atomic

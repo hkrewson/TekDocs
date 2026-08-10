@@ -73,7 +73,7 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "products",
         "recycle_bin",
     ),
-    "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products", "recycle_bin"),
+    "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "recycle_bin"),
 }
 
 CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {

@@ -170,6 +170,249 @@ class CredentialReference(TimestampedModel):
             raise ValidationError("Credential reference organization must belong to its tenant")
 
 
+class CatalogProductKind(models.TextChoices):
+    HARDWARE = "hardware", "Hardware"
+    SOFTWARE = "software", "Software"
+
+
+class CatalogModelLifecycle(models.TextChoices):
+    ACTIVE = "active", "Active"
+    DISCONTINUED = "discontinued", "Discontinued"
+    PRE_RELEASE = "pre_release", "Pre-release"
+
+
+class CatalogProduct(TimestampedModel):
+    """A supplier-owned, addressable hardware or software product family."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_products")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="catalog_products")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="catalog_product")
+    kind = models.CharField(max_length=16, choices=CatalogProductKind.choices)
+    description = models.CharField(max_length=1000, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        indexes = [
+            models.Index(fields=("tenant", "organization", "kind", "archived_at"), name="core_catprod_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog product and entity scopes must match")
+        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+            raise ValidationError("Catalog product organization must belong to its tenant")
+
+
+class CatalogSpecificationDefinition(TimestampedModel):
+    """Stable supplier-owned identity for an immutable specification schema history."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_specification_definitions")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="catalog_specification_definitions"
+    )
+    name = models.CharField(max_length=160)
+    product_kind = models.CharField(max_length=16, choices=CatalogProductKind.choices)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "product_kind", "name"),
+                name="unique_catalog_spec_definition_name",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "product_kind", "archived_at"),
+                name="core_catspecdef_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding and "archived_at" not in (kwargs.get("update_fields") or ()):
+            raise ValidationError("Specification-definition identity is immutable")
+        return super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+            raise ValidationError("Specification definition organization must belong to its tenant")
+
+
+class CatalogSpecificationDefinitionVersion(models.Model):
+    """An immutable JSON Schema contract used by catalog-model revisions."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_specification_versions")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="catalog_specification_versions"
+    )
+    definition = models.ForeignKey(CatalogSpecificationDefinition, on_delete=models.PROTECT, related_name="versions")
+    version = models.PositiveIntegerField()
+    schema = models.JSONField()
+    checksum = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="catalog_specification_versions",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("definition_id", "version")
+        constraints = [
+            models.UniqueConstraint(fields=("definition", "version"), name="unique_catalog_spec_definition_version"),
+            models.CheckConstraint(condition=models.Q(version__gte=1), name="catalog_spec_version_positive"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "definition", "version"), name="core_catspecver_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.definition_id} v{self.version}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Specification-definition versions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Specification-definition versions are immutable")
+
+    def clean(self) -> None:
+        if self.definition_id and (
+            self.definition.tenant_id != self.tenant_id or self.definition.organization_id != self.organization_id
+        ):
+            raise ValidationError("Specification version and definition scopes must match")
+
+
+class CatalogModel(TimestampedModel):
+    """A stable, addressable supplier template whose data changes through revisions."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_models")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="catalog_models")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="catalog_model")
+    product = models.ForeignKey(CatalogProduct, on_delete=models.PROTECT, related_name="models")
+    model_number = models.CharField(max_length=160)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "product", "model_number"),
+                name="unique_catalog_model_number",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "product", "archived_at"), name="core_catmodel_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog model and entity scopes must match")
+        if self.product_id and (
+            self.product.tenant_id != self.tenant_id or self.product.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog model and product scopes must match")
+
+
+class CatalogModelRevision(models.Model):
+    """Immutable model specifications pinned to one immutable schema version."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="catalog_model_revisions")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="catalog_model_revisions")
+    model = models.ForeignKey(CatalogModel, on_delete=models.PROTECT, related_name="revisions")
+    parent = models.OneToOneField(
+        "self", on_delete=models.PROTECT, related_name="child_revision", null=True, blank=True
+    )
+    revision = models.PositiveIntegerField()
+    specification_version = models.ForeignKey(
+        CatalogSpecificationDefinitionVersion,
+        on_delete=models.PROTECT,
+        related_name="model_revisions",
+    )
+    lifecycle = models.CharField(max_length=24, choices=CatalogModelLifecycle.choices)
+    specifications = models.JSONField(default=dict)
+    notes = models.CharField(max_length=1000, blank=True)
+    checksum = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="catalog_model_revisions",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("model_id", "revision")
+        constraints = [
+            models.UniqueConstraint(fields=("model", "revision"), name="unique_catalog_model_revision"),
+            models.CheckConstraint(condition=models.Q(revision__gte=1), name="catalog_model_revision_positive"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "model", "revision"), name="core_catmodelrev_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.model_id} r{self.revision}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Catalog model revisions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Catalog model revisions are immutable")
+
+    def clean(self) -> None:
+        if self.model_id and (
+            self.model.tenant_id != self.tenant_id or self.model.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog model revision and model scopes must match")
+        if self.specification_version_id and (
+            self.specification_version.tenant_id != self.tenant_id
+            or self.specification_version.organization_id != self.organization_id
+        ):
+            raise ValidationError("Catalog model revision and specification scopes must match")
+
+
 class OrganizationAccessMode(models.TextChoices):
     ALL_AUTHORIZED = "all_authorized", "All authorized MSP staff"
     ASSIGNED_ONLY = "assigned_only", "Assigned MSP staff only"

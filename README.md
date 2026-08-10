@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.2` adds production runtime secret-file inputs while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.3` adds supplier-owned product and model catalogs with immutable, versioned specification sets while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 
@@ -30,6 +30,8 @@ The installation owner can open **Organizations** to create, classify, edit, fil
 The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
 
 The **Documentation** area persists workspace-owned Markdown in immutable, reusable block revisions. It offers visual block controls, raw Markdown, secure preview, revision history, live/pinned reuse, references, templates, managed attachments, and immutable signed STATIC publications with retained PDFs. Semantic highlight uses `==important context==`; NOTE, TIP, IMPORTANT, WARNING, and CAUTION callouts use the portable blockquote form `> [!WARNING]`. Raw HTML, MDX, scripts, inline styles, and document-authored CSS are intentionally unsupported.
+
+Vendor and manufacturer workspaces expose **Products** for supplier-owned hardware/software families, concrete models, and reusable specification sets. Specification versions and model revisions are immutable and checksummed; stale edits fail without overwriting either writer. Client asset instantiation and retained supplier provenance follow in `0.3.4`.
 
 ### First-owner bootstrap
 
@@ -75,7 +77,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
 - The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The broader 1.0 capacity, concurrency, supported encrypted backup tooling, malware quarantine, and public GitHub Wiki remain later milestones.
-- Organizations, People, Sites, Locations, versioned custom fields, and typed Entity relationships are active entity-backed foundations. Other domain families remain scheduled slices.
+- Organizations, People, Sites, Locations, versioned custom fields, typed Entity relationships, and supplier product/model catalogs are active entity-backed foundations. Client-owned assets and other domain families remain scheduled slices.
 - TekDocs does not store customer credential values. Provider-neutral external credential references arrived in `0.3.1`; production runtime secret-file injection is implemented in `0.3.2`, with mandatory removal of environment fallback remaining assigned to `0.8.7`.
 
 ## License

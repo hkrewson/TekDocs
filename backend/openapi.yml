@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.2
+  version: 0.3.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2723,6 +2723,358 @@ paths:
           description: Organization workspace not found
         '503':
           description: Installation context unavailable
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products:
+    get:
+      operationId: organization_catalog_products_list
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogProductResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_catalog_products_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogProduct'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}:
+    get:
+      operationId: organization_catalog_products_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogProduct'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_catalog_products_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductUpdate'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogProduct'
+          description: ''
+    delete:
+      operationId: workspaces_organizations_catalog_products_destroy
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Product archived
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}/models:
+    post:
+      operationId: workspaces_organizations_catalog_products_models_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ModelWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ModelWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogModel'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/products/{product_entity_id}/models/{model_entity_id}:
+    patch:
+      operationId: workspaces_organizations_catalog_products_models_partial_update
+      parameters:
+      - in: path
+        name: model_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedModelRevisionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedModelRevisionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedModelRevisionWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogModel'
+          description: ''
+        '409':
+          description: No response body
+    delete:
+      operationId: workspaces_organizations_catalog_products_models_destroy
+      parameters:
+      - in: path
+        name: model_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: product_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Model archived
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/specification-definitions:
+    get:
+      operationId: workspaces_organizations_catalog_specification_definitions_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecificationDefinitionResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_catalog_specification_definitions_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefinitionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DefinitionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DefinitionWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecificationDefinition'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/catalog/specification-definitions/{definition_id}/versions:
+    post:
+      operationId: workspaces_organizations_catalog_specification_definitions_versions_create
+      parameters:
+      - in: path
+        name: definition_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefinitionVersionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DefinitionVersionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DefinitionVersionWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecificationVersion'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/credential-references:
     get:
       operationId: workspaces_organizations_credential_references_retrieve
@@ -4974,6 +5326,140 @@ components:
         * `read_only` - Read-only
         * `client_administrator` - Client Administrator
         * `client_user` - Client User
+    CatalogModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        model_number:
+          type: string
+        current_revision:
+          allOf:
+          - $ref: '#/components/schemas/CatalogModelRevision'
+          nullable: true
+          readOnly: true
+        revisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogModelRevision'
+          readOnly: true
+      required:
+      - current_revision
+      - id
+      - model_number
+      - name
+      - revisions
+    CatalogModelLifecycleEnum:
+      enum:
+      - active
+      - discontinued
+      - pre_release
+      type: string
+      description: |-
+        * `active` - Active
+        * `discontinued` - Discontinued
+        * `pre_release` - Pre-release
+    CatalogModelRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        specification_version_id:
+          type: string
+          format: uuid
+        specification_definition_id:
+          type: string
+          format: uuid
+          readOnly: true
+        specification_definition_name:
+          type: string
+          readOnly: true
+        specification_version:
+          type: integer
+          readOnly: true
+        lifecycle:
+          $ref: '#/components/schemas/CatalogModelLifecycleEnum'
+        specifications: {}
+        notes:
+          type: string
+        checksum:
+          type: string
+        created_by:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - checksum
+      - created_at
+      - created_by
+      - id
+      - lifecycle
+      - notes
+      - parent_id
+      - revision
+      - specification_definition_id
+      - specification_definition_name
+      - specification_version
+      - specification_version_id
+      - specifications
+    CatalogProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/CatalogProductKindEnum'
+        description:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogModel'
+      required:
+      - description
+      - id
+      - kind
+      - models
+      - name
+      - updated_at
+    CatalogProductKindEnum:
+      enum:
+      - hardware
+      - software
+      type: string
+      description: |-
+        * `hardware` - Hardware
+        * `software` - Software
+    CatalogProductResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogProduct'
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - results
     CategoryEnum:
       enum:
       - general
@@ -5248,6 +5734,25 @@ components:
         * `tenant` - Tenant
         * `organization` - Organization
         * `collection` - Collection
+    DefinitionVersionWrite:
+      type: object
+      properties:
+        schema: {}
+      required:
+      - schema
+    DefinitionWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        product_kind:
+          $ref: '#/components/schemas/CatalogProductKindEnum'
+        schema: {}
+      required:
+      - name
+      - product_kind
+      - schema
     DirectionEnum:
       enum:
       - outgoing
@@ -6291,6 +6796,31 @@ components:
       - compatible
       - incompatible
       - total
+    ModelWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        model_number:
+          type: string
+          maxLength: 160
+        specification_version_id:
+          type: string
+          format: uuid
+        lifecycle:
+          $ref: '#/components/schemas/CatalogModelLifecycleEnum'
+        specifications: {}
+        notes:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - lifecycle
+      - model_number
+      - name
+      - specification_version_id
+      - specifications
     OidcProvider:
       type: object
       properties:
@@ -6549,6 +7079,28 @@ components:
       properties:
         role:
           $ref: '#/components/schemas/TenantAssignableRoleEnum'
+    PatchedModelRevisionWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        model_number:
+          type: string
+          maxLength: 160
+        specification_version_id:
+          type: string
+          format: uuid
+        lifecycle:
+          $ref: '#/components/schemas/CatalogModelLifecycleEnum'
+        specifications: {}
+        notes:
+          type: string
+          default: ''
+          maxLength: 1000
+        base_revision_id:
+          type: string
+          format: uuid
     PatchedOrganizationAccessWrite:
       type: object
       properties:
@@ -6613,6 +7165,16 @@ components:
           type: string
           format: email
           maxLength: 254
+    PatchedProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
     PatchedProfileUpdate:
       type: object
       properties:
@@ -6805,6 +7367,21 @@ components:
       required:
       - full_name
       - kind
+    ProductWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        kind:
+          $ref: '#/components/schemas/CatalogProductKindEnum'
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - kind
+      - name
     ProviderEnum:
       enum:
       - onepassword
@@ -7232,6 +7809,61 @@ components:
           maxLength: 64
       required:
       - name
+    SpecificationDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        product_kind:
+          $ref: '#/components/schemas/CatalogProductKindEnum'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpecificationVersion'
+      required:
+      - id
+      - name
+      - product_kind
+      - versions
+    SpecificationDefinitionResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpecificationDefinition'
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - results
+    SpecificationVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        schema: {}
+        checksum:
+          type: string
+        created_by:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - checksum
+      - created_at
+      - created_by
+      - id
+      - schema
+      - version
     StateEnum:
       enum:
       - pending

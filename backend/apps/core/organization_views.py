@@ -1,8 +1,10 @@
 from uuid import UUID
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -98,11 +100,14 @@ class OrganizationDetailView(APIView):
             "classifications": [classification.kind for classification in organization.classifications.all()],
             **serializer.validated_data,
         }
-        update_organization(
-            organization=organization,
-            actor_id=request.user.pk,
-            **changes,
-        )
+        try:
+            update_organization(
+                organization=organization,
+                actor_id=request.user.pk,
+                **changes,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"classifications": exc.messages}) from exc
         organization = self._get(context=context, permission=PermissionKey.ORGANIZATIONS_EDIT, entity_id=entity_id)
         return Response(OrganizationSerializer(organization).data)
 

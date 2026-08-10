@@ -222,6 +222,8 @@ SPECTACULAR_SETTINGS = {
         "TenantAssignableRoleEnum": "apps.accounts.models.TENANT_ASSIGNABLE_ROLE_CHOICES",
         "CustomRoleScopeEnum": "apps.accounts.models.CustomRoleScope",
         "OrganizationAccessModeEnum": "apps.core.models.OrganizationAccessMode",
+        "CatalogProductKindEnum": "apps.core.models.CatalogProductKind",
+        "CatalogModelLifecycleEnum": "apps.core.models.CatalogModelLifecycle",
     },
 }
 

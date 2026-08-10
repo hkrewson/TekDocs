@@ -41,6 +41,9 @@ import type { AccessControlClient } from './access-control/api'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
 import { SecuritySettings } from './auth/SecuritySettings'
+import { Products } from './catalog/Products'
+import { browserCatalogClient } from './catalog/api'
+import type { CatalogClient } from './catalog/api'
 import { CustomFields } from './custom-fields/CustomFields'
 import { browserCustomFieldsClient } from './custom-fields/api'
 import type { CustomFieldsClient } from './custom-fields/api'
@@ -264,6 +267,12 @@ const plannedAreas: Record<string, { title: string; description: string; release
 
 function PlannedPage({ path }: { path: string }) {
   const area = plannedAreas[path]
+  if (path === '/products') {
+    return <>
+      <PageHeader title="Products" description="Reusable supplier product and model definitions." />
+      <section className="content-section"><div className="section-heading"><div><h2>Supplier catalogs are available</h2><p>Open a vendor or manufacturer from Organizations, then choose Products to manage its hardware and software templates. MSP-wide aggregation and client asset provenance arrive in 0.3.4.</p></div><span>0.3.3</span></div><Link className="secondary-button" to="/organizations">Browse organizations</Link></section>
+    </>
+  }
   return (
     <>
       <PageHeader title={area.title} description={area.description} />
@@ -278,7 +287,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.1 adds external credential references without taking custody of customer secrets." />
+      <PageHeader title="Overview" description="TekDocs 0.3.3 adds supplier-owned product and model catalogs with immutable specification history." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -300,6 +309,7 @@ function Overview() {
             ['Session security', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
             ['1Password credential references', 'Available'],
+            ['Supplier product and model catalogs', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
       </section>
@@ -343,7 +353,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -355,6 +365,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
   if (area === 'documentation') return <Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} />
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
+  if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -366,7 +377,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -378,6 +389,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   recycleBinClient: RecycleBinClient
   documentsClient: DocumentsClient
   credentialReferencesClient?: CredentialReferencesClient
+  catalogClient?: CatalogClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -438,7 +450,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             {Object.keys(plannedAreas).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
@@ -448,7 +460,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -460,6 +472,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   recycleBinClient?: RecycleBinClient
   documentsClient?: DocumentsClient
   credentialReferencesClient?: CredentialReferencesClient
+  catalogClient?: CatalogClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -477,6 +490,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           recycleBinClient={recycleBinClient}
           documentsClient={documentsClient}
           credentialReferencesClient={credentialReferencesClient}
+          catalogClient={catalogClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

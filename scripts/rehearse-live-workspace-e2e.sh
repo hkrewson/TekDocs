@@ -53,7 +53,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, Organization, PersonAssociation, Site
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -104,6 +104,23 @@ vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
 link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
 assert link.archived_at is None
 assert link.metadata == {}
+catalog_product = CatalogProduct.objects.get(entity__display_name="Live EdgeSwitch")
+catalog_model = CatalogModel.objects.get(entity__display_name="Live EdgeSwitch 24")
+catalog_definition = CatalogSpecificationDefinition.objects.get(name="Managed switch")
+catalog_version = CatalogSpecificationDefinitionVersion.objects.get(definition=catalog_definition, version=1)
+catalog_revisions = list(CatalogModelRevision.objects.filter(model=catalog_model).order_by("revision"))
+assert catalog_product.organization == vendor
+assert catalog_product.kind == "hardware"
+assert catalog_model.organization == vendor
+assert catalog_model.product == catalog_product
+assert catalog_version.schema["additionalProperties"] is False
+assert catalog_version.schema["required"] == ["port_count"]
+assert len(catalog_revisions) == 2
+assert catalog_revisions[0].parent_id is None
+assert catalog_revisions[1].parent_id == catalog_revisions[0].id
+assert catalog_revisions[1].specification_version == catalog_version
+assert catalog_revisions[1].specifications == {"port_count": 24}
+assert catalog_revisions[0].checksum != catalog_revisions[1].checksum
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

@@ -571,7 +571,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | --- | --- |
 | `0.3.1` | **Complete:** provider-neutral credential references, strict 1Password Private Link validation, scoped RBAC, value-free audit, and explicit rejection of share links, arbitrary URLs, and secret values. |
 | `0.3.2` | **Complete:** production runtime `*_FILE` inputs, fail-closed secret-file validation, service-scoped Compose mounts, production-image leakage tests, removable bootstrap custody, and an operator-owned 1Password CLI injection recipe. |
-| `0.3.3` | Supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
+| `0.3.3` | **Complete:** supplier-workspace product/model catalogs, hardware/software template identity, and versioned specification definitions. |
 | `0.3.4` | Supplier-owned product documentation, client asset instantiation with retained product/specification/document provenance, and relationship-derived client vendor lists. |
 | `0.3.5` | Client hardware assets, serials, acquisition/disposal, warranty, assignment, and lifecycle history. |
 | `0.3.6` | Software installations, licenses, seats, renewals, and relationships. |
@@ -605,6 +605,19 @@ Evidence: `docs/releases/0.3.1.md`.
 - [x] Security baseline, threat model, risk register, operator documentation, release notes, version metadata, and release gates agree at `0.3.2`; no schema or product API change is introduced.
 
 Evidence: `docs/releases/0.3.2.md`.
+
+### `0.3.3` acceptance criteria
+
+- [x] Only active vendor- or manufacturer-classified organization workspaces may own catalog data; client-only and partner-only direct routes fail closed, while multi-classified suppliers retain one organization identity.
+- [x] A supplier may create, search, open, edit, and archive stable addressable hardware or software products and concrete addressable models without accepting tenant or organization ownership from the browser.
+- [x] Stable specification definitions have immutable sequential versions containing a bounded, server-validated Draft 2020-12 object schema and a server-calculated SHA-256 checksum; publishing a new version never rewrites or reinterprets prior model data.
+- [x] Every model create or edit appends an immutable sequential revision pinned to one exact specification-definition version. Values validate against that schema, history remains readable, and stale base revisions return `409` without overwriting either writer.
+- [x] Product/model/definition/revision relationships enforce exact tenant and supplier scope in Django and PostgreSQL; forced RLS, scoped managers, route inventory, and allow/deny/sibling/cross-tenant IDOR tests cover every route.
+- [x] Catalog reads use `assets.view`; catalog mutations use the centrally declared MFA/CSRF-protected `assets.edit` permission. Supplier classification narrows access and never grants it.
+- [x] The supplier Products page provides restrained search, hardware/software filtering, product/model creation, structured specification-definition versioning, model history, loading/empty/error/denial, responsive, keyboard, and accessibility states.
+- [x] OpenAPI, architecture, security baseline, threat model, risk register, migration/upgrade evidence, backend/frontend tests, Docker Compose, and one non-mocked browser-to-Django-to-PostgreSQL supplier catalog journey agree at `0.3.3`.
+
+Evidence: `docs/releases/0.3.3.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

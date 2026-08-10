@@ -35,7 +35,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Credential references | Links to externally protected credentials; no values stored or revealed by TekDocs | Client-scoped links whose provider independently enforces vault access | — | references `0.3.1`; runtime secret injection `0.3.2` |
 | Services | MSP services and contracts | Client services, providers, and dependencies | — | relationship seam in `0.3.7` |
 | Vendors | MSP supplier directory/relationships | Vendors related to the client through assets or services | — | `0.3.4` |
-| Products | MSP-visible supplier catalog | — | Supplier-owned product/model templates | `0.3.3` |
+| Products | Supplier-catalog entry point; aggregate view follows provenance work | — | Supplier-owned product/model templates with versioned specifications | supplier workspace `0.3.3`; aggregate/provenance `0.3.4` |
 | Tickets | MSP service queue | Client service requests | — | post-`1.0` placeholder |
 | Accounting | MSP billing, purchasing, quotes, recurring work, and expenses | — | — | post-`1.0` placeholder |
 | Compliance, activity, integrations | MSP governance and provider administration | only explicitly client-capable governance views when introduced | only explicitly supplier-capable views when introduced | later roadmap slices |

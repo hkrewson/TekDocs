@@ -28,6 +28,14 @@ from apps.accounts.views import (
     OwnerBootstrapView,
     ProfileView,
 )
+from apps.core.catalog_views import (
+    CatalogModelDetailView,
+    CatalogModelListCreateView,
+    CatalogProductDetailView,
+    CatalogProductListCreateView,
+    CatalogSpecificationDefinitionListCreateView,
+    CatalogSpecificationDefinitionVersionView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -378,6 +386,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",
+        CatalogProductListCreateView.as_view(),
+        name="organization-catalog-product-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>",
+        CatalogProductDetailView.as_view(),
+        name="organization-catalog-product-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/models",
+        CatalogModelListCreateView.as_view(),
+        name="organization-catalog-model-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products/<uuid:product_entity_id>/models/<uuid:model_entity_id>",
+        CatalogModelDetailView.as_view(),
+        name="organization-catalog-model-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/specification-definitions",
+        CatalogSpecificationDefinitionListCreateView.as_view(),
+        name="organization-catalog-specification-definition-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/specification-definitions/<uuid:definition_id>/versions",
+        CatalogSpecificationDefinitionVersionView.as_view(),
+        name="organization-catalog-specification-definition-version-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/credential-references",

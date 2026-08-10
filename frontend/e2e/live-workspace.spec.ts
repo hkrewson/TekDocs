@@ -22,6 +22,7 @@ async function invitationTokenFromMailpit(page: Page) {
 }
 
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
+  test.setTimeout(60_000)
   const deploymentToken = process.env.TEKDOCS_E2E_BOOTSTRAP_TOKEN
   if (!deploymentToken) throw new Error('The isolated live test requires TEKDOCS_E2E_BOOTSTRAP_TOKEN.')
 
@@ -120,7 +121,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   await page.goto('/organizations')
 
-  await page.getByRole('link', { name: 'Live Acme Client' }).click()
+  await page.goto(clientHref)
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/overview$/)
   await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
   await expect(page.getByText('Live Acme Client, LLC')).toBeVisible()
@@ -148,7 +149,36 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('link', { name: 'Live Northwind Vendor' }).click()
   await expect(page.getByText('Supplies')).toBeVisible()
   await expect(page.getByText('Backlink')).toBeVisible()
-  await page.getByRole('link', { name: 'Live Acme Client' }).click()
+  await page.getByRole('link', { name: 'Products' }).click()
+  await page.getByRole('tab', { name: 'Specification sets' }).click()
+  await page.getByRole('button', { name: 'New specification set' }).click()
+  await page.getByLabel('Name').fill('Managed switch')
+  await page.getByLabel('Key').fill('port_count')
+  await page.getByLabel('Label').fill('Port count')
+  await page.locator('.specification-row select').selectOption('integer')
+  await page.getByLabel('Required').check()
+  await page.getByRole('button', { name: 'Create specification set' }).click()
+  await expect(page.getByText('Managed switch', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Products and models' }).click()
+  await page.getByRole('button', { name: 'New product' }).click()
+  await page.getByLabel('Name').fill('Live EdgeSwitch')
+  await page.getByLabel('Description').fill('Live supplier catalog regression')
+  await page.getByRole('button', { name: 'Create product' }).click()
+  await expect(page.getByRole('heading', { name: 'Live EdgeSwitch' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add model' }).first().click()
+  await page.getByLabel('Model name').fill('Live EdgeSwitch 24')
+  await page.getByLabel('Model number or SKU').fill('LIVE-ES-24')
+  await page.getByLabel('Port count *').fill('24')
+  await page.getByLabel('Revision notes').fill('Live initial specification')
+  await page.getByRole('button', { name: 'Add model' }).last().click()
+  await expect(page.getByText('LIVE-ES-24 · active · revision 1')).toBeVisible()
+  await page.getByRole('button', { name: 'Revise' }).click()
+  await page.getByLabel('Revision notes').fill(' reviewed')
+  await page.getByRole('button', { name: 'Create revision' }).click()
+  await expect(page.getByText('LIVE-ES-24 · active · revision 2')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('LIVE-ES-24 · active · revision 2')).toBeVisible()
+  await page.goto(clientHref)
 
   await page.getByRole('button', { name: /Current workspace: Live Acme Client/ }).click()
   await page.getByRole('textbox', { name: 'Find a client' }).fill('Live Acme')

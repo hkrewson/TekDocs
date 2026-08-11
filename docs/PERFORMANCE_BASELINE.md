@@ -26,10 +26,10 @@ The gate measures eight warmed HTTP requests for each ordinary read and rejects 
 | Client Entity search | 5 | 11.4 ms |
 | Client relationship discovery | 6 | 10.9 ms |
 | Document revision-history page | 3 | 20.6 ms (`0.2.9` evidence) |
-| Client asset page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.3.12` gate) |
-| Client software-license page (25 of 60) | 32 whole-request queries | `< 500 ms` (`0.3.12` gate) |
-| Client contract page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.3.12` gate) |
-| Client credential-reference page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.3.12` gate) |
+| Client asset page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.4.0` certification) |
+| Client software-license page (25 of 60) | 32 whole-request queries | `< 500 ms` (`0.4.0` certification) |
+| Client contract page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.4.0` certification) |
+| Client credential-reference page (25 of 120) | 32 whole-request queries | `< 500 ms` (`0.4.0` certification) |
 
 Observed service query counts for the original six paths were 3, 3, 2, 2, 3, and 2 in the same order. The document-history service ceiling is three queries. The inventory ceilings cover the complete authenticated HTTP request—including session bookkeeping, transaction-local RLS binding, Workspace and policy resolution, count, page read, and fixed relation prefetches—so they are not directly comparable with the earlier service-only counts. These values are evidence from local runs, not a universal capacity promise.
 

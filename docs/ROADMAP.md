@@ -581,7 +581,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.10` | **Complete:** attachment-provider/scanner quarantine boundary, hostile-file corpus, exact-workspace asset relationships, and atomic bounded bulk operations. |
 | `0.3.11` | **Complete:** canonical asset CSV import/export, signed dry-run review, bounded validation, deterministic retry identity, atomic apply, and secret-safe exclusions. |
 | `0.3.12` | **Complete:** inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
-| `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
+| `0.4.0` | **Complete:** formal certification of external credential references and hardware/software inventory without adding another domain family. |
 
 ### `0.3.1` acceptance criteria
 
@@ -738,6 +738,19 @@ Evidence: `docs/releases/0.3.11.md`.
 - [x] A dedicated inventory certification gate composes inventory, commercial, credential-reference, permission/IDOR, forced-RLS, migration, concurrency, reference-performance, and recovery suites. OpenAPI, architecture, security/threat model, risks, Compose, production images, version metadata, and release evidence agree at `0.3.12`.
 
 Evidence: `docs/releases/0.3.12.md`.
+
+### `0.4.0` acceptance criteria
+
+- [x] The release adds no inventory model, migration, route, provider capability, secret-value custody, import field, or cross-client reporting surface; it certifies the implemented `0.3.x` contract rather than broadening it.
+- [x] `make test-inventory-certification` runs the supplier catalog, asset/provenance, hardware/software lifecycle, licensing, commercial/cost, credential-reference, hostile-attachment, relationship, recovery, authenticated-route/IDOR, forced-RLS, migration, concurrency, and reference-performance suites against PostgreSQL.
+- [x] MSP and client operational routes resolve one explicit Workspace before policy and pagination; MSP pages remain non-aggregate, client pages remain exact-organization, and cost-denied responses omit the protected member completely.
+- [x] Customer credential values remain outside TekDocs. Lists, search, export, audit metadata, and browser content omit provider pointers; handoff remains separately authorized and 1Password remains responsible for item existence, vault access, unlock, reveal, and value audit.
+- [x] Catalog revisions, retained document/specification provenance, hardware lifecycle, software entitlements and seats, contract costs, attachments, relationships, CSV retry identity, and credential-reference lifecycle retain their append-only, exact-Workspace, and atomicity invariants.
+- [x] The `0.3.12` to `0.4.0` upgrade rehearsal and independent PostgreSQL/media restore preserve representative subsystem identities, checksums, retained bytes, lifecycle/history, protected costs, and external pointers without treating pointers as retrievable secrets.
+- [x] Version, OpenAPI/migration drift, backend/frontend coverage, Docker Compose, browser matrix, real-stack journey, security scans, production image, clean installation, architecture, threat model, risk register, and release evidence agree at `0.4.0`.
+- [x] “Certified” means the documented local repository gates passed for the implemented one-MSP-per-installation boundary. It is not third-party certification, a penetration-test result, provider validation, or a hosted multi-MSP claim; hosted checks, tags, images, attestations, and deployment remain unperformed without authorization.
+
+Evidence: `docs/releases/0.4.0.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

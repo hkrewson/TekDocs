@@ -30,6 +30,7 @@ For cross-cutting stabilization:
 make test-stabilization
 make test-certification
 make test-documentation-certification
+make test-inventory-certification
 ```
 
 For release evidence, also run:

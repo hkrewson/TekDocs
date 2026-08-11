@@ -85,7 +85,7 @@ test-inventory:
 	docker compose run --rm migrate pytest apps/core/tests/test_inventory.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-inventory-certification:
-	docker compose run --rm migrate pytest apps/core/tests/test_inventory.py apps/core/tests/test_inventory_stabilization.py apps/core/tests/test_commercial.py apps/core/tests/test_credential_references.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_catalogs.py apps/core/tests/test_inventory.py apps/core/tests/test_inventory_stabilization.py apps/core/tests/test_commercial.py apps/core/tests/test_credential_references.py apps/core/tests/test_attachment_security.py apps/core/tests/test_relationships.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-commercial:
 	docker compose run --rm migrate pytest apps/core/tests/test_commercial.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q

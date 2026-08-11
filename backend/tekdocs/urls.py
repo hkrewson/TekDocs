@@ -126,6 +126,12 @@ from apps.core.inventory_views import (
     ClientHardwareLifecycleView,
     ClientVendorListView,
 )
+from apps.core.netbox_reconciliation_views import (
+    NetBoxReconciliationPreviewView,
+    NetBoxReferenceChoiceView,
+    NetBoxReferenceCollectionView,
+    NetBoxReferenceDetailView,
+)
 from apps.core.network_addressing_views import (
     SubnetDetailView,
     SubnetListCreateView,
@@ -417,6 +423,26 @@ urlpatterns = [
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
     path("api/v1/workspaces/msp/networks/choices", NetworkChoiceListView.as_view(), name="msp-network-choices"),
+    path(
+        "api/v1/workspaces/msp/networks/netbox/references",
+        NetBoxReferenceCollectionView.as_view(),
+        name="msp-netbox-reference-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/netbox/references/<uuid:reference_id>",
+        NetBoxReferenceDetailView.as_view(),
+        name="msp-netbox-reference-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/netbox/choices",
+        NetBoxReferenceChoiceView.as_view(),
+        name="msp-netbox-reference-choices",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/netbox/reconcile-preview",
+        NetBoxReconciliationPreviewView.as_view(),
+        name="msp-netbox-reconcile-preview",
+    ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
         "api/v1/workspaces/msp/networks/racks/<uuid:rack_entity_id>",
@@ -572,6 +598,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/choices",
         NetworkChoiceListView.as_view(),
         name="organization-network-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/references",
+        NetBoxReferenceCollectionView.as_view(),
+        name="organization-netbox-reference-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/references/<uuid:reference_id>",
+        NetBoxReferenceDetailView.as_view(),
+        name="organization-netbox-reference-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/choices",
+        NetBoxReferenceChoiceView.as_view(),
+        name="organization-netbox-reference-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/reconcile-preview",
+        NetBoxReconciliationPreviewView.as_view(),
+        name="organization-netbox-reconcile-preview",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/racks",

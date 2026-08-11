@@ -2257,6 +2257,80 @@ class NetworkMACAddress(TimestampedModel):
             raise ValidationError("Network MAC address interface must use its Workspace scope")
 
 
+class NetBoxObjectType(models.TextChoices):
+    RACK = "dcim.rack", "Rack"
+    DEVICE = "dcim.device", "Device"
+    MAC_ADDRESS = "dcim.macaddress", "MAC address"
+    VLAN = "ipam.vlan", "VLAN"
+    PREFIX = "ipam.prefix", "Prefix"
+    IP_ADDRESS = "ipam.ipaddress", "IP address"
+
+
+class NetBoxReference(TimestampedModel):
+    """A stable NetBox identity attached to one lightweight TekDocs record."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="netbox_references")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="netbox_references")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="netbox_references", null=True, blank=True
+    )
+    entity = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="netbox_references")
+    object_type = models.CharField(max_length=32, choices=NetBoxObjectType.choices)
+    object_id = models.PositiveBigIntegerField()
+    observed_fingerprint = models.CharField(max_length=64, blank=True)
+    last_observed_at = models.DateTimeField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("object_type", "object_id", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(object_type__in=NetBoxObjectType.values), name="netbox_type_valid"
+            ),
+            models.CheckConstraint(condition=models.Q(object_id__gte=1), name="netbox_object_id_positive"),
+            models.CheckConstraint(
+                condition=models.Q(observed_fingerprint="")
+                | models.Q(observed_fingerprint__regex=r"^[0-9a-f]{64}$"),
+                name="netbox_fingerprint_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("workspace", "entity"),
+                condition=models.Q(archived_at__isnull=True),
+                name="netbox_active_entity_unique",
+            ),
+            models.UniqueConstraint(
+                fields=("workspace", "object_type", "object_id"),
+                condition=models.Q(archived_at__isnull=True),
+                name="netbox_active_remote_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "archived_at"), name="core_netbox_scope_idx"),
+            models.Index(fields=("workspace", "object_type", "object_id"), name="core_netbox_remote_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.object_type}:{self.object_id}"
+
+    def clean(self) -> None:
+        if self.workspace_id and (
+            self.workspace.tenant_id != self.tenant_id
+            or self.workspace.organization_id != self.organization_id
+        ):
+            raise ValidationError("NetBox reference Workspace ownership does not match")
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.workspace_id != self.workspace_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.archived_at is not None
+        ):
+            raise ValidationError("NetBox reference entity must use its active Workspace scope")
+
+
 class NetworkCircuitKind(models.TextChoices):
     INTERNET = "internet", "Internet"
     WAN = "wan", "WAN"

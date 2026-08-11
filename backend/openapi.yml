@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.6
+  version: 0.4.7
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -4461,6 +4461,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/MACAddress'
           description: ''
+  /api/v1/workspaces/msp/networks/netbox/choices:
+    get:
+      operationId: workspaces_msp_networks_netbox_choices_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/networks/netbox/reconcile-preview:
+    post:
+      operationId: workspaces_msp_networks_netbox_reconcile_preview_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPreviewResult'
+          description: ''
+  /api/v1/workspaces/msp/networks/netbox/references:
+    get:
+      operationId: workspaces_msp_networks_netbox_references_list
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NetBoxReference'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_netbox_references_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxReference'
+          description: ''
+  /api/v1/workspaces/msp/networks/netbox/references/{reference_id}:
+    delete:
+      operationId: workspaces_msp_networks_netbox_references_destroy
+      parameters:
+      - in: path
+        name: reference_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/workspaces/msp/networks/racks:
     get:
       operationId: workspaces_msp_networks_racks_retrieve
@@ -9235,6 +9333,138 @@ paths:
               schema:
                 $ref: '#/components/schemas/MACAddress'
           description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choices:
+    get:
+      operationId: workspaces_organizations_networks_netbox_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxChoiceResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/reconcile-preview:
+    post:
+      operationId: workspaces_organizations_networks_netbox_reconcile_preview_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPreviewWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPreviewResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/references:
+    get:
+      operationId: workspaces_organizations_networks_netbox_references_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NetBoxReference'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_netbox_references_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxReferenceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxReference'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/references/{reference_id}:
+    delete:
+      operationId: workspaces_organizations_networks_netbox_references_destroy
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: reference_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks:
     get:
       operationId: workspaces_organizations_networks_racks_retrieve
@@ -14107,6 +14337,168 @@ components:
       - name
       - specification_version_id
       - specifications
+    NetBoxChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        entity_type:
+          type: string
+        object_type:
+          type: string
+        linked:
+          type: boolean
+      required:
+      - entity_type
+      - id
+      - linked
+      - name
+      - object_type
+    NetBoxChoiceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetBoxChoice'
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - results
+    NetBoxObservation:
+      type: object
+      properties:
+        object_type:
+          $ref: '#/components/schemas/ObjectTypeEnum'
+        object_id:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 1
+          format: int64
+        fingerprint:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      required:
+      - fingerprint
+      - object_id
+      - object_type
+    NetBoxPreviewItem:
+      type: object
+      properties:
+        object_type:
+          type: string
+        object_id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/NetBoxPreviewItemStatusEnum'
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        entity_name:
+          type: string
+        entity_type:
+          type: string
+      required:
+      - entity_id
+      - entity_name
+      - entity_type
+      - object_id
+      - object_type
+      - status
+    NetBoxPreviewItemStatusEnum:
+      enum:
+      - current
+      - changed
+      - unmatched
+      - missing_remote
+      type: string
+      description: |-
+        * `current` - current
+        * `changed` - changed
+        * `unmatched` - unmatched
+        * `missing_remote` - missing_remote
+    NetBoxPreviewResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetBoxPreviewItem'
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+      required:
+      - counts
+      - results
+    NetBoxPreviewWrite:
+      type: object
+      properties:
+        observations:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetBoxObservation'
+      required:
+      - observations
+    NetBoxReference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entity_id:
+          type: string
+          format: uuid
+        entity_name:
+          type: string
+        entity_type:
+          type: string
+        object_type:
+          type: string
+        object_id:
+          type: integer
+        observed_fingerprint:
+          type: string
+        last_observed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - entity_id
+      - entity_name
+      - entity_type
+      - id
+      - last_observed_at
+      - object_id
+      - object_type
+      - observed_fingerprint
+    NetBoxReferenceWrite:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        object_type:
+          $ref: '#/components/schemas/ObjectTypeEnum'
+        object_id:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 1
+          format: int64
+        fingerprint:
+          type: string
+          default: ''
+          pattern: ^[0-9a-f]{64}$
+      required:
+      - entity_id
+      - object_id
+      - object_type
     NetworkChoice:
       type: object
       properties:
@@ -14408,6 +14800,22 @@ components:
         * `planned` - planned
         * `active` - active
         * `retired` - retired
+    ObjectTypeEnum:
+      enum:
+      - dcim.rack
+      - dcim.device
+      - dcim.macaddress
+      - ipam.vlan
+      - ipam.prefix
+      - ipam.ipaddress
+      type: string
+      description: |-
+        * `dcim.rack` - Rack
+        * `dcim.device` - Device
+        * `dcim.macaddress` - MAC address
+        * `ipam.vlan` - VLAN
+        * `ipam.prefix` - Prefix
+        * `ipam.ipaddress` - IP address
     OidcProvider:
       type: object
       properties:

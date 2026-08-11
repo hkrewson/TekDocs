@@ -55,7 +55,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetBoxReference, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -251,6 +251,14 @@ assert handoff.site == site
 assert handoff.device == network_device
 assert handoff.interface == network_interface
 assert handoff.provider_reference == "LIVE-DEMARC-1"
+netbox_reference = NetBoxReference.objects.select_related("entity", "workspace").get(
+    entity__display_name="Live Core Rack", archived_at__isnull=True
+)
+assert netbox_reference.organization == organization
+assert netbox_reference.workspace == organization.ownership_workspace
+assert netbox_reference.object_type == "dcim.rack"
+assert netbox_reference.object_id == 4107
+assert netbox_reference.observed_fingerprint == ""
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

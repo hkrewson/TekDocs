@@ -51,6 +51,12 @@ export type CircuitContract = { id: string; name: string; status: string; renews
 export type CircuitHandoff = { id: string; name: string; side: 'a' | 'z'; media: 'copper' | 'fiber' | 'coax' | 'wireless' | 'virtual' | 'other'; connector: string; provider_reference: string; site_id: string | null; site_name: string | null; location_id: string | null; location_name: string | null; device_id: string | null; device_name: string | null; interface_id: string | null; interface_name: string | null; description: string }
 export type NetworkCircuit = { id: string; name: string; provider_id: string; provider_name: string; contract?: CircuitContract | null; service_identifier: string; kind: 'internet' | 'wan' | 'mpls' | 'dark_fiber' | 'broadband' | 'cellular' | 'voice' | 'other'; status: 'ordered' | 'provisioning' | 'active' | 'suspended' | 'disconnected'; bandwidth_down_mbps: string | null; bandwidth_up_mbps: string | null; installed_on: string | null; service_starts_on: string | null; review_on: string | null; planned_disconnect_on: string | null; description: string; handoffs: CircuitHandoff[]; lifecycle_events: CircuitLifecycleEvent[] }
 export type CircuitChoices = { providers: Array<{ id: string; name: string }>; contracts: Array<{ id: string; name: string; provider_id: string }>; sites: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; site_id: string }>; devices: Array<{ id: string; name: string }>; interfaces: Array<{ id: string; name: string; device_id: string }>; can_view_contracts: boolean }
+export type NetBoxObjectType = 'dcim.rack' | 'dcim.device' | 'dcim.macaddress' | 'ipam.vlan' | 'ipam.prefix' | 'ipam.ipaddress'
+export type NetBoxReference = { id: string; entity_id: string; entity_name: string; entity_type: string; object_type: NetBoxObjectType; object_id: number; observed_fingerprint: string; last_observed_at: string | null }
+export type NetBoxChoice = { id: string; name: string; entity_type: string; object_type: NetBoxObjectType; linked: boolean }
+export type NetBoxReferenceWrite = { entity_id: string; object_type: NetBoxObjectType; object_id: number; fingerprint?: string }
+export type NetBoxObservation = { object_type: NetBoxObjectType; object_id: number; fingerprint: string }
+export type NetBoxPreview = { results: Array<{ object_type: NetBoxObjectType; object_id: number; status: 'current' | 'changed' | 'unmatched' | 'missing_remote'; entity_id: string | null; entity_name: string; entity_type: string }>; counts: Record<string, number> }
 export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
@@ -116,6 +122,11 @@ export interface NetworksClient {
   updateCircuit(workspace: WorkspaceContext, id: string, values: Partial<CircuitWrite>): Promise<NetworkCircuit>
   createCircuitHandoff(workspace: WorkspaceContext, circuitId: string, values: HandoffWrite): Promise<CircuitHandoff>
   updateCircuitHandoff(workspace: WorkspaceContext, circuitId: string, id: string, values: HandoffWrite): Promise<CircuitHandoff>
+  listNetBoxReferences(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetBoxReference[]>
+  netBoxChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: NetBoxChoice[]; can_manage: boolean }>
+  setNetBoxReference(workspace: WorkspaceContext, values: NetBoxReferenceWrite): Promise<NetBoxReference>
+  removeNetBoxReference(workspace: WorkspaceContext, id: string): Promise<void>
+  previewNetBoxReconciliation(workspace: WorkspaceContext, observations: NetBoxObservation[]): Promise<NetBoxPreview>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -152,6 +163,13 @@ async function write<T>(url: string, method: 'POST' | 'PATCH', values: unknown) 
     body: JSON.stringify(values),
   })
   return json<T>(response)
+}
+
+async function remove(url: string) {
+  const response = await fetch(url, {
+    method: 'DELETE', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRFToken': await csrfToken() },
+  })
+  if (!response.ok) await json(response)
 }
 
 export const browserNetworksClient: NetworksClient = {
@@ -223,4 +241,13 @@ export const browserNetworksClient: NetworksClient = {
   updateCircuit: (workspace, id, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(id)}`, 'PATCH', values),
   createCircuitHandoff: (workspace, circuitId, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs`, 'POST', values),
   updateCircuitHandoff: (workspace, circuitId, id, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listNetBoxReferences(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/netbox/references`, { credentials: 'same-origin', signal }))
+  },
+  async netBoxChoices(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/netbox/choices`, { credentials: 'same-origin', signal }))
+  },
+  setNetBoxReference: (workspace, values) => write(`${basePath(workspace)}/netbox/references`, 'POST', values),
+  removeNetBoxReference: (workspace, id) => remove(`${basePath(workspace)}/netbox/references/${encodeURIComponent(id)}`),
+  previewNetBoxReconciliation: (workspace, observations) => write(`${basePath(workspace)}/netbox/reconcile-preview`, 'POST', { observations }),
 }

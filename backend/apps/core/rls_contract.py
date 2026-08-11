@@ -45,6 +45,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_dnsrecord",
     "core_networkcircuit",
     "core_networkcircuithandoff",
+    "core_netboxreference",
 )
 
 TENANT_SCOPED_TABLES = (

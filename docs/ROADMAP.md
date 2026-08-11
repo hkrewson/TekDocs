@@ -15,7 +15,7 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 | `0.2.0` | Addressable entities, selectable MSP/organization workspaces, scoped RBAC, and isolation. |
 | `0.3.0` | Reusable Markdown documentation and immutable STATIC publication. |
 | `0.4.0` | External credential references, supplier catalogs, and MSP/client operational inventory. |
-| `0.5.0` | Network inventory and relationship-derived views. |
+| `0.5.0` | Lightweight network inventory and NetBox reconciliation boundary. |
 | `0.6.0` | Controlled client portal, publication workflow, and notifications. |
 | `0.7.0` | Stable integration API, provider runtime, webhooks, and reconciliation. |
 | `0.8.0` | Compliance evidence plus domain inventory, renewal tracking, DNS observations, and safe certificate monitoring. |
@@ -762,9 +762,9 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.4` | **Complete in chronological build `0.4.6`:** circuits, providers, handoffs, contracts, and lifecycle reminders. |
 | `0.4.5` | **Complete:** wireless networks and permission-aware DNS zones/records. |
 | `0.4.6` | **Complete:** packaging checkpoint for the deferred `0.4.4` circuit contract; the application version was not downgraded after `0.4.5`. |
-| `0.4.7` | Relationship-derived network diagrams and accessible tabular equivalents. |
-| `0.4.8` | NetBox-compatible external identifiers plus deterministic import/reconciliation seam. |
-| `0.4.9` | Network search/export, scale testing, upgrade/restore, and isolation remediation. |
+| `0.4.7` | **Complete:** NetBox-compatible identifiers plus a deterministic, provider-input reconciliation seam. |
+| `0.4.8` | Simplify the TekDocs network boundary: asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows. |
+| `0.4.9` | Lightweight network search/export, scale testing, upgrade/restore, and isolation remediation. |
 | `0.5.0` | Stabilize and certify network inventory. |
 
 ### `0.4.1` acceptance criteria
@@ -828,6 +828,18 @@ Evidence: `docs/releases/0.4.5.md`.
 - [x] The Network page exposes restrained searchable circuit, contract, lifecycle, and handoff workflows with loading, empty, error, denial, responsive, and keyboard-accessible states in MSP and client contexts.
 
 Evidence: `docs/releases/0.4.6.md`.
+
+### `0.4.7` acceptance criteria
+
+- [x] One active `NetBoxReference` maps a stable NetBox content type and positive numeric object ID to one active record in one explicit MSP or organization Workspace. Remote identity is unique inside that Workspace.
+- [x] The supported overlap is deliberately small: `dcim.rack` maps to a TekDocs rack, `dcim.device` maps to a hardware Asset, and `dcim.macaddress`, `ipam.vlan`, `ipam.prefix`, and `ipam.ipaddress` map to their lightweight TekDocs counterparts. New mappings do not support Interfaces or VRFs.
+- [x] `networks.view` authorizes exact-Workspace reference/choice/preview reads; MFA-backed `networks.edit` authorizes link and unlink. Scoped managers, explicit Workspace ownership, forced RLS, database relationship guards, permission inventory, and sibling/anonymous/direct-write tests fail closed.
+- [x] A bounded preview accepts at most 500 normalized `{object_type, object_id, fingerprint}` observations and deterministically reports `current`, `changed`, `unmatched`, and `missing_remote` without changing either system.
+- [x] TekDocs stores no NetBox base URL, API token, arbitrary remote payload, remote display label, or live result body in this slice. No outbound request, scheduled sync, auto-create/update/delete, or bidirectional write-back exists.
+- [x] The Network page exposes accessible loading, empty, error, server-denial, link, unlink-confirmation, search, and exact-workspace states for the identifier seam without implying that a connector has validated NetBox.
+- [x] Model/migration/OpenAPI drift, PostgreSQL RLS/direct-write/isolation, backend API, frontend component/API, and Docker network gates pass. The `0.4.8` migration owns simplification and preservation of already-created Interface/VRF-era records.
+
+Evidence: `docs/releases/0.4.7.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

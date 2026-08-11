@@ -40,6 +40,9 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     listCircuits: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true, can_view_contracts: true }),
     circuitChoices: vi.fn().mockResolvedValue({ providers: [{ id: 'provider-1', name: 'Example Carrier' }], contracts: [{ id: 'contract-1', name: 'Internet agreement', provider_id: 'provider-1' }], sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [], devices: [{ id: 'device-1', name: 'Core switch' }], interfaces: [{ id: 'interface-1', name: 'WAN1', device_id: 'device-1' }], can_view_contracts: true }),
     createCircuit: vi.fn(), updateCircuit: vi.fn(), createCircuitHandoff: vi.fn(), updateCircuitHandoff: vi.fn(),
+    listNetBoxReferences: vi.fn().mockResolvedValue([]),
+    netBoxChoices: vi.fn().mockResolvedValue({ results: [], can_manage: true }),
+    setNetBoxReference: vi.fn(), removeNetBoxReference: vi.fn(), previewNetBoxReconciliation: vi.fn(),
     ...overrides,
   }
 }
@@ -50,6 +53,24 @@ const relationshipsClient = {
 } as RelationshipsClient
 
 describe('Networks', () => {
+  it('links a lightweight record to a stable NetBox identity', async () => {
+    const reference = { id: 'reference-1', entity_id: 'rack-1', entity_name: 'Core rack', entity_type: 'network_rack', object_type: 'dcim.rack' as const, object_id: 41, observed_fingerprint: '', last_observed_at: null }
+    const listNetBoxReferences = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([reference])
+    const netBoxChoices = vi.fn().mockResolvedValue({ results: [{ id: 'rack-1', name: 'Core rack', entity_type: 'network_rack', object_type: 'dcim.rack', linked: false }], can_manage: true })
+    const setNetBoxReference = vi.fn().mockResolvedValue(reference)
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ listNetBoxReferences, netBoxChoices, setNetBoxReference })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'NetBox' }))
+    expect(await screen.findByText('No NetBox identities match this workspace and search.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Link record' }))
+    await user.selectOptions(screen.getByLabelText('TekDocs record'), 'rack-1')
+    await user.type(screen.getByLabelText('NetBox numeric ID'), '41')
+    await user.click(screen.getByRole('button', { name: 'Link identity' }))
+    await waitFor(() => expect(setNetBoxReference).toHaveBeenCalledWith(workspace, { entity_id: 'rack-1', object_type: 'dcim.rack', object_id: 41 }))
+    expect(await screen.findByRole('cell', { name: '41' })).toBeInTheDocument()
+  })
+
   it('creates a canonical subnet from the workspace addressing surface', async () => {
     const createSubnet = vi.fn().mockResolvedValue({ id: 'subnet-1', name: 'Guest', cidr: '192.0.2.0/24', address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' })
     const user = userEvent.setup()

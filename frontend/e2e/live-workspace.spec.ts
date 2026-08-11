@@ -493,6 +493,13 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Circuits' }).click()
   await expect(page.getByText('2027-06-15 · Review circuit', { exact: true })).toBeVisible()
   await expect(page.getByText(/A side · fiber · LC · ethernet1/)).toBeVisible()
+  await page.getByRole('button', { name: 'NetBox' }).click()
+  await expect(page.getByText('No NetBox identities match this workspace and search.')).toBeVisible()
+  await page.getByRole('button', { name: 'Link record' }).click()
+  await page.getByLabel('TekDocs record').selectOption({ label: 'Live Core Rack · Rack' })
+  await page.getByLabel('NetBox numeric ID').fill('4107')
+  await page.getByRole('button', { name: 'Link identity' }).click()
+  await expect(page.getByRole('table', { name: 'NetBox object identities for this workspace' }).getByRole('cell', { name: '4107' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Documentation' }).click()
   await page.getByRole('button', { name: 'New document' }).click()

@@ -50,7 +50,7 @@ class NetworkDeviceWriteSerializer(StrictSerializer):
         choices=NetworkDeviceStatus.values, required=False, default=NetworkDeviceStatus.ACTIVE
     )
     hardware_asset_id = serializers.UUIDField(
-        source="hardware_asset_entity_id", allow_null=True, required=False, default=None
+        source="hardware_asset_entity_id", allow_null=False, required=True
     )
     site_id = serializers.UUIDField(source="site_entity_id", allow_null=True, required=False, default=None)
     location_id = serializers.UUIDField(source="location_entity_id", allow_null=True, required=False, default=None)

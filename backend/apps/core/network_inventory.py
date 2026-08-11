@@ -242,6 +242,8 @@ def create_device(
         rack_units=rack_units,
     )
     asset = _hardware_asset(scope, hardware_asset_entity_id)
+    if asset is None:
+        raise NetworkInventoryError("Choose an existing hardware asset for this network device.")
     if asset is not None and NetworkDevice.objects.filter(hardware_asset=asset).exists():
         raise NetworkInventoryError("That hardware asset already has a network-device record.")
     entity = Entity.objects.create(
@@ -259,6 +261,7 @@ def create_device(
         role=role,
         status=status,
         hardware_asset=asset,
+        legacy_unbacked=False,
         site=site,
         location=location,
         rack=rack,
@@ -311,11 +314,15 @@ def update_device(*, device: NetworkDevice, actor_id: UUID, values: dict[str, ob
         ),
     )
     hardware_asset = _hardware_asset(scope, asset_value)
+    if hardware_asset is None and not locked.legacy_unbacked:
+        raise NetworkInventoryError("Network devices must remain linked to a hardware asset.")
     if hardware_asset is not None and NetworkDevice.objects.filter(hardware_asset=hardware_asset).exclude(
         pk=locked.pk
     ).exists():
         raise NetworkInventoryError("That hardware asset already has a network-device record.")
     locked.hardware_asset = hardware_asset
+    if hardware_asset is not None:
+        locked.legacy_unbacked = False
     locked.site, locked.location, locked.rack = site, location, rack
     locked.rack_unit, locked.rack_units = rack_unit, rack_units
     locked.role = str(values.get("role", locked.role))

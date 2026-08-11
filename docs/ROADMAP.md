@@ -764,7 +764,7 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.6` | **Complete:** packaging checkpoint for the deferred `0.4.4` circuit contract; the application version was not downgraded after `0.4.5`. |
 | `0.4.7` | **Complete:** NetBox-compatible identifiers plus a deterministic, provider-input reconciliation seam. |
 | `0.4.8` | **Complete:** exact-Workspace network search/export, scale testing, upgrade/restore, and isolation stabilization. |
-| `0.4.9` | Simplify the TekDocs network boundary: asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows. |
+| `0.4.9` | **Complete:** simplify the TekDocs network boundary with asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows while preserving legacy data. |
 | `0.5.0` | Stabilize and certify network inventory. |
 
 ### `0.4.1` acceptance criteria
@@ -852,6 +852,17 @@ Evidence: `docs/releases/0.4.7.md`.
 - [x] The network stabilization gate composes search/export, every network family, NetBox reconciliation, permission/IDOR, forced-RLS, migration, scale, upgrade, restore, frontend, OpenAPI, and real browser-to-Django-to-PostgreSQL evidence. This slice adds no network model family, import/apply path, live NetBox connection, or bidirectional synchronization.
 
 Evidence: `docs/releases/0.4.8.md`.
+
+### `0.4.9` acceptance criteria
+
+- [x] Every new network-device record extends one existing active hardware asset in the exact Workspace; neither the API nor PostgreSQL accepts a missing, reused, software, archived, or cross-Workspace asset edge.
+- [x] IP and MAC records support direct exact-Workspace hardware-asset assignment. Asset identity is omitted unless the caller independently has `assets.view`, and retained interface/direct-asset edges cannot disagree.
+- [x] Ordinary navigation and create/edit workflows no longer expose Interfaces or VRFs. Subnets use the default routing namespace; existing VRF association is retained and labeled as legacy rather than silently cleared.
+- [x] Existing Interface/VRF tables, identifiers, relationships, APIs, search/export rows, and recovery behavior remain available as a compatibility boundary. No destructive schema change or name-based reinterpretation occurs.
+- [x] The migration explicitly marks pre-existing unbacked devices and backfills a direct address-to-asset edge only through an exact retained interface/device/asset chain. Assigning an asset repairs and clears the legacy marker; new legacy rows are database-rejected.
+- [x] Backend model/service/trigger tests, direct-write and sibling-client negatives, frontend component/accessibility states, OpenAPI/migration drift, a `0.4.8` legacy-data upgrade, and independent current-version backup/restore agree with ADR 0047.
+
+Evidence: `docs/releases/0.4.9.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

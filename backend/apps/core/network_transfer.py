@@ -26,19 +26,19 @@ from .models import (
     NetworkVRF,
     WirelessNetwork,
 )
-from .scoping import DataScope
 from .rls import OrganizationRLSMode, rls_scope
+from .scoping import DataScope
 
 NETWORK_EXPORT_SCHEMA = "tekdocs.networks.v1"
 NETWORK_ENTITY_SECTIONS = {
     "network_device": "devices",
     "network_rack": "racks",
-    "network_interface": "interfaces",
+    "network_interface": "devices",
     "network_ip_address": "ip-addresses",
     "network_mac_address": "mac-addresses",
     "network_subnet": "subnets",
     "network_vlan": "vlans",
-    "network_vrf": "vrfs",
+    "network_vrf": "subnets",
     "network_circuit": "circuits",
     "network_circuit_handoff": "circuits",
     "wireless_network": "wireless",
@@ -48,12 +48,12 @@ NETWORK_ENTITY_SECTIONS = {
 NETWORK_ENTITY_LABELS = {
     "network_device": "Device",
     "network_rack": "Rack",
-    "network_interface": "Interface",
+    "network_interface": "Legacy interface",
     "network_ip_address": "IP address",
     "network_mac_address": "MAC address",
     "network_subnet": "Subnet",
     "network_vlan": "VLAN",
-    "network_vrf": "VRF",
+    "network_vrf": "Legacy VRF",
     "network_circuit": "Circuit",
     "network_circuit_handoff": "Circuit handoff",
     "wireless_network": "Wireless network",

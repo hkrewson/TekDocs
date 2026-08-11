@@ -10,6 +10,8 @@ from django.db.models import QuerySet
 
 from .models import (
     AuditEvent,
+    CatalogProductKind,
+    ClientAsset,
     Entity,
     EntityVisibility,
     NetworkDevice,
@@ -59,13 +61,18 @@ def interfaces_for_scope(scope: DataScope) -> QuerySet[NetworkInterface]:
 
 def ip_addresses_for_scope(scope: DataScope) -> QuerySet[NetworkIPAddress]:
     return NetworkIPAddress.scoped.for_scope(scope).select_related(
-        "entity", "subnet__entity", "subnet__vrf__entity", "interface__entity", "interface__device__entity"
+        "entity",
+        "subnet__entity",
+        "subnet__vrf__entity",
+        "interface__entity",
+        "interface__device__entity",
+        "hardware_asset__entity",
     )
 
 
 def mac_addresses_for_scope(scope: DataScope) -> QuerySet[NetworkMACAddress]:
     return NetworkMACAddress.scoped.for_scope(scope).select_related(
-        "entity", "interface__entity", "interface__device__entity"
+        "entity", "interface__entity", "interface__device__entity", "hardware_asset__entity"
     )
 
 
@@ -83,6 +90,24 @@ def _interface(scope: DataScope, entity_id: UUID | None) -> NetworkInterface | N
         return interfaces_for_scope(scope).get(entity_id=entity_id)
     except NetworkInterface.DoesNotExist as exc:
         raise NetworkEndpointError("The selected interface is unavailable in this Workspace.") from exc
+
+
+def _hardware_asset(scope: DataScope, entity_id: UUID | None) -> ClientAsset | None:
+    if entity_id is None:
+        return None
+    try:
+        return (
+            ClientAsset.scoped.for_scope(scope)
+            .select_related("entity", "product")
+            .get(
+                entity_id=entity_id,
+                archived_at__isnull=True,
+                entity__archived_at__isnull=True,
+                product__kind=CatalogProductKind.HARDWARE,
+            )
+        )
+    except ClientAsset.DoesNotExist as exc:
+        raise NetworkEndpointError("The selected hardware asset is unavailable in this Workspace.") from exc
 
 
 def _subnet(scope: DataScope, entity_id: UUID) -> NetworkSubnet:
@@ -227,11 +252,13 @@ def create_ip_address(
     status: str,
     dns_name: str,
     description: str,
+    hardware_asset_entity_id: UUID | None = None,
 ) -> NetworkIPAddress:
     scope = DataScope.owner(tenant, organization)
     host = canonical_host(address)
     subnet = _subnet(scope, subnet_entity_id)
     interface = _interface(scope, interface_entity_id)
+    hardware_asset = _hardware_asset(scope, hardware_asset_entity_id)
     _validate_host_in_subnet(host, subnet)
     _lock_ip_namespace(scope, subnet)
     _assert_ip_available(scope, subnet=subnet, address=host.compressed)
@@ -244,6 +271,7 @@ def create_ip_address(
         entity=entity,
         subnet=subnet,
         interface=interface,
+        hardware_asset=hardware_asset,
         address=host.compressed,
         address_family=host.version,
         status=status,
@@ -266,6 +294,12 @@ def update_ip_address(*, record: NetworkIPAddress, actor_id: UUID, values: dict[
     subnet = _subnet(scope, cast(UUID, values.get("subnet_entity_id", locked.subnet.entity_id)))
     current_interface_id = cast(NetworkInterface, locked.interface).entity_id if locked.interface_id else None
     interface = _interface(scope, cast(UUID | None, values.get("interface_entity_id", current_interface_id)))
+    current_asset_id = cast(ClientAsset, locked.hardware_asset).entity_id if locked.hardware_asset_id else None
+    hardware_asset = _hardware_asset(
+        scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id))
+    )
+    if "hardware_asset_entity_id" in values:
+        interface = None
     _validate_host_in_subnet(host, subnet)
     _lock_ip_namespace(scope, subnet)
     _assert_ip_available(scope, subnet=subnet, address=host.compressed, exclude_ip_id=locked.pk)
@@ -273,6 +307,7 @@ def update_ip_address(*, record: NetworkIPAddress, actor_id: UUID, values: dict[
     locked.entity.save(update_fields=("display_name", "updated_at"))
     locked.subnet = subnet
     locked.interface = interface
+    locked.hardware_asset = hardware_asset
     locked.address = host.compressed
     locked.address_family = host.version
     locked.status = str(values.get("status", locked.status))
@@ -299,10 +334,12 @@ def create_mac_address(
     address: str,
     interface_entity_id: UUID | None,
     description: str,
+    hardware_asset_entity_id: UUID | None = None,
 ) -> NetworkMACAddress:
     scope = DataScope.owner(tenant, organization)
     clean_address = canonical_mac(address)
     interface = _interface(scope, interface_entity_id)
+    hardware_asset = _hardware_asset(scope, hardware_asset_entity_id)
     entity = _create_entity(
         tenant=tenant, organization=organization, entity_type="network_mac_address", name=clean_address
     )
@@ -311,6 +348,7 @@ def create_mac_address(
         organization=organization,
         entity=entity,
         interface=interface,
+        hardware_asset=hardware_asset,
         address=clean_address,
         description=description.strip(),
     )
@@ -331,9 +369,16 @@ def update_mac_address(*, record: NetworkMACAddress, actor_id: UUID, values: dic
     clean_address = canonical_mac(str(values.get("address", locked.address)))
     current_interface_id = cast(NetworkInterface, locked.interface).entity_id if locked.interface_id else None
     interface = _interface(scope, cast(UUID | None, values.get("interface_entity_id", current_interface_id)))
+    current_asset_id = cast(ClientAsset, locked.hardware_asset).entity_id if locked.hardware_asset_id else None
+    hardware_asset = _hardware_asset(
+        scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id))
+    )
+    if "hardware_asset_entity_id" in values:
+        interface = None
     locked.entity.display_name = clean_address
     locked.entity.save(update_fields=("display_name", "updated_at"))
     locked.interface = interface
+    locked.hardware_asset = hardware_asset
     locked.address = clean_address
     locked.description = str(values.get("description", locked.description)).strip()
     locked.full_clean()

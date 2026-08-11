@@ -1,6 +1,8 @@
 import os
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.catalogs import create_definition, create_model, create_product
+from apps.core.inventory import create_client_asset
 from apps.core.models import (
     DNSRecord,
     InstallationState,
@@ -52,6 +54,58 @@ def create_fixture():
             website="",
             classifications=["vendor"],
         )
+        supplier = create_organization(
+            tenant=result.tenant,
+            actor_id=result.owner.id,
+            name="Network Recovery Manufacturer",
+            legal_name="Network Recovery Manufacturer, Inc.",
+            website="",
+            classifications=["manufacturer"],
+        )
+        hardware_asset_entity_id = None
+        if os.environ.get("TEKDOCS_FIXTURE_LEGACY") != "true":
+            bind_local_rls_scope(
+                DataScope.organization(result.tenant, supplier),
+                organization_mode=OrganizationRLSMode.ORGANIZATION,
+            )
+            definition = create_definition(
+                tenant=result.tenant,
+                organization=supplier,
+                actor_id=result.owner.id,
+                name="Recovery network hardware",
+                product_kind="hardware",
+                schema={"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": False, "properties": {}},
+            )
+            product = create_product(
+                tenant=result.tenant,
+                organization=supplier,
+                actor_id=result.owner.id,
+                name="Recovery edge platform",
+                kind="hardware",
+                description="Recovery fixture",
+            )
+            model = create_model(
+                product=product,
+                actor_id=result.owner.id,
+                name="Recovery edge model",
+                model_number="REC-EDGE",
+                specification_version=definition.versions.get(version=1),
+                lifecycle="active",
+                specifications={},
+                notes="",
+            )
+            bind_local_rls_scope(
+                DataScope.organization(result.tenant, client),
+                organization_mode=OrganizationRLSMode.ORGANIZATION,
+            )
+            asset = create_client_asset(
+                tenant=result.tenant,
+                organization=client,
+                actor_id=result.owner.id,
+                model_entity_id=model.entity_id,
+                name="Recovery edge device",
+            )
+            hardware_asset_entity_id = asset.entity_id
         bind_local_rls_scope(
             DataScope.organization(result.tenant, client),
             organization_mode=OrganizationRLSMode.ORGANIZATION,
@@ -88,7 +142,7 @@ def create_fixture():
             name="Recovery edge device",
             role="firewall",
             status="active",
-            hardware_asset_entity_id=None,
+            hardware_asset_entity_id=hardware_asset_entity_id,
             site_entity_id=None,
             location_entity_id=None,
             rack_entity_id=rack.entity_id,
@@ -225,12 +279,19 @@ def verify_fixture():
         rack = NetworkRack.scoped.for_scope(scope).get(entity__display_name="Recovery core rack")
         assert rack.entity.workspace.organization_id == client.id
         assert rack.unit_count == 42
-        assert NetworkDevice.scoped.for_scope(scope).get().rack_id == rack.id
+        device = NetworkDevice.scoped.for_scope(scope).get()
+        assert device.rack_id == rack.id
+        assert (device.hardware_asset_id is not None) != device.legacy_unbacked
         assert NetBoxReference.scoped.for_scope(scope).get(entity=rack.entity).object_id == 4242
         assert NetworkVLAN.scoped.for_scope(scope).get(entity__display_name="Recovery operations VLAN").vlan_id == 42
         assert NetworkSubnet.scoped.for_scope(scope).get(entity__display_name="Recovery operations subnet").cidr == "192.0.2.0/24"
-        assert NetworkIPAddress.scoped.for_scope(scope).get(address="192.0.2.42").dns_name == "recovery.example.invalid"
-        assert NetworkMACAddress.scoped.for_scope(scope).get().address == "02:00:00:00:00:42"
+        retained_ip = NetworkIPAddress.scoped.for_scope(scope).get(address="192.0.2.42")
+        assert retained_ip.dns_name == "recovery.example.invalid"
+        retained_mac = NetworkMACAddress.scoped.for_scope(scope).get()
+        assert retained_mac.address == "02:00:00:00:00:42"
+        if device.hardware_asset_id is not None:
+            assert retained_ip.hardware_asset_id is None
+            assert retained_mac.hardware_asset_id is None
         assert WirelessNetwork.scoped.for_scope(scope).get().ssid == "Recovery Staff"
         assert DNSRecord.scoped.for_scope(scope).get().value == "192.0.2.42"
         circuit = NetworkCircuit.scoped.for_scope(scope).get()

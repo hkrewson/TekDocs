@@ -41,8 +41,8 @@ export type NetworkVRF = { id: string; name: string; route_distinguisher: string
 export type NetworkVLAN = { id: string; name: string; vlan_id: number; description: string }
 export type NetworkSubnet = { id: string; name: string; cidr: string; address_family: 4 | 6; vrf_id: string | null; vrf_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; description: string }
 export type NetworkInterface = { id: string; name: string; device_id: string; device_name: string; kind: 'physical' | 'virtual' | 'lag' | 'loopback' | 'tunnel' | 'wireless' | 'other'; status: 'planned' | 'active' | 'disabled' | 'retired'; description: string }
-export type NetworkIPAddress = { id: string; address: string; address_family: 4 | 6; subnet_id: string; subnet_cidr: string; vrf_id: string | null; vrf_name: string | null; interface_id: string | null; interface_name: string | null; device_name: string | null; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string }
-export type NetworkMACAddress = { id: string; address: string; interface_id: string | null; interface_name: string | null; device_name: string | null; description: string }
+export type NetworkIPAddress = { id: string; address: string; address_family: 4 | 6; subnet_id: string; subnet_cidr: string; vrf_id: string | null; vrf_name: string | null; interface_id: string | null; interface_name: string | null; hardware_asset_id: string | null; hardware_asset_name: string | null; device_name: string | null; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string }
+export type NetworkMACAddress = { id: string; address: string; interface_id: string | null; interface_name: string | null; hardware_asset_id: string | null; hardware_asset_name: string | null; device_name: string | null; description: string }
 export type WirelessNetwork = { id: string; ssid: string; purpose: 'corporate' | 'guest' | 'iot' | 'voice' | 'other'; security: 'open' | 'owe' | 'wpa2_personal' | 'wpa3_personal' | 'wpa2_enterprise' | 'wpa3_enterprise' | 'mixed_personal' | 'mixed_enterprise'; status: 'planned' | 'active' | 'disabled' | 'retired'; hidden: boolean; client_isolation: boolean; site_id: string | null; site_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; subnet_id: string | null; subnet_cidr: string | null; description: string }
 export type DNSZone = { id: string; name: string; description: string; record_count: number }
 export type DNSRecord = { id: string; zone_id: string; zone_name: string; owner_name: string; record_type: 'A' | 'AAAA' | 'CNAME' | 'MX' | 'TXT' | 'SRV' | 'CAA' | 'NS' | 'PTR'; value: string; ttl: number; priority: number | null; weight: number | null; port: number | null; ip_address_id: string | null; description: string }
@@ -57,14 +57,14 @@ export type NetBoxChoice = { id: string; name: string; entity_type: string; obje
 export type NetBoxReferenceWrite = { entity_id: string; object_type: NetBoxObjectType; object_id: number; fingerprint?: string }
 export type NetBoxObservation = { object_type: NetBoxObjectType; object_id: number; fingerprint: string }
 export type NetBoxPreview = { results: Array<{ object_type: NetBoxObjectType; object_id: number; status: 'current' | 'changed' | 'unmatched' | 'missing_remote'; entity_id: string | null; entity_name: string; entity_type: string }>; counts: Record<string, number> }
-export type NetworkSearchItem = { id: string; name: string; record_type: string; type_label: string; section: 'devices' | 'racks' | 'interfaces' | 'ip-addresses' | 'mac-addresses' | 'subnets' | 'vlans' | 'vrfs' | 'circuits' | 'wireless' | 'dns' }
+export type NetworkSearchItem = { id: string; name: string; record_type: string; type_label: string; section: 'devices' | 'racks' | 'ip-addresses' | 'mac-addresses' | 'subnets' | 'vlans' | 'circuits' | 'wireless' | 'dns' | 'netbox' }
 export type NetworkSearchResult = { results: NetworkSearchItem[]; page: number; page_size: number; count: number; has_more: boolean }
 export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
 export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
-export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'interface_id' | 'status' | 'dns_name' | 'description'>
-export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'interface_id' | 'description'>
+export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'>
+export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'>
 export type WirelessWrite = Pick<WirelessNetwork, 'ssid' | 'purpose' | 'security' | 'status' | 'hidden' | 'client_isolation' | 'site_id' | 'vlan_id' | 'subnet_id' | 'description'>
 export type DNSZoneWrite = Pick<DNSZone, 'name' | 'description'>
 export type DNSRecordWrite = Pick<DNSRecord, 'zone_id' | 'owner_name' | 'record_type' | 'value' | 'ttl' | 'priority' | 'weight' | 'port' | 'ip_address_id' | 'description'>
@@ -73,7 +73,7 @@ export type HandoffWrite = Pick<CircuitHandoff, 'name' | 'side' | 'media' | 'con
 
 export type RackWrite = Pick<NetworkRack, 'name' | 'unit_count' | 'status'> & { site_id: string; location_id: string | null }
 export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack_units'> & {
-  hardware_asset_id: string | null
+  hardware_asset_id: string
   site_id: string | null
   location_id: string | null
   rack_id: string | null

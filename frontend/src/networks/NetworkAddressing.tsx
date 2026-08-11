@@ -301,28 +301,11 @@ export function NetworkAddressing({
                   />
                   <small>Use the network address, not a host address.</small>
                 </label>
-                <label>
-                  <span>Routing table</span>
-                  <select
-                    value={(form.values as SubnetWrite).vrf_id ?? ""}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        values: {
-                          ...form.values,
-                          vrf_id: event.target.value || null,
-                        },
-                      })
-                    }
-                  >
-                    <option value="">Default routing table</option>
-                    {(vrfs ?? []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {(form.values as SubnetWrite).vrf_id && (
+                  <p className="field-note">
+                    This retained subnet uses a legacy VRF. Its routing assignment is preserved but managed in NetBox.
+                  </p>
+                )}
                 <label>
                   <span>VLAN</span>
                   <select
@@ -403,13 +386,13 @@ export function NetworkAddressing({
         />
       ) : (
         <Table
-          headers={["Name", "CIDR", "Family", "Routing table", "VLAN"]}
+          headers={["Name", "CIDR", "Family", "Legacy routing", "VLAN"]}
           items={shownSubnets}
           row={(item) => [
             item.name,
             item.cidr,
             `IPv${item.address_family}`,
-            item.vrf_name ?? "Default",
+            item.vrf_name ? `Legacy VRF: ${item.vrf_name}` : "Default",
             item.vlan_number ? `${item.vlan_number} · ${item.vlan_name}` : "—",
           ]}
           onEdit={canManage ? edit : undefined}

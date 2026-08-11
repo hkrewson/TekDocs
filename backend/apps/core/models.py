@@ -1900,7 +1900,11 @@ class NetworkDeviceStatus(models.TextChoices):
 
 
 class NetworkDevice(TimestampedModel):
-    """A network role and physical placement optionally backed by one hardware asset."""
+    """A network role and physical placement backed by one hardware asset.
+
+    ``legacy_unbacked`` exists only to preserve pre-0.4.9 rows whose original
+    creation preceded the asset requirement. New application records may not set it.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_devices")
@@ -1917,6 +1921,7 @@ class NetworkDevice(TimestampedModel):
         null=True,
         blank=True,
     )
+    legacy_unbacked = models.BooleanField(default=False)
     site = models.ForeignKey(Site, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True)
     location = models.ForeignKey(
         Location, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True
@@ -1971,6 +1976,10 @@ class NetworkDevice(TimestampedModel):
             or hardware_asset.product.kind != CatalogProductKind.HARDWARE
         ):
             raise ValidationError("Network device hardware asset must be hardware in the same Workspace")
+        if hardware_asset is None and not self.legacy_unbacked:
+            raise ValidationError("Network devices require a hardware asset")
+        if hardware_asset is not None and self.legacy_unbacked:
+            raise ValidationError("Asset-backed network devices cannot retain the legacy marker")
         site = self.site if self.site_id else None
         if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
             raise ValidationError("Network device site must use its Workspace scope")
@@ -2175,6 +2184,9 @@ class NetworkIPAddress(TimestampedModel):
     interface = models.ForeignKey(
         NetworkInterface, on_delete=models.PROTECT, related_name="ip_addresses", null=True, blank=True
     )
+    hardware_asset = models.ForeignKey(
+        ClientAsset, on_delete=models.PROTECT, related_name="network_ip_addresses", null=True, blank=True
+    )
     address = models.CharField(max_length=45)
     address_family = models.PositiveSmallIntegerField()
     status = models.CharField(max_length=24, choices=NetworkIPAddressStatus.choices)
@@ -2192,6 +2204,7 @@ class NetworkIPAddress(TimestampedModel):
         indexes = [
             models.Index(fields=("tenant", "organization", "subnet"), name="core_netip_scope_idx"),
             models.Index(fields=("tenant", "organization", "address"), name="core_netip_address_idx"),
+            models.Index(fields=("tenant", "organization", "hardware_asset"), name="core_netip_asset_idx"),
         ]
 
     def __str__(self) -> str:
@@ -2205,15 +2218,24 @@ class NetworkIPAddress(TimestampedModel):
         for related, label in (
             (self.subnet if self.subnet_id else None, "subnet"),
             (self.interface if self.interface_id else None, "interface"),
+            (self.hardware_asset if self.hardware_asset_id else None, "hardware asset"),
         ):
             if related is not None and (
                 related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
             ):
                 raise ValidationError(f"Network IP address {label} must use its Workspace scope")
+        hardware_asset = self.hardware_asset if self.hardware_asset_id else None
+        if hardware_asset is not None and hardware_asset.product.kind != CatalogProductKind.HARDWARE:
+            raise ValidationError("Network IP address assignment requires a hardware asset")
+        interface = self.interface if self.interface_id else None
+        if interface is not None and hardware_asset is not None:
+            interface_asset_id = interface.device.hardware_asset_id
+            if interface_asset_id is not None and interface_asset_id != hardware_asset.id:
+                raise ValidationError("Network IP address legacy interface and hardware asset must agree")
 
 
 class NetworkMACAddress(TimestampedModel):
-    """A canonical EUI-48 address optionally assigned to one interface."""
+    """A canonical EUI-48 address assigned directly to hardware or retained legacy interface data."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_mac_addresses")
@@ -2223,6 +2245,9 @@ class NetworkMACAddress(TimestampedModel):
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_mac_address")
     interface = models.ForeignKey(
         NetworkInterface, on_delete=models.PROTECT, related_name="mac_addresses", null=True, blank=True
+    )
+    hardware_asset = models.ForeignKey(
+        ClientAsset, on_delete=models.PROTECT, related_name="network_mac_addresses", null=True, blank=True
     )
     address = models.CharField(max_length=17)
     description = models.TextField(blank=True)
@@ -2239,7 +2264,10 @@ class NetworkMACAddress(TimestampedModel):
                 nulls_distinct=False,
             )
         ]
-        indexes = [models.Index(fields=("tenant", "organization", "interface"), name="core_netmac_scope_idx")]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "interface"), name="core_netmac_scope_idx"),
+            models.Index(fields=("tenant", "organization", "hardware_asset"), name="core_netmac_asset_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.address
@@ -2255,6 +2283,18 @@ class NetworkMACAddress(TimestampedModel):
             and (self.interface.tenant_id != self.tenant_id or self.interface.organization_id != self.organization_id)
         ):
             raise ValidationError("Network MAC address interface must use its Workspace scope")
+        hardware_asset = self.hardware_asset if self.hardware_asset_id else None
+        if hardware_asset is not None and (
+            hardware_asset.tenant_id != self.tenant_id
+            or hardware_asset.organization_id != self.organization_id
+            or hardware_asset.product.kind != CatalogProductKind.HARDWARE
+        ):
+            raise ValidationError("Network MAC address assignment requires same-Workspace hardware")
+        interface = self.interface if self.interface_id else None
+        if interface is not None and hardware_asset is not None:
+            interface_asset_id = interface.device.hardware_asset_id
+            if interface_asset_id is not None and interface_asset_id != hardware_asset.id:
+                raise ValidationError("Network MAC address legacy interface and hardware asset must agree")
 
 
 class NetBoxObjectType(models.TextChoices):

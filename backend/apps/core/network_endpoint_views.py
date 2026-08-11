@@ -6,7 +6,7 @@ from uuid import UUID
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import QuerySet
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -47,7 +47,9 @@ class InterfaceWriteSerializer(StrictSerializer):
 class IPAddressWriteSerializer(StrictSerializer):
     address = serializers.CharField(max_length=45, trim_whitespace=True)
     subnet_id = serializers.UUIDField(source="subnet_entity_id")
-    interface_id = serializers.UUIDField(source="interface_entity_id", required=False, allow_null=True, default=None)
+    hardware_asset_id = serializers.UUIDField(
+        source="hardware_asset_entity_id", required=False, allow_null=True, default=None
+    )
     status = serializers.ChoiceField(choices=("active", "reserved", "dhcp", "deprecated"), default="active")
     dns_name = serializers.CharField(max_length=253, required=False, allow_blank=True, default="")
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
@@ -55,7 +57,9 @@ class IPAddressWriteSerializer(StrictSerializer):
 
 class MACAddressWriteSerializer(StrictSerializer):
     address = serializers.CharField(max_length=32, trim_whitespace=True)
-    interface_id = serializers.UUIDField(source="interface_entity_id", required=False, allow_null=True, default=None)
+    hardware_asset_id = serializers.UUIDField(
+        source="hardware_asset_entity_id", required=False, allow_null=True, default=None
+    )
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
 
 
@@ -79,10 +83,30 @@ class IPAddressSerializer(serializers.Serializer):
     vrf_name = serializers.CharField(source="subnet.vrf.entity.display_name", allow_null=True)
     interface_id = serializers.UUIDField(source="interface.entity_id", allow_null=True)
     interface_name = serializers.CharField(source="interface.entity.display_name", allow_null=True)
-    device_name = serializers.CharField(source="interface.device.entity.display_name", allow_null=True)
+    hardware_asset_id = serializers.SerializerMethodField()
+    hardware_asset_name = serializers.SerializerMethodField()
+    device_name = serializers.SerializerMethodField()
     status = serializers.CharField()
     dns_name = serializers.CharField()
     description = serializers.CharField()
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_hardware_asset_id(self, record: NetworkIPAddress) -> UUID | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        return asset.entity_id if self.context.get("can_view_assets") and asset is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_hardware_asset_name(self, record: NetworkIPAddress) -> str | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        return asset.entity.display_name if self.context.get("can_view_assets") and asset is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_device_name(self, record: NetworkIPAddress) -> str | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        if self.context.get("can_view_assets") and asset is not None:
+            return asset.entity.display_name
+        interface = record.interface if record.interface_id else None
+        return interface.device.entity.display_name if interface is not None else None
 
 
 class MACAddressSerializer(serializers.Serializer):
@@ -90,8 +114,28 @@ class MACAddressSerializer(serializers.Serializer):
     address = serializers.CharField()
     interface_id = serializers.UUIDField(source="interface.entity_id", allow_null=True)
     interface_name = serializers.CharField(source="interface.entity.display_name", allow_null=True)
-    device_name = serializers.CharField(source="interface.device.entity.display_name", allow_null=True)
+    hardware_asset_id = serializers.SerializerMethodField()
+    hardware_asset_name = serializers.SerializerMethodField()
+    device_name = serializers.SerializerMethodField()
     description = serializers.CharField()
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_hardware_asset_id(self, record: NetworkMACAddress) -> UUID | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        return asset.entity_id if self.context.get("can_view_assets") and asset is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_hardware_asset_name(self, record: NetworkMACAddress) -> str | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        return asset.entity.display_name if self.context.get("can_view_assets") and asset is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_device_name(self, record: NetworkMACAddress) -> str | None:
+        asset = record.hardware_asset if record.hardware_asset_id else None
+        if self.context.get("can_view_assets") and asset is not None:
+            return asset.entity.display_name
+        interface = record.interface if record.interface_id else None
+        return interface.device.entity.display_name if interface is not None else None
 
 
 class CollectionResultSerializer(serializers.Serializer):
@@ -145,7 +189,12 @@ def _page(
                 "can_manage": context_has_permission(
                     workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
                 ),
-            }
+            },
+            context={
+                "can_view_assets": context_has_permission(
+                    workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+                )
+            },
         ).data
     )
 
@@ -222,16 +271,19 @@ class IPAddressListCreateView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = IPAddressWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("hardware_asset_entity_id") is not None:
+            require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
         try:
             record = create_ip_address(
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=request.user.pk,
+                interface_entity_id=None,
                 **serializer.validated_data,
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
-        return Response(IPAddressSerializer(record).data, status=201)
+        return Response(IPAddressSerializer(record, context={"can_view_assets": True}).data, status=201)
 
 
 class IPAddressDetailView(APIView):
@@ -244,13 +296,22 @@ class IPAddressDetailView(APIView):
     @extend_schema(responses={200: IPAddressSerializer})
     def get(self, request, ip_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return Response(IPAddressSerializer(self._record(workspace, ip_address_entity_id)).data)
+        can_view_assets = context_has_permission(
+            workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+        )
+        return Response(
+            IPAddressSerializer(
+                self._record(workspace, ip_address_entity_id), context={"can_view_assets": can_view_assets}
+            ).data
+        )
 
     @extend_schema(request=IPAddressWriteSerializer, responses={200: IPAddressSerializer})
     def patch(self, request, ip_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = IPAddressWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if "hardware_asset_id" in request.data:
+            require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
         try:
             record = update_ip_address(
                 record=self._record(workspace, ip_address_entity_id),
@@ -259,7 +320,10 @@ class IPAddressDetailView(APIView):
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
-        return Response(IPAddressSerializer(record).data)
+        can_view_assets = context_has_permission(
+            workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+        )
+        return Response(IPAddressSerializer(record, context={"can_view_assets": can_view_assets}).data)
 
 
 class MACAddressListCreateView(APIView):
@@ -273,16 +337,19 @@ class MACAddressListCreateView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = MACAddressWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("hardware_asset_entity_id") is not None:
+            require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
         try:
             record = create_mac_address(
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=request.user.pk,
+                interface_entity_id=None,
                 **serializer.validated_data,
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
-        return Response(MACAddressSerializer(record).data, status=201)
+        return Response(MACAddressSerializer(record, context={"can_view_assets": True}).data, status=201)
 
 
 class MACAddressDetailView(APIView):
@@ -295,13 +362,22 @@ class MACAddressDetailView(APIView):
     @extend_schema(responses={200: MACAddressSerializer})
     def get(self, request, mac_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return Response(MACAddressSerializer(self._record(workspace, mac_address_entity_id)).data)
+        can_view_assets = context_has_permission(
+            workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+        )
+        return Response(
+            MACAddressSerializer(
+                self._record(workspace, mac_address_entity_id), context={"can_view_assets": can_view_assets}
+            ).data
+        )
 
     @extend_schema(request=MACAddressWriteSerializer, responses={200: MACAddressSerializer})
     def patch(self, request, mac_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = MACAddressWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if "hardware_asset_id" in request.data:
+            require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
         try:
             record = update_mac_address(
                 record=self._record(workspace, mac_address_entity_id),
@@ -310,4 +386,7 @@ class MACAddressDetailView(APIView):
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
-        return Response(MACAddressSerializer(record).data)
+        can_view_assets = context_has_permission(
+            workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+        )
+        return Response(MACAddressSerializer(record, context={"can_view_assets": can_view_assets}).data)

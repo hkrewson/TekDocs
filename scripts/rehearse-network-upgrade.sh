@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_NETWORK_UPGRADE_FROM_REF:-2f46919}
+baseline_ref=${TEKDOCS_NETWORK_UPGRADE_FROM_REF:-8226338}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-network-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -41,12 +41,12 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.4.7" ]; then
-  echo "Network upgrade expected baseline 0.4.7, found $baseline_version" >&2
+if [ "$baseline_version" != "0.4.8" ]; then
+  echo "Network upgrade expected baseline 0.4.8, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.4.8" ]; then
-  echo "Network upgrade expected current version 0.4.8, found $current_version" >&2
+if [ "$current_version" != "0.4.9" ]; then
+  echo "Network upgrade expected current version 0.4.9, found $current_version" >&2
   exit 1
 fi
 
@@ -54,6 +54,7 @@ echo "Creating retained network data in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T \
   -e TEKDOCS_FIXTURE_MODE=create \
+  -e TEKDOCS_FIXTURE_LEGACY=true \
   -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/scripts/network-certification-fixture.py"
 baseline_compose down --remove-orphans

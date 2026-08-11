@@ -24,6 +24,7 @@ from apps.core.network_addressing import create_subnet, create_vrf
 from apps.core.network_endpoints import NetworkEndpointError, canonical_host, canonical_mac, create_ip_address
 from apps.core.network_inventory import create_device
 from apps.core.organizations import create_organization
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 
 @pytest.fixture
@@ -58,6 +59,7 @@ def _organization(installation, name):  # type: ignore[no-untyped-def]
 
 
 def _device(installation, organization, name="Core switch"):  # type: ignore[no-untyped-def]
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name=name)
     return create_device(
         tenant=installation.tenant,
         organization=organization,
@@ -65,7 +67,7 @@ def _device(installation, organization, name="Core switch"):  # type: ignore[no-
         name=name,
         role="switch",
         status="active",
-        hardware_asset_entity_id=None,
+        hardware_asset_entity_id=asset.entity_id,
         site_entity_id=None,
         location_entity_id=None,
         rack_entity_id=None,
@@ -118,20 +120,21 @@ def test_interface_ip_mac_crud_and_workspace_isolation(owner_client, installatio
         {
             "address": "192.0.2.10",
             "subnet_id": str(subnet.entity_id),
-            "interface_id": interface.json()["id"],
+            "hardware_asset_id": str(device.hardware_asset.entity_id),
             "status": "active",
             "dns_name": "SWITCH.EXAMPLE.INVALID",
         },
     )
     assert ip_address.status_code == 201
     assert ip_address.json()["dns_name"] == "switch.example.invalid"
-    assert ip_address.json()["interface_name"] == "ethernet1"
+    assert ip_address.json()["hardware_asset_name"] == "Core switch"
+    assert ip_address.json()["interface_name"] is None
 
     mac = _post(
         owner_client,
         "organization-network-mac-addresses",
         organization,
-        {"address": "02:00:00:00:00:01", "interface_id": interface.json()["id"]},
+        {"address": "02:00:00:00:00:01", "hardware_asset_id": str(device.hardware_asset.entity_id)},
     )
     assert mac.status_code == 201
     assert mac.json()["device_name"] == "Core switch"
@@ -158,6 +161,17 @@ def test_interface_ip_mac_crud_and_workspace_isolation(owner_client, installatio
     )
     assert foreign_edge.status_code == 400
 
+    sibling_asset = create_network_hardware_asset(
+        installation=installation, organization=sibling, name="Sibling private switch"
+    )
+    foreign_asset = _post(
+        owner_client,
+        "organization-network-mac-addresses",
+        organization,
+        {"address": "02:00:00:00:00:09", "hardware_asset_id": str(sibling_asset.entity_id)},
+    )
+    assert foreign_asset.status_code == 400
+
 
 @pytest.mark.django_db
 def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installation):
@@ -178,7 +192,7 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
             owner_client,
             "organization-network-ip-addresses",
             organization,
-            {"address": address, "subnet_id": str(subnet.entity_id), "interface_id": None, "status": "active"},
+            {"address": address, "subnet_id": str(subnet.entity_id), "hardware_asset_id": None, "status": "active"},
         )
 
     assert add("192.0.2.10", default_subnet).status_code == 201
@@ -197,7 +211,7 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
         owner_client,
         "organization-network-mac-addresses",
         organization,
-        {"address": "02:00:00:00:00:02", "interface_id": None},
+        {"address": "02:00:00:00:00:02", "hardware_asset_id": None},
     )
     assert first_mac.status_code == 201
     assert (
@@ -205,7 +219,7 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
             owner_client,
             "organization-network-mac-addresses",
             organization,
-            {"address": "02:00:00:00:00:02", "interface_id": None},
+            {"address": "02:00:00:00:00:02", "hardware_asset_id": None},
         ).status_code
         == 400
     )
@@ -213,7 +227,7 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
         owner_client,
         "organization-network-mac-addresses",
         organization,
-        {"address": "02-00-00-00-00-03", "interface_id": None},
+        {"address": "02-00-00-00-00-03", "hardware_asset_id": None},
     )
     assert noncanonical_mac.status_code == 400
     assert "02:00:00:00:00:03" in noncanonical_mac.content.decode()

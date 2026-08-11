@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.8
+  version: 0.4.9
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -13752,9 +13752,19 @@ components:
         interface_name:
           type: string
           nullable: true
+        hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        hardware_asset_name:
+          type: string
+          nullable: true
+          readOnly: true
         device_name:
           type: string
           nullable: true
+          readOnly: true
         status:
           type: string
         dns_name:
@@ -13767,6 +13777,8 @@ components:
       - description
       - device_name
       - dns_name
+      - hardware_asset_id
+      - hardware_asset_name
       - id
       - interface_id
       - interface_name
@@ -13808,7 +13820,7 @@ components:
         subnet_id:
           type: string
           format: uuid
-        interface_id:
+        hardware_asset_id:
           type: string
           format: uuid
           nullable: true
@@ -14247,15 +14259,27 @@ components:
         interface_name:
           type: string
           nullable: true
+        hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        hardware_asset_name:
+          type: string
+          nullable: true
+          readOnly: true
         device_name:
           type: string
           nullable: true
+          readOnly: true
         description:
           type: string
       required:
       - address
       - description
       - device_name
+      - hardware_asset_id
+      - hardware_asset_name
       - id
       - interface_id
       - interface_name
@@ -14289,7 +14313,7 @@ components:
         address:
           type: string
           maxLength: 32
-        interface_id:
+        hardware_asset_id:
           type: string
           format: uuid
           nullable: true
@@ -14751,7 +14775,6 @@ components:
         hardware_asset_id:
           type: string
           format: uuid
-          nullable: true
         site_id:
           type: string
           format: uuid
@@ -14775,6 +14798,7 @@ components:
           minimum: 1
           default: 1
       required:
+      - hardware_asset_id
       - name
       - role
     NetworkDeviceWriteRoleEnum:
@@ -15401,7 +15425,7 @@ components:
         subnet_id:
           type: string
           format: uuid
-        interface_id:
+        hardware_asset_id:
           type: string
           format: uuid
           nullable: true
@@ -15496,7 +15520,7 @@ components:
         address:
           type: string
           maxLength: 32
-        interface_id:
+        hardware_asset_id:
           type: string
           format: uuid
           nullable: true
@@ -15546,7 +15570,6 @@ components:
         hardware_asset_id:
           type: string
           format: uuid
-          nullable: true
         site_id:
           type: string
           format: uuid

@@ -22,6 +22,7 @@ from apps.core.network_endpoints import create_interface
 from apps.core.network_inventory import create_device
 from apps.core.organizations import create_organization
 from apps.core.sites import create_site
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 
 @pytest.fixture
@@ -137,6 +138,9 @@ def test_circuit_contract_handoff_and_lifecycle_projection(owner_client, install
         timezone="America/Chicago",
         phone="",
     )
+    hardware_asset = create_network_hardware_asset(
+        installation=installation, organization=client, name="Edge router"
+    )
     device = create_device(
         tenant=installation.tenant,
         organization=client,
@@ -144,7 +148,7 @@ def test_circuit_contract_handoff_and_lifecycle_projection(owner_client, install
         name="Edge router",
         role="router",
         status="active",
-        hardware_asset_entity_id=None,
+        hardware_asset_entity_id=hardware_asset.entity_id,
         site_entity_id=site.entity_id,
         location_entity_id=None,
         rack_entity_id=None,

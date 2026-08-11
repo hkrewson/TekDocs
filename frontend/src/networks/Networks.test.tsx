@@ -115,31 +115,20 @@ describe('Networks', () => {
     expect(screen.getByRole('heading', { name: 'Logical relationships' })).toBeInTheDocument()
   })
 
-  it('creates an interface and exposes endpoint assignment tabs', async () => {
-    const created = { id: 'interface-1', name: 'ethernet1', device_id: 'device-1', device_name: 'Core switch', kind: 'physical' as const, status: 'active' as const, description: '' }
-    const createInterface = vi.fn().mockResolvedValue(created)
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createInterface })} relationshipsClient={relationshipsClient} />)
+  it('keeps the ordinary surface focused on asset-backed addressing', async () => {
+    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
     await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'Interfaces' }))
-    expect(await screen.findByText('No interface records match this workspace and search.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Add interface' }))
-    await user.type(screen.getByLabelText('Name'), 'ethernet1')
-    await user.selectOptions(screen.getByLabelText('Device'), 'device-1')
-    await user.click(screen.getByRole('button', { name: 'Save interface' }))
-    await waitFor(() => expect(createInterface).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'ethernet1', device_id: 'device-1' })))
-    expect(await screen.findByText('ethernet1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'IP addresses' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'MAC addresses' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Interfaces' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'VRFs' })).not.toBeInTheDocument()
   })
 
   it('creates assigned IP and MAC records from canonical values', async () => {
-    const networkInterface = { id: 'interface-1', name: 'ethernet1', device_id: 'device-1', device_name: 'Core switch', kind: 'physical' as const, status: 'active' as const, description: '' }
     const subnet = { id: 'subnet-1', name: 'LAN', cidr: '192.0.2.0/24', address_family: 4 as const, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' }
-    const createIPAddress = vi.fn().mockResolvedValue({ id: 'ip-1', address: '192.0.2.10', address_family: 4, subnet_id: subnet.id, subnet_cidr: subnet.cidr, vrf_id: null, vrf_name: null, interface_id: networkInterface.id, interface_name: networkInterface.name, device_name: device.name, status: 'active', dns_name: '', description: '' })
-    const createMACAddress = vi.fn().mockResolvedValue({ id: 'mac-1', address: '02:00:00:00:00:01', interface_id: networkInterface.id, interface_name: networkInterface.name, device_name: device.name, description: '' })
+    const createIPAddress = vi.fn().mockResolvedValue({ id: 'ip-1', address: '192.0.2.10', address_family: 4, subnet_id: subnet.id, subnet_cidr: subnet.cidr, vrf_id: null, vrf_name: null, hardware_asset_id: 'asset-1', hardware_asset_name: 'EdgeSwitch 24', interface_id: null, interface_name: null, device_name: device.name, status: 'active', dns_name: '', description: '' })
+    const createMACAddress = vi.fn().mockResolvedValue({ id: 'mac-1', address: '02:00:00:00:00:01', hardware_asset_id: 'asset-1', hardware_asset_name: 'EdgeSwitch 24', interface_id: null, interface_name: null, device_name: device.name, description: '' })
     const client = networkClient({
-      listInterfaces: vi.fn().mockResolvedValue({ results: [networkInterface], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
       listSubnets: vi.fn().mockResolvedValue({ results: [subnet], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
       createIPAddress,
       createMACAddress,
@@ -153,17 +142,17 @@ describe('Networks', () => {
     await user.click(screen.getByRole('button', { name: 'Add IP address' }))
     await user.type(screen.getByLabelText('IP address'), '192.0.2.10')
     await user.selectOptions(screen.getByLabelText('Subnet'), 'subnet-1')
-    await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
+    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
     await user.click(screen.getByRole('button', { name: 'Save IP address' }))
-    await waitFor(() => expect(createIPAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '192.0.2.10', subnet_id: 'subnet-1', interface_id: 'interface-1' })))
+    await waitFor(() => expect(createIPAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '192.0.2.10', subnet_id: 'subnet-1', hardware_asset_id: 'asset-1' })))
 
     await user.click(screen.getByRole('button', { name: 'MAC addresses' }))
     await screen.findByText('No MAC address records match this workspace and search.')
     await user.click(screen.getByRole('button', { name: 'Add MAC address' }))
     await user.type(screen.getByLabelText('MAC address'), '02:00:00:00:00:01')
-    await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
+    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
     await user.click(screen.getByRole('button', { name: 'Save MAC address' }))
-    await waitFor(() => expect(createMACAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '02:00:00:00:00:01', interface_id: 'interface-1' })))
+    await waitFor(() => expect(createMACAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '02:00:00:00:00:01', hardware_asset_id: 'asset-1' })))
   })
 
   it('creates wireless inventory without accepting a credential value', async () => {
@@ -252,15 +241,16 @@ describe('Networks', () => {
     render(<Networks workspace={workspace} client={networkClient({ createDevice, updateDevice })} relationshipsClient={relationshipsClient} />)
     await screen.findByRole('button', { name: 'Core switch' })
 
-    await user.click(screen.getByRole('button', { name: 'Add device' }))
+    await user.click(screen.getByRole('button', { name: 'Add asset-backed device' }))
     await user.type(screen.getByLabelText('Name'), 'Edge firewall')
+    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
     await user.selectOptions(screen.getByLabelText('Role'), 'firewall')
     await user.selectOptions(screen.getByLabelText('Rack'), 'rack-1')
     await user.clear(screen.getByLabelText('Starting unit'))
     await user.type(screen.getByLabelText('Starting unit'), '10')
     await user.click(screen.getByRole('button', { name: 'Save device' }))
     await waitFor(() => expect(createDevice).toHaveBeenCalledWith(workspace, expect.objectContaining({
-      name: 'Edge firewall', role: 'firewall', rack_id: 'rack-1', rack_unit: 10,
+      name: 'Edge firewall', role: 'firewall', hardware_asset_id: 'asset-1', rack_id: 'rack-1', rack_unit: 10,
     })))
 
     await user.click(screen.getAllByRole('button', { name: 'Edit' })[0])

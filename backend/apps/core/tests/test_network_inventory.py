@@ -25,6 +25,7 @@ from apps.core.network_inventory import NetworkInventoryError, create_device
 from apps.core.network_inventory_views import NetworkDeviceSerializer
 from apps.core.organizations import create_organization
 from apps.core.rls_contract import RUNTIME_ROLE
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 
 @pytest.fixture
@@ -89,14 +90,15 @@ def _rack(owner_client, organization, site, name="Core rack"):  # type: ignore[n
     return response.json()
 
 
-def _device(owner_client, organization, rack, name, unit):  # type: ignore[no-untyped-def]
+def _device(owner_client, installation, organization, rack, name, unit):  # type: ignore[no-untyped-def]
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name=name)
     return owner_client.post(
         reverse("organization-network-devices", kwargs={"organization_entity_id": organization.entity_id}),
         {
             "name": name,
             "role": "switch",
             "status": "active",
-            "hardware_asset_id": None,
+            "hardware_asset_id": str(asset.entity_id),
             "site_id": None,
             "location_id": None,
             "rack_id": rack["id"],
@@ -116,13 +118,13 @@ def test_racks_devices_placement_relationships_and_workspace_idor(owner_client, 
     rack = _rack(owner_client, client, site)
     sibling_rack = _rack(owner_client, sibling, sibling_site, "Sibling rack")
 
-    first = _device(owner_client, client, rack, "Core switch", 10)
+    first = _device(owner_client, installation, client, rack, "Core switch", 10)
     assert first.status_code == 201
     assert first.json()["site_name"] == "Headquarters"
     assert first.json()["rack_unit"] == 10
-    second = _device(owner_client, client, rack, "Distribution switch", 14)
+    second = _device(owner_client, installation, client, rack, "Distribution switch", 14)
     assert second.status_code == 201
-    overlap = _device(owner_client, client, rack, "Overlapping switch", 11)
+    overlap = _device(owner_client, installation, client, rack, "Overlapping switch", 11)
     assert overlap.status_code == 400
     assert "overlap" in overlap.content.decode().lower()
 
@@ -210,7 +212,7 @@ def test_rack_update_rejects_move_or_shrink_around_placed_devices(owner_client, 
     first_site = _site(owner_client, client, "First site")
     second_site = _site(owner_client, client, "Second site")
     rack = _rack(owner_client, client, first_site)
-    assert _device(owner_client, client, rack, "Edge firewall", 40).status_code == 201
+    assert _device(owner_client, installation, client, rack, "Edge firewall", 40).status_code == 201
     detail = reverse(
         "organization-network-rack-detail",
         kwargs={"organization_entity_id": client.entity_id, "rack_entity_id": rack["id"]},
@@ -229,6 +231,10 @@ def test_concurrent_device_placement_serializes_on_the_rack(owner_client, instal
     site = _site(owner_client, client, "Concurrency site")
     rack_data = _rack(owner_client, client, site)
     rack = NetworkRack.objects.get(entity_id=rack_data["id"])
+    assets = {
+        name: create_network_hardware_asset(installation=installation, organization=client, name=name)
+        for name in ("First", "Second")
+    }
     barrier = threading.Barrier(2)
 
     def place(name):  # type: ignore[no-untyped-def]
@@ -244,7 +250,7 @@ def test_concurrent_device_placement_serializes_on_the_rack(owner_client, instal
                 name=name,
                 role="switch",
                 status="active",
-                hardware_asset_entity_id=None,
+                hardware_asset_entity_id=assets[name].entity_id,
                 site_entity_id=None,
                 location_entity_id=None,
                 rack_entity_id=rack.entity_id,
@@ -294,6 +300,21 @@ def test_postgres_guards_and_forced_rls_reject_cross_workspace_network_writes(ow
     sibling_site = _site(owner_client, sibling, "Sibling RLS site")
     rack_data = _rack(owner_client, first, first_site)
     rack = NetworkRack.objects.get(entity_id=rack_data["id"])
+
+    unbacked_entity = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=first,
+        entity_type="network_device",
+        display_name="Forbidden unbacked device",
+    )
+    with pytest.raises(DatabaseError), transaction.atomic():
+        NetworkDevice.objects.create(
+            tenant=installation.tenant,
+            organization=first,
+            entity=unbacked_entity,
+            role="switch",
+            status="active",
+        )
 
     sibling_site_record = Site.objects.get(entity_id=sibling_site["id"])
     with pytest.raises(DatabaseError), transaction.atomic():

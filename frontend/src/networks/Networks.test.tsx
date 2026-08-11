@@ -19,6 +19,12 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     choices: vi.fn().mockResolvedValue({ sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [], racks: [{ id: 'rack-1', name: 'Core rack', site_id: 'site-1' }], hardware_assets: [{ id: 'asset-1', name: 'EdgeSwitch 24' }] }),
     createRack: vi.fn().mockResolvedValue(rack), updateRack: vi.fn().mockResolvedValue(rack),
     createDevice: vi.fn().mockResolvedValue(device), updateDevice: vi.fn().mockResolvedValue(device),
+    listVRFs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createVRF: vi.fn(), updateVRF: vi.fn(),
+    listVLANs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createVLAN: vi.fn(), updateVLAN: vi.fn(),
+    listSubnets: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createSubnet: vi.fn(), updateSubnet: vi.fn(),
     ...overrides,
   }
 }
@@ -29,6 +35,21 @@ const relationshipsClient = {
 } as RelationshipsClient
 
 describe('Networks', () => {
+  it('creates a canonical subnet from the workspace addressing surface', async () => {
+    const createSubnet = vi.fn().mockResolvedValue({ id: 'subnet-1', name: 'Guest', cidr: '192.0.2.0/24', address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' })
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ createSubnet })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'Subnets' }))
+    await screen.findByText('No subnets match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add subnet' }))
+    await user.type(screen.getByLabelText('Name'), 'Guest')
+    await user.type(screen.getByLabelText(/^CIDR/), '192.0.2.0/24')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(createSubnet).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'Guest', cidr: '192.0.2.0/24', vrf_id: null })))
+    expect(await screen.findByText('IPv4')).toBeInTheDocument()
+  })
+
   it('shows workspace-scoped device placement and logical relationship surface', async () => {
     const user = userEvent.setup()
     render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)

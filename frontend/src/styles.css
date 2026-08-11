@@ -903,7 +903,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .network-form { padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
 .network-form h2 { margin: 0 0 14px; font-size: 15px; }
 .network-form label, .network-relationship-form label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
-.network-form input, .network-form select, .network-relationship-form input, .network-relationship-form select { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.network-form input, .network-form select, .network-form textarea, .network-relationship-form input, .network-relationship-form select { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.network-form .field-wide { grid-column: 1 / -1; }
+.network-form small { color: var(--muted); font-weight: 400; }
+.network-addressing-actions { display: flex; justify-content: flex-end; }
 .network-table-wrap { overflow-x: auto; }
 .network-table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 13px; }
 .network-table th, .network-table td { padding: 10px 12px 10px 2px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -921,6 +924,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 @media (max-width: 720px) {
   .network-toolbar { align-items: stretch; }
+  .segmented-control { max-width: 100%; overflow-x: auto; }
   .network-toolbar .primary-button { width: 100%; margin-left: 0; }
   .network-search { flex: 1; }
   .network-relationship-form { grid-template-columns: 1fr; }

@@ -19,6 +19,9 @@ SEARCHABLE_ENTITY_TYPES = (
     "client_asset",
     "network_rack",
     "network_device",
+    "network_vrf",
+    "network_vlan",
+    "network_subnet",
 )
 
 

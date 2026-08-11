@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.1
+  version: 0.4.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1805,6 +1805,9 @@ paths:
           - client_asset
           - network_rack
           - network_device
+          - network_vrf
+          - network_vlan
+          - network_subnet
           - ''
           type: string
           default: ''
@@ -1816,6 +1819,9 @@ paths:
           * `client_asset` - client_asset
           * `network_rack` - network_rack
           * `network_device` - network_device
+          * `network_vrf` - network_vrf
+          * `network_vlan` - network_vlan
+          * `network_subnet` - network_subnet
       - in: query
         name: page
         schema:
@@ -3801,6 +3807,324 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkRack'
+          description: ''
+  /api/v1/workspaces/msp/networks/subnets:
+    get:
+      operationId: workspaces_msp_networks_subnets_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_subnets_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+  /api/v1/workspaces/msp/networks/subnets/{subnet_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_subnets_retrieve_2
+      parameters:
+      - in: path
+        name: subnet_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_subnets_partial_update
+      parameters:
+      - in: path
+        name: subnet_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+  /api/v1/workspaces/msp/networks/vlans:
+    get:
+      operationId: workspaces_msp_networks_vlans_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLANResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_vlans_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+  /api/v1/workspaces/msp/networks/vlans/{vlan_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_vlans_retrieve_2
+      parameters:
+      - in: path
+        name: vlan_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_vlans_partial_update
+      parameters:
+      - in: path
+        name: vlan_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+  /api/v1/workspaces/msp/networks/vrfs:
+    get:
+      operationId: workspaces_msp_networks_vrfs_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRFResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_vrfs_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
+          description: ''
+  /api/v1/workspaces/msp/networks/vrfs/{vrf_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_vrfs_retrieve_2
+      parameters:
+      - in: path
+        name: vrf_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_vrfs_partial_update
+      parameters:
+      - in: path
+        name: vrf_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
           description: ''
   /api/v1/workspaces/msp/vendors:
     get:
@@ -6639,6 +6963,9 @@ paths:
           - client_asset
           - network_rack
           - network_device
+          - network_vrf
+          - network_vlan
+          - network_subnet
           - ''
           type: string
           default: ''
@@ -6650,6 +6977,9 @@ paths:
           * `client_asset` - client_asset
           * `network_rack` - network_rack
           * `network_device` - network_device
+          * `network_vrf` - network_vrf
+          * `network_vlan` - network_vlan
+          * `network_subnet` - network_subnet
       - in: path
         name: organization_entity_id
         schema:
@@ -7236,6 +7566,399 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkRack'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/subnets:
+    get:
+      operationId: workspaces_organizations_networks_subnets_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_subnets_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubnetWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/subnets/{subnet_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_subnets_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: subnet_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_subnets_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: subnet_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubnetWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subnet'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/vlans:
+    get:
+      operationId: workspaces_organizations_networks_vlans_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLANResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_vlans_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VLANWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/vlans/{vlan_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_vlans_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: vlan_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_vlans_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: vlan_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVLANWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VLAN'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/vrfs:
+    get:
+      operationId: workspaces_organizations_networks_vrfs_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRFResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_vrfs_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VRFWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/vrfs/{vrf_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_vrfs_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: vrf_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_vrfs_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: vrf_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVRFWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRF'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
@@ -10076,6 +10799,9 @@ components:
       - client_asset
       - network_rack
       - network_device
+      - network_vrf
+      - network_vlan
+      - network_subnet
       type: string
       description: |-
         * `organization` - organization
@@ -10085,6 +10811,9 @@ components:
         * `client_asset` - client_asset
         * `network_rack` - network_rack
         * `network_device` - network_device
+        * `network_vrf` - network_vrf
+        * `network_vlan` - network_vlan
+        * `network_subnet` - network_subnet
     EntityRelationship:
       type: object
       properties:
@@ -11640,6 +12369,55 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedSubnetWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        cidr:
+          type: string
+          maxLength: 49
+        vrf_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+    PatchedVLANWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        vlan_id:
+          type: integer
+          maximum: 4094
+          minimum: 1
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+    PatchedVRFWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        route_distinguisher:
+          type: string
+          default: ''
+          maxLength: 64
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PeopleResult:
       type: object
       properties:
@@ -12585,6 +13363,96 @@ components:
         * `expired` - Expired
         * `revoked` - Revoked
         * `accepted` - Accepted
+    Subnet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        cidr:
+          type: string
+        address_family:
+          type: integer
+        vrf_id:
+          type: string
+          format: uuid
+          nullable: true
+        vrf_name:
+          type: string
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_name:
+          type: string
+          nullable: true
+        vlan_number:
+          type: integer
+          nullable: true
+        description:
+          type: string
+      required:
+      - address_family
+      - cidr
+      - description
+      - id
+      - name
+      - vlan_id
+      - vlan_name
+      - vlan_number
+      - vrf_id
+      - vrf_name
+    SubnetResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subnet'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    SubnetWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        cidr:
+          type: string
+          maxLength: 49
+        vrf_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - cidr
+      - name
     TenantAssignableRoleEnum:
       enum:
       - administrator
@@ -12597,6 +13465,121 @@ components:
         * `technician` - Technician
         * `contributor` - Contributor
         * `read_only` - Read-only
+    VLAN:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        vlan_id:
+          type: integer
+        description:
+          type: string
+      required:
+      - description
+      - id
+      - name
+      - vlan_id
+    VLANResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VLAN'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    VLANWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        vlan_id:
+          type: integer
+          maximum: 4094
+          minimum: 1
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - name
+      - vlan_id
+    VRF:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        route_distinguisher:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - id
+      - name
+      - route_distinguisher
+    VRFResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VRF'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    VRFWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        route_distinguisher:
+          type: string
+          default: ''
+          maxLength: 64
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - name
     VisibilityEnum:
       enum:
       - msp_private

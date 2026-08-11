@@ -126,6 +126,14 @@ from apps.core.inventory_views import (
     ClientHardwareLifecycleView,
     ClientVendorListView,
 )
+from apps.core.network_addressing_views import (
+    SubnetDetailView,
+    SubnetListCreateView,
+    VLANDetailView,
+    VLANListCreateView,
+    VRFDetailView,
+    VRFListCreateView,
+)
 from apps.core.network_inventory_views import (
     NetworkChoiceListView,
     NetworkDeviceDetailView,
@@ -402,6 +410,24 @@ urlpatterns = [
         NetworkDeviceDetailView.as_view(),
         name="msp-network-device-detail",
     ),
+    path("api/v1/workspaces/msp/networks/vrfs", VRFListCreateView.as_view(), name="msp-network-vrfs"),
+    path(
+        "api/v1/workspaces/msp/networks/vrfs/<uuid:vrf_entity_id>",
+        VRFDetailView.as_view(),
+        name="msp-network-vrf-detail",
+    ),
+    path("api/v1/workspaces/msp/networks/vlans", VLANListCreateView.as_view(), name="msp-network-vlans"),
+    path(
+        "api/v1/workspaces/msp/networks/vlans/<uuid:vlan_entity_id>",
+        VLANDetailView.as_view(),
+        name="msp-network-vlan-detail",
+    ),
+    path("api/v1/workspaces/msp/networks/subnets", SubnetListCreateView.as_view(), name="msp-network-subnets"),
+    path(
+        "api/v1/workspaces/msp/networks/subnets/<uuid:subnet_entity_id>",
+        SubnetDetailView.as_view(),
+        name="msp-network-subnet-detail",
+    ),
     path(
         "api/v1/custom-field-definitions",
         MSPCustomFieldDefinitionListCreateView.as_view(),
@@ -472,6 +498,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/devices/<uuid:device_entity_id>",
         NetworkDeviceDetailView.as_view(),
         name="organization-network-device-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/vrfs",
+        VRFListCreateView.as_view(),
+        name="organization-network-vrfs",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/vrfs/<uuid:vrf_entity_id>",
+        VRFDetailView.as_view(),
+        name="organization-network-vrf-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/vlans",
+        VLANListCreateView.as_view(),
+        name="organization-network-vlans",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/vlans/<uuid:vlan_entity_id>",
+        VLANDetailView.as_view(),
+        name="organization-network-vlan-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/subnets",
+        SubnetListCreateView.as_view(),
+        name="organization-network-subnets",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/subnets/<uuid:subnet_entity_id>",
+        SubnetDetailView.as_view(),
+        name="organization-network-subnet-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",

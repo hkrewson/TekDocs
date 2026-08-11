@@ -11,9 +11,11 @@ describe('network inventory API client', () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserNetworksClient.listRacks(workspace)
     await browserNetworksClient.listDevices(workspace)
+    await browserNetworksClient.listSubnets(workspace)
     await browserNetworksClient.createRack(workspace, { name: 'Core rack', site_id: 'site-1', location_id: null, unit_count: 42, status: 'active' })
 
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks?page=1&page_size=100', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/subnets?page=1&page_size=100', expect.any(Object))
     const post = vi.mocked(fetch).mock.calls.find(([, options]) => options?.method === 'POST')
     expect(post?.[0]).toBe('/api/v1/workspaces/organizations/client%2F1/networks/racks')
     expect((post?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('network-csrf')
@@ -23,7 +25,9 @@ describe('network inventory API client', () => {
     const workspace = { kind: 'msp', id: 'msp-1' } as never
     await browserNetworksClient.listRacks(workspace)
     await browserNetworksClient.choices(workspace)
+    await browserNetworksClient.listVRFs(workspace)
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/racks?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/choices', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/vrfs?page=1&page_size=100', expect.any(Object))
   })
 })

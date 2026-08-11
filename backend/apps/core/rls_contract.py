@@ -34,6 +34,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_contractcost",
     "core_networkrack",
     "core_networkdevice",
+    "core_networkvrf",
+    "core_networkvlan",
+    "core_networksubnet",
 )
 
 TENANT_SCOPED_TABLES = (

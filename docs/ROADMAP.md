@@ -757,7 +757,7 @@ Evidence: `docs/releases/0.4.0.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.4.1` | **Complete:** addressable racks and network devices, exact-Workspace physical placement, and typed logical relationships. |
-| `0.4.2` | VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
+| `0.4.2` | **Complete:** VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
 | `0.4.3` | Addresses, interfaces, MAC records, assignments, and conflict detection. |
 | `0.4.4` | Circuits, providers, handoffs, contracts, and lifecycle reminders. |
 | `0.4.5` | Wireless networks and permission-aware DNS records. |
@@ -778,6 +778,18 @@ Evidence: `docs/releases/0.4.0.md`.
 - [x] VLANs, VRFs, subnets, addresses, interfaces, circuits, wireless records, diagrams, NetBox reconciliation, bulk transfer, and recycle-bin recovery remain assigned to later network slices.
 
 Evidence: `docs/releases/0.4.1.md`.
+
+### `0.4.2` acceptance criteria
+
+- [x] VRFs, VLANs, and subnets are addressable exact-Workspace records with stable Entities; MSP routes remain exact-MSP rather than client-aggregate views.
+- [x] VLAN IDs are restricted to 1–4094 and unique within one Workspace. Subnets retain canonical IPv4 or IPv6 CIDR, derived address family, an optional same-Workspace VRF, and an optional same-Workspace VLAN.
+- [x] The default routing table is one explicit overlap namespace. Any intersecting prefix in the same default table or VRF is rejected, while identical address space in different VRFs is allowed; VLAN selection never creates a routing namespace.
+- [x] Application validation provides canonical-CIDR guidance, serializes routing-namespace writes, and rejects foreign VRF/VLAN identifiers. PostgreSQL independently validates canonical CIDR, family, entity/ownership edges, and concurrent overlap.
+- [x] `networks.view` and MFA-backed `networks.edit`, permission inventory, forced RLS, non-disclosing detail lookup, sibling-client tests, direct-write tests, and overlap concurrency tests cover all new routes and tables.
+- [x] Property tests exercise IPv4/IPv6 canonicalization and family-aware overlap behavior. The Network page exposes restrained, searchable, keyboard-accessible Subnets, VLANs, and VRFs surfaces in both MSP and client contexts.
+- [x] Addresses, interfaces, MAC assignments, circuits, wireless records, diagrams, reconciliation, bulk transfer, recovery, and scale certification remain later slices.
+
+Evidence: `docs/releases/0.4.2.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

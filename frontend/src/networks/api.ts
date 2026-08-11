@@ -37,6 +37,13 @@ export type NetworkChoices = {
   hardware_assets: Array<{ id: string; name: string }>
 }
 
+export type NetworkVRF = { id: string; name: string; route_distinguisher: string; description: string }
+export type NetworkVLAN = { id: string; name: string; vlan_id: number; description: string }
+export type NetworkSubnet = { id: string; name: string; cidr: string; address_family: 4 | 6; vrf_id: string | null; vrf_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; description: string }
+export type VRFWrite = Omit<NetworkVRF, 'id'>
+export type VLANWrite = Omit<NetworkVLAN, 'id'>
+export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
+
 export type RackWrite = Pick<NetworkRack, 'name' | 'unit_count' | 'status'> & { site_id: string; location_id: string | null }
 export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack_units'> & {
   hardware_asset_id: string | null
@@ -57,6 +64,15 @@ export interface NetworksClient {
   createDevice(workspace: WorkspaceContext, values: DeviceWrite): Promise<NetworkDevice>
   updateDevice(workspace: WorkspaceContext, deviceId: string, values: DeviceWrite): Promise<NetworkDevice>
   choices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetworkChoices>
+  listVRFs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkVRF>>
+  createVRF(workspace: WorkspaceContext, values: VRFWrite): Promise<NetworkVRF>
+  updateVRF(workspace: WorkspaceContext, id: string, values: VRFWrite): Promise<NetworkVRF>
+  listVLANs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkVLAN>>
+  createVLAN(workspace: WorkspaceContext, values: VLANWrite): Promise<NetworkVLAN>
+  updateVLAN(workspace: WorkspaceContext, id: string, values: VLANWrite): Promise<NetworkVLAN>
+  listSubnets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkSubnet>>
+  createSubnet(workspace: WorkspaceContext, values: SubnetWrite): Promise<NetworkSubnet>
+  updateSubnet(workspace: WorkspaceContext, id: string, values: SubnetWrite): Promise<NetworkSubnet>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -109,4 +125,19 @@ export const browserNetworksClient: NetworksClient = {
   async choices(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/choices`, { credentials: 'same-origin', signal }))
   },
+  async listVRFs(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/vrfs?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createVRF: (workspace, values) => write(`${basePath(workspace)}/vrfs`, 'POST', values),
+  updateVRF: (workspace, id, values) => write(`${basePath(workspace)}/vrfs/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listVLANs(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/vlans?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createVLAN: (workspace, values) => write(`${basePath(workspace)}/vlans`, 'POST', values),
+  updateVLAN: (workspace, id, values) => write(`${basePath(workspace)}/vlans/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listSubnets(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/subnets?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createSubnet: (workspace, values) => write(`${basePath(workspace)}/subnets`, 'POST', values),
+  updateSubnet: (workspace, id, values) => write(`${basePath(workspace)}/subnets/${encodeURIComponent(id)}`, 'PATCH', values),
 }

@@ -951,7 +951,9 @@ class ClientSoftwareInstallation(TimestampedModel):
         ):
             raise ValidationError("Software installation must use an exact client software asset scope")
         site = self.site if self.site_id else None
-        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
+        if site is not None and (
+            site.tenant_id != self.tenant_id or site.organization_id != self.organization_id
+        ):
             raise ValidationError("Software installation site must use the asset's client scope")
         if self.status == SoftwareInstallationStatus.INSTALLED and not self.installed_on:
             raise ValidationError("Installed software requires an installation date")
@@ -1971,9 +1973,7 @@ class NetworkDevice(TimestampedModel):
         ):
             raise ValidationError("Network device hardware asset must be hardware in the same Workspace")
         site = self.site if self.site_id else None
-        if site is not None and (
-            site.tenant_id != self.tenant_id or site.organization_id != self.organization_id
-        ):
+        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
             raise ValidationError("Network device site must use its Workspace scope")
         location = self.location if self.location_id else None
         if location is not None and (
@@ -1990,6 +1990,118 @@ class NetworkDevice(TimestampedModel):
             or rack.location_id != self.location_id
         ):
             raise ValidationError("Network device rack must match its physical Workspace location")
+
+
+class NetworkVRF(TimestampedModel):
+    """An isolated routing namespace in one exact Workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_vrfs")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_vrfs", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_vrf")
+    route_distinguisher = models.CharField(max_length=64, blank=True)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        indexes = [models.Index(fields=("tenant", "organization"), name="core_netvrf_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network VRF and entity scopes must match")
+
+
+class NetworkVLAN(TimestampedModel):
+    """A VLAN identifier owned by one exact Workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_vlans")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_vlans", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_vlan")
+    vlan_id = models.PositiveSmallIntegerField()
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("vlan_id", "entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(vlan_id__gte=1, vlan_id__lte=4094), name="network_vlan_id_valid"),
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "vlan_id"),
+                name="network_vlan_id_unique_in_workspace",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "vlan_id"), name="core_netvlan_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.vlan_id} · {self.entity.display_name}"
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network VLAN and entity scopes must match")
+
+
+class NetworkSubnet(TimestampedModel):
+    """A canonical IP prefix in the default table or one explicit VRF."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_subnets")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_subnets", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_subnet")
+    cidr = models.CharField(max_length=49)
+    address_family = models.PositiveSmallIntegerField()
+    vrf = models.ForeignKey(NetworkVRF, on_delete=models.PROTECT, related_name="subnets", null=True, blank=True)
+    vlan = models.ForeignKey(NetworkVLAN, on_delete=models.PROTECT, related_name="subnets", null=True, blank=True)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("address_family", "cidr", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(address_family__in=(4, 6)), name="network_subnet_family_valid"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "vrf"), name="core_netsubnet_scope_idx"),
+            models.Index(fields=("tenant", "organization", "cidr"), name="core_netsubnet_cidr_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.cidr
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network subnet and entity scopes must match")
+        for related, label in (
+            (self.vrf if self.vrf_id else None, "VRF"),
+            (self.vlan if self.vlan_id else None, "VLAN"),
+        ):
+            if related is not None and (
+                related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
+            ):
+                raise ValidationError(f"Network subnet {label} must use its Workspace scope")
 
 
 class EntityLinkType(models.TextChoices):

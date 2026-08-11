@@ -1,5 +1,6 @@
 import secrets
 from typing import Any
+from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth import login
@@ -11,16 +12,23 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_sche
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.models import InstallationState
+from apps.core.models import InstallationState, Organization
 
 from .audit import record_auth_event
 from .bootstrap import bootstrap_owner
 from .invitations import InvitationConflict, accept_invitation, issue_invitation, resend_invitation, revoke_invitation
-from .models import Invitation, User
-from .policy import InstallationMemberContext, PermissionKey, require_installation_member, require_permission
+from .models import BuiltInRole, Invitation, User
+from .policy import (
+    InstallationMemberContext,
+    PermissionKey,
+    require_client_portal_member,
+    require_installation_member,
+    require_permission,
+)
 from .serializers import (
     AuthenticatedContextSerializer,
     BootstrapStatusSerializer,
@@ -42,6 +50,15 @@ def _context_payload(user: User, context: InstallationMemberContext) -> dict[str
         "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
         "role": context.role.value,
         "permissions": sorted(permission.value for permission in context.permissions),
+        "surface": context.surface,
+        "organization": (
+            {
+                "id": str(context.organization.entity_id),
+                "name": context.organization.entity.display_name,
+            }
+            if context.organization is not None
+            else None
+        ),
     }
 
 
@@ -112,6 +129,13 @@ class AuthenticatedContextView(APIView):
         return Response(_context_payload(request.user, context))
 
 
+class ClientPortalContextView(APIView):
+    @extend_schema(responses={200: AuthenticatedContextSerializer, 403: OpenApiResponse(description="Portal required")})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        context = require_client_portal_member(request.user)
+        return Response(_context_payload(request.user, context))
+
+
 class ProfileView(APIView):
     @extend_schema(
         request=ProfileUpdateSerializer,
@@ -173,7 +197,7 @@ class InvitationListCreateView(APIView):
     @extend_schema(responses={200: InvitationSerializer(many=True), 403: OpenApiResponse(description="Owner required")})
     def get(self, request):  # type: ignore[no-untyped-def]
         context = require_permission(request.user, PermissionKey.INVITATIONS_VIEW)
-        invitations = Invitation.scoped.for_tenant(context.tenant)
+        invitations = Invitation.scoped.for_tenant(context.tenant).select_related("organization__entity")
         return Response(InvitationSerializer(invitations, many=True).data)
 
     @extend_schema(
@@ -194,6 +218,49 @@ class InvitationListCreateView(APIView):
             tenant=context.tenant,
             actor=request.user,
             email=serializer.validated_data["email"],
+        )
+        return Response(InvitationSerializer(invitation).data, status=201)
+
+
+class ClientInvitationListCreateView(APIView):
+    def _organization(
+        self,
+        request: Request,
+        organization_entity_id: UUID,
+    ) -> tuple[InstallationMemberContext, Organization]:
+        context = require_permission(request.user, PermissionKey.INVITATIONS_VIEW)
+        organization = get_object_or_404(
+            Organization.scoped.for_tenant(context.tenant)
+            .select_related("entity")
+            .filter(classifications__kind="client", entity__archived_at__isnull=True)
+            .distinct(),
+            entity_id=organization_entity_id,
+        )
+        require_permission(request.user, PermissionKey.INVITATIONS_VIEW, organization=organization)
+        return context, organization
+
+    @extend_schema(responses={200: InvitationSerializer(many=True)})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        context, organization = self._organization(request, organization_entity_id)
+        invitations = (
+            Invitation.scoped.for_tenant(context.tenant)
+            .filter(organization=organization)
+            .select_related("organization__entity")
+        )
+        return Response(InvitationSerializer(invitations, many=True).data)
+
+    @extend_schema(request=InvitationRequestSerializer, responses={201: InvitationSerializer})
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        context, organization = self._organization(request, organization_entity_id)
+        require_permission(request.user, PermissionKey.INVITATIONS_CREATE, organization=organization)
+        serializer = InvitationRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invitation = issue_invitation(
+            tenant=context.tenant,
+            actor=request.user,
+            email=serializer.validated_data["email"],
+            organization=organization,
+            role=BuiltInRole.CLIENT_USER,
         )
         return Response(InvitationSerializer(invitation).data, status=201)
 

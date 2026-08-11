@@ -10,6 +10,8 @@ const context: AuthenticatedContext = {
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
   role: 'owner',
   permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
+  surface: 'msp',
+  organization: null,
 }
 
 function client(overrides: Partial<AuthClient> = {}): AuthClient {

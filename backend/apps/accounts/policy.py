@@ -347,6 +347,11 @@ class InstallationMemberContext:
     role: BuiltInRole
     is_owner: bool
     membership_id: UUID | None = None
+    organization: Organization | None = None
+
+    @property
+    def surface(self) -> str:
+        return "client_portal" if self.role in {BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER} else "msp"
 
     @property
     def data_scope(self) -> DataScope:
@@ -382,7 +387,12 @@ def require_installation_member(user: User) -> InstallationMemberContext:
         return InstallationMemberContext(
             state=state, tenant=state.tenant, user=user, role=BuiltInRole.OWNER, is_owner=True, membership_id=None
         )
-    membership = TenantMembership.scoped.for_tenant(state.tenant).filter(user=user).first()
+    membership = (
+        TenantMembership.scoped.for_tenant(state.tenant)
+        .select_related("organization", "organization__entity")
+        .filter(user=user)
+        .first()
+    )
     if membership is None:
         raise PermissionDenied("Installation membership is required.")
     return InstallationMemberContext(
@@ -392,12 +402,15 @@ def require_installation_member(user: User) -> InstallationMemberContext:
         role=BuiltInRole(membership.role),
         is_owner=False,
         membership_id=membership.id,
+        organization=membership.organization,
     )
 
 
 def _organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:
     if organization.tenant_id != context.tenant.id or organization.entity.archived_at is not None:
         return False
+    if context.surface == "client_portal":
+        return context.organization is not None and organization.id == context.organization.id
     if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED:
         return True
     if context.is_owner:
@@ -433,6 +446,8 @@ def context_has_permission(
     *,
     organization: Organization | None = None,
 ) -> bool:
+    if context.surface == "client_portal":
+        return False
     if not _permission_granted(context, permission, organization=organization):
         return False
     return organization is None or _organization_allowed(context, organization)
@@ -455,6 +470,15 @@ def require_permission(
         ).exists()
     ):
         raise PrivilegedMFARequired()
+    return context
+
+
+def require_client_portal_member(user: User) -> InstallationMemberContext:
+    context = require_installation_member(user)
+    if context.surface != "client_portal" or context.organization is None:
+        raise PermissionDenied("Client portal membership is required.")
+    if context.organization.entity.archived_at is not None:
+        raise PermissionDenied("Client portal membership is unavailable.")
     return context
 
 

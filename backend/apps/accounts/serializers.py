@@ -50,6 +50,8 @@ class AuthenticatedContextSerializer(serializers.Serializer):
     tenant = BootstrapTenantResultSerializer()
     role = serializers.CharField()
     permissions = serializers.ListField(child=serializers.CharField())
+    surface = serializers.ChoiceField(choices=("msp", "client_portal"))
+    organization = serializers.DictField(allow_null=True)
 
 
 class ProfileUpdateSerializer(serializers.Serializer):
@@ -81,11 +83,24 @@ class InvitationAcceptanceSerializer(serializers.Serializer):
 
 
 class InvitationSerializer(serializers.ModelSerializer):
+    organization = serializers.SerializerMethodField()
+
+    def get_organization(self, invitation: Invitation) -> dict[str, str] | None:
+        organization = invitation.organization
+        if organization is None:
+            return None
+        return {
+            "id": str(organization.entity_id),
+            "name": organization.entity.display_name,
+        }
+
     class Meta:
         model = Invitation
         fields = (
             "id",
             "email",
+            "role",
+            "organization",
             "state",
             "expires_at",
             "last_sent_at",

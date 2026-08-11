@@ -10,6 +10,8 @@ export type AuthenticatedContext = {
   }
   role: 'owner' | 'administrator' | 'technician' | 'contributor' | 'read_only' | 'client_administrator' | 'client_user'
   permissions: string[]
+  surface: 'msp' | 'client_portal'
+  organization: { id: string; name: string } | null
 }
 
 export type BootstrapDetails = {

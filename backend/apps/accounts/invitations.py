@@ -15,10 +15,10 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, ValidationError
 
 from apps.core.email import send_invitation_email
-from apps.core.models import AuditEvent, Tenant
+from apps.core.models import AuditEvent, Organization, Tenant
 from apps.core.rls import bind_tenant_scope_if_postgresql
 
-from .models import EMPTY_DIGEST, Invitation, InvitationState, TenantMembership, User
+from .models import EMPTY_DIGEST, BuiltInRole, Invitation, InvitationState, TenantMembership, User
 
 
 class InvitationConflict(APIException):
@@ -113,8 +113,19 @@ def _deliver(issued: IssuedInvitation, actor: User) -> Invitation:
     return current
 
 
-def issue_invitation(*, tenant: Tenant, actor: User, email: str) -> Invitation:
+def issue_invitation(
+    *,
+    tenant: Tenant,
+    actor: User,
+    email: str,
+    organization: Organization | None = None,
+    role: BuiltInRole = BuiltInRole.READ_ONLY,
+) -> Invitation:
     normalized_email = User.objects.normalize_email(email).strip().lower()
+    if organization is not None and organization.tenant_id != tenant.id:
+        raise InvitationConflict("The selected organization is unavailable.")
+    if (organization is None) != (role not in {BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER}):
+        raise InvitationConflict("The invitation role does not match its organization scope.")
     token = _new_token()
     try:
         with transaction.atomic():
@@ -132,6 +143,8 @@ def issue_invitation(*, tenant: Tenant, actor: User, email: str) -> Invitation:
                 _mark_expired(existing, actor)
             invitation = Invitation.objects.create(
                 tenant=tenant,
+                organization=organization,
+                role=role,
                 email=normalized_email,
                 token_digest=Invitation.digest_token(token),
                 invited_by=actor,
@@ -216,7 +229,12 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
                     display_name=display_name.strip(),
                 )
                 EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
-                TenantMembership.objects.create(tenant=invitation.tenant, user=user)
+                TenantMembership.objects.create(
+                    tenant=invitation.tenant,
+                    user=user,
+                    role=invitation.role,
+                    organization=invitation.organization,
+                )
                 invitation.state = InvitationState.ACCEPTED
                 invitation.accepted_by = user
                 invitation.accepted_at = timezone.now()

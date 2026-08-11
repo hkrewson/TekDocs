@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.0
+  version: 0.5.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2456,6 +2456,22 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/portal/context:
+    get:
+      operationId: portal_context_retrieve
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedContext'
+          description: ''
+        '403':
+          description: Portal required
   /api/v1/recycle-bin:
     get:
       operationId: recycle_bin_msp_list
@@ -6361,6 +6377,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecificationVersion'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/client-invitations:
+    get:
+      operationId: workspaces_organizations_client_invitations_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+          description: ''
+    post:
+      operationId: workspaces_organizations_client_invitations_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/contracts:
     get:
@@ -11322,9 +11393,17 @@ components:
           type: array
           items:
             type: string
+        surface:
+          $ref: '#/components/schemas/SurfaceEnum'
+        organization:
+          type: object
+          additionalProperties: {}
+          nullable: true
       required:
+      - organization
       - permissions
       - role
+      - surface
       - tenant
       - user
     AuthenticatedUser:
@@ -14195,6 +14274,16 @@ components:
           type: string
           format: email
           readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/InvitationRoleEnum'
+          readOnly: true
+        organization:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          readOnly: true
         state:
           allOf:
           - $ref: '#/components/schemas/InvitationStateEnum'
@@ -14235,6 +14324,8 @@ components:
       - id
       - last_delivery_failed_at
       - last_sent_at
+      - organization
+      - role
       - send_count
       - state
       - updated_at
@@ -14264,6 +14355,22 @@ components:
           maxLength: 254
       required:
       - email
+    InvitationRoleEnum:
+      enum:
+      - administrator
+      - technician
+      - contributor
+      - read_only
+      - client_administrator
+      - client_user
+      type: string
+      description: |-
+        * `administrator` - Administrator
+        * `technician` - Technician
+        * `contributor` - Contributor
+        * `read_only` - Read-only
+        * `client_administrator` - Client Administrator
+        * `client_user` - Client User
     InvitationStateEnum:
       enum:
       - pending
@@ -17329,6 +17436,14 @@ components:
       required:
       - cidr
       - name
+    SurfaceEnum:
+      enum:
+      - msp
+      - client_portal
+      type: string
+      description: |-
+        * `msp` - msp
+        * `client_portal` - client_portal
     TenantAssignableRoleEnum:
       enum:
       - administrator

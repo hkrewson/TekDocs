@@ -166,6 +166,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("invitation-revoke", ("POST",), mutations=(PermissionKey.INVITATIONS_REVOKE,)),
     route("invitation-resend", ("POST",), mutations=(PermissionKey.INVITATIONS_RESEND,)),
     route(
+        "client-invitation-list-create",
+        ("GET", "POST"),
+        PermissionKey.INVITATIONS_VIEW,
+        (PermissionKey.INVITATIONS_CREATE,),
+        organization_scoped=True,
+    ),
+    route("client-portal-context", ("GET",)),
+    route(
         "organization-list-create",
         ("GET", "POST"),
         PermissionKey.ORGANIZATIONS_VIEW,

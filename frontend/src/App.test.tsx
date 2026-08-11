@@ -14,12 +14,23 @@ const authContext: AuthenticatedContext = {
   tenant: { id: '00000000-0000-4000-8000-000000000002', name: 'Example MSP' },
   role: 'owner',
   permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
+  surface: 'msp',
+  organization: null,
 }
 
 const authClient = {
   listSessions: vi.fn().mockResolvedValue([]),
   loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
 } as unknown as AuthClient
+
+const portalContext: AuthenticatedContext = {
+  ...authContext,
+  user: { ...authContext.user, email: 'client@example.com', display_name: 'Client User' },
+  role: 'client_user',
+  permissions: ['workspaces.view', 'documents.view'],
+  surface: 'client_portal',
+  organization: { id: '00000000-0000-4000-8000-000000000010', name: 'Acme Dental' },
+}
 const loadOrganization = vi.fn().mockResolvedValue({
   kind: 'organization',
   id: '00000000-0000-4000-8000-000000000010',
@@ -69,6 +80,15 @@ const app = (initialPath: string) => <App initialPath={initialPath} initialAuthC
 
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('keeps a client account inside the dedicated portal surface', () => {
+    render(<App initialPath="/overview" initialAuthContext={portalContext} authClient={authClient} />)
+
+    expect(screen.getByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
+    expect(screen.getByText('Your account is bound to this organization and cannot enter the MSP workspace.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+  })
 
   it('renders sectioned navigation and the active route', () => {
     render(app('/overview'))

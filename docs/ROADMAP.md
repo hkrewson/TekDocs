@@ -903,6 +903,17 @@ Evidence: `docs/releases/0.5.0.md`.
 
 Evidence: `docs/releases/0.5.1.md`.
 
+### `0.5.2` acceptance criteria
+
+- [x] Client invitations bind a new account to exactly one active client organization and a client-only built-in role without exposing token material in storage, API output, audit metadata, or URLs after browser intake.
+- [x] Authenticated context declares an MSP or client-portal surface. Client sessions use a separate portal shell and cannot enter MSP navigation or ordinary MSP/organization domain APIs.
+- [x] Portal authorization derives the organization only from immutable membership state; a route identifier cannot switch, widen, or disclose sibling-client scope.
+- [x] MSP sessions cannot consume portal endpoints, and client sessions cannot use invitation administration, organization discovery, workspace switching, or MSP APIs.
+- [x] Django constraints plus PostgreSQL guards enforce role/scope agreement, active client classification, tenant agreement, and immutable invitation/membership organization edges.
+- [x] Invitation/acceptance regression, cross-client negatives, migration reversal/reapplication, frontend accessibility, build, and bundle gates pass. Read-only portal content remains assigned to `0.5.3`.
+
+Evidence: `docs/releases/0.5.2.md`.
+
 ## API and integrations: `0.6.x` → `0.7.0`
 
 | Release | Slice and exit condition |

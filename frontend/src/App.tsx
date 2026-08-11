@@ -58,6 +58,7 @@ import type { InventoryClient } from './inventory/api'
 import type { NetworksClient } from './networks/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
+import { ClientPortal } from './portal/ClientPortal'
 import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
 import { browserRelationshipsClient } from './relationships/api'
@@ -297,9 +298,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.5.1" />
+      <PageHeader title="Overview" description="TekDocs 0.5.2" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.5.1</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.5.2</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -319,6 +320,7 @@ function Overview() {
             ['Session security', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
             ['Controlled publication decisions', 'Available'],
+            ['Client portal identity boundary', 'Available'],
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],
@@ -512,7 +514,12 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   const application = (
     <AuthGate client={authClient} initialContext={initialAuthContext}>
       {({ context, signOut, signingOut, signOutError }) => (
-        <ApplicationShell
+        context.surface === 'client_portal' ? <ClientPortal
+          context={context}
+          onSignOut={signOut}
+          signingOut={signingOut}
+          signOutError={signOutError}
+        /> : <ApplicationShell
           authContext={context}
           authClient={authClient}
           accessControlClient={accessControlClient}

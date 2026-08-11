@@ -20,6 +20,8 @@ from apps.accounts.access_views import (
 from apps.accounts.views import (
     AuthenticatedContextView,
     BootstrapStatusView,
+    ClientInvitationListCreateView,
+    ClientPortalContextView,
     InvitationAcceptView,
     InvitationListCreateView,
     InvitationResendView,
@@ -232,6 +234,7 @@ urlpatterns = [
     path("api/v1/bootstrap/status", BootstrapStatusView.as_view(), name="bootstrap-status"),
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
+    path("api/v1/portal/context", ClientPortalContextView.as_view(), name="client-portal-context"),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),
@@ -287,6 +290,11 @@ urlpatterns = [
     ),
     path("api/v1/invitations/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
     path("api/v1/invitations", InvitationListCreateView.as_view(), name="invitation-list-create"),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/client-invitations",
+        ClientInvitationListCreateView.as_view(),
+        name="client-invitation-list-create",
+    ),
     path("api/v1/markdown/render", MarkdownRenderView.as_view(), name="markdown-render"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),

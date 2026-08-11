@@ -53,11 +53,23 @@ TENANT_ASSIGNABLE_ROLES = (
     BuiltInRole.READ_ONLY,
 )
 TENANT_ASSIGNABLE_ROLE_CHOICES = tuple((role.value, role.label) for role in TENANT_ASSIGNABLE_ROLES)
+MEMBERSHIP_ROLE_CHOICES = tuple(
+    (role.value, role.label)
+    for role in (*TENANT_ASSIGNABLE_ROLES, BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER)
+)
 
 
 class Invitation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="invitations")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="client_invitations",
+        null=True,
+        blank=True,
+    )
+    role = models.CharField(max_length=32, choices=MEMBERSHIP_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
     email = models.EmailField(max_length=254)
     token_digest = models.CharField(max_length=64, blank=True)
     state = models.CharField(max_length=16, choices=InvitationState, default=InvitationState.PENDING)
@@ -120,6 +132,16 @@ class Invitation(models.Model):
                 ),
                 name="invitation_revocation_time_matches_state",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        role__in=(BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER),
+                        organization__isnull=False,
+                    )
+                    | models.Q(role__in=TENANT_ASSIGNABLE_ROLES, organization__isnull=True)
+                ),
+                name="invitation_role_matches_organization_scope",
+            ),
         ]
         indexes = [models.Index(fields=("tenant", "state", "expires_at"))]
 
@@ -143,7 +165,14 @@ class TenantMembership(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="memberships")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="tenant_memberships")
-    role = models.CharField(max_length=32, choices=TENANT_ASSIGNABLE_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
+    role = models.CharField(max_length=32, choices=MEMBERSHIP_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="client_memberships",
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -153,8 +182,18 @@ class TenantMembership(models.Model):
         constraints = [
             models.UniqueConstraint(fields=("tenant", "user"), name="unique_tenant_membership"),
             models.CheckConstraint(
-                condition=models.Q(role__in=tuple(role.value for role in TENANT_ASSIGNABLE_ROLES)),
+                condition=models.Q(role__in=tuple(value for value, _label in MEMBERSHIP_ROLE_CHOICES)),
                 name="tenant_membership_role_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        role__in=(BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER),
+                        organization__isnull=False,
+                    )
+                    | models.Q(role__in=TENANT_ASSIGNABLE_ROLES, organization__isnull=True)
+                ),
+                name="membership_role_matches_organization_scope",
             ),
         ]
 

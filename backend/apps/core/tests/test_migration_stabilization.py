@@ -234,7 +234,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
             "'accounts_access_collection_creator_guard')"
         )
         assert cursor.fetchone() == (0,)
-    call_command("migrate", "accounts", "0014", verbosity=0, interactive=False)
+    call_command("migrate", "accounts", "0016", verbosity=0, interactive=False)
     assert TenantMembership.objects.filter(id=membership.id, tenant=result.tenant, user=member).exists()
     assert ScopedRoleAssignment.objects.filter(id=assignment.id).exists()
     with connection.cursor() as cursor:

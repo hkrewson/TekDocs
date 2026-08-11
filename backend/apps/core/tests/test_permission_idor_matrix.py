@@ -69,6 +69,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "access-control-organization-staff-detail": ("organization_entity_id", "user_id"),
         "invitation-revoke": ("invitation_id",),
         "invitation-resend": ("invitation_id",),
+        "client-invitation-list-create": ("organization_entity_id",),
         "organization-detail": ("entity_id",),
         "msp-entity-relationship-list-create": ("entity_id",),
         "msp-entity-relationship-detail": ("entity_id", "link_id"),

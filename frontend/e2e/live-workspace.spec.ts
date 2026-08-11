@@ -62,6 +62,10 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   if (!setupAddress) throw new Error('Authenticator setup address was unavailable.')
   const totp = OTPAuth.URI.parse(setupAddress)
   if (!(totp instanceof OTPAuth.TOTP)) throw new Error('Authenticator setup did not return a TOTP address.')
+  const secondsIntoWindow = Math.floor(Date.now() / 1000) % totp.period
+  if (secondsIntoWindow >= totp.period - 5) {
+    await page.waitForTimeout((totp.period - secondsIntoWindow + 1) * 1000)
+  }
   await page.getByLabel('Authentication code').fill(totp.generate())
   await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
   await page.getByRole('button', { name: 'I saved these codes' }).click()
@@ -500,6 +504,15 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('NetBox numeric ID').fill('4107')
   await page.getByRole('button', { name: 'Link identity' }).click()
   await expect(page.getByRole('table', { name: 'NetBox object identities for this workspace' }).getByRole('cell', { name: '4107' })).toBeVisible()
+  await page.getByRole('button', { name: 'All records' }).click()
+  await page.getByRole('searchbox', { name: 'Search network inventory' }).fill('192.0.2.10')
+  await expect(page.getByRole('cell', { name: '192.0.2.10', exact: true })).toBeVisible()
+  const exportHref = await page.getByRole('link', { name: 'Export CSV' }).getAttribute('href')
+  expect(exportHref).toMatch(/\/api\/v1\/workspaces\/organizations\/[0-9a-f-]+\/networks\/export$/)
+  const exportResponse = await page.request.get(exportHref ?? '')
+  expect(exportResponse.ok()).toBe(true)
+  expect(exportResponse.headers()['content-type']).toContain('text/csv')
+  expect(await exportResponse.text()).toContain('tekdocs.networks.v1')
 
   await page.getByRole('link', { name: 'Documentation' }).click()
   await page.getByRole('button', { name: 'New document' }).click()

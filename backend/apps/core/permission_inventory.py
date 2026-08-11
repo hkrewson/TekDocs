@@ -307,6 +307,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-asset-model-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-detail", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-network-search", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-network-export", ("GET",), PermissionKey.NETWORKS_VIEW),
     route(
         "msp-netbox-reference-list-create",
         ("GET", "POST"),
@@ -558,6 +560,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route("organization-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True),
+    route("organization-network-search", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True),
+    route("organization-network-export", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True),
     route(
         "organization-netbox-reference-list-create",
         ("GET", "POST"),

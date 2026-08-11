@@ -31,6 +31,7 @@ make test-stabilization
 make test-certification
 make test-documentation-certification
 make test-inventory-certification
+make test-network-stabilization
 ```
 
 For release evidence, also run:
@@ -40,9 +41,11 @@ make clean-install-rehearsal
 make upgrade-rehearsal
 make documentation-upgrade-rehearsal
 make documentation-backup-rehearsal
+make network-upgrade-rehearsal
+make network-backup-rehearsal
 ```
 
-The general upgrade rehearsal begins from the maintained `0.1.3` schema fixture, applies current migrations through the one-shot migration owner, verifies preserved sentinel data, and starts the application under the separate runtime role. The documentation rehearsal separately begins at `0.2.8` with immutable revision history, a managed attachment, a signed STATIC publication, and retained PDF bytes. The backup rehearsal independently captures PostgreSQL and media, restores both into clean volumes, and verifies them with separately retained deployment keys. Docker-backed evidence is mandatory; a SQLite or host-only pass cannot certify migrations or RLS.
+The general upgrade rehearsal begins from the maintained `0.1.3` schema fixture, applies current migrations through the one-shot migration owner, verifies preserved sentinel data, and starts the application under the separate runtime role. The documentation rehearsal separately begins at `0.2.8` with immutable revision history, a managed attachment, a signed STATIC publication, and retained PDF bytes. The network rehearsal begins at `0.4.7`, retains representative network records and NetBox identity, applies the current production images, then verifies exact Workspace ownership plus search/export. Its independent backup rehearsal captures PostgreSQL and media, restores both into clean volumes, and verifies the same data. Docker-backed evidence is mandatory; a SQLite or host-only pass cannot certify migrations or RLS.
 
 ## Failure handling
 

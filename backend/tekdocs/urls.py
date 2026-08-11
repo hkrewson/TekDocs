@@ -170,6 +170,7 @@ from apps.core.network_service_views import (
     WirelessDetailView,
     WirelessListCreateView,
 )
+from apps.core.network_transfer_views import NetworkCsvExportView, NetworkSearchView
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -423,6 +424,8 @@ urlpatterns = [
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
     path("api/v1/workspaces/msp/networks/choices", NetworkChoiceListView.as_view(), name="msp-network-choices"),
+    path("api/v1/workspaces/msp/networks/search", NetworkSearchView.as_view(), name="msp-network-search"),
+    path("api/v1/workspaces/msp/networks/export", NetworkCsvExportView.as_view(), name="msp-network-export"),
     path(
         "api/v1/workspaces/msp/networks/netbox/references",
         NetBoxReferenceCollectionView.as_view(),
@@ -598,6 +601,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/choices",
         NetworkChoiceListView.as_view(),
         name="organization-network-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/search",
+        NetworkSearchView.as_view(),
+        name="organization-network-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/export",
+        NetworkCsvExportView.as_view(),
+        name="organization-network-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/references",

@@ -763,8 +763,8 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.5` | **Complete:** wireless networks and permission-aware DNS zones/records. |
 | `0.4.6` | **Complete:** packaging checkpoint for the deferred `0.4.4` circuit contract; the application version was not downgraded after `0.4.5`. |
 | `0.4.7` | **Complete:** NetBox-compatible identifiers plus a deterministic, provider-input reconciliation seam. |
-| `0.4.8` | Simplify the TekDocs network boundary: asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows. |
-| `0.4.9` | Lightweight network search/export, scale testing, upgrade/restore, and isolation remediation. |
+| `0.4.8` | **Complete:** exact-Workspace network search/export, scale testing, upgrade/restore, and isolation stabilization. |
+| `0.4.9` | Simplify the TekDocs network boundary: asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows. |
 | `0.5.0` | Stabilize and certify network inventory. |
 
 ### `0.4.1` acceptance criteria
@@ -837,9 +837,21 @@ Evidence: `docs/releases/0.4.6.md`.
 - [x] A bounded preview accepts at most 500 normalized `{object_type, object_id, fingerprint}` observations and deterministically reports `current`, `changed`, `unmatched`, and `missing_remote` without changing either system.
 - [x] TekDocs stores no NetBox base URL, API token, arbitrary remote payload, remote display label, or live result body in this slice. No outbound request, scheduled sync, auto-create/update/delete, or bidirectional write-back exists.
 - [x] The Network page exposes accessible loading, empty, error, server-denial, link, unlink-confirmation, search, and exact-workspace states for the identifier seam without implying that a connector has validated NetBox.
-- [x] Model/migration/OpenAPI drift, PostgreSQL RLS/direct-write/isolation, backend API, frontend component/API, and Docker network gates pass. The `0.4.8` migration owns simplification and preservation of already-created Interface/VRF-era records.
+- [x] Model/migration/OpenAPI drift, PostgreSQL RLS/direct-write/isolation, backend API, frontend component/API, and Docker network gates pass. The `0.4.9` migration owns simplification and preservation of already-created Interface/VRF-era records.
 
 Evidence: `docs/releases/0.4.7.md`.
+
+### `0.4.8` acceptance criteria
+
+- [x] One `networks.view` endpoint searches every retained network Entity family inside one resolved MSP or organization Workspace. Search text is bounded, pagination is capped and stable, and results identify the owning section without returning sibling-client or tenant-wide matches.
+- [x] One export-only `tekdocs.networks.v1` CSV contract emits deterministic, exact-Workspace technical inventory across retained network families and NetBox mappings. It excludes costs, linked-contract details, asset-only fields, credential references, arbitrary provider payloads, and every secret-shaped value; all cells are spreadsheet-safe.
+- [x] Search/export authorization uses the central network permission and explicit Workspace owner before filtering. MSP results remain MSP-owned rather than client aggregates, sibling identifiers fail closed, responses are private/non-cacheable, and the permission/IDOR inventory covers both routes.
+- [x] The Network page adds a restrained all-records search surface and direct CSV download. It handles loading, empty, error, stale-Workspace, pagination, keyboard, responsive, and server-denial states while retaining the existing per-section search behavior.
+- [x] A PostgreSQL reference fixture spans at least 100 client Workspaces and 10,000 network Entities. Authorized first/middle/last pages and selective searches retain fixed query ceilings and local p95 below 500 ms; export is streamed rather than assembled as one unbounded response.
+- [x] A `0.4.7` to `0.4.8` production-image upgrade rehearsal and an independent PostgreSQL backup/restore rehearsal preserve representative racks, devices, VLANs, subnets, endpoint addresses, wireless/DNS, circuits/handoffs, and NetBox identities with exact Workspace ownership.
+- [x] The network stabilization gate composes search/export, every network family, NetBox reconciliation, permission/IDOR, forced-RLS, migration, scale, upgrade, restore, frontend, OpenAPI, and real browser-to-Django-to-PostgreSQL evidence. This slice adds no network model family, import/apply path, live NetBox connection, or bidirectional synchronization.
+
+Evidence: `docs/releases/0.4.8.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

@@ -57,6 +57,8 @@ export type NetBoxChoice = { id: string; name: string; entity_type: string; obje
 export type NetBoxReferenceWrite = { entity_id: string; object_type: NetBoxObjectType; object_id: number; fingerprint?: string }
 export type NetBoxObservation = { object_type: NetBoxObjectType; object_id: number; fingerprint: string }
 export type NetBoxPreview = { results: Array<{ object_type: NetBoxObjectType; object_id: number; status: 'current' | 'changed' | 'unmatched' | 'missing_remote'; entity_id: string | null; entity_name: string; entity_type: string }>; counts: Record<string, number> }
+export type NetworkSearchItem = { id: string; name: string; record_type: string; type_label: string; section: 'devices' | 'racks' | 'interfaces' | 'ip-addresses' | 'mac-addresses' | 'subnets' | 'vlans' | 'vrfs' | 'circuits' | 'wireless' | 'dns' }
+export type NetworkSearchResult = { results: NetworkSearchItem[]; page: number; page_size: number; count: number; has_more: boolean }
 export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
@@ -127,6 +129,8 @@ export interface NetworksClient {
   setNetBoxReference(workspace: WorkspaceContext, values: NetBoxReferenceWrite): Promise<NetBoxReference>
   removeNetBoxReference(workspace: WorkspaceContext, id: string): Promise<void>
   previewNetBoxReconciliation(workspace: WorkspaceContext, observations: NetBoxObservation[]): Promise<NetBoxPreview>
+  searchNetwork(workspace: WorkspaceContext, query: string, page?: number, signal?: AbortSignal): Promise<NetworkSearchResult>
+  networkExportUrl(workspace: WorkspaceContext): string
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -250,4 +254,9 @@ export const browserNetworksClient: NetworksClient = {
   setNetBoxReference: (workspace, values) => write(`${basePath(workspace)}/netbox/references`, 'POST', values),
   removeNetBoxReference: (workspace, id) => remove(`${basePath(workspace)}/netbox/references/${encodeURIComponent(id)}`),
   previewNetBoxReconciliation: (workspace, observations) => write(`${basePath(workspace)}/netbox/reconcile-preview`, 'POST', { observations }),
+  async searchNetwork(workspace, query, page = 1, signal) {
+    const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '50' })
+    return json(await fetch(`${basePath(workspace)}/search?${parameters}`, { credentials: 'same-origin', signal }))
+  },
+  networkExportUrl: (workspace) => `${basePath(workspace)}/export`,
 }

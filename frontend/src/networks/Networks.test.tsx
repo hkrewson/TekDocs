@@ -43,6 +43,8 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     listNetBoxReferences: vi.fn().mockResolvedValue([]),
     netBoxChoices: vi.fn().mockResolvedValue({ results: [], can_manage: true }),
     setNetBoxReference: vi.fn(), removeNetBoxReference: vi.fn(), previewNetBoxReconciliation: vi.fn(),
+    searchNetwork: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
+    networkExportUrl: vi.fn().mockReturnValue('/api/v1/workspaces/organizations/client-1/networks/export'),
     ...overrides,
   }
 }
@@ -53,6 +55,22 @@ const relationshipsClient = {
 } as RelationshipsClient
 
 describe('Networks', () => {
+  it('searches all network records and opens the matching section', async () => {
+    const searchNetwork = vi.fn().mockResolvedValue({
+      results: [{ id: 'subnet-1', name: 'Guest network', record_type: 'network_subnet', type_label: 'Subnet', section: 'subnets' }],
+      page: 1, page_size: 50, count: 1, has_more: false,
+    })
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ searchNetwork })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    expect(screen.getByRole('link', { name: 'Export CSV' })).toHaveAttribute('href', '/api/v1/workspaces/organizations/client-1/networks/export')
+    await user.click(screen.getByRole('button', { name: 'All records' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Search network inventory' }), 'Guest')
+    expect(await screen.findByText('Guest network')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Open section' }))
+    expect(screen.getByRole('button', { name: 'Subnets' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('links a lightweight record to a stable NetBox identity', async () => {
     const reference = { id: 'reference-1', entity_id: 'rack-1', entity_name: 'Core rack', entity_type: 'network_rack', object_type: 'dcim.rack' as const, object_id: 41, observed_fingerprint: '', last_observed_at: null }
     const listNetBoxReferences = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([reference])

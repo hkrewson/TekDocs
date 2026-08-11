@@ -177,6 +177,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-client-asset-model-choices": ("organization_entity_id",),
         "organization-client-asset-detail": ("organization_entity_id", "asset_entity_id"),
         "organization-network-choices": ("organization_entity_id",),
+        "organization-network-search": ("organization_entity_id",),
+        "organization-network-export": ("organization_entity_id",),
         "organization-netbox-reference-list-create": ("organization_entity_id",),
         "organization-netbox-reference-detail": ("organization_entity_id", "reference_id"),
         "organization-netbox-reference-choices": ("organization_entity_id",),

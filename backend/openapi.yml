@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.10
+  version: 0.3.11
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -3002,6 +3002,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientAssetBulkResult'
           description: ''
+  /api/v1/workspaces/msp/assets/csv/apply:
+    post:
+      operationId: workspaces_msp_assets_csv_apply_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCsvApplyResult'
+          description: ''
+  /api/v1/workspaces/msp/assets/csv/export:
+    get:
+      operationId: workspaces_msp_assets_csv_export_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Workspace-scoped asset CSV export
+  /api/v1/workspaces/msp/assets/csv/preview:
+    post:
+      operationId: workspaces_msp_assets_csv_preview_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCsvPreview'
+          description: ''
+  /api/v1/workspaces/msp/assets/csv/template:
+    get:
+      operationId: workspaces_msp_assets_csv_template_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Canonical TekDocs asset CSV template
   /api/v1/workspaces/msp/assets/model-choices:
     get:
       operationId: workspaces_msp_assets_model_choices_retrieve
@@ -3971,6 +4043,106 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientAssetBulkResult'
           description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/csv/apply:
+    post:
+      operationId: workspaces_organizations_assets_csv_apply_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetCsvApply'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCsvApplyResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/csv/export:
+    get:
+      operationId: workspaces_organizations_assets_csv_export_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Workspace-scoped asset CSV export
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/csv/preview:
+    post:
+      operationId: workspaces_organizations_assets_csv_preview_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetCsvUpload'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCsvPreview'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/csv/template:
+    get:
+      operationId: workspaces_organizations_assets_csv_template_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Canonical TekDocs asset CSV template
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/model-choices:
     get:
       operationId: workspaces_organizations_assets_model_choices_retrieve
@@ -7067,7 +7239,7 @@ components:
       description: "* `` - \n* `purchase` - purchase\n* `lease` - lease\n* `rental`\
         \ - rental\n* `transfer` - transfer\n* `donation` - donation\n* `other` -\
         \ other"
-    ActionEnum:
+    Action949Enum:
       enum:
       - set_hardware_state
       - archive
@@ -7075,6 +7247,118 @@ components:
       description: |-
         * `set_hardware_state` - set_hardware_state
         * `archive` - archive
+    AssetCsvApply:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+        preview_token:
+          type: string
+          maxLength: 4096
+      required:
+      - file
+      - preview_token
+    AssetCsvApplyResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        skipped:
+          type: integer
+      required:
+      - created
+      - skipped
+      - updated
+    AssetCsvError:
+      type: object
+      properties:
+        row:
+          type: integer
+        message:
+          type: string
+      required:
+      - message
+      - row
+    AssetCsvPreview:
+      type: object
+      properties:
+        schema_version:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetCsvPreviewRow'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetCsvError'
+        summary:
+          type: object
+          additionalProperties:
+            type: integer
+        preview_token:
+          type: string
+          nullable: true
+      required:
+      - errors
+      - preview_token
+      - rows
+      - schema_version
+      - summary
+    AssetCsvPreviewRow:
+      type: object
+      properties:
+        row:
+          type: integer
+        asset_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/AssetCsvPreviewRowKindEnum'
+        action:
+          $ref: '#/components/schemas/AssetCsvPreviewRowActionEnum'
+        changes:
+          type: array
+          items:
+            type: string
+      required:
+      - action
+      - asset_id
+      - changes
+      - kind
+      - name
+      - row
+    AssetCsvPreviewRowActionEnum:
+      enum:
+      - create
+      - update
+      - skip
+      type: string
+      description: |-
+        * `create` - create
+        * `update` - update
+        * `skip` - skip
+    AssetCsvPreviewRowKindEnum:
+      enum:
+      - hardware
+      - software
+      type: string
+      description: |-
+        * `hardware` - hardware
+        * `software` - software
+    AssetCsvUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+      required:
+      - file
     AssetDocumentDetail:
       type: object
       properties:
@@ -7757,7 +8041,7 @@ components:
       type: object
       properties:
         action:
-          $ref: '#/components/schemas/ActionEnum'
+          $ref: '#/components/schemas/Action949Enum'
         processed:
           type: integer
           maximum: 100
@@ -7776,7 +8060,7 @@ components:
           maxItems: 100
           minItems: 1
         action:
-          $ref: '#/components/schemas/ActionEnum'
+          $ref: '#/components/schemas/Action949Enum'
         lifecycle_state:
           $ref: '#/components/schemas/LifecycleStateEnum'
       required:

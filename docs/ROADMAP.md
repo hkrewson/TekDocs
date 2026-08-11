@@ -579,7 +579,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.8` | **Complete:** MSP-owned operational parity for assets, hardware lifecycle, software installations/licenses, contracts/costs, and derived vendors without aggregating client records. |
 | `0.3.9` | **Complete:** explicit immutable MSP/organization Workspace identities, non-null Entity ownership, data backfill, workspace-bound RLS input, and non-orphaning organization retention. |
 | `0.3.10` | **Complete:** attachment-provider/scanner quarantine boundary, hostile-file corpus, exact-workspace asset relationships, and atomic bounded bulk operations. |
-| `0.3.11` | CSV import/export with dry-run, validation, idempotency, and secret-safe exclusions. |
+| `0.3.11` | **Complete:** canonical asset CSV import/export, signed dry-run review, bounded validation, deterministic retry identity, atomic apply, and secret-safe exclusions. |
 | `0.3.12` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
 
@@ -712,6 +712,19 @@ Evidence: `docs/releases/0.3.9.md`.
 - [x] Permission inventory, IDOR/RLS tests, migration/upgrade evidence, OpenAPI, architecture, security/threat model, risks, Compose, release notes, and version metadata agree at `0.3.10`.
 
 Evidence: `docs/releases/0.3.10.md`.
+
+### `0.3.11` acceptance criteria
+
+- [x] TekDocs owns a versioned `tekdocs.assets.v1` exact-header contract and downloadable header-only template; arbitrary column mapping and third-party formats remain later adapters.
+- [x] Export is `assets.view`-authorized and exact-Workspace scoped. Its explicit allowlist excludes assignments, disposal, licenses, costs, contracts, attachments, credential references, secrets, and internal provenance payloads.
+- [x] Spreadsheet-formula-shaped exported cells are escaped, while canonical re-import restores the literal value. UTF-8 decoding, malformed structure, null bytes, file/row/cell bounds, duplicate/unknown/reordered columns, UUIDs, dates, enums, field sizes, catalog kind, and workspace identifiers validate server-side.
+- [x] Import requires MFA/CSRF-protected `assets.edit`, a dry run, and a separate apply. The 15-minute signed token binds the exact bytes, Workspace UUID, and normalized action digest; changed, expired, forged, or cross-workspace previews fail closed.
+- [x] New rows require a stable `import_key` that deterministically resolves one Workspace-owned Entity identity. Existing rows use `asset_id`; retry becomes an unchanged skip, while CSV cannot retarget retained supplier/model provenance.
+- [x] Apply reparses under the current authorization boundary and runs the complete file in one transaction through ordinary creation/lifecycle/audit services. Invalid rows cannot commit a prefix.
+- [x] The Assets surface exposes export, template guidance, file selection, create/update/skip/error counts, row review, explicit apply, loading, error, keyboard, and responsive states; server denial remains authoritative.
+- [x] Backend hostile-file, duplicate-identifier, retry, formula-escape, MSP/client isolation, frontend component, OpenAPI, Compose, architecture, threat-model, risk, and release evidence agree at `0.3.11`.
+
+Evidence: `docs/releases/0.3.11.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

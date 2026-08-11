@@ -295,7 +295,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.10 adds quarantined attachment intake, exact-workspace asset relationships, and atomic bulk inventory changes." />
+      <PageHeader title="Overview" description="TekDocs 0.3.11 adds controlled, preview-first CSV transfer for exact-workspace asset inventory." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">

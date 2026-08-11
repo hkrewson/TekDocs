@@ -6,6 +6,7 @@ import type { AssetDocument, ClientAsset, InventoryClient, ModelChoice } from '.
 import { HardwareLifecycle } from './HardwareLifecycle'
 import { SoftwareInstallation } from './SoftwareInstallation'
 import { AssetRelationships } from './AssetRelationships'
+import { AssetCsvTransfer } from './AssetCsvTransfer'
 
 export function Assets({ workspace, client }: { workspace: WorkspaceContext; client: InventoryClient }) {
   const ownerLabel = workspace.kind === 'msp' ? 'MSP' : 'client'
@@ -27,6 +28,7 @@ export function Assets({ workspace, client }: { workspace: WorkspaceContext; cli
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [document, setDocument] = useState<(AssetDocument & { sanitized_html: string }) | null>(null)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -38,7 +40,7 @@ export function Assets({ workspace, client }: { workspace: WorkspaceContext; cli
       })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client, workspace])
+  }, [client, workspace, reload])
 
   useEffect(() => {
     if (!creating) return
@@ -97,7 +99,7 @@ export function Assets({ workspace, client }: { workspace: WorkspaceContext; cli
   }
 
   return <>
-    <header className="page-header"><div><h1>Assets</h1><p>{ownerLabel}-owned records created from exact supplier models and retained documentation.</p></div>{canManage && <button type="button" className="primary-button" onClick={() => setCreating(true)}><Plus size={16} />New asset</button>}</header>
+    <header className="page-header"><div><h1>Assets</h1><p>{ownerLabel}-owned records created from exact supplier models and retained documentation.</p></div><div className="page-header-actions"><AssetCsvTransfer workspace={workspace} client={client} canManage={canManage} onApplied={() => setReload((value) => value + 1)} />{canManage && <button type="button" className="primary-button" onClick={() => setCreating(true)}><Plus size={16} />New asset</button>}</div></header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {canManage && selectedIds.size > 0 && <section className="content-section asset-bulk-toolbar" aria-label="Bulk asset actions"><strong>{selectedIds.size} selected</strong><label><span>Action</span><select value={bulkAction} onChange={(event) => { setBulkAction(event.target.value as 'set_hardware_state' | 'archive'); setConfirmingArchive(false) }}><option value="set_hardware_state">Change hardware state</option><option value="archive">Archive assets</option></select></label>{bulkAction === 'set_hardware_state' && <label><span>State</span><select value={bulkState} onChange={(event) => setBulkState(event.target.value as typeof bulkState)}><option value="in_stock">In stock</option><option value="in_service">In service</option><option value="repair">Repair</option><option value="retired">Retired</option></select></label>}{bulkAction === 'archive' && confirmingArchive ? <><span role="status">Archive {selectedIds.size} selected assets? They can be restored from the recycle bin.</span><button className="secondary-button danger" type="button" disabled={saving} onClick={() => { void applyBulkAction() }}><Archive size={15} />{saving ? 'Archiving…' : 'Confirm archive'}</button><button className="row-action" type="button" disabled={saving} onClick={() => setConfirmingArchive(false)}>Cancel</button></> : <button className={bulkAction === 'archive' ? 'secondary-button danger' : 'secondary-button'} type="button" disabled={saving} onClick={() => { if (bulkAction === 'archive') setConfirmingArchive(true); else void applyBulkAction() }}>{bulkAction === 'archive' ? <Archive size={15} /> : null}{saving ? 'Applying…' : bulkAction === 'archive' ? 'Review archive' : 'Apply'}</button>}<button className="row-action" type="button" disabled={saving} onClick={() => { setSelectedIds(new Set()); setConfirmingArchive(false) }}>Clear</button></section>}
     {phase === 'loading' && <section className="content-section" role="status">Loading {ownerLabel} assets…</section>}

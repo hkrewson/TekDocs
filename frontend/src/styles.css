@@ -94,6 +94,25 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .page-header { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .page-header h1 { margin: 0 0 6px; font-size: 25px; line-height: 1.2; letter-spacing: -.018em; }
 .page-header p { max-width: 680px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.page-header-actions, .asset-transfer-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.asset-csv-panel { margin: -8px 0 24px; }
+.asset-csv-panel .section-heading { margin-bottom: 12px; }
+.asset-csv-guidance { max-width: 860px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.asset-csv-file { display: grid; gap: 6px; max-width: 560px; margin: 18px 0 14px; }
+.asset-csv-file > span { font-size: 13px; font-weight: 600; }
+.asset-csv-file input { width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.asset-csv-preview { display: grid; gap: 16px; margin-top: 18px; }
+.asset-csv-preview dl { display: flex; gap: 24px; margin: 0; padding: 12px 0; border-block: 1px solid var(--border); }
+.asset-csv-preview dl div { display: grid; gap: 2px; }
+.asset-csv-preview dt { color: var(--muted); font-size: 12px; }
+.asset-csv-preview dd { margin: 0; font-size: 18px; font-weight: 650; }
+.asset-csv-errors { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.asset-csv-errors li { display: flex; gap: 12px; padding: 9px 11px; border-left: 3px solid #a94f40; background: #fbf5f3; font-size: 13px; }
+.asset-csv-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+.asset-csv-table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.asset-csv-table-wrap th, .asset-csv-table-wrap td { padding: 9px 11px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.asset-csv-table-wrap th { color: var(--muted); background: #f4f3ef; font-size: 12px; font-weight: 600; }
+.asset-csv-table-wrap tr:last-child td { border-bottom: 0; }
 .primary-button { min-height: 36px; padding: 0 14px; color: #fffaf2; background: var(--accent); border: 1px solid var(--accent); border-radius: 7px; cursor: pointer; }
 .primary-button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .primary-button:disabled { color: #e1d8cc; background: #8c7356; border-color: #8c7356; cursor: wait; }

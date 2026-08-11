@@ -326,6 +326,7 @@ def create_client_asset(
     actor_id: UUID,
     model_entity_id: UUID,
     name: str,
+    entity_id: UUID | None = None,
 ) -> ClientAsset:
     require_operational_owner(organization)
     # Supplier catalog rows are a read-only RLS projection in client context.
@@ -361,7 +362,11 @@ def create_client_asset(
         "specifications": revision.specifications,
     }
     display_name = name.strip() or model.entity.display_name
+    entity_values: dict[str, object] = {}
+    if entity_id is not None:
+        entity_values["id"] = entity_id
     entity = Entity.objects.create(
+        **entity_values,
         tenant=tenant,
         workspace=workspace_for_owner(tenant=tenant, organization=organization),
         organization=organization,

@@ -1,3 +1,5 @@
+import csv
+import io
 import secrets
 import uuid
 
@@ -5,11 +7,13 @@ import psycopg
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.asset_csv import FIELDS, SCHEMA_VERSION
 from apps.core.models import (
     ClientAsset,
     ClientAssetDocumentProvenance,
@@ -158,6 +162,129 @@ def _software_asset(owner_client, installation, supplier, client, name="Endpoint
     ).json()
 
 
+def _asset_csv(*rows):  # type: ignore[no-untyped-def]
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=FIELDS, lineterminator="\r\n")
+    writer.writeheader()
+    for values in rows:
+        writer.writerow({field: values.get(field, "") for field in FIELDS})
+    return output.getvalue().encode()
+
+
+def _csv_upload(content):  # type: ignore[no-untyped-def]
+    return SimpleUploadedFile("assets.csv", content, content_type="text/csv")
+
+
+@pytest.mark.django_db
+def test_asset_csv_preview_apply_retry_export_and_workspace_isolation(owner_client, installation):
+    supplier = _organization(installation, "CSV Hardware", "manufacturer")
+    client = _organization(installation, "CSV Client", "client")
+    other_client = _organization(installation, "Other CSV Client", "client")
+    _definition, _product, model, _document, _publication = _catalog(owner_client, supplier)
+    content = _asset_csv(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "import_key": "switch-001",
+            "name": "=Core switch",
+            "kind": "hardware",
+            "model_id": model["id"],
+            "serial_number": "csv-001",
+            "asset_tag": "edge-001",
+            "lifecycle_state": "in_service",
+            "acquired_on": "2026-08-10",
+            "acquisition_method": "purchase",
+        }
+    )
+    base = {"organization_entity_id": client.entity_id}
+    preview = owner_client.post(
+        reverse("organization-asset-csv-preview", kwargs=base),
+        {"file": _csv_upload(content)},
+    )
+    assert preview.status_code == 200
+    assert preview.json()["summary"] == {"total": 1, "create": 1, "update": 0, "skip": 0, "errors": 0}
+    token = preview.json()["preview_token"]
+
+    applied = owner_client.post(
+        reverse("organization-asset-csv-apply", kwargs=base),
+        {"file": _csv_upload(content), "preview_token": token},
+    )
+    assert applied.status_code == 200
+    assert applied.json() == {"created": 1, "updated": 0, "skipped": 0}
+    asset = ClientAsset.objects.select_related("entity", "hardware").get(organization=client)
+    assert asset.entity.display_name == "=Core switch"
+    assert asset.hardware.serial_number == "CSV-001"
+
+    retry_preview = owner_client.post(
+        reverse("organization-asset-csv-preview", kwargs=base),
+        {"file": _csv_upload(content)},
+    ).json()
+    assert retry_preview["summary"]["skip"] == 1
+    retry = owner_client.post(
+        reverse("organization-asset-csv-apply", kwargs=base),
+        {"file": _csv_upload(content), "preview_token": retry_preview["preview_token"]},
+    )
+    assert retry.json() == {"created": 0, "updated": 0, "skipped": 1}
+    assert ClientAsset.objects.filter(organization=client).count() == 1
+
+    exported = owner_client.get(reverse("organization-asset-csv-export", kwargs=base))
+    assert exported.status_code == 200
+    assert b"'=Core switch" in exported.content
+    assert b"credential" not in exported.content.lower()
+    assert owner_client.get(reverse("organization-asset-csv-template", kwargs=base)).content == _asset_csv()
+
+    cross_scope = _asset_csv(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "asset_id": str(asset.entity_id),
+            "name": "Cross-scope update",
+            "kind": "hardware",
+            "model_id": model["id"],
+        }
+    )
+    rejected = owner_client.post(
+        reverse(
+            "organization-asset-csv-preview",
+            kwargs={"organization_entity_id": other_client.entity_id},
+        ),
+        {"file": _csv_upload(cross_scope)},
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["summary"]["errors"] == 1
+    assert rejected.json()["preview_token"] is None
+
+
+@pytest.mark.django_db
+def test_asset_csv_rejects_hostile_files_and_duplicate_identifiers_before_apply(owner_client, installation):
+    supplier = _organization(installation, "CSV Rollback Hardware", "manufacturer")
+    client = _organization(installation, "CSV Rollback Client", "client")
+    _definition, _product, model, _document, _publication = _catalog(owner_client, supplier)
+    base = {"organization_entity_id": client.entity_id}
+    hostile = owner_client.post(
+        reverse("organization-asset-csv-preview", kwargs=base),
+        {"file": _csv_upload(b"schema_version\x00,asset_id\n")},
+    )
+    assert hostile.status_code == 400
+    assert "null bytes" in str(hostile.json())
+
+    common = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "hardware",
+        "model_id": model["id"],
+        "serial_number": "DUPLICATE-001",
+    }
+    content = _asset_csv(
+        {**common, "import_key": "first", "name": "First switch"},
+        {**common, "import_key": "second", "name": "Second switch"},
+    )
+    preview = owner_client.post(
+        reverse("organization-asset-csv-preview", kwargs=base),
+        {"file": _csv_upload(content)},
+    ).json()
+    assert preview["summary"]["errors"] == 1
+    assert preview["preview_token"] is None
+    assert ClientAsset.objects.filter(organization=client).count() == 0
+
+
 @pytest.mark.django_db
 def test_msp_assets_are_owned_not_aggregated_and_cannot_cross_workspace(owner_client, installation):
     supplier = _organization(installation, "Parity Hardware", "manufacturer")
@@ -183,15 +310,19 @@ def test_msp_assets_are_owned_not_aggregated_and_cannot_cross_workspace(owner_cl
     )
     assert [record["name"] for record in msp_list.json()["results"]] == ["MSP switch"]
     assert [record["name"] for record in client_list.json()["results"]] == ["Client switch"]
-    assert owner_client.get(
-        reverse("msp-asset-detail", kwargs={"asset_entity_id": client_asset.json()["id"]})
-    ).status_code == 404
-    assert owner_client.get(
-        reverse(
-            "organization-client-asset-detail",
-            kwargs={"organization_entity_id": client.entity_id, "asset_entity_id": msp_asset.json()["id"]},
-        )
-    ).status_code == 404
+    assert (
+        owner_client.get(reverse("msp-asset-detail", kwargs={"asset_entity_id": client_asset.json()["id"]})).status_code
+        == 404
+    )
+    assert (
+        owner_client.get(
+            reverse(
+                "organization-client-asset-detail",
+                kwargs={"organization_entity_id": client.entity_id, "asset_entity_id": msp_asset.json()["id"]},
+            )
+        ).status_code
+        == 404
+    )
 
     msp_hardware = ClientAsset.objects.select_related("hardware").get(entity_id=msp_asset.json()["id"])
     assert msp_hardware.organization_id is None
@@ -541,7 +672,11 @@ def test_hardware_identity_assignment_disposal_and_history_are_scoped(owner_clie
     assert owner_client.patch(hardware_url, {"asset_tag": "LATE"}, content_type="application/json").status_code == 400
     history = owner_client.get(reverse("organization-client-hardware-lifecycle", kwargs=base)).json()
     assert [event["event_type"] for event in reversed(history)] == [
-        "created", "state_changed", "assigned", "unassigned", "disposed"
+        "created",
+        "state_changed",
+        "assigned",
+        "unassigned",
+        "disposed",
     ]
     assert ClientHardwareAsset.objects.get(asset__entity_id=asset["id"]).disposal_reason == "Replaced"
     assert ClientAssetLifecycleEvent.objects.filter(asset__entity_id=asset["id"]).exists()
@@ -626,9 +761,15 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
     license_record = owner_client.post(
         reverse("organization-software-license-list-create", kwargs={"organization_entity_id": client.entity_id}),
         {
-            "name": "Secure Agent annual entitlement", "asset_id": asset["id"], "kind": "subscription",
-            "seat_limit": 1, "starts_on": "2026-08-01", "renews_on": "2027-08-01",
-            "ends_on": "2027-08-31", "renewal_interval": "annual", "auto_renew": True,
+            "name": "Secure Agent annual entitlement",
+            "asset_id": asset["id"],
+            "kind": "subscription",
+            "seat_limit": 1,
+            "starts_on": "2026-08-01",
+            "renews_on": "2027-08-01",
+            "ends_on": "2027-08-31",
+            "renewal_interval": "annual",
+            "auto_renew": True,
             "reference": "CONTRACT-REFERENCE",
         },
         content_type="application/json",
@@ -691,7 +832,8 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
             "organization-software-license-seat",
             kwargs={"organization_entity_id": client.entity_id, "license_entity_id": payload["id"]},
         ),
-        {"installation_id": installation_id}, content_type="application/json",
+        {"installation_id": installation_id},
+        content_type="application/json",
     )
     assert exhausted.status_code == 400
     assert b"No seats" in exhausted.content
@@ -738,17 +880,17 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
     )
     assert inactive_assignment.status_code == 400
     assert b"active license" in inactive_assignment.content
-    sibling_read = owner_client.get(reverse(
-        "organization-software-license-detail",
-        kwargs={"organization_entity_id": sibling.entity_id, "license_entity_id": payload["id"]},
-    ))
+    sibling_read = owner_client.get(
+        reverse(
+            "organization-software-license-detail",
+            kwargs={"organization_entity_id": sibling.entity_id, "license_entity_id": payload["id"]},
+        )
+    )
     assert sibling_read.status_code == 404
     event_types = SoftwareLicenseEvent.objects.filter(license__entity_id=payload["id"]).values_list(
         "event_type", flat=True
     )
-    assert set(event_types) == {
-        "created", "installation_linked", "seat_assigned", "seat_revoked", "details_updated"
-    }
+    assert set(event_types) == {"created", "installation_linked", "seat_assigned", "seat_revoked", "details_updated"}
     assert ClientSoftwareInstallation.objects.get(asset__entity_id=asset["id"]).status == "installed"
 
 

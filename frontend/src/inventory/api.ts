@@ -78,6 +78,13 @@ export type DerivedVendor = {
   classifications: string[]
   asset_count: number
 }
+export type AssetCsvPreview = {
+  schema_version: string
+  rows: Array<{ row: number; asset_id: string; name: string; kind: 'hardware' | 'software'; action: 'create' | 'update' | 'skip'; changes: string[] }>
+  errors: Array<{ row: number; message: string }>
+  summary: { total: number; create: number; update: number; skip: number; errors: number }
+  preview_token: string | null
+}
 
 export interface InventoryClient {
   listAssets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: ClientAsset[]; count: number; can_manage: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }>
@@ -101,6 +108,10 @@ export interface InventoryClient {
   loadDocument(workspace: WorkspaceContext, assetId: string, publicationId: string): Promise<AssetDocument & { sanitized_html: string }>
   listVendors(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: DerivedVendor[]; count: number }>
   artifactUrl(workspace: WorkspaceContext, assetId: string, publicationId: string, artifactId: string): string
+  assetCsvTemplateUrl(workspace: WorkspaceContext): string
+  assetCsvExportUrl(workspace: WorkspaceContext): string
+  previewAssetCsv(workspace: WorkspaceContext, file: File): Promise<AssetCsvPreview>
+  applyAssetCsv(workspace: WorkspaceContext, file: File, previewToken: string): Promise<{ created: number; updated: number; skipped: number }>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -140,6 +151,13 @@ async function mutate<T>(path: string, method: string, body?: object): Promise<T
   }))
 }
 
+async function mutateForm<T>(path: string, body: FormData): Promise<T> {
+  await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+  return parse(await fetch(path, {
+    method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken() }, body,
+  }))
+}
+
 export const browserInventoryClient: InventoryClient = {
   listAssets: (workspace, signal) => get(`${basePath(workspace)}/assets`, signal),
   listModelChoices: (workspace, query, signal) => get(`${basePath(workspace)}/assets/model-choices?q=${encodeURIComponent(query)}`, signal),
@@ -168,4 +186,14 @@ export const browserInventoryClient: InventoryClient = {
   loadDocument: (workspace, assetId, publicationId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}`),
   listVendors: (workspace, signal) => get(`${basePath(workspace)}/vendors`, signal),
   artifactUrl: (workspace, assetId, publicationId, artifactId) => `${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,
+  assetCsvTemplateUrl: (workspace) => `${basePath(workspace)}/assets/csv/template`,
+  assetCsvExportUrl: (workspace) => `${basePath(workspace)}/assets/csv/export`,
+  previewAssetCsv: (workspace, file) => {
+    const body = new FormData(); body.append('file', file)
+    return mutateForm(`${basePath(workspace)}/assets/csv/preview`, body)
+  },
+  applyAssetCsv: (workspace, file, previewToken) => {
+    const body = new FormData(); body.append('file', file); body.append('preview_token', previewToken)
+    return mutateForm(`${basePath(workspace)}/assets/csv/apply`, body)
+  },
 }

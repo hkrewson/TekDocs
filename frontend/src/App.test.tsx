@@ -62,6 +62,8 @@ const listAssets = vi.fn().mockResolvedValue({ results: [], count: 0, can_manage
 const inventoryClient = {
   listAssets,
   listModelChoices: vi.fn().mockResolvedValue({ results: [] }),
+  assetCsvExportUrl: vi.fn().mockReturnValue('/assets.csv'),
+  assetCsvTemplateUrl: vi.fn().mockReturnValue('/assets-template.csv'),
 } as unknown as InventoryClient
 const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />
 

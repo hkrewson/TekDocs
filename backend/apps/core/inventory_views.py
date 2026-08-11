@@ -13,6 +13,13 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .asset_csv import (
+    AssetCsvError,
+    apply_assets_csv,
+    export_assets_csv,
+    preview_assets_csv,
+    template_csv,
+)
 from .inventory import (
     InventoryError,
     assets_for_scope,
@@ -41,6 +48,7 @@ from .models import (
     Organization,
 )
 from .publications import PublicationConflict, read_publication_artifact, verify_publication
+from .software_inventory import SoftwareInventoryError
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -89,6 +97,53 @@ class ClientAssetBulkWriteSerializer(StrictSerializer):
 class ClientAssetBulkResultSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=("set_hardware_state", "archive"))
     processed = serializers.IntegerField(min_value=1, max_value=100)
+
+
+class AssetCsvUploadSerializer(StrictSerializer):
+    file = serializers.FileField()
+
+    def validate_file(self, value):  # type: ignore[no-untyped-def]
+        if value.content_type not in {
+            "text/csv",
+            "application/csv",
+            "application/vnd.ms-excel",
+            "application/octet-stream",
+            "text/plain",
+        }:
+            raise serializers.ValidationError("Choose a CSV file.")
+        return value
+
+
+class AssetCsvApplySerializer(AssetCsvUploadSerializer):
+    preview_token = serializers.CharField(max_length=4096)
+
+
+class AssetCsvPreviewRowSerializer(serializers.Serializer):
+    row = serializers.IntegerField()
+    asset_id = serializers.UUIDField()
+    name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=("hardware", "software"))
+    action = serializers.ChoiceField(choices=("create", "update", "skip"))
+    changes = serializers.ListField(child=serializers.CharField())
+
+
+class AssetCsvErrorSerializer(serializers.Serializer):
+    row = serializers.IntegerField()
+    message = serializers.CharField()
+
+
+class AssetCsvPreviewSerializer(serializers.Serializer):
+    schema_version = serializers.CharField()
+    rows = AssetCsvPreviewRowSerializer(many=True)
+    errors = AssetCsvErrorSerializer(many=True)
+    summary = serializers.DictField(child=serializers.IntegerField())
+    preview_token = serializers.CharField(allow_null=True)
+
+
+class AssetCsvApplyResultSerializer(serializers.Serializer):
+    created = serializers.IntegerField()
+    updated = serializers.IntegerField()
+    skipped = serializers.IntegerField()
 
 
 class CatalogModelChoiceSerializer(serializers.Serializer):
@@ -199,9 +254,7 @@ class HardwareDetailWriteSerializer(StrictSerializer):
     serial_number = serializers.CharField(max_length=160, allow_blank=True, required=False)
     asset_tag = serializers.CharField(max_length=120, allow_blank=True, required=False)
     lifecycle_state = serializers.ChoiceField(
-        choices=[
-            choice for choice in HardwareLifecycleState.values if choice != HardwareLifecycleState.DISPOSED
-        ],
+        choices=[choice for choice in HardwareLifecycleState.values if choice != HardwareLifecycleState.DISPOSED],
         required=False,
     )
     acquired_on = serializers.DateField(allow_null=True, required=False)
@@ -374,6 +427,61 @@ class ClientAssetBulkView(APIView):
         return Response(ClientAssetBulkResultSerializer({"action": values["action"], "processed": processed}).data)
 
 
+class ClientAssetCsvTemplateView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Canonical TekDocs asset CSV template")})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        response = HttpResponse(template_csv(), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="tekdocs-assets-template.csv"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class ClientAssetCsvExportView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Workspace-scoped asset CSV export")})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        response = HttpResponse(export_assets_csv(workspace.data_scope), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="tekdocs-assets.csv"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class ClientAssetCsvPreviewView(APIView):
+    @extend_schema(request=AssetCsvUploadSerializer, responses={200: AssetCsvPreviewSerializer})
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = AssetCsvUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            preview = preview_assets_csv(scope=workspace.data_scope, content=serializer.validated_data["file"].read())
+        except AssetCsvError as exc:
+            raise serializers.ValidationError({"file": str(exc)}) from exc
+        return Response(AssetCsvPreviewSerializer(preview).data)
+
+
+class ClientAssetCsvApplyView(APIView):
+    @extend_schema(request=AssetCsvApplySerializer, responses={200: AssetCsvApplyResultSerializer})
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        serializer = AssetCsvApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = apply_assets_csv(
+                scope=workspace.data_scope,
+                content=serializer.validated_data["file"].read(),
+                preview_token=serializer.validated_data["preview_token"],
+                actor_id=request.user.pk,
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+            )
+        except (AssetCsvError, InventoryError, SoftwareInventoryError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(AssetCsvApplyResultSerializer(result).data)
+
+
 class ClientAssetDetailView(APIView):
     @extend_schema(responses={200: ClientAssetSerializer})
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
@@ -419,8 +527,7 @@ class ClientHardwareAssignmentChoicesView(APIView):
                 "people": [{"id": item.id, "name": item.person.entity.display_name} for item in people],
                 "sites": [{"id": item.id, "name": item.entity.display_name} for item in sites],
                 "locations": [
-                    {"id": item.id, "name": item.entity.display_name, "site_id": item.site_id}
-                    for item in locations
+                    {"id": item.id, "name": item.entity.display_name, "site_id": item.site_id} for item in locations
                 ],
             }
         )
@@ -492,9 +599,7 @@ class ClientAssetModelChoiceListView(APIView):
 
 
 class ClientAssetDocumentDetailView(APIView):
-    @extend_schema(
-        responses={200: AssetDocumentDetailSerializer}
-    )
+    @extend_schema(responses={200: AssetDocumentDetailSerializer})
     def get(self, request, organization_entity_id, asset_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         asset = _asset(workspace, asset_entity_id)

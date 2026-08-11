@@ -110,6 +110,10 @@ from apps.core.document_views import (
 )
 from apps.core.inventory_views import (
     ClientAssetBulkView,
+    ClientAssetCsvApplyView,
+    ClientAssetCsvExportView,
+    ClientAssetCsvPreviewView,
+    ClientAssetCsvTemplateView,
     ClientAssetDetailView,
     ClientAssetDocumentArtifactDownloadView,
     ClientAssetDocumentDetailView,
@@ -504,6 +508,30 @@ urlpatterns = [
         name="msp-asset-bulk",
     ),
     path(
+        "api/v1/workspaces/msp/assets/csv/template",
+        ClientAssetCsvTemplateView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-csv-template",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/csv/export",
+        ClientAssetCsvExportView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-csv-export",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/csv/preview",
+        ClientAssetCsvPreviewView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-csv-preview",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/csv/apply",
+        ClientAssetCsvApplyView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-csv-apply",
+    ),
+    path(
         "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>",
         ClientAssetDetailView.as_view(),
         {"organization_entity_id": None},
@@ -643,6 +671,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/bulk",
         ClientAssetBulkView.as_view(),
         name="organization-client-asset-bulk",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/csv/template",
+        ClientAssetCsvTemplateView.as_view(),
+        name="organization-asset-csv-template",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/csv/export",
+        ClientAssetCsvExportView.as_view(),
+        name="organization-asset-csv-export",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/csv/preview",
+        ClientAssetCsvPreviewView.as_view(),
+        name="organization-asset-csv-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/csv/apply",
+        ClientAssetCsvApplyView.as_view(),
+        name="organization-asset-csv-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>",

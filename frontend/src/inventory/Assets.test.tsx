@@ -58,6 +58,10 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     loadDocument: vi.fn().mockResolvedValue({ ...asset.documents[0], sanitized_html: '<h1>Installation guide</h1>' }),
     listVendors: vi.fn().mockResolvedValue({ results: [], count: 0 }),
     artifactUrl: vi.fn().mockReturnValue('/retained.pdf'),
+    assetCsvTemplateUrl: vi.fn().mockReturnValue('/assets-template.csv'),
+    assetCsvExportUrl: vi.fn().mockReturnValue('/assets.csv'),
+    previewAssetCsv: vi.fn(),
+    applyAssetCsv: vi.fn(),
     ...overrides,
   }
 }
@@ -74,6 +78,26 @@ describe('Assets', () => {
     expect(await screen.findByText('created')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Installation guide/ }))
     expect(await screen.findByText('Approved')).toBeInTheDocument()
+  })
+
+  it('requires a reviewed dry run before applying an asset CSV', async () => {
+    const user = userEvent.setup()
+    const previewAssetCsv = vi.fn().mockResolvedValue({
+      schema_version: 'tekdocs.assets.v1',
+      rows: [{ row: 2, asset_id: 'asset-2', name: 'Imported switch', kind: 'hardware', action: 'create', changes: ['asset'] }],
+      errors: [], summary: { total: 1, create: 1, update: 0, skip: 0, errors: 0 }, preview_token: 'signed-preview',
+    })
+    const applyAssetCsv = vi.fn().mockResolvedValue({ created: 1, updated: 0, skipped: 0 })
+    render(<Assets workspace={workspace} client={inventoryClient({ previewAssetCsv, applyAssetCsv })} />)
+    await user.click(await screen.findByRole('button', { name: 'Import CSV' }))
+    const file = new File(['schema_version\ntekdocs.assets.v1\n'], 'assets.csv', { type: 'text/csv' })
+    await user.upload(screen.getByLabelText('TekDocs asset CSV'), file)
+    await user.click(screen.getByRole('button', { name: 'Preview changes' }))
+    expect(await screen.findByText('Imported switch')).toBeInTheDocument()
+    expect(previewAssetCsv).toHaveBeenCalledWith(workspace, file)
+    await user.click(screen.getByRole('button', { name: 'Apply import' }))
+    await waitFor(() => expect(applyAssetCsv).toHaveBeenCalledWith(workspace, file, 'signed-preview'))
+    expect(await screen.findByText('1 created, 0 updated, 0 unchanged.')).toBeInTheDocument()
   })
 
   it('creates an asset from an exact supplier model', async () => {

@@ -32,4 +32,22 @@ describe('inventory API client', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses', expect.any(Object))
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors', expect.any(Object))
   })
+
+  it('sends CSV preview and apply as CSRF-protected multipart requests', async () => {
+    const workspace = { kind: 'organization', id: 'client-1' } as never
+    const file = new File(['schema_version\n'], 'assets.csv', { type: 'text/csv' })
+    await browserInventoryClient.previewAssetCsv(workspace, file)
+    await browserInventoryClient.applyAssetCsv(workspace, file, 'signed-preview')
+
+    const calls = vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === 'POST')
+    expect(calls.map(([url]) => url)).toEqual([
+      '/api/v1/workspaces/organizations/client-1/assets/csv/preview',
+      '/api/v1/workspaces/organizations/client-1/assets/csv/apply',
+    ])
+    const applyBody = calls[1][1]?.body as FormData
+    expect(applyBody.get('file')).toBe(file)
+    expect(applyBody.get('preview_token')).toBe('signed-preview')
+    expect((calls[1][1]?.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+    expect((calls[1][1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('inventory-csrf')
+  })
 })

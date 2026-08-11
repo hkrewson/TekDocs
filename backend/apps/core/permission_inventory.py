@@ -328,6 +328,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-network-vlan-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route("msp-network-subnets", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route("msp-network-subnet-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-interfaces", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-interface-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route("msp-network-ip-addresses", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-ip-address-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route("msp-network-mac-addresses", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-mac-address-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-hardware-assignment-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route(
@@ -595,6 +607,48 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-network-subnet-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-interfaces",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-interface-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-ip-addresses",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-ip-address-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-mac-addresses",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-mac-address-detail",
         ("GET", "PATCH"),
         PermissionKey.NETWORKS_VIEW,
         (PermissionKey.NETWORKS_EDIT,),

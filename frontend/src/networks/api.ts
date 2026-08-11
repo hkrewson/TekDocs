@@ -40,9 +40,15 @@ export type NetworkChoices = {
 export type NetworkVRF = { id: string; name: string; route_distinguisher: string; description: string }
 export type NetworkVLAN = { id: string; name: string; vlan_id: number; description: string }
 export type NetworkSubnet = { id: string; name: string; cidr: string; address_family: 4 | 6; vrf_id: string | null; vrf_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; description: string }
+export type NetworkInterface = { id: string; name: string; device_id: string; device_name: string; kind: 'physical' | 'virtual' | 'lag' | 'loopback' | 'tunnel' | 'wireless' | 'other'; status: 'planned' | 'active' | 'disabled' | 'retired'; description: string }
+export type NetworkIPAddress = { id: string; address: string; address_family: 4 | 6; subnet_id: string; subnet_cidr: string; vrf_id: string | null; vrf_name: string | null; interface_id: string | null; interface_name: string | null; device_name: string | null; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string }
+export type NetworkMACAddress = { id: string; address: string; interface_id: string | null; interface_name: string | null; device_name: string | null; description: string }
 export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
+export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
+export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'interface_id' | 'status' | 'dns_name' | 'description'>
+export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'interface_id' | 'description'>
 
 export type RackWrite = Pick<NetworkRack, 'name' | 'unit_count' | 'status'> & { site_id: string; location_id: string | null }
 export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack_units'> & {
@@ -73,6 +79,15 @@ export interface NetworksClient {
   listSubnets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkSubnet>>
   createSubnet(workspace: WorkspaceContext, values: SubnetWrite): Promise<NetworkSubnet>
   updateSubnet(workspace: WorkspaceContext, id: string, values: SubnetWrite): Promise<NetworkSubnet>
+  listInterfaces(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkInterface>>
+  createInterface(workspace: WorkspaceContext, values: InterfaceWrite): Promise<NetworkInterface>
+  updateInterface(workspace: WorkspaceContext, id: string, values: InterfaceWrite): Promise<NetworkInterface>
+  listIPAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkIPAddress>>
+  createIPAddress(workspace: WorkspaceContext, values: IPAddressWrite): Promise<NetworkIPAddress>
+  updateIPAddress(workspace: WorkspaceContext, id: string, values: IPAddressWrite): Promise<NetworkIPAddress>
+  listMACAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkMACAddress>>
+  createMACAddress(workspace: WorkspaceContext, values: MACAddressWrite): Promise<NetworkMACAddress>
+  updateMACAddress(workspace: WorkspaceContext, id: string, values: MACAddressWrite): Promise<NetworkMACAddress>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -140,4 +155,19 @@ export const browserNetworksClient: NetworksClient = {
   },
   createSubnet: (workspace, values) => write(`${basePath(workspace)}/subnets`, 'POST', values),
   updateSubnet: (workspace, id, values) => write(`${basePath(workspace)}/subnets/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listInterfaces(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/interfaces?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createInterface: (workspace, values) => write(`${basePath(workspace)}/interfaces`, 'POST', values),
+  updateInterface: (workspace, id, values) => write(`${basePath(workspace)}/interfaces/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listIPAddresses(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/ip-addresses?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createIPAddress: (workspace, values) => write(`${basePath(workspace)}/ip-addresses`, 'POST', values),
+  updateIPAddress: (workspace, id, values) => write(`${basePath(workspace)}/ip-addresses/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listMACAddresses(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/mac-addresses?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createMACAddress: (workspace, values) => write(`${basePath(workspace)}/mac-addresses`, 'POST', values),
+  updateMACAddress: (workspace, id, values) => write(`${basePath(workspace)}/mac-addresses/${encodeURIComponent(id)}`, 'PATCH', values),
 }

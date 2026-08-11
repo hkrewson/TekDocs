@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.2
+  version: 0.4.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1808,6 +1808,9 @@ paths:
           - network_vrf
           - network_vlan
           - network_subnet
+          - network_interface
+          - network_ip_address
+          - network_mac_address
           - ''
           type: string
           default: ''
@@ -1822,6 +1825,9 @@ paths:
           * `network_vrf` - network_vrf
           * `network_vlan` - network_vlan
           * `network_subnet` - network_subnet
+          * `network_interface` - network_interface
+          * `network_ip_address` - network_ip_address
+          * `network_mac_address` - network_mac_address
       - in: query
         name: page
         schema:
@@ -3701,6 +3707,324 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/msp/networks/interfaces:
+    get:
+      operationId: workspaces_msp_networks_interfaces_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterfaceResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_interfaces_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+  /api/v1/workspaces/msp/networks/interfaces/{interface_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_interfaces_retrieve_2
+      parameters:
+      - in: path
+        name: interface_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_interfaces_partial_update
+      parameters:
+      - in: path
+        name: interface_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+  /api/v1/workspaces/msp/networks/ip-addresses:
+    get:
+      operationId: workspaces_msp_networks_ip_addresses_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddressResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_ip_addresses_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+  /api/v1/workspaces/msp/networks/ip-addresses/{ip_address_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_ip_addresses_retrieve_2
+      parameters:
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_ip_addresses_partial_update
+      parameters:
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+  /api/v1/workspaces/msp/networks/mac-addresses:
+    get:
+      operationId: workspaces_msp_networks_mac_addresses_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddressResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_mac_addresses_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
+          description: ''
+  /api/v1/workspaces/msp/networks/mac-addresses/{mac_address_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_mac_addresses_retrieve_2
+      parameters:
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_mac_addresses_partial_update
+      parameters:
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
           description: ''
   /api/v1/workspaces/msp/networks/racks:
     get:
@@ -6966,6 +7290,9 @@ paths:
           - network_vrf
           - network_vlan
           - network_subnet
+          - network_interface
+          - network_ip_address
+          - network_mac_address
           - ''
           type: string
           default: ''
@@ -6980,6 +7307,9 @@ paths:
           * `network_vrf` - network_vrf
           * `network_vlan` - network_vlan
           * `network_subnet` - network_subnet
+          * `network_interface` - network_interface
+          * `network_ip_address` - network_ip_address
+          * `network_mac_address` - network_mac_address
       - in: path
         name: organization_entity_id
         schema:
@@ -7435,6 +7765,399 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/interfaces:
+    get:
+      operationId: workspaces_organizations_networks_interfaces_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterfaceResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_interfaces_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InterfaceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/interfaces/{interface_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_interfaces_retrieve_2
+      parameters:
+      - in: path
+        name: interface_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_interfaces_partial_update
+      parameters:
+      - in: path
+        name: interface_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInterfaceWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/ip-addresses:
+    get:
+      operationId: workspaces_organizations_networks_ip_addresses_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddressResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_ip_addresses_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IPAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/ip-addresses/{ip_address_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_ip_addresses_retrieve_2
+      parameters:
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_ip_addresses_partial_update
+      parameters:
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIPAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPAddress'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/mac-addresses:
+    get:
+      operationId: workspaces_organizations_networks_mac_addresses_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddressResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_mac_addresses_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MACAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/mac-addresses/{mac_address_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_mac_addresses_retrieve_2
+      parameters:
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_mac_addresses_partial_update
+      parameters:
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMACAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MACAddress'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks:
     get:
@@ -10802,6 +11525,9 @@ components:
       - network_vrf
       - network_vlan
       - network_subnet
+      - network_interface
+      - network_ip_address
+      - network_mac_address
       type: string
       description: |-
         * `organization` - organization
@@ -10814,6 +11540,9 @@ components:
         * `network_vrf` - network_vrf
         * `network_vlan` - network_vlan
         * `network_subnet` - network_subnet
+        * `network_interface` - network_interface
+        * `network_ip_address` - network_ip_address
+        * `network_mac_address` - network_mac_address
     EntityRelationship:
       type: object
       properties:
@@ -11067,6 +11796,122 @@ components:
       - warranty_provider
       - warranty_reference
       - warranty_starts_on
+    IPAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        address_family:
+          type: integer
+        subnet_id:
+          type: string
+          format: uuid
+        subnet_cidr:
+          type: string
+        vrf_id:
+          type: string
+          format: uuid
+          nullable: true
+        vrf_name:
+          type: string
+          nullable: true
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        interface_name:
+          type: string
+          nullable: true
+        device_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+        dns_name:
+          type: string
+        description:
+          type: string
+      required:
+      - address
+      - address_family
+      - description
+      - device_name
+      - dns_name
+      - id
+      - interface_id
+      - interface_name
+      - status
+      - subnet_cidr
+      - subnet_id
+      - vrf_id
+      - vrf_name
+    IPAddressResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/IPAddress'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    IPAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 45
+        subnet_id:
+          type: string
+          format: uuid
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/IPAddressWriteStatusEnum'
+          default: active
+        dns_name:
+          type: string
+          default: ''
+          maxLength: 253
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - address
+      - subnet_id
+    IPAddressWriteStatusEnum:
+      enum:
+      - active
+      - reserved
+      - dhcp
+      - deprecated
+      type: string
+      description: |-
+        * `active` - active
+        * `reserved` - reserved
+        * `dhcp` - dhcp
+        * `deprecated` - deprecated
     InstallationLinkWrite:
       type: object
       properties:
@@ -11075,6 +11920,111 @@ components:
           format: uuid
       required:
       - installation_id
+    Interface:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        device_id:
+          type: string
+          format: uuid
+        device_name:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - device_id
+      - device_name
+      - id
+      - kind
+      - name
+      - status
+    InterfaceResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Interface'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    InterfaceWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        device_id:
+          type: string
+          format: uuid
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/InterfaceWriteKindEnum'
+          default: physical
+        status:
+          allOf:
+          - $ref: '#/components/schemas/InterfaceWriteStatusEnum'
+          default: active
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - device_id
+      - name
+    InterfaceWriteKindEnum:
+      enum:
+      - physical
+      - virtual
+      - lag
+      - loopback
+      - tunnel
+      - wireless
+      - other
+      type: string
+      description: |-
+        * `physical` - physical
+        * `virtual` - virtual
+        * `lag` - lag
+        * `loopback` - loopback
+        * `tunnel` - tunnel
+        * `wireless` - wireless
+        * `other` - other
+    InterfaceWriteStatusEnum:
+      enum:
+      - planned
+      - active
+      - disabled
+      - retired
+      type: string
+      description: |-
+        * `planned` - planned
+        * `active` - active
+        * `disabled` - disabled
+        * `retired` - retired
     Invitation:
       type: object
       properties:
@@ -11328,6 +12278,73 @@ components:
       required:
       - kind
       - name
+    MACAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        interface_name:
+          type: string
+          nullable: true
+        device_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+      required:
+      - address
+      - description
+      - device_name
+      - id
+      - interface_id
+      - interface_name
+    MACAddressResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MACAddress'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    MACAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 32
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - address
     MarkdownImport:
       type: object
       properties:
@@ -12094,6 +13111,52 @@ components:
         warranty_reference:
           type: string
           maxLength: 240
+    PatchedIPAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 45
+        subnet_id:
+          type: string
+          format: uuid
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/IPAddressWriteStatusEnum'
+          default: active
+        dns_name:
+          type: string
+          default: ''
+          maxLength: 253
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+    PatchedInterfaceWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        device_id:
+          type: string
+          format: uuid
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/InterfaceWriteKindEnum'
+          default: physical
+        status:
+          allOf:
+          - $ref: '#/components/schemas/InterfaceWriteStatusEnum'
+          default: active
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedLicenseWrite:
       type: object
       properties:
@@ -12146,6 +13209,20 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedMACAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 32
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedMemberRoleWrite:
       type: object
       properties:

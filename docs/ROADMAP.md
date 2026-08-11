@@ -758,7 +758,7 @@ Evidence: `docs/releases/0.4.0.md`.
 | --- | --- |
 | `0.4.1` | **Complete:** addressable racks and network devices, exact-Workspace physical placement, and typed logical relationships. |
 | `0.4.2` | **Complete:** VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
-| `0.4.3` | Addresses, interfaces, MAC records, assignments, and conflict detection. |
+| `0.4.3` | **Complete:** IP addresses, interfaces, MAC records, assignments, and conflict detection. |
 | `0.4.4` | Circuits, providers, handoffs, contracts, and lifecycle reminders. |
 | `0.4.5` | Wireless networks and permission-aware DNS records. |
 | `0.4.6` | Relationship-derived network diagrams and accessible tabular equivalents. |
@@ -790,6 +790,18 @@ Evidence: `docs/releases/0.4.1.md`.
 - [x] Addresses, interfaces, MAC assignments, circuits, wireless records, diagrams, reconciliation, bulk transfer, recovery, and scale certification remain later slices.
 
 Evidence: `docs/releases/0.4.2.md`.
+
+### `0.4.3` acceptance criteria
+
+- [x] Network interfaces, IP addresses, and MAC addresses are stable, addressable, exact-Workspace records. Interfaces resolve to same-Workspace devices; address assignments resolve only to same-Workspace interfaces and canonical parent subnets.
+- [x] IPv4/IPv6 hosts retain canonical form and derived family. IPv4 network and broadcast identifiers are not assignable except where `/31` or `/32` semantics make them usable hosts.
+- [x] Duplicate IPs are rejected within the Workspace's default routing table or one VRF while identical addresses in separate VRFs remain valid. MAC addresses are canonical EUI-48 values unique across one Workspace.
+- [x] Service and PostgreSQL advisory locks serialize conflict checks. Database triggers independently guard entity types, exact ownership edges, canonical forms, subnet containment, reserved addresses, duplicate interface names, and address conflicts, including direct writes and subnet changes.
+- [x] Central `networks.view` and MFA-backed `networks.edit`, permission inventory, forced RLS, non-disclosing lookups, sibling-client negative tests, property tests, and concurrency tests cover every new route and table.
+- [x] The Network page exposes searchable, keyboard-accessible Interfaces, IP addresses, and MAC addresses surfaces with assignment-aware create/edit, loading, empty, error, and server-denial behavior.
+- [x] Circuits, wireless/DNS records, diagrams, reconciliation, bulk transfer, recovery, and final scale certification remain later slices.
+
+Evidence: `docs/releases/0.4.3.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

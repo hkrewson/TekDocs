@@ -11,6 +11,7 @@ from .models import (
     AuditEvent,
     Entity,
     EntityVisibility,
+    NetworkIPAddress,
     NetworkSubnet,
     NetworkVLAN,
     NetworkVRF,
@@ -72,11 +73,16 @@ def _vlan(scope: DataScope, entity_id: UUID | None) -> NetworkVLAN | None:
         raise NetworkAddressingError("The selected VLAN is unavailable in this Workspace.") from exc
 
 
-def _lock_routing_namespace(scope: DataScope, vrf: NetworkVRF | None) -> None:
+def _lock_routing_namespace_ids(scope: DataScope, *vrf_ids: UUID | None) -> None:
     if connection.vendor == "postgresql":
-        key = f"{scope.tenant_id}:{scope.organization_id or 'msp'}:{vrf.id if vrf else 'default'}"
         with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [key])
+            for vrf_id in sorted({str(value) if value is not None else "default" for value in vrf_ids}):
+                key = f"{scope.tenant_id}:{scope.organization_id or 'msp'}:{vrf_id}"
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [key])
+
+
+def _lock_routing_namespace(scope: DataScope, vrf: NetworkVRF | None) -> None:
+    _lock_routing_namespace_ids(scope, vrf.id if vrf else None)
 
 
 def _assert_no_overlap(
@@ -231,8 +237,32 @@ def update_subnet(*, record: NetworkSubnet, actor_id: UUID, values: dict[str, ob
     vlan = _vlan(
         scope, cast(UUID | None, values.get("vlan_entity_id", current_vlan_id))
     )
-    _lock_routing_namespace(scope, vrf)
+    _lock_routing_namespace_ids(scope, locked.vrf_id, vrf.id if vrf else None)
     _assert_no_overlap(scope, cidr=network.with_prefixlen, vrf=vrf, exclude_subnet_id=locked.pk)
+    assignments = list(NetworkIPAddress.objects.select_for_update().filter(subnet=locked))
+    target_network = ipaddress.ip_network(network.with_prefixlen, strict=True)
+    for assignment in assignments:
+        host = ipaddress.ip_address(assignment.address)
+        if host not in target_network:
+            raise NetworkAddressingError(
+                f"Subnet cannot exclude assigned address {assignment.address}; move or unassign it first."
+            )
+        if isinstance(target_network, ipaddress.IPv4Network) and target_network.prefixlen < 31:
+            if host in {target_network.network_address, target_network.broadcast_address}:
+                raise NetworkAddressingError(
+                    f"Subnet change would make {assignment.address} a reserved network or broadcast address."
+                )
+    if assignments:
+        conflict = (
+            NetworkIPAddress.scoped.for_scope(scope)
+            .filter(address__in=[item.address for item in assignments], subnet__vrf=vrf)
+            .exclude(subnet=locked)
+            .first()
+        )
+        if conflict is not None:
+            raise NetworkAddressingError(
+                f"Subnet move conflicts with recorded address {conflict.address} in the destination routing table."
+            )
     locked.entity.display_name = str(values.get("name", locked.entity.display_name)).strip()
     locked.entity.save(update_fields=("display_name", "updated_at"))
     locked.cidr = network.with_prefixlen

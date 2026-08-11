@@ -2104,6 +2104,159 @@ class NetworkSubnet(TimestampedModel):
                 raise ValidationError(f"Network subnet {label} must use its Workspace scope")
 
 
+class NetworkInterfaceKind(models.TextChoices):
+    PHYSICAL = "physical", "Physical"
+    VIRTUAL = "virtual", "Virtual"
+    LAG = "lag", "Link aggregation"
+    LOOPBACK = "loopback", "Loopback"
+    TUNNEL = "tunnel", "Tunnel"
+    WIRELESS = "wireless", "Wireless"
+    OTHER = "other", "Other"
+
+
+class NetworkInterfaceStatus(models.TextChoices):
+    PLANNED = "planned", "Planned"
+    ACTIVE = "active", "Active"
+    DISABLED = "disabled", "Disabled"
+    RETIRED = "retired", "Retired"
+
+
+class NetworkInterface(TimestampedModel):
+    """A stable logical or physical interface on one network device."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_interfaces")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_interfaces", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_interface")
+    device = models.ForeignKey(NetworkDevice, on_delete=models.PROTECT, related_name="interfaces")
+    kind = models.CharField(max_length=24, choices=NetworkInterfaceKind.choices)
+    status = models.CharField(max_length=24, choices=NetworkInterfaceStatus.choices)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("device__entity__display_name", "entity__display_name", "entity_id")
+        indexes = [models.Index(fields=("tenant", "organization", "device"), name="core_netif_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.device.entity.display_name} · {self.entity.display_name}"
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network interface and entity scopes must match")
+        if self.device_id and (
+            self.device.tenant_id != self.tenant_id or self.device.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network interface device must use its Workspace scope")
+
+
+class NetworkIPAddressStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    RESERVED = "reserved", "Reserved"
+    DHCP = "dhcp", "DHCP"
+    DEPRECATED = "deprecated", "Deprecated"
+
+
+class NetworkIPAddress(TimestampedModel):
+    """A canonical host address within one subnet and routing namespace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_ip_addresses")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_ip_addresses", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_ip_address")
+    subnet = models.ForeignKey(NetworkSubnet, on_delete=models.PROTECT, related_name="ip_addresses")
+    interface = models.ForeignKey(
+        NetworkInterface, on_delete=models.PROTECT, related_name="ip_addresses", null=True, blank=True
+    )
+    address = models.CharField(max_length=45)
+    address_family = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=24, choices=NetworkIPAddressStatus.choices)
+    dns_name = models.CharField(max_length=253, blank=True)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("address_family", "address", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(address_family__in=(4, 6)), name="network_ip_family_valid")
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "subnet"), name="core_netip_scope_idx"),
+            models.Index(fields=("tenant", "organization", "address"), name="core_netip_address_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.address
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network IP address and entity scopes must match")
+        for related, label in (
+            (self.subnet if self.subnet_id else None, "subnet"),
+            (self.interface if self.interface_id else None, "interface"),
+        ):
+            if related is not None and (
+                related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
+            ):
+                raise ValidationError(f"Network IP address {label} must use its Workspace scope")
+
+
+class NetworkMACAddress(TimestampedModel):
+    """A canonical EUI-48 address optionally assigned to one interface."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_mac_addresses")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_mac_addresses", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_mac_address")
+    interface = models.ForeignKey(
+        NetworkInterface, on_delete=models.PROTECT, related_name="mac_addresses", null=True, blank=True
+    )
+    address = models.CharField(max_length=17)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("address", "entity_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "address"),
+                name="network_mac_unique_in_workspace",
+                nulls_distinct=False,
+            )
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "interface"), name="core_netmac_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.address
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network MAC address and entity scopes must match")
+        if self.interface_id and self.interface is not None and (
+            self.interface.tenant_id != self.tenant_id
+            or self.interface.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network MAC address interface must use its Workspace scope")
+
+
 class EntityLinkType(models.TextChoices):
     RELATED_TO = "related_to", "Related to"
     CONNECTED_TO = "connected_to", "Connected to"

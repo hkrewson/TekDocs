@@ -25,6 +25,12 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     createVLAN: vi.fn(), updateVLAN: vi.fn(),
     listSubnets: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
     createSubnet: vi.fn(), updateSubnet: vi.fn(),
+    listInterfaces: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createInterface: vi.fn(), updateInterface: vi.fn(),
+    listIPAddresses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createIPAddress: vi.fn(), updateIPAddress: vi.fn(),
+    listMACAddresses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createMACAddress: vi.fn(), updateMACAddress: vi.fn(),
     ...overrides,
   }
 }
@@ -59,6 +65,57 @@ describe('Networks', () => {
     await user.click(screen.getByRole('button', { name: 'Core switch' }))
     expect(await screen.findByRole('heading', { name: /Core switch/ })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Logical relationships' })).toBeInTheDocument()
+  })
+
+  it('creates an interface and exposes endpoint assignment tabs', async () => {
+    const created = { id: 'interface-1', name: 'ethernet1', device_id: 'device-1', device_name: 'Core switch', kind: 'physical' as const, status: 'active' as const, description: '' }
+    const createInterface = vi.fn().mockResolvedValue(created)
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ createInterface })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'Interfaces' }))
+    expect(await screen.findByText('No interface records match this workspace and search.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add interface' }))
+    await user.type(screen.getByLabelText('Name'), 'ethernet1')
+    await user.selectOptions(screen.getByLabelText('Device'), 'device-1')
+    await user.click(screen.getByRole('button', { name: 'Save interface' }))
+    await waitFor(() => expect(createInterface).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'ethernet1', device_id: 'device-1' })))
+    expect(await screen.findByText('ethernet1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'IP addresses' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'MAC addresses' })).toBeInTheDocument()
+  })
+
+  it('creates assigned IP and MAC records from canonical values', async () => {
+    const networkInterface = { id: 'interface-1', name: 'ethernet1', device_id: 'device-1', device_name: 'Core switch', kind: 'physical' as const, status: 'active' as const, description: '' }
+    const subnet = { id: 'subnet-1', name: 'LAN', cidr: '192.0.2.0/24', address_family: 4 as const, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' }
+    const createIPAddress = vi.fn().mockResolvedValue({ id: 'ip-1', address: '192.0.2.10', address_family: 4, subnet_id: subnet.id, subnet_cidr: subnet.cidr, vrf_id: null, vrf_name: null, interface_id: networkInterface.id, interface_name: networkInterface.name, device_name: device.name, status: 'active', dns_name: '', description: '' })
+    const createMACAddress = vi.fn().mockResolvedValue({ id: 'mac-1', address: '02:00:00:00:00:01', interface_id: networkInterface.id, interface_name: networkInterface.name, device_name: device.name, description: '' })
+    const client = networkClient({
+      listInterfaces: vi.fn().mockResolvedValue({ results: [networkInterface], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
+      listSubnets: vi.fn().mockResolvedValue({ results: [subnet], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
+      createIPAddress,
+      createMACAddress,
+    })
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={client} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+
+    await user.click(screen.getByRole('button', { name: 'IP addresses' }))
+    await screen.findByText('No IP address records match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add IP address' }))
+    await user.type(screen.getByLabelText('IP address'), '192.0.2.10')
+    await user.selectOptions(screen.getByLabelText('Subnet'), 'subnet-1')
+    await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
+    await user.click(screen.getByRole('button', { name: 'Save IP address' }))
+    await waitFor(() => expect(createIPAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '192.0.2.10', subnet_id: 'subnet-1', interface_id: 'interface-1' })))
+
+    await user.click(screen.getByRole('button', { name: 'MAC addresses' }))
+    await screen.findByText('No MAC address records match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add MAC address' }))
+    await user.type(screen.getByLabelText('MAC address'), '02:00:00:00:00:01')
+    await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
+    await user.click(screen.getByRole('button', { name: 'Save MAC address' }))
+    await waitFor(() => expect(createMACAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '02:00:00:00:00:01', interface_id: 'interface-1' })))
   })
 
   it('creates a rack from the restrained physical-placement form', async () => {

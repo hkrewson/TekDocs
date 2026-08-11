@@ -22,6 +22,9 @@ SEARCHABLE_ENTITY_TYPES = (
     "network_vrf",
     "network_vlan",
     "network_subnet",
+    "network_interface",
+    "network_ip_address",
+    "network_mac_address",
 )
 
 

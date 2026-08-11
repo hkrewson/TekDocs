@@ -134,6 +134,14 @@ from apps.core.network_addressing_views import (
     VRFDetailView,
     VRFListCreateView,
 )
+from apps.core.network_endpoint_views import (
+    InterfaceDetailView,
+    InterfaceListCreateView,
+    IPAddressDetailView,
+    IPAddressListCreateView,
+    MACAddressDetailView,
+    MACAddressListCreateView,
+)
 from apps.core.network_inventory_views import (
     NetworkChoiceListView,
     NetworkDeviceDetailView,
@@ -429,6 +437,36 @@ urlpatterns = [
         name="msp-network-subnet-detail",
     ),
     path(
+        "api/v1/workspaces/msp/networks/interfaces",
+        InterfaceListCreateView.as_view(),
+        name="msp-network-interfaces",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/interfaces/<uuid:interface_entity_id>",
+        InterfaceDetailView.as_view(),
+        name="msp-network-interface-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/ip-addresses",
+        IPAddressListCreateView.as_view(),
+        name="msp-network-ip-addresses",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/ip-addresses/<uuid:ip_address_entity_id>",
+        IPAddressDetailView.as_view(),
+        name="msp-network-ip-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/mac-addresses",
+        MACAddressListCreateView.as_view(),
+        name="msp-network-mac-addresses",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/mac-addresses/<uuid:mac_address_entity_id>",
+        MACAddressDetailView.as_view(),
+        name="msp-network-mac-address-detail",
+    ),
+    path(
         "api/v1/custom-field-definitions",
         MSPCustomFieldDefinitionListCreateView.as_view(),
         name="msp-custom-field-definition-list-create",
@@ -528,6 +566,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/subnets/<uuid:subnet_entity_id>",
         SubnetDetailView.as_view(),
         name="organization-network-subnet-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/interfaces",
+        InterfaceListCreateView.as_view(),
+        name="organization-network-interfaces",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/interfaces/<uuid:interface_entity_id>",
+        InterfaceDetailView.as_view(),
+        name="organization-network-interface-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/ip-addresses",
+        IPAddressListCreateView.as_view(),
+        name="organization-network-ip-addresses",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/ip-addresses/<uuid:ip_address_entity_id>",
+        IPAddressDetailView.as_view(),
+        name="organization-network-ip-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/mac-addresses",
+        MACAddressListCreateView.as_view(),
+        name="organization-network-mac-addresses",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/mac-addresses/<uuid:mac_address_entity_id>",
+        MACAddressDetailView.as_view(),
+        name="organization-network-mac-address-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",

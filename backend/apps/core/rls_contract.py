@@ -37,6 +37,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_networkvrf",
     "core_networkvlan",
     "core_networksubnet",
+    "core_networkinterface",
+    "core_networkipaddress",
+    "core_networkmacaddress",
 )
 
 TENANT_SCOPED_TABLES = (

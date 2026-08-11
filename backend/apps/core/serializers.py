@@ -482,6 +482,44 @@ class DocumentPublicationDetailSerializer(DocumentPublicationSerializer):
     manifest = serializers.JSONField()
 
 
+class PortalDocumentArtifactSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    kind = serializers.CharField()
+    filename = serializers.CharField(source="original_filename")
+    size = serializers.IntegerField()
+    checksum = serializers.CharField()
+
+
+class PortalDocumentSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    title = serializers.CharField()
+    category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    reason = serializers.CharField()
+    lifecycle_state = serializers.CharField()
+    retention = serializers.ChoiceField(choices=PublicationRetention.choices)
+    retention_review_on = serializers.DateField(allow_null=True)
+    published_at = serializers.DateTimeField()
+    content_digest = serializers.CharField()
+    source_kind = serializers.SerializerMethodField()
+    visibility = serializers.SerializerMethodField()
+    artifacts = PortalDocumentArtifactSerializer(many=True)
+
+    def get_source_kind(self, _obj: DocumentPublication) -> str:
+        return "organization_document"
+
+    def get_visibility(self, _obj: DocumentPublication) -> str:
+        return "client_visible"
+
+
+class PortalDocumentDetailSerializer(PortalDocumentSerializer):
+    sanitized_html = serializers.CharField(allow_blank=True)
+
+
+class PortalDocumentResultSerializer(serializers.Serializer):
+    results = PortalDocumentSerializer(many=True)
+    count = serializers.IntegerField()
+
+
 class DocumentPublicationResultSerializer(serializers.Serializer):
     results = DocumentPublicationSerializer(many=True)
     count = serializers.IntegerField()

@@ -184,6 +184,11 @@ from apps.core.people_views import (
     OrganizationPeopleListCreateView,
     OrganizationPersonDetailView,
 )
+from apps.core.portal_views import (
+    ClientPortalDocumentArtifactDownloadView,
+    ClientPortalDocumentDetailView,
+    ClientPortalDocumentListView,
+)
 from apps.core.recycle_views import (
     MSPRecycleBinListView,
     MSPRecycleBinRestoreView,
@@ -235,6 +240,17 @@ urlpatterns = [
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
     path("api/v1/portal/context", ClientPortalContextView.as_view(), name="client-portal-context"),
+    path("api/v1/portal/documents", ClientPortalDocumentListView.as_view(), name="client-portal-document-list"),
+    path(
+        "api/v1/portal/documents/<uuid:publication_entity_id>",
+        ClientPortalDocumentDetailView.as_view(),
+        name="client-portal-document-detail",
+    ),
+    path(
+        "api/v1/portal/documents/<uuid:publication_entity_id>/artifacts/<uuid:artifact_entity_id>/download",
+        ClientPortalDocumentArtifactDownloadView.as_view(),
+        name="client-portal-document-artifact-download",
+    ),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),

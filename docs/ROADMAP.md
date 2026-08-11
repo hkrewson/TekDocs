@@ -914,6 +914,18 @@ Evidence: `docs/releases/0.5.1.md`.
 
 Evidence: `docs/releases/0.5.2.md`.
 
+### `0.5.3` acceptance criteria
+
+- [x] The client portal lists and opens only active, approved, client-visible immutable publications owned by the membership's exact organization. Pending, withdrawn, superseded, sibling-client, and MSP-internal records return no disclosure.
+- [x] Portal organization scope comes only from immutable membership state; the document routes contain no organization selector, and MSP sessions cannot consume them.
+- [x] Retained server-sanitized HTML is sanitized again in the browser. Retained artifacts download as attachments with private/no-store and nosniff controls.
+- [x] Reference cards require every referenced entity to remain explicitly client-visible in the same organization. New unsafe approvals fail, and unsafe historical projections are omitted.
+- [x] MSP-owned documentation listing references are not implicit portal grants; they require a future explicit per-client immutable projection and approval.
+- [x] The separate portal includes loading, empty, error, list, detail, review-due, download, responsive, keyboard, and semantic states with explicit client-visible labels.
+- [x] PostgreSQL projection, cross-client negatives, route inventory, frontend sanitizer/component, type, lint, build, bundle, migration, and OpenAPI gates pass.
+
+Evidence: `docs/releases/0.5.3.md`.
+
 ## API and integrations: `0.6.x` → `0.7.0`
 
 | Release | Slice and exit condition |

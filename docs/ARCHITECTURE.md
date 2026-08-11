@@ -78,6 +78,8 @@ STATIC publication creates a separate append-only `DocumentPublication`; it neve
 
 Distribution authority is deliberately outside that signed snapshot. `DocumentPublicationControlEvent` is an append-only submitted/approved/withdrawn ledger protected by central scoped permissions, recent MFA, PostgreSQL guards, forced RLS, and transaction advisory locks. MSP-internal snapshots approve on creation; client-visible snapshots require a distinct authorized approver. Lifecycle and audience projections are derived: MSP staff retain authorized evidence access, while the future client portal receives only active approved client-visible material. Corrections do not supersede their predecessor until approved, and only one approved successor can win. Publication and artifact downloads continue to authorize through the source workspace. ADRs 0025–0026 define snapshot/artifact retention, and ADR 0049 defines controlled distribution.
 
+The client portal is a separate read-only projection, not a second documentation workspace. Its organization is derived from immutable membership, and only current approved client-visible STATIC publications enter the projection. New approval and portal reads both require every retained entity-reference card to be explicitly client-visible in that same organization. Unsafe historical snapshots remain MSP evidence but are omitted from the portal. MSP-owned listing references do not grant client access implicitly; a future reference feature needs an explicit immutable per-client projection and approval. ADRs 0050 and 0051 define the identity and content boundaries.
+
 ## Trust boundaries
 
 - Browser to same-origin Django session and CSRF boundary.

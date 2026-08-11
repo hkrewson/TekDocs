@@ -476,6 +476,27 @@ def _lock_publication_controls(*publication_ids: UUID) -> None:
             )
 
 
+def _client_reference_projection_safe(publication: DocumentPublication) -> bool:
+    manifest_entities = publication.manifest.get("entities", [])
+    if not isinstance(manifest_entities, list):
+        return False
+    try:
+        reference_ids = {UUID(str(item["id"])) for item in manifest_entities if isinstance(item, dict)}
+    except (KeyError, TypeError, ValueError):
+        return False
+    if len(reference_ids) != len(manifest_entities):
+        return False
+    visible_ids = set(
+        Entity.objects.filter(
+            id__in=reference_ids,
+            tenant=publication.tenant,
+            organization=publication.organization,
+            visibility=EntityVisibility.CLIENT_VISIBLE,
+        ).values_list("id", flat=True)
+    )
+    return visible_ids == reference_ids
+
+
 @transaction.atomic
 def approve_publication(
     *, publication: DocumentPublication, actor_id: UUID, reason: str
@@ -495,6 +516,10 @@ def approve_publication(
         raise PublicationConflict("This publication is already approved.")
     if locked.audience != PublicationAudience.CLIENT_VISIBLE:
         raise PublicationConflict("MSP-internal publications are approved when they are created.")
+    if not _client_reference_projection_safe(locked):
+        raise PublicationConflict(
+            "Client-visible publications may reference only client-visible records in this organization."
+        )
     if locked.published_by_id == actor_id:
         raise PublicationConflict("Client-visible publication approval requires a different authorized user.")
     if locked.supersedes_id is not None:

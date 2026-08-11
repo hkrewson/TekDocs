@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.2
+  version: 0.5.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2472,6 +2472,71 @@ paths:
           description: ''
         '403':
           description: Portal required
+  /api/v1/portal/documents:
+    get:
+      operationId: client_portal_documents_list
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalDocumentResult'
+          description: ''
+  /api/v1/portal/documents/{publication_entity_id}:
+    get:
+      operationId: client_portal_documents_retrieve
+      parameters:
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalDocumentDetail'
+          description: ''
+  /api/v1/portal/documents/{publication_entity_id}/artifacts/{artifact_entity_id}/download:
+    get:
+      operationId: client_portal_document_artifacts_download
+      parameters:
+      - in: path
+        name: artifact_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '409':
+          description: Integrity conflict
   /api/v1/recycle-bin:
     get:
       operationId: recycle_bin_msp_list
@@ -16380,6 +16445,137 @@ components:
       required:
       - full_name
       - kind
+    PortalDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        reason:
+          type: string
+        lifecycle_state:
+          type: string
+        retention:
+          $ref: '#/components/schemas/RetentionEnum'
+        retention_review_on:
+          type: string
+          format: date
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+        content_digest:
+          type: string
+        source_kind:
+          type: string
+          readOnly: true
+        visibility:
+          type: string
+          readOnly: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalDocumentArtifact'
+      required:
+      - artifacts
+      - category
+      - content_digest
+      - id
+      - lifecycle_state
+      - published_at
+      - reason
+      - retention
+      - retention_review_on
+      - source_kind
+      - title
+      - visibility
+    PortalDocumentArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        filename:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+      required:
+      - checksum
+      - filename
+      - id
+      - kind
+      - size
+    PortalDocumentDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        reason:
+          type: string
+        lifecycle_state:
+          type: string
+        retention:
+          $ref: '#/components/schemas/RetentionEnum'
+        retention_review_on:
+          type: string
+          format: date
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+        content_digest:
+          type: string
+        source_kind:
+          type: string
+          readOnly: true
+        visibility:
+          type: string
+          readOnly: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalDocumentArtifact'
+        sanitized_html:
+          type: string
+      required:
+      - artifacts
+      - category
+      - content_digest
+      - id
+      - lifecycle_state
+      - published_at
+      - reason
+      - retention
+      - retention_review_on
+      - sanitized_html
+      - source_kind
+      - title
+      - visibility
+    PortalDocumentResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalDocument'
+        count:
+          type: integer
+      required:
+      - count
+      - results
     ProductWrite:
       type: object
       properties:

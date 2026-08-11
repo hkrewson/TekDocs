@@ -173,6 +173,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route("client-portal-context", ("GET",)),
+    route("client-portal-document-list", ("GET",)),
+    route("client-portal-document-detail", ("GET",)),
+    route("client-portal-document-artifact-download", ("GET",)),
     route(
         "organization-list-create",
         ("GET", "POST"),

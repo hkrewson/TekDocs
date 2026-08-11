@@ -81,13 +81,15 @@ const app = (initialPath: string) => <App initialPath={initialPath} initialAuthC
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('keeps a client account inside the dedicated portal surface', () => {
+  it('keeps a client account inside the dedicated portal surface', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
     render(<App initialPath="/overview" initialAuthContext={portalContext} authClient={authClient} />)
 
     expect(screen.getByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
-    expect(screen.getByText('Your account is bound to this organization and cannot enter the MSP workspace.')).toBeInTheDocument()
+    expect(screen.getByText('Only approved, current client-visible STATIC publications appear here.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(await screen.findByText(/no documentation has been published/i)).toBeInTheDocument()
   })
 
   it('renders sectioned navigation and the active route', () => {

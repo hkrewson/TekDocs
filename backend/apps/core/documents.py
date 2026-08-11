@@ -120,7 +120,7 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
     ).select_related("entity", "created_by")
     publications = DocumentPublication.objects.filter(tenant_id=scope.tenant_id).select_related(
         "entity", "document", "document__entity", "published_by"
-    )
+    ).prefetch_related("control_events__actor", "successors__control_events")
     records = Document.objects.filter(tenant_id=scope.tenant_id, archived_at__isnull=True)
     if scope.organization_id is None:
         records = records.filter(organization__isnull=True)

@@ -529,7 +529,7 @@ Evidence: `docs/releases/0.2.7.md`.
 - [x] PDF output is deterministic for the same frozen publication inputs, uses only server-controlled presentation, carries publication identity and page numbering, and passes structural, text-extraction, and rendered-page checks without loading remote resources.
 - [x] Publication requests require a bounded reason, an explicit `msp_internal` or `client_visible` audience, and a retention class. Client-visible intent is valid only for organization-owned publications and does not itself grant portal access.
 - [x] Retention is either permanent or review-on-date. Reaching a review date produces a visible `review_due` state but never deletes, hides, or mutates publication evidence; TekDocs exposes no application retention purge.
-- [x] A correction creates a complete new publication that references exactly one prior publication of the same source document and workspace. The prior record remains readable, the chain is acyclic and single-successor, and current/superseded state is derived without updating either publication.
+- [x] A correction creates a complete new publication that references exactly one prior publication of the same source document and workspace. The prior record remains readable and the chain is acyclic. This `0.2.8` single-successor rule is amended in `0.5.1`: only one successor may become approved, while an abandoned attempt no longer blocks a later correction.
 - [x] PDF and retained-attachment downloads authorize through the source publication, use forced private `nosniff` responses, and reject malformed, sibling-client, cross-tenant, mismatched-source, or unretained artifact identifiers without disclosure.
 - [x] Publication, artifact, supersession, audience, retention, signature, and file-failure paths are append-only and fail closed in Django and PostgreSQL; partially written storage is cleaned when publication fails.
 - [x] The Documentation interface collects publication metadata before confirmation, distinguishes current and superseded STATIC records, shows audience/reason/retention state, and offers authorized PDF and retained-artifact downloads with responsive and accessible denial/error states.
@@ -557,7 +557,7 @@ Evidence: `docs/releases/0.2.9.md`.
 - [x] `make test-documentation-certification` runs the complete document/publication service and API suite with rendering abuse, authenticated-route/IDOR, raw runtime-role forced-RLS, migration-aware reference performance, and 2,500-revision history evidence against PostgreSQL.
 - [x] Every document mutation remains centrally authorized and MFA/CSRF protected; every direct identifier remains non-disclosing across anonymous, non-member, Read-only, sibling-client, assigned-only, malformed, and cross-tenant cases.
 - [x] Canonical Markdown, immutable revisions, live/pinned resolution, reuse impact, detach, entity mentions, templates, managed attachments, import/export, and server/client sanitization remain aligned with ADRs 0019 and 0021–0024.
-- [x] STATIC publication continues to freeze exact dependency revisions and retained bytes into append-only signed manifests, deterministic PDFs, lifecycle metadata, and one-successor correction chains under ADRs 0025–0026.
+- [x] STATIC publication continues to freeze exact dependency revisions and retained bytes into append-only signed manifests, deterministic PDFs, lifecycle metadata, and correction chains under ADRs 0025–0026. ADR 0049 later moves distribution state to a separate ledger and narrows the uniqueness rule to one approved successor.
 - [x] Documentation-specific `0.2.8` upgrade and isolated PostgreSQL-plus-media restore rehearsals preserve identities, revision history, exact attachment bytes, signed manifests, and retained PDFs with deployment keys held separately.
 - [x] The shell/editor bundle budgets, 2,500-revision latency/query ceilings, keyboard and axe behavior, and the Chromium/Firefox/WebKit matrix remain blocking without claiming the later 250,000-revision or representative-device capacity target.
 - [x] Version, migration/OpenAPI drift, backend/frontend coverage, Docker Compose, production images, clean installation, oldest-supported upgrade, documentation upgrade/restore, security scans, architecture, threat model, security baseline, risk register, and release evidence agree at `0.3.0`.
@@ -890,6 +890,18 @@ Evidence: `docs/releases/0.5.0.md`.
 | `0.5.8` | Document review/expiry reminders and calendar-feed seam. |
 | `0.5.9` | Portal/notification stabilization, accessibility, mail-outage, load, and upgrade evidence. |
 | `0.6.0` | Stabilize and certify controlled client access and notifications. |
+
+### `0.5.1` acceptance criteria
+
+- [x] Signed STATIC snapshots remain immutable evidence while a separate append-only ledger records submitted, approved, and withdrawn distribution decisions with actor, reason, and time.
+- [x] MSP-internal snapshots are approved on creation. Client-visible snapshots remain pending until a different user with scoped `documents.approve` authority and recent MFA approves them; publishing, approval, and withdrawal are separate permissions.
+- [x] Lifecycle state is derived as pending approval, published, review due, withdrawn, or superseded. MSP staff retain authorized evidence access while the future client-portal projection is available only for an active approved client-visible publication.
+- [x] Withdrawal removes audience availability without deleting or modifying signed snapshots or artifacts. A correction supersedes its predecessor only after approval, and database locking/guards permit at most one approved successor without blocking a later correction after an abandoned attempt.
+- [x] API and Documentation UI expose bounded decision history, audience projections, approval/withdrawal actions, correction state, loading/error/denial behavior, and responsive accessible controls without adding client accounts or portal delivery.
+- [x] Forced RLS, exact-Workspace central policy, non-disclosing IDOR tests, append-only PostgreSQL triggers, direct-write/concurrency cases, and supplier-publication filtering fail closed.
+- [x] Existing publications are backfilled as submitted and approved. Exact `0.5.0` production-image upgrade, current backup/restore, OpenAPI/version/migration drift, frontend gates, architecture/security/threat/risk documentation, ADR 0049, and release evidence agree.
+
+Evidence: `docs/releases/0.5.1.md`.
 
 ## API and integrations: `0.6.x` → `0.7.0`
 

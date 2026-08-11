@@ -46,7 +46,14 @@ from .models import (
     DocumentPublication,
     DocumentPublicationArtifact,
 )
-from .publications import PublicationConflict, canonical_json, publish_document, read_publication_artifact
+from .publications import (
+    PublicationConflict,
+    approve_publication,
+    canonical_json,
+    publish_document,
+    read_publication_artifact,
+    withdraw_publication,
+)
 from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
@@ -61,6 +68,7 @@ from .serializers import (
     DocumentListQuerySerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
+    DocumentPublicationControlWriteSerializer,
     DocumentPublicationDetailSerializer,
     DocumentPublicationResultSerializer,
     DocumentPublicationWriteSerializer,
@@ -268,8 +276,14 @@ def _archive_attachment(
 
 def _publication_records(document: Document):  # type: ignore[no-untyped-def]
     return DocumentPublication.objects.filter(tenant=document.tenant, document=document).select_related(
-        "entity", "document", "document__entity", "published_by", "supersedes__entity", "superseded_by__entity"
-    ).prefetch_related("artifacts", "artifacts__entity", "artifacts__source_attachment__entity")
+        "entity", "document", "document__entity", "published_by", "supersedes__entity"
+    ).prefetch_related(
+        "artifacts",
+        "artifacts__entity",
+        "artifacts__source_attachment__entity",
+        "control_events__actor",
+        "successors__control_events",
+    )
 
 
 def _publication(
@@ -315,6 +329,37 @@ def _publish(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Re
     except PublicationConflict as conflict:
         return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
     return Response(DocumentPublicationDetailSerializer(publication).data, status=201)
+
+
+def _control_publication(
+    workspace: ResolvedWorkspace,
+    document_entity_id: UUID,
+    publication_entity_id: UUID,
+    request: Request,
+    *,
+    action: str,
+) -> Response:
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    serializer = DocumentPublicationControlWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        if action == "approve":
+            approve_publication(
+                publication=publication,
+                actor_id=request.user.pk,
+                reason=serializer.validated_data["reason"],
+            )
+        else:
+            withdraw_publication(
+                publication=publication,
+                actor_id=request.user.pk,
+                reason=serializer.validated_data["reason"],
+            )
+    except PublicationConflict as conflict:
+        return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
+    refreshed = _publication(workspace, document_entity_id, publication_entity_id)
+    return Response(DocumentPublicationDetailSerializer(refreshed).data)
 
 
 def _publication_artifact(
@@ -702,6 +747,38 @@ class MSPDocumentPublicationDetailView(APIView):
         )
 
 
+class MSPDocumentPublicationApproveView(APIView):
+    @extend_schema(
+        operation_id="document_publications_msp_approve",
+        request=DocumentPublicationControlWriteSerializer,
+        responses={200: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="State conflict")},
+    )
+    def post(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _control_publication(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE),
+            document_entity_id,
+            publication_entity_id,
+            request,
+            action="approve",
+        )
+
+
+class MSPDocumentPublicationWithdrawView(APIView):
+    @extend_schema(
+        operation_id="document_publications_msp_withdraw",
+        request=DocumentPublicationControlWriteSerializer,
+        responses={200: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="State conflict")},
+    )
+    def post(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _control_publication(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_WITHDRAW),
+            document_entity_id,
+            publication_entity_id,
+            request,
+            action="withdraw",
+        )
+
+
 class MSPDocumentPublicationMarkdownView(APIView):
     @extend_schema(operation_id="document_publications_msp_markdown", responses={(200, "text/markdown"): bytes})
     def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
@@ -958,6 +1035,38 @@ class OrganizationDocumentPublicationDetailView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
             publication_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationApproveView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_approve",
+        request=DocumentPublicationControlWriteSerializer,
+        responses={200: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="State conflict")},
+    )
+    def post(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _control_publication(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            document_entity_id,
+            publication_entity_id,
+            request,
+            action="approve",
+        )
+
+
+class OrganizationDocumentPublicationWithdrawView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_withdraw",
+        request=DocumentPublicationControlWriteSerializer,
+        responses={200: DocumentPublicationDetailSerializer, 409: OpenApiResponse(description="State conflict")},
+    )
+    def post(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _control_publication(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_WITHDRAW),
+            document_entity_id,
+            publication_entity_id,
+            request,
+            action="withdraw",
         )
 
 

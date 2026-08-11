@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -75,6 +75,10 @@ test-certification:
 test-documentation-certification:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
 
+test-publication-control:
+	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	./scripts/frontend-gate.sh test
+
 test-credential-references:
 	docker compose run --rm migrate pytest apps/core/tests/test_credential_references.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
 
@@ -134,7 +138,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-network-certification test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal
+release-gate: check test test-auth-abuse test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-network-certification test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh
@@ -153,6 +157,9 @@ documentation-backup-rehearsal:
 
 documentation-upgrade-rehearsal:
 	./scripts/rehearse-documentation-upgrade.sh
+
+publication-control-upgrade-rehearsal:
+	./scripts/rehearse-publication-control-upgrade.sh
 
 inventory-backup-rehearsal:
 	./scripts/rehearse-inventory-backup.sh

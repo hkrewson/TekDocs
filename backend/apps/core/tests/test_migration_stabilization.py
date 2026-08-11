@@ -45,6 +45,7 @@ DOCUMENT_RLS_TABLES = {
     "core_documentattachment",
     "core_documentpublication",
     "core_documentpublicationartifact",
+    "core_documentpublicationcontrolevent",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",
@@ -233,7 +234,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
             "'accounts_access_collection_creator_guard')"
         )
         assert cursor.fetchone() == (0,)
-    call_command("migrate", "accounts", "0013", verbosity=0, interactive=False)
+    call_command("migrate", "accounts", "0014", verbosity=0, interactive=False)
     assert TenantMembership.objects.filter(id=membership.id, tenant=result.tenant, user=member).exists()
     assert ScopedRoleAssignment.objects.filter(id=assignment.id).exists()
     with connection.cursor() as cursor:
@@ -264,7 +265,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0060", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0065", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

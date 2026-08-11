@@ -17,6 +17,7 @@ from apps.core.models import (
     DocumentPlacement,
     DocumentPublication,
     DocumentPublicationArtifact,
+    DocumentPublicationControlEvent,
     Entity,
     Organization,
     Tenant,
@@ -319,6 +320,13 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
             checksum=artifact_checksum,
             created_at="2026-08-09T12:00:00Z",
         )
+        control_event = DocumentPublicationControlEvent.objects.create(
+            tenant=tenant,
+            publication=publication,
+            action="submitted",
+            reason="RLS fixture",
+            occurred_at="2026-08-09T12:00:00Z",
+        )
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         _bind(cursor, tenant.id, "organization", selected_org.id)
@@ -338,6 +346,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
         assert cursor.fetchall() == [(publication.id,)]
         cursor.execute("SELECT id FROM core_documentpublicationartifact")
         assert cursor.fetchall() == [(artifact.id,)]
+        cursor.execute("SELECT id FROM core_documentpublicationcontrolevent")
+        assert cursor.fetchall() == [(control_event.id,)]
         cursor.execute("SELECT id FROM core_entity WHERE entity_type = 'document_publication'")
         assert cursor.fetchall() == [(publication_entity.id,)]
         runtime.commit()
@@ -351,6 +361,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
             "core_documentationlistingreference",
             "core_documentattachment",
             "core_documentpublication",
+            "core_documentpublicationartifact",
+            "core_documentpublicationcontrolevent",
         ):
             cursor.execute(f"SELECT count(*) FROM {table}")  # noqa: S608 - fixed test allowlist
             assert cursor.fetchone() == (0,)

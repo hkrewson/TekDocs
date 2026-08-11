@@ -5,7 +5,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Prefetch, Q, QuerySet
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, QuerySet
 from django.utils import timezone
 
 from .models import (
@@ -21,6 +21,7 @@ from .models import (
     ClientSoftwareInstallation,
     DocumentPublication,
     DocumentPublicationArtifact,
+    DocumentPublicationControlEvent,
     Entity,
     EntityVisibility,
     HardwareLifecycleEventType,
@@ -29,6 +30,7 @@ from .models import (
     Organization,
     PersonAssociation,
     PublicationAudience,
+    PublicationControlAction,
     Site,
     Tenant,
     workspace_for_owner,
@@ -232,9 +234,24 @@ def model_choices_for_client(scope: DataScope, *, query: str = "") -> QuerySet[C
 def eligible_publications_for_supplier(scope: DataScope) -> QuerySet[DocumentPublication]:
     if scope.organization_id is None:
         return DocumentPublication.objects.none()
+    approved = DocumentPublicationControlEvent.objects.filter(
+        publication_id=OuterRef("pk"), action=PublicationControlAction.APPROVED
+    )
+    withdrawn = DocumentPublicationControlEvent.objects.filter(
+        publication_id=OuterRef("pk"), action=PublicationControlAction.WITHDRAWN
+    )
+    approved_successor = DocumentPublicationControlEvent.objects.filter(
+        publication__supersedes_id=OuterRef("pk"), action=PublicationControlAction.APPROVED
+    )
     return (
         DocumentPublication.scoped.for_scope(scope)
         .filter(audience=PublicationAudience.CLIENT_VISIBLE)
+        .annotate(
+            audience_approved=Exists(approved),
+            audience_withdrawn=Exists(withdrawn),
+            audience_superseded=Exists(approved_successor),
+        )
+        .filter(audience_approved=True, audience_withdrawn=False, audience_superseded=False)
         .select_related("entity", "document", "document__entity")
         .prefetch_related(Prefetch("artifacts", queryset=DocumentPublicationArtifact.objects.select_related("entity")))
         .order_by("title", "-published_at")
@@ -274,6 +291,7 @@ def associate_product_document(
         locked_publication.tenant_id != locked_product.tenant_id
         or locked_publication.organization_id != locked_product.organization_id
         or locked_publication.audience != PublicationAudience.CLIENT_VISIBLE
+        or locked_publication.lifecycle_state not in {"published", "review_due"}
     ):
         raise InventoryError("Choose a client-visible STATIC publication owned by this supplier.")
     if not verify_publication(locked_publication)["valid"]:

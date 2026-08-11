@@ -89,12 +89,17 @@ describe('documentation placement API client', () => {
     const scope = { organizationId: 'org' }
 
     await browserDocumentsClient.publish(scope, 'doc', { reason: 'Approved', audience: 'client_visible', retention: 'permanent' })
+    await browserDocumentsClient.approvePublication(scope, 'doc', 'publication', 'Independent approval')
+    await browserDocumentsClient.withdrawPublication(scope, 'doc', 'publication', 'Replaced policy')
     await browserDocumentsClient.getPublication(scope, 'doc', 'publication')
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications')
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ reason: 'Approved', audience: 'client_visible', retention: 'permanent' }))
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications/publication')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications/publication/approve')
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ reason: 'Independent approval' }))
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications/publication/withdraw')
+    expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/publications/publication')
     expect(browserDocumentsClient.publicationMarkdownUrl(scope, 'doc', 'publication')).toContain('/publications/publication/markdown')
     expect(browserDocumentsClient.publicationManifestUrl(scope, 'doc', 'publication')).toContain('/publications/publication/manifest')
     expect(browserDocumentsClient.publicationArtifactUrl(scope, 'doc', 'publication', 'artifact')).toContain('/publications/publication/artifacts/artifact/download')

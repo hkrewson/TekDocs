@@ -1296,6 +1296,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentPublicationDetail'
           description: ''
+  /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/approve:
+    post:
+      operationId: document_publications_msp_approve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+        '409':
+          description: State conflict
   /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/artifacts/{artifact_entity_id}/download:
     get:
       operationId: document_publication_artifacts_msp_download
@@ -1386,6 +1427,47 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/withdraw:
+    post:
+      operationId: document_publications_msp_withdraw
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+        '409':
+          description: State conflict
   /api/v1/documents/{document_entity_id}/references:
     get:
       operationId: document_references_list
@@ -7456,6 +7538,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentPublicationDetail'
           description: ''
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/approve
+  : post:
+      operationId: document_publications_organization_approve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+        '409':
+          description: State conflict
   ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/artifacts/{artifact_entity_id}/download
   : get:
       operationId: document_publication_artifacts_organization_download
@@ -7564,6 +7693,53 @@ paths:
                 type: string
                 format: binary
           description: ''
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/withdraw
+  : post:
+      operationId: document_publications_organization_withdraw
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPublicationControlWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPublicationDetail'
+          description: ''
+        '409':
+          description: State conflict
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -12855,6 +13031,16 @@ components:
           type: string
           format: uuid
           nullable: true
+          readOnly: true
+        control_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPublicationControlEvent'
+        audience_projections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationAudienceProjection'
+          readOnly: true
         artifacts:
           type: array
           items:
@@ -12883,8 +13069,10 @@ components:
       required:
       - artifacts
       - audience
+      - audience_projections
       - category
       - content_digest
+      - control_events
       - id
       - key_fingerprint
       - lifecycle_state
@@ -12929,6 +13117,38 @@ components:
       - media_type
       - size
       - source_attachment_id
+    DocumentPublicationControlEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        reason:
+          type: string
+        actor:
+          type: string
+          nullable: true
+          readOnly: true
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - action
+      - actor
+      - id
+      - occurred_at
+      - reason
+    DocumentPublicationControlWrite:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 1
+      required:
+      - reason
     DocumentPublicationDetail:
       type: object
       properties:
@@ -12962,6 +13182,16 @@ components:
           type: string
           format: uuid
           nullable: true
+          readOnly: true
+        control_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPublicationControlEvent'
+        audience_projections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationAudienceProjection'
+          readOnly: true
         artifacts:
           type: array
           items:
@@ -12995,9 +13225,11 @@ components:
       required:
       - artifacts
       - audience
+      - audience_projections
       - canonical_markdown
       - category
       - content_digest
+      - control_events
       - id
       - key_fingerprint
       - lifecycle_state
@@ -16081,6 +16313,19 @@ components:
       - onepassword
       type: string
       description: '* `onepassword` - 1Password'
+    PublicationAudienceProjection:
+      type: object
+      properties:
+        audience:
+          type: string
+        available:
+          type: boolean
+        state:
+          type: string
+      required:
+      - audience
+      - available
+      - state
     PublicationVerification:
       type: object
       properties:

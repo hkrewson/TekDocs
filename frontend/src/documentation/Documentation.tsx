@@ -53,6 +53,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [editorGeneration, setEditorGeneration] = useState(0)
   const [publicationView, setPublicationView] = useState<{ sourceId: string; phase: 'loading' | 'ready' | 'error'; record?: DocumentPublicationDetail } | null>(null)
   const [publicationForm, setPublicationForm] = useState<{ source: DocumentRecord; reason: string; audience: PublicationAudience; retention: PublicationRetention; reviewOn: string; supersedesId: string | null } | null>(null)
+  const [publicationControl, setPublicationControl] = useState<{ action: 'approve' | 'withdraw'; reason: string } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
   const attachmentInput = useRef<HTMLInputElement>(null)
 
@@ -89,11 +90,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
   const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]) }
-  const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
-  const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
-  const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setShareQuery(''); setShareOptions([]) }
+  const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
+  const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
+  const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
   const openPublication = async (document: DocumentRecord, publication: DocumentPublication) => {
-    resetRevisionUi(); setSelected(null); setPublicationView({ sourceId: document.id, phase: 'loading' }); setError(null); setMessage(null)
+    resetRevisionUi(); setSelected(null); setPublicationForm(null); setPublicationControl(null); setPublicationView({ sourceId: document.id, phase: 'loading' }); setError(null); setMessage(null)
     try { setPublicationView({ sourceId: document.id, phase: 'ready', record: await client.getPublication(scope, document.id, publication.id) }) }
     catch (publicationError) { setPublicationView({ sourceId: document.id, phase: 'error' }); setError(errorMessage(publicationError)) }
   }
@@ -260,8 +261,9 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://attachment/${attachmentId})`)
     setEditorGeneration((value) => value + 1)
   }
-  const beginPublication = (source: DocumentRecord, supersedesId: string | null = null) => {
-    setPublicationForm({ source, reason: '', audience: 'msp_internal', retention: 'permanent', reviewOn: '', supersedesId })
+  const beginPublication = (source: DocumentRecord, supersedes: DocumentPublication | null = null) => {
+    setPublicationControl(null)
+    setPublicationForm({ source, reason: '', audience: supersedes?.audience ?? 'msp_internal', retention: 'permanent', reviewOn: '', supersedesId: supersedes?.id ?? null })
   }
   const publishStatic = async () => {
     if (!publicationForm || !publicationForm.reason.trim()) return
@@ -277,8 +279,23 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       setLoaded((current) => current ? { ...current, results: current.results.map((document) => document.id === sourceId ? { ...document, publications: [publication, ...document.publications], publication_count: document.publication_count + 1 } : document) } : current)
       setSelected(null); setPublicationForm(null)
       setPublicationView({ sourceId, phase: 'ready', record: publication })
-      setMessage(publication.supersedes_id ? 'Corrected STATIC publication created; the prior version remains retained.' : 'Immutable STATIC publication and retained artifacts created.')
+      setMessage(publication.lifecycle_state === 'pending_approval' ? 'STATIC snapshot submitted. A different authorized user must approve client portal availability.' : publication.supersedes_id ? 'Corrected STATIC publication created; the prior version remains retained.' : 'Immutable STATIC publication and retained artifacts created.')
     } catch (publicationError) { setError(errorMessage(publicationError)) } finally { setSaving(false) }
+  }
+  const applyPublicationControl = async () => {
+    if (!publicationView?.record || !publicationControl?.reason.trim()) return
+    const verb = publicationControl.action === 'approve' ? 'Approve' : 'Withdraw'
+    if (!window.confirm(`${verb} “${publicationView.record.title}”? This decision is retained in its append-only publication history.`)) return
+    setSaving(true); setError(null)
+    try {
+      const record = publicationControl.action === 'approve'
+        ? await client.approvePublication(scope, publicationView.sourceId, publicationView.record.id, publicationControl.reason.trim())
+        : await client.withdrawPublication(scope, publicationView.sourceId, publicationView.record.id, publicationControl.reason.trim())
+      setPublicationView({ sourceId: publicationView.sourceId, phase: 'ready', record })
+      setPublicationControl(null)
+      setRevision((value) => value + 1)
+      setMessage(publicationControl.action === 'approve' ? 'Publication approved for its intended audience.' : 'Publication withdrawn from audience availability; retained evidence remains accessible to authorized MSP staff.')
+    } catch (controlError) { setError(errorMessage(controlError)) } finally { setSaving(false) }
   }
 
   return <>
@@ -304,22 +321,27 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
           <div><dt>Reason</dt><dd>{publicationView.record.reason}</dd></div>
           <div><dt>Retention</dt><dd>{publicationView.record.retention === 'permanent' ? 'Permanent' : `Review on ${publicationView.record.retention_review_on}`}</dd></div>
         </dl>
-        <div className="publication-integrity"><ShieldCheck size={18} /><div><strong>{publicationView.record.verification.valid ? 'Signature verified' : 'Verification failed'}</strong><span>{publicationView.record.signature_algorithm} · published {new Date(publicationView.record.published_at).toLocaleString()} by {publicationView.record.published_by ?? 'System'}</span><code>SHA-256 {publicationView.record.content_digest}</code><code>Key {publicationView.record.key_fingerprint}</code></div></div>
+        <section className="publication-audiences" aria-labelledby="publication-audiences-heading"><h3 id="publication-audiences-heading">Audience availability</h3><dl>{publicationView.record.audience_projections.map((projection) => <div key={projection.audience}><dt>{projection.audience === 'msp_staff' ? 'MSP staff' : 'Client portal'}</dt><dd>{projection.available ? 'Available' : projection.state.replaceAll('_', ' ')}</dd></div>)}</dl></section>
+        <div className="publication-integrity"><ShieldCheck size={18} /><div><strong>{publicationView.record.verification.valid ? 'Signature verified' : 'Verification failed'}</strong><span>{publicationView.record.signature_algorithm} · snapshot created {new Date(publicationView.record.published_at).toLocaleString()} by {publicationView.record.published_by ?? 'System'}</span><code>SHA-256 {publicationView.record.content_digest}</code><code>Key {publicationView.record.key_fingerprint}</code></div></div>
         <SanitizedMarkdown html={publicationView.record.sanitized_html} />
         <div className="document-actions">
           {publicationView.record.artifacts.filter((artifact) => artifact.kind === 'pdf').map((artifact) => <a key={artifact.id} className="secondary-button" href={client.publicationArtifactUrl(scope, publicationView.sourceId, publicationView.record!.id, artifact.id)}><Download size={15} />Download PDF</a>)}
           <a className="secondary-button" href={client.publicationMarkdownUrl(scope, publicationView.sourceId, publicationView.record.id)}><Download size={15} />Download Markdown</a>
           <a className="secondary-button" href={client.publicationManifestUrl(scope, publicationView.sourceId, publicationView.record.id)}><Download size={15} />Download manifest</a>
-          {!publicationView.record.superseded_by_id && results.find((document) => document.id === publicationView.sourceId) && <button className="secondary-button" type="button" onClick={() => beginPublication(results.find((document) => document.id === publicationView.sourceId)!, publicationView.record!.id)}><FileCheck2 size={15} />Publish correction</button>}
+          {['published', 'review_due', 'withdrawn'].includes(publicationView.record.lifecycle_state) && !publicationView.record.superseded_by_id && results.find((document) => document.id === publicationView.sourceId) && <button className="secondary-button" type="button" onClick={() => beginPublication(results.find((document) => document.id === publicationView.sourceId)!, publicationView.record)}><FileCheck2 size={15} />Publish correction</button>}
+          {publicationView.record.lifecycle_state === 'pending_approval' && <button className="secondary-button" type="button" onClick={() => setPublicationControl({ action: 'approve', reason: '' })}>Approve publication</button>}
+          {['pending_approval', 'published', 'review_due'].includes(publicationView.record.lifecycle_state) && <button className="danger-button" type="button" onClick={() => setPublicationControl({ action: 'withdraw', reason: '' })}>Withdraw publication</button>}
         </div>
+        {publicationControl && <section className="publication-control" aria-labelledby="publication-control-heading"><h3 id="publication-control-heading">{publicationControl.action === 'approve' ? 'Approval decision' : 'Withdrawal decision'}</h3><p>{publicationControl.action === 'approve' ? 'Client-visible approval must come from a different authorized user than the snapshot publisher.' : 'Withdrawal removes audience availability without deleting the signed snapshot or retained artifacts.'}</p><label>Decision reason<textarea required maxLength={500} value={publicationControl.reason} onChange={(event) => setPublicationControl({ ...publicationControl, reason: event.target.value })} /></label><div className="document-actions"><button className={publicationControl.action === 'approve' ? 'primary-button' : 'danger-button'} type="button" disabled={saving || !publicationControl.reason.trim()} onClick={() => { void applyPublicationControl() }}>{saving ? 'Saving decision…' : publicationControl.action === 'approve' ? 'Record approval' : 'Record withdrawal'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPublicationControl(null)}>Cancel</button></div></section>}
+        <section className="publication-history" aria-labelledby="publication-history-heading"><h3 id="publication-history-heading">Publication history</h3><ol>{publicationView.record.control_events.map((event) => <li key={event.id}><strong>{event.action.replace('_', ' ')}</strong><span>{event.reason}</span><small>{event.actor ?? 'System'} · {new Date(event.occurred_at).toLocaleString()}</small></li>)}</ol></section>
         {publicationView.record.artifacts.some((artifact) => artifact.kind === 'attachment') && <section className="publication-artifacts" aria-labelledby="retained-artifacts-heading"><h3 id="retained-artifacts-heading">Retained attachments</h3><ul>{publicationView.record.artifacts.filter((artifact) => artifact.kind === 'attachment').map((artifact) => <li key={artifact.id}><a href={client.publicationArtifactUrl(scope, publicationView.sourceId, publicationView.record!.id, artifact.id)}><strong>{artifact.filename}</strong><small>{artifact.media_type} · {artifact.size.toLocaleString()} bytes · {artifact.checksum.slice(0, 12)}</small></a></li>)}</ul></section>}
       </>}
     </section>}
     {publicationForm && <section className="publication-form" aria-labelledby="publication-form-heading">
       <div className="section-heading"><div><h2 id="publication-form-heading">{publicationForm.supersedesId ? 'Publish correction' : 'Publish STATIC'}</h2><p>{publicationForm.source.title}</p></div><button className="icon-button" type="button" aria-label="Cancel publication" onClick={() => setPublicationForm(null)}><X size={18} /></button></div>
       <label>Publication reason<textarea required maxLength={500} value={publicationForm.reason} onChange={(event) => setPublicationForm({ ...publicationForm, reason: event.target.value })} /></label>
-      <div className="publication-form-fields"><label>Audience<select value={publicationForm.audience} onChange={(event) => setPublicationForm({ ...publicationForm, audience: event.target.value as PublicationAudience })}><option value="msp_internal">MSP internal</option>{workspace && <option value="client_visible">Client visible</option>}</select></label><label>Retention<select value={publicationForm.retention} onChange={(event) => setPublicationForm({ ...publicationForm, retention: event.target.value as PublicationRetention, reviewOn: event.target.value === 'permanent' ? '' : publicationForm.reviewOn })}><option value="permanent">Permanent</option><option value="review_on">Review on date</option></select></label>{publicationForm.retention === 'review_on' && <label>Review date<input type="date" required value={publicationForm.reviewOn} onChange={(event) => setPublicationForm({ ...publicationForm, reviewOn: event.target.value })} /></label>}</div>
-      <p>Publishing retains signed Markdown, HTML, PDF, manifest, and referenced attachment bytes. These records cannot be edited or deleted.</p>
+      <div className="publication-form-fields"><label>Audience<select disabled={publicationForm.supersedesId !== null} value={publicationForm.audience} onChange={(event) => setPublicationForm({ ...publicationForm, audience: event.target.value as PublicationAudience })}><option value="msp_internal">MSP internal</option>{workspace && <option value="client_visible">Client visible</option>}</select></label><label>Retention<select value={publicationForm.retention} onChange={(event) => setPublicationForm({ ...publicationForm, retention: event.target.value as PublicationRetention, reviewOn: event.target.value === 'permanent' ? '' : publicationForm.reviewOn })}><option value="permanent">Permanent</option><option value="review_on">Review on date</option></select></label>{publicationForm.retention === 'review_on' && <label>Review date<input type="date" required value={publicationForm.reviewOn} onChange={(event) => setPublicationForm({ ...publicationForm, reviewOn: event.target.value })} /></label>}</div>
+      <p>Publishing retains signed Markdown, HTML, PDF, manifest, and referenced attachment bytes. Client-visible snapshots remain pending until a different authorized user approves them.</p>
       <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !publicationForm.reason.trim() || (publicationForm.retention === 'review_on' && !publicationForm.reviewOn)} onClick={() => { void publishStatic() }}>{saving ? 'Publishing…' : publicationForm.supersedesId ? 'Publish correction' : 'Publish immutable version'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPublicationForm(null)}>Cancel</button></div>
     </section>}
     {selected && <section className="document-workspace" aria-label={selected === 'new' ? 'New document' : `Edit ${selected.title}`}>

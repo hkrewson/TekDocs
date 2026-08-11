@@ -33,6 +33,7 @@ from apps.core.models import (
     DocumentPlacement,
     DocumentPublication,
     DocumentPublicationArtifact,
+    DocumentPublicationControlEvent,
     Entity,
     InstallationState,
     Organization,
@@ -59,6 +60,24 @@ def installation(db):
 def owner_client(installation):
     client = Client()
     client.force_login(installation.owner)
+    return client
+
+
+@pytest.fixture
+def approver_client(installation):
+    approver = User.objects.create_user(
+        email="documents-approver@example.invalid",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+        display_name="Publication Approver",
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=approver,
+        role=BuiltInRole.ADMINISTRATOR,
+    )
+    TOTP.activate(approver, generate_totp_secret())
+    client = Client()
+    client.force_login(approver)
     return client
 
 
@@ -195,7 +214,12 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
         assert publication_payload["reason"] == "Approved access policy"
         assert publication_payload["audience"] == "client_visible"
-        assert publication_payload["lifecycle_state"] == "current"
+        assert publication_payload["lifecycle_state"] == "pending_approval"
+        assert publication_payload["audience_projections"][1] == {
+            "audience": "client_portal",
+            "available": False,
+            "state": "pending_approval",
+        }
         assert len(publication_payload["artifacts"]) == 2
         assert {item["kind"] for item in publication_payload["manifest"]["artifacts"]} == {"pdf", "attachment"}
         assert "Access standard" in publication_payload["sanitized_html"]
@@ -265,7 +289,9 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
 
 
 @pytest.mark.django_db
-def test_static_correction_retention_and_audience_rules_are_append_only(owner_client, installation, tmp_path):
+def test_static_correction_retention_and_audience_rules_are_append_only(
+    owner_client, approver_client, installation, tmp_path
+):
     client_org = organization(installation.tenant, "Lifecycle Client")
     created = owner_client.post(
         reverse("organization-document-list-create", kwargs={"organization_entity_id": client_org.entity_id}),
@@ -288,7 +314,29 @@ def test_static_correction_retention_and_audience_rules_are_append_only(owner_cl
             content_type="application/json",
         )
         assert first.status_code == 201
-        assert first.json()["lifecycle_state"] == "review_due"
+        assert first.json()["lifecycle_state"] == "pending_approval"
+        approval_url = reverse(
+            "organization-document-publication-approve",
+            kwargs={
+                "organization_entity_id": client_org.entity_id,
+                "document_entity_id": created["id"],
+                "publication_entity_id": first.json()["id"],
+            },
+        )
+        self_approval = owner_client.post(
+            approval_url,
+            {"reason": "Attempted self approval"},
+            content_type="application/json",
+        )
+        assert self_approval.status_code == 409
+        approved_first = approver_client.post(
+            approval_url,
+            {"reason": "Independent policy approval"},
+            content_type="application/json",
+        )
+        assert approved_first.status_code == 200
+        assert approved_first.json()["lifecycle_state"] == "review_due"
+        assert approved_first.json()["audience_projections"][1]["available"] is True
         corrected = owner_client.post(
             publication_url,
             {
@@ -302,6 +350,22 @@ def test_static_correction_retention_and_audience_rules_are_append_only(owner_cl
         assert corrected.status_code == 201
         assert corrected.json()["supersedes_id"] == first.json()["id"]
         prior = DocumentPublication.objects.get(entity_id=first.json()["id"])
+        assert prior.lifecycle_state == "review_due"
+        corrected_approval = approver_client.post(
+            reverse(
+                "organization-document-publication-approve",
+                kwargs={
+                    "organization_entity_id": client_org.entity_id,
+                    "document_entity_id": created["id"],
+                    "publication_entity_id": corrected.json()["id"],
+                },
+            ),
+            {"reason": "Correction independently approved"},
+            content_type="application/json",
+        )
+        assert corrected_approval.status_code == 200
+        assert corrected_approval.json()["lifecycle_state"] == "published"
+        prior.refresh_from_db()
         assert prior.lifecycle_state == "superseded"
         duplicate = owner_client.post(
             publication_url,
@@ -315,6 +379,26 @@ def test_static_correction_retention_and_audience_rules_are_append_only(owner_cl
         )
         assert duplicate.status_code == 409
         assert DocumentPublication.objects.count() == 2
+
+        withdrawal = approver_client.post(
+            reverse(
+                "organization-document-publication-withdraw",
+                kwargs={
+                    "organization_entity_id": client_org.entity_id,
+                    "document_entity_id": created["id"],
+                    "publication_entity_id": corrected.json()["id"],
+                },
+            ),
+            {"reason": "Policy withdrawn pending replacement"},
+            content_type="application/json",
+        )
+        assert withdrawal.status_code == 200
+        assert withdrawal.json()["lifecycle_state"] == "withdrawn"
+        assert withdrawal.json()["audience_projections"][1] == {
+            "audience": "client_portal",
+            "available": False,
+            "state": "withdrawn",
+        }
 
     msp_document = owner_client.post(
         reverse("msp-document-list-create"),
@@ -464,6 +548,7 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
     )
     publication = DocumentPublication.objects.get()
     artifact = DocumentPublicationArtifact.objects.get(kind="pdf")
+    control_event = DocumentPublicationControlEvent.objects.get(action="approved")
     publication.title = "Mutated"
     with pytest.raises(ValidationError, match="append-only"):
         publication.save()
@@ -474,6 +559,11 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
         artifact.save()
     with pytest.raises(ValidationError, match="append-only"):
         artifact.delete()
+    control_event.reason = "Mutated"
+    with pytest.raises(ValidationError, match="append-only"):
+        control_event.save()
+    with pytest.raises(ValidationError, match="append-only"):
+        control_event.delete()
     malformed = DocumentPublication(
         tenant=publication.tenant,
         document=publication.document,
@@ -507,6 +597,17 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
             DocumentPublicationArtifact.objects.filter(pk=artifact.pk).update(original_filename="database.pdf")
         with pytest.raises(DatabaseError, match="append-only"), transaction.atomic(), connection.cursor() as cursor:
             cursor.execute("DELETE FROM core_documentpublicationartifact WHERE id = %s", [artifact.pk])
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+            DocumentPublicationControlEvent.objects.filter(pk=control_event.pk).update(reason="Database mutation")
+        with pytest.raises(DatabaseError, match="append-only"), transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("DELETE FROM core_documentpublicationcontrolevent WHERE id = %s", [control_event.pk])
+        with pytest.raises(DatabaseError, match="requires an actor"), transaction.atomic():
+            DocumentPublicationControlEvent.objects.create(
+                tenant=publication.tenant,
+                publication=publication,
+                action="withdrawn",
+                reason="Forged anonymous withdrawal",
+            )
         with pytest.raises(DatabaseError, match="publication"), transaction.atomic():
             DocumentPublication.objects.bulk_create([malformed])
 
@@ -1223,3 +1324,92 @@ def test_client_editor_cannot_change_msp_shared_block_but_can_detach(owner_clien
     assert denied.status_code == 403
     assert BlockRevision.objects.filter(block__entity_id=source["block_id"]).count() == 1
     assert editor_client.post(reverse("organization-document-placement-detach", kwargs=route_kwargs)).status_code == 200
+
+
+@pytest.mark.django_db
+def test_publication_approval_role_is_exact_client_scoped_and_does_not_grant_withdrawal(
+    owner_client, installation, tmp_path
+):
+    acme = organization(installation.tenant, "Approval Acme")
+    beta = organization(installation.tenant, "Approval Beta")
+
+    def publish_for(target):  # type: ignore[no-untyped-def]
+        document = owner_client.post(
+            reverse("organization-document-list-create", kwargs={"organization_entity_id": target.entity_id}),
+            {"title": f"{target.entity.display_name} policy", "markdown": "Controlled"},
+            content_type="application/json",
+        ).json()
+        publication = owner_client.post(
+            reverse(
+                "organization-document-publication-list-create",
+                kwargs={"organization_entity_id": target.entity_id, "document_entity_id": document["id"]},
+            ),
+            {"reason": "Client distribution request", "audience": "client_visible", "retention": "permanent"},
+            content_type="application/json",
+        ).json()
+        return document, publication
+
+    with override_settings(MEDIA_ROOT=tmp_path):
+        acme_document, acme_publication = publish_for(acme)
+        beta_document, beta_publication = publish_for(beta)
+
+    approver = User.objects.create_user(email="scoped-approver@example.invalid", display_name="Scoped Approver")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=approver,
+        role=BuiltInRole.READ_ONLY,
+    )
+    role = CustomRole.objects.create(
+        tenant=installation.tenant,
+        name="Client publication approver",
+        scope=CustomRoleScope.ORGANIZATION,
+        created_by=installation.owner,
+    )
+    CustomRolePermission.objects.create(
+        tenant=installation.tenant,
+        role=role,
+        permission="documents.approve",
+    )
+    ScopedRoleAssignment.objects.create(
+        tenant=installation.tenant,
+        membership=membership,
+        role=role,
+        organization=acme,
+        created_by=installation.owner,
+    )
+    TOTP.activate(approver, generate_totp_secret())
+    browser = Client()
+    browser.force_login(approver)
+
+    acme_kwargs = {
+        "organization_entity_id": acme.entity_id,
+        "document_entity_id": acme_document["id"],
+        "publication_entity_id": acme_publication["id"],
+    }
+    approved = browser.post(
+        reverse("organization-document-publication-approve", kwargs=acme_kwargs),
+        {"reason": "Approved within assigned client scope"},
+        content_type="application/json",
+    )
+    assert approved.status_code == 200
+    assert approved.json()["lifecycle_state"] == "published"
+    assert browser.post(
+        reverse("organization-document-publication-withdraw", kwargs=acme_kwargs),
+        {"reason": "Not granted"},
+        content_type="application/json",
+    ).status_code == 403
+
+    beta_response = browser.post(
+        reverse(
+            "organization-document-publication-approve",
+            kwargs={
+                "organization_entity_id": beta.entity_id,
+                "document_entity_id": beta_document["id"],
+                "publication_entity_id": beta_publication["id"],
+            },
+        ),
+        {"reason": "Cross-client attempt"},
+        content_type="application/json",
+    )
+    assert beta_response.status_code == 403
+    assert DocumentPublication.objects.get(entity_id=beta_publication["id"]).lifecycle_state == "pending_approval"

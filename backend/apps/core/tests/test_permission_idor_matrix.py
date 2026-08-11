@@ -83,6 +83,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-document-attachment-download": ("document_entity_id", "attachment_entity_id"),
         "msp-document-publication-list-create": ("document_entity_id",),
         "msp-document-publication-detail": ("document_entity_id", "publication_entity_id"),
+        "msp-document-publication-approve": ("document_entity_id", "publication_entity_id"),
+        "msp-document-publication-withdraw": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-markdown": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-manifest": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-artifact-download": (
@@ -275,6 +277,16 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         ),
         "organization-document-publication-list-create": ("organization_entity_id", "document_entity_id"),
         "organization-document-publication-detail": (
+            "organization_entity_id",
+            "document_entity_id",
+            "publication_entity_id",
+        ),
+        "organization-document-publication-approve": (
+            "organization_entity_id",
+            "document_entity_id",
+            "publication_entity_id",
+        ),
+        "organization-document-publication-withdraw": (
             "organization_entity_id",
             "document_entity_id",
             "publication_entity_id",

@@ -75,6 +75,8 @@ class PermissionKey(StrEnum):
     DOCUMENTS_VIEW = "documents.view"
     DOCUMENTS_EDIT = "documents.edit"
     DOCUMENTS_PUBLISH = "documents.publish"
+    DOCUMENTS_APPROVE = "documents.approve"
+    DOCUMENTS_WITHDRAW = "documents.withdraw"
     ASSETS_VIEW = "assets.view"
     ASSETS_EDIT = "assets.edit"
     NETWORKS_VIEW = "networks.view"
@@ -155,6 +157,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),
     _permission(PermissionKey.DOCUMENTS_EDIT, "Edit documentation", "Documentation", mfa=True),
     _permission(PermissionKey.DOCUMENTS_PUBLISH, "Publish documentation", "Documentation", mfa=True),
+    _permission(PermissionKey.DOCUMENTS_APPROVE, "Approve client-visible documentation", "Documentation", mfa=True),
+    _permission(PermissionKey.DOCUMENTS_WITHDRAW, "Withdraw published documentation", "Documentation", mfa=True),
     _permission(PermissionKey.ASSETS_VIEW, "View assets", "Assets"),
     _permission(PermissionKey.ASSETS_EDIT, "Edit assets", "Assets", mfa=True),
     _permission(PermissionKey.NETWORKS_VIEW, "View networks", "Networks"),
@@ -237,6 +241,8 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.ORGANIZATIONS_ARCHIVE,
         PermissionKey.CUSTOM_FIELDS_MANAGE,
         PermissionKey.DOCUMENTS_PUBLISH,
+        PermissionKey.DOCUMENTS_APPROVE,
+        PermissionKey.DOCUMENTS_WITHDRAW,
         PermissionKey.COSTS_VIEW,
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,

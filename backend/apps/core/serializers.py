@@ -14,6 +14,7 @@ from .models import (
     DocumentCategory,
     DocumentPlacement,
     DocumentPublication,
+    DocumentPublicationControlEvent,
     LocationKind,
     Organization,
     OrganizationAccessMode,
@@ -383,6 +384,34 @@ class DocumentPublicationWriteSerializer(serializers.Serializer):
         return attrs
 
 
+class DocumentPublicationControlWriteSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=1, max_length=500, trim_whitespace=True)
+
+    def validate_reason(self, value: str) -> str:
+        if any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Control characters are not allowed.")
+        return value
+
+
+class DocumentPublicationControlEventSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    action = serializers.CharField()
+    reason = serializers.CharField()
+    actor = serializers.SerializerMethodField()
+    occurred_at = serializers.DateTimeField()
+
+    def get_actor(self, obj: DocumentPublicationControlEvent) -> str | None:
+        if obj.actor is None:
+            return None
+        return obj.actor.get_full_name() or obj.actor.get_username()
+
+
+class PublicationAudienceProjectionSerializer(serializers.Serializer):
+    audience = serializers.CharField()
+    available = serializers.BooleanField()
+    state = serializers.CharField()
+
+
 class DocumentPublicationArtifactSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     kind = serializers.CharField()
@@ -404,7 +433,9 @@ class DocumentPublicationSerializer(serializers.Serializer):
     retention_review_on = serializers.DateField(allow_null=True)
     lifecycle_state = serializers.CharField()
     supersedes_id = serializers.UUIDField(source="supersedes.entity_id", allow_null=True)
-    superseded_by_id = serializers.UUIDField(source="superseded_by.entity_id", allow_null=True)
+    superseded_by_id = serializers.SerializerMethodField()
+    control_events = DocumentPublicationControlEventSerializer(many=True)
+    audience_projections = serializers.SerializerMethodField()
     artifacts = DocumentPublicationArtifactSerializer(many=True)
     content_digest = serializers.CharField()
     signature_algorithm = serializers.CharField()
@@ -414,6 +445,24 @@ class DocumentPublicationSerializer(serializers.Serializer):
     published_by = serializers.SerializerMethodField()
     published_at = serializers.DateTimeField()
     verification = serializers.SerializerMethodField()
+
+    def get_superseded_by_id(self, obj: DocumentPublication) -> UUID | None:
+        successor = obj.superseded_by_publication
+        return successor.entity_id if successor is not None else None
+
+    @extend_schema_field(PublicationAudienceProjectionSerializer(many=True))
+    def get_audience_projections(self, obj: DocumentPublication) -> list[dict[str, object]]:
+        state = obj.lifecycle_state
+        if obj.audience == PublicationAudience.MSP_INTERNAL:
+            client_state = "not_intended"
+        elif state in {"published", "review_due"}:
+            client_state = "available"
+        else:
+            client_state = state
+        return [
+            {"audience": "msp_staff", "available": True, "state": "retained"},
+            {"audience": "client_portal", "available": client_state == "available", "state": client_state},
+        ]
 
     def get_published_by(self, obj: DocumentPublication) -> str | None:
         if obj.published_by is None:

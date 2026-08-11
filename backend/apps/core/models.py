@@ -2993,6 +2993,12 @@ class PublicationArtifactKind(models.TextChoices):
     ATTACHMENT = "attachment", "Retained attachment"
 
 
+class PublicationControlAction(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    APPROVED = "approved", "Approved"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
 class DocumentPublication(models.Model):
     """An append-only STATIC snapshot of one document and its resolved dependencies."""
 
@@ -3013,10 +3019,10 @@ class DocumentPublication(models.Model):
     audience = models.CharField(max_length=24, choices=PublicationAudience.choices)
     retention = models.CharField(max_length=20, choices=PublicationRetention.choices)
     retention_review_on = models.DateField(null=True, blank=True)
-    supersedes = models.OneToOneField(
+    supersedes = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,
-        related_name="superseded_by",
+        related_name="successors",
         null=True,
         blank=True,
     )
@@ -3122,6 +3128,7 @@ class DocumentPublication(models.Model):
             supersedes.tenant_id != self.tenant_id
             or supersedes.organization_id != self.organization_id
             or supersedes.document_id != self.document_id
+            or supersedes.audience != self.audience
         ):
             raise ValidationError("A correction may supersede only a publication of the same document and workspace")
         if self.manifest.get("format") == "tekdocs-static-publication/v2":
@@ -3137,11 +3144,111 @@ class DocumentPublication(models.Model):
 
     @property
     def lifecycle_state(self) -> str:
-        if hasattr(self, "superseded_by"):
+        actions = self.control_actions
+        if PublicationControlAction.WITHDRAWN in actions:
+            return "withdrawn"
+        if PublicationControlAction.APPROVED not in actions:
+            return "pending_approval"
+        successors = list(getattr(self, "prefetched_successors", ()))
+        if not successors:
+            successors = list(self.successors.all())
+        if any(PublicationControlAction.APPROVED in successor.control_actions for successor in successors):
             return "superseded"
         if self.retention_review_on is not None and self.retention_review_on <= timezone.localdate():
             return "review_due"
-        return "current"
+        return "published"
+
+    @property
+    def control_actions(self) -> frozenset[str]:
+        events = list(getattr(self, "prefetched_control_events", ()))
+        if not events:
+            events = list(self.control_events.all())
+        return frozenset(event.action for event in events)
+
+    @property
+    def superseded_by_publication(self) -> "DocumentPublication | None":
+        successors = list(getattr(self, "prefetched_successors", ()))
+        if not successors:
+            successors = list(self.successors.all())
+        return next(
+            (
+                successor
+                for successor in successors
+                if PublicationControlAction.APPROVED in successor.control_actions
+            ),
+            None,
+        )
+
+
+class DocumentPublicationControlEvent(models.Model):
+    """An append-only distribution decision for one immutable STATIC publication."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_publication_events")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="document_publication_events",
+        null=True,
+        blank=True,
+    )
+    publication = models.ForeignKey(
+        DocumentPublication,
+        on_delete=models.PROTECT,
+        related_name="control_events",
+    )
+    action = models.CharField(max_length=20, choices=PublicationControlAction.choices)
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="document_publication_control_events",
+        null=True,
+        blank=True,
+    )
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(action__in=PublicationControlAction.values),
+                name="publication_control_action_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("publication", "action"),
+                name="unique_publication_control_action",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "publication", "occurred_at"),
+                name="core_pubctl_scope_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.publication_id}: {self.action}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Publication control events are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Publication control events are append-only")
+
+    def clean(self) -> None:
+        if self.publication_id and (
+            self.publication.tenant_id != self.tenant_id
+            or self.publication.organization_id != self.organization_id
+        ):
+            raise ValidationError("Publication control event must use its publication workspace scope")
+        if not self.reason.strip() or len(self.reason) > 500:
+            raise ValidationError("Publication control reason is required and may not exceed 500 characters")
 
 
 class DocumentPublicationArtifact(models.Model):

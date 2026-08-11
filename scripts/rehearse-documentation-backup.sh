@@ -36,7 +36,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.document_attachments import create_document_attachment
 from apps.core.documents import create_document, update_document
-from apps.core.models import DocumentPublicationArtifact, PublicationAudience, PublicationRetention
+from apps.core.models import DocumentPublicationArtifact, DocumentPublicationControlEvent, PublicationAudience, PublicationRetention
 from apps.core.publications import publish_document
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
@@ -52,6 +52,7 @@ publication = publish_document(workspace=resolve_msp_workspace(result.owner), do
 assert revision.revision_number == 2
 assert attachment.file.storage.exists(attachment.file.name)
 assert DocumentPublicationArtifact.objects.filter(publication=publication, kind="pdf").count() == 1
+assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
 scope_context.__exit__(None, None, None)
 print("Documentation recovery fixture created")
 '
@@ -71,7 +72,7 @@ docker volume create "${restore_project}_media_data" >/dev/null
 docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_directory:/backup:ro" postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 tar -xzf /backup/media.tar.gz -C /restore
 compose_for "$restore_project" up -d --build --wait backend
 compose_for "$restore_project" exec -T backend python manage.py shell -c '
-from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, InstallationState
+from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, InstallationState
 from apps.core.publications import verify_publication
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
@@ -86,6 +87,7 @@ with attachment.file.storage.open(attachment.file.name, "rb") as stored:
     assert stored.read() == b"retained attachment bytes\n"
 publication = DocumentPublication.objects.get(document=document)
 assert verify_publication(publication)["valid"] is True
+assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
 artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind="pdf")
 with artifact.file.storage.open(artifact.file.name, "rb") as stored:
     assert stored.read(5) == b"%PDF-"

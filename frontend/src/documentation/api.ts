@@ -46,7 +46,9 @@ export type DocumentAttachment = { id: string; filename: string; media_type: str
 export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
 export type PublicationAudience = 'msp_internal' | 'client_visible'
 export type PublicationRetention = 'permanent' | 'review_on'
-export type PublicationLifecycleState = 'current' | 'superseded' | 'review_due'
+export type PublicationLifecycleState = 'pending_approval' | 'published' | 'superseded' | 'review_due' | 'withdrawn'
+export type PublicationControlEvent = { id: string; action: 'submitted' | 'approved' | 'withdrawn'; reason: string; actor: string | null; occurred_at: string }
+export type PublicationAudienceProjection = { audience: 'msp_staff' | 'client_portal'; available: boolean; state: string }
 export type DocumentPublicationArtifact = { id: string; kind: 'pdf' | 'attachment'; filename: string; media_type: string; size: number; checksum: string; source_attachment_id: string | null }
 export type DocumentPublicationInput = { reason: string; audience: PublicationAudience; retention: PublicationRetention; retention_review_on?: string | null; supersedes_id?: string | null }
 export type DocumentPublication = {
@@ -61,6 +63,8 @@ export type DocumentPublication = {
   lifecycle_state: PublicationLifecycleState
   supersedes_id: string | null
   superseded_by_id: string | null
+  control_events: PublicationControlEvent[]
+  audience_projections: PublicationAudienceProjection[]
   artifacts: DocumentPublicationArtifact[]
   content_digest: string
   signature_algorithm: 'Ed25519'
@@ -167,6 +171,8 @@ export interface DocumentsClient {
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
   publish(scope: DocumentScope, id: string, input: DocumentPublicationInput): Promise<DocumentPublicationDetail>
+  approvePublication(scope: DocumentScope, id: string, publicationId: string, reason: string): Promise<DocumentPublicationDetail>
+  withdrawPublication(scope: DocumentScope, id: string, publicationId: string, reason: string): Promise<DocumentPublicationDetail>
   getPublication(scope: DocumentScope, id: string, publicationId: string): Promise<DocumentPublicationDetail>
   publicationMarkdownUrl(scope: DocumentScope, id: string, publicationId: string): string
   publicationManifestUrl(scope: DocumentScope, id: string, publicationId: string): string
@@ -274,6 +280,8 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   archiveAttachment: (scope, id, attachmentId) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
   publish: (scope, id, input) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications`, 'POST', input),
+  approvePublication: (scope, id, publicationId, reason) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/approve`, 'POST', { reason }),
+  withdrawPublication: (scope, id, publicationId, reason) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/withdraw`, 'POST', { reason }),
   async getPublication(scope, id, publicationId) {
     return parse<DocumentPublicationDetail>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },

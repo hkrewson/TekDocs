@@ -15,6 +15,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core.asset_csv import FIELDS, SCHEMA_VERSION
 from apps.core.models import (
     ClientAsset,
@@ -126,6 +127,25 @@ def _catalog(owner_client, supplier):  # type: ignore[no-untyped-def]
         {"reason": "Approved product guide", "audience": "client_visible", "retention": "permanent"},
         content_type="application/json",
     ).json()
+    approver = User.objects.create_user(
+        email=f"catalog-approver-{uuid.uuid4()}@example.invalid",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+        display_name="Catalog Approver",
+    )
+    TenantMembership.objects.create(tenant=supplier.tenant, user=approver, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(approver, generate_totp_secret())
+    approver_client = Client(enforce_csrf_checks=False)
+    approver_client.force_login(approver)
+    approval = approver_client.post(
+        reverse(
+            "organization-document-publication-approve",
+            kwargs={**base, "document_entity_id": document["id"], "publication_entity_id": publication["id"]},
+        ),
+        {"reason": "Independent catalog publication approval"},
+        content_type="application/json",
+    )
+    assert approval.status_code == 200
+    publication = approval.json()
     association = owner_client.post(
         reverse(
             "organization-catalog-product-document-list-create",

@@ -32,8 +32,10 @@ function clients() {
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
   const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', scan_status: 'clean', scan_engine: 'test-scanner', scanned_at: '2026-08-09T00:00:00Z', created_at: '2026-08-09T00:00:00Z' })
   const archiveAttachment = vi.fn().mockResolvedValue(undefined)
-  const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, reason: 'Approved for operations', audience: 'msp_internal' as const, retention: 'permanent' as const, retention_review_on: null, lifecycle_state: 'current' as const, supersedes_id: null, superseded_by_id: null, artifacts: [{ id: 'pdf-1', kind: 'pdf' as const, filename: 'firewall-static.pdf', media_type: 'application/pdf', size: 1200, checksum: 'c'.repeat(64), source_attachment_id: null }], content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v2' } }
+  const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, reason: 'Approved for operations', audience: 'msp_internal' as const, retention: 'permanent' as const, retention_review_on: null, lifecycle_state: 'published' as const, supersedes_id: null, superseded_by_id: null, control_events: [{ id: 'event-1', action: 'submitted' as const, reason: 'Approved for operations', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }, { id: 'event-2', action: 'approved' as const, reason: 'Approved for MSP-internal distribution at publication time.', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }], audience_projections: [{ audience: 'msp_staff' as const, available: true, state: 'retained' }, { audience: 'client_portal' as const, available: false, state: 'not_intended' }], artifacts: [{ id: 'pdf-1', kind: 'pdf' as const, filename: 'firewall-static.pdf', media_type: 'application/pdf', size: 1200, checksum: 'c'.repeat(64), source_attachment_id: null }], content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v2' } }
   const publish = vi.fn().mockResolvedValue(publication)
+  const approvePublication = vi.fn().mockResolvedValue(publication)
+  const withdrawPublication = vi.fn().mockResolvedValue({ ...publication, lifecycle_state: 'withdrawn' as const })
   const getPublication = vi.fn().mockResolvedValue(publication)
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
@@ -53,6 +55,8 @@ function clients() {
     uploadAttachment,
     archiveAttachment,
     publish,
+    approvePublication,
+    withdrawPublication,
     getPublication,
     publicationMarkdownUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/markdown`,
     publicationManifestUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/manifest`,
@@ -66,7 +70,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, getPublication }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, publication }
 }
 
 it('lists titles and persists edited Markdown', async () => {
@@ -201,4 +205,43 @@ it('publishes and opens an immutable verified STATIC version', async () => {
   expect(screen.getByText(`SHA-256 ${'a'.repeat(64)}`)).toBeVisible()
   expect(screen.getByRole('link', { name: 'Download Markdown' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/markdown')
   expect(screen.queryByRole('textbox', { name: 'Document Markdown' })).not.toBeInTheDocument()
+})
+
+it('shows pending client publication audiences and records an approval decision', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publication } = clients()
+  const pending = {
+    ...publication,
+    audience: 'client_visible' as const,
+    lifecycle_state: 'pending_approval' as const,
+    control_events: [publication.control_events[0]],
+    audience_projections: [
+      { audience: 'msp_staff' as const, available: true, state: 'retained' },
+      { audience: 'client_portal' as const, available: false, state: 'pending_approval' },
+    ],
+  }
+  const approved = {
+    ...pending,
+    lifecycle_state: 'published' as const,
+    control_events: publication.control_events,
+    audience_projections: [pending.audience_projections[0], { audience: 'client_portal' as const, available: true, state: 'available' }],
+  }
+  documents.publish = vi.fn().mockResolvedValue(pending)
+  const approvePublication = vi.fn().mockResolvedValue(approved)
+  documents.approvePublication = approvePublication
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
+  await user.type(screen.getByLabelText('Publication reason'), 'Client policy release')
+  await user.selectOptions(screen.getByLabelText('Audience'), 'client_visible')
+  await user.click(screen.getByRole('button', { name: 'Publish immutable version' }))
+  expect((await screen.findAllByText('pending approval')).length).toBeGreaterThan(0)
+  expect(screen.getByText('Client portal').parentElement).toHaveTextContent('pending approval')
+  await user.click(screen.getByRole('button', { name: 'Approve publication' }))
+  await user.type(screen.getByLabelText('Decision reason'), 'Independent approval')
+  await user.click(screen.getByRole('button', { name: 'Record approval' }))
+  await waitFor(() => expect(approvePublication).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', 'publication-1', 'Independent approval'))
+  expect(await screen.findByText('Publication approved for its intended audience.')).toBeVisible()
+  expect(screen.getByText('Client portal').parentElement).toHaveTextContent('Available')
 })

@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
@@ -32,10 +32,12 @@ from .models import (
     DocumentPlacement,
     DocumentPublication,
     DocumentPublicationArtifact,
+    DocumentPublicationControlEvent,
     Entity,
     EntityVisibility,
     PublicationArtifactKind,
     PublicationAudience,
+    PublicationControlAction,
 )
 from .rendering import (
     RenderedAttachment,
@@ -227,7 +229,8 @@ def publish_document(
                     supersedes.document_id != locked_document.id
                     or supersedes.tenant_id != locked_document.tenant_id
                     or supersedes.organization_id != locked_document.organization_id
-                    or hasattr(supersedes, "superseded_by")
+                    or supersedes.audience != audience
+                    or supersedes.lifecycle_state not in {"published", "review_due", "withdrawn"}
                 ):
                     raise PublicationConflict("The selected STATIC publication cannot be superseded.")
 
@@ -373,6 +376,29 @@ def publish_document(
             )
             publication.full_clean()
             publication.save()  # type: ignore[no-untyped-call]
+            submitted = DocumentPublicationControlEvent(
+                tenant=publication.tenant,
+                organization=publication.organization,
+                publication=publication,
+                action=PublicationControlAction.SUBMITTED,
+                reason=reason,
+                actor_id=actor_id,
+                occurred_at=published_at,
+            )
+            submitted.full_clean()
+            submitted.save()  # type: ignore[no-untyped-call]
+            if audience == PublicationAudience.MSP_INTERNAL:
+                approved = DocumentPublicationControlEvent(
+                    tenant=publication.tenant,
+                    organization=publication.organization,
+                    publication=publication,
+                    action=PublicationControlAction.APPROVED,
+                    reason="Approved for MSP-internal distribution at publication time.",
+                    actor_id=actor_id,
+                    occurred_at=published_at + timedelta(microseconds=1),
+                )
+                approved.full_clean()
+                approved.save()  # type: ignore[no-untyped-call]
             for pending in pending_artifacts:
                 artifact_entity = Entity.objects.create(
                     id=pending.entity_id,
@@ -404,7 +430,11 @@ def publish_document(
             AuditEvent.objects.create(
                 tenant=locked_document.tenant,
                 actor_id=actor_id,
-                action="document.publication.corrected" if supersedes is not None else "document.publication.created",
+                action=(
+                    "document.publication.correction_submitted"
+                    if supersedes is not None
+                    else "document.publication.submitted"
+                ),
                 entity_id=publication.entity_id,
                 metadata={"source_document_id": str(locked_document.entity_id)},
             )
@@ -413,6 +443,116 @@ def publish_document(
         for storage, stored_name in stored_artifacts:
             storage.delete(stored_name)  # type: ignore[attr-defined]
         raise
+
+
+def _append_control_event(
+    *,
+    publication: DocumentPublication,
+    action: PublicationControlAction,
+    actor_id: UUID,
+    reason: str,
+) -> DocumentPublicationControlEvent:
+    event = DocumentPublicationControlEvent(
+        tenant=publication.tenant,
+        organization=publication.organization,
+        publication=publication,
+        action=action,
+        reason=reason,
+        actor_id=actor_id,
+    )
+    event.full_clean()
+    event.save()  # type: ignore[no-untyped-call]
+    return event
+
+
+def _lock_publication_controls(*publication_ids: UUID) -> None:
+    if connection.vendor != "postgresql":
+        return
+    with connection.cursor() as cursor:
+        for publication_id in sorted(set(publication_ids), key=str):
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                [f"publication-control:{publication_id}"],
+            )
+
+
+@transaction.atomic
+def approve_publication(
+    *, publication: DocumentPublication, actor_id: UUID, reason: str
+) -> DocumentPublication:
+    control_ids = [publication.id]
+    if publication.supersedes_id is not None:
+        control_ids.append(publication.supersedes_id)
+    _lock_publication_controls(*control_ids)
+    locked = DocumentPublication.objects.select_related("document", "entity", "published_by", "supersedes").get(
+        pk=publication.pk
+    )
+    events = list(locked.control_events.order_by("occurred_at", "id"))
+    actions = {event.action for event in events}
+    if PublicationControlAction.WITHDRAWN in actions:
+        raise PublicationConflict("A withdrawn publication cannot be approved.")
+    if PublicationControlAction.APPROVED in actions:
+        raise PublicationConflict("This publication is already approved.")
+    if locked.audience != PublicationAudience.CLIENT_VISIBLE:
+        raise PublicationConflict("MSP-internal publications are approved when they are created.")
+    if locked.published_by_id == actor_id:
+        raise PublicationConflict("Client-visible publication approval requires a different authorized user.")
+    if locked.supersedes_id is not None:
+        competing_successors = DocumentPublication.objects.filter(supersedes_id=locked.supersedes_id).exclude(
+            pk=locked.pk
+        )
+        if DocumentPublicationControlEvent.objects.filter(
+            publication__in=competing_successors,
+            action=PublicationControlAction.APPROVED,
+        ).exists():
+            raise PublicationConflict("Another correction has already superseded the selected publication.")
+    _append_control_event(
+        publication=locked,
+        action=PublicationControlAction.APPROVED,
+        actor_id=actor_id,
+        reason=reason,
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.publication.approved",
+        entity_id=locked.entity_id,
+        metadata={"source_document_id": str(locked.document.entity_id)},
+    )
+    return locked
+
+
+@transaction.atomic
+def withdraw_publication(
+    *, publication: DocumentPublication, actor_id: UUID, reason: str
+) -> DocumentPublication:
+    _lock_publication_controls(publication.id)
+    locked = DocumentPublication.objects.select_related(
+        "document", "document__entity", "entity", "published_by", "supersedes"
+    ).get(pk=publication.pk)
+    events = list(locked.control_events.order_by("occurred_at", "id"))
+    actions = {event.action for event in events}
+    if PublicationControlAction.WITHDRAWN in actions:
+        raise PublicationConflict("This publication is already withdrawn.")
+    if DocumentPublicationControlEvent.objects.filter(
+        publication__supersedes=locked,
+        action=PublicationControlAction.APPROVED,
+    ).exists():
+        raise PublicationConflict("A superseded publication cannot be withdrawn.")
+    _append_control_event(
+        publication=locked,
+        action=PublicationControlAction.WITHDRAWN,
+        actor_id=actor_id,
+        reason=reason,
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.publication.withdrawn",
+        entity_id=locked.entity_id,
+        metadata={"source_document_id": str(locked.document.entity_id)},
+    )
+    return locked
 
 
 def verify_publication(publication: DocumentPublication) -> dict[str, bool]:

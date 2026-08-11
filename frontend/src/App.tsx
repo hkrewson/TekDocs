@@ -50,7 +50,6 @@ import type { CustomFieldsClient } from './custom-fields/api'
 import { CredentialReferences } from './credential-references/CredentialReferences'
 import { browserCredentialReferencesClient } from './credential-references/api'
 import type { CredentialReferencesClient } from './credential-references/api'
-import { Documentation } from './documentation/Documentation'
 import { browserDocumentsClient } from './documentation/api'
 import type { DocumentsClient } from './documentation/api'
 import { browserInventoryClient } from './inventory/api'
@@ -77,6 +76,7 @@ import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
+const Documentation = lazy(async () => ({ default: (await import('./documentation/Documentation')).Documentation }))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
@@ -297,9 +297,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.5.0" />
+      <PageHeader title="Overview" description="TekDocs 0.5.1" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.5.0</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.5.1</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -318,6 +318,7 @@ function Overview() {
             ['Password recovery', 'Available'],
             ['Session security', 'Available'],
             ['Reusable documentation', 'Milestone 0.3.0'],
+            ['Controlled publication decisions', 'Available'],
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],
@@ -378,7 +379,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
-  if (area === 'documentation') return <Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} />
+  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} /></Suspense>
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
@@ -464,7 +465,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
-            <Route path="/documentation" element={<Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} />} />
+            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />

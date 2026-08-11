@@ -4,6 +4,7 @@ from pathlib import PurePosixPath
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from .scoping import OrganizationScopedManager, TenantScopedManager
@@ -951,9 +952,7 @@ class ClientSoftwareInstallation(TimestampedModel):
         ):
             raise ValidationError("Software installation must use an exact client software asset scope")
         site = self.site if self.site_id else None
-        if site is not None and (
-            site.tenant_id != self.tenant_id or site.organization_id != self.organization_id
-        ):
+        if site is not None and (site.tenant_id != self.tenant_id or site.organization_id != self.organization_id):
             raise ValidationError("Software installation site must use the asset's client scope")
         if self.status == SoftwareInstallationStatus.INSTALLED and not self.installed_on:
             raise ValidationError("Installed software requires an installation date")
@@ -2250,11 +2249,219 @@ class NetworkMACAddress(TimestampedModel):
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Network MAC address and entity scopes must match")
-        if self.interface_id and self.interface is not None and (
-            self.interface.tenant_id != self.tenant_id
-            or self.interface.organization_id != self.organization_id
+        if (
+            self.interface_id
+            and self.interface is not None
+            and (self.interface.tenant_id != self.tenant_id or self.interface.organization_id != self.organization_id)
         ):
             raise ValidationError("Network MAC address interface must use its Workspace scope")
+
+
+class WirelessNetworkPurpose(models.TextChoices):
+    CORPORATE = "corporate", "Corporate"
+    GUEST = "guest", "Guest"
+    IOT = "iot", "IoT"
+    VOICE = "voice", "Voice"
+    OTHER = "other", "Other"
+
+
+class WirelessNetworkSecurity(models.TextChoices):
+    OPEN = "open", "Open"
+    OWE = "owe", "Enhanced open (OWE)"
+    WPA2_PERSONAL = "wpa2_personal", "WPA2 Personal"
+    WPA3_PERSONAL = "wpa3_personal", "WPA3 Personal"
+    WPA2_ENTERPRISE = "wpa2_enterprise", "WPA2 Enterprise"
+    WPA3_ENTERPRISE = "wpa3_enterprise", "WPA3 Enterprise"
+    MIXED_PERSONAL = "mixed_personal", "WPA2/WPA3 Personal"
+    MIXED_ENTERPRISE = "mixed_enterprise", "WPA2/WPA3 Enterprise"
+
+
+class WirelessNetworkStatus(models.TextChoices):
+    PLANNED = "planned", "Planned"
+    ACTIVE = "active", "Active"
+    DISABLED = "disabled", "Disabled"
+    RETIRED = "retired", "Retired"
+
+
+class WirelessNetwork(TimestampedModel):
+    """A logical SSID and its non-secret security posture in one exact Workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="wireless_networks")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="wireless_networks", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="wireless_network")
+    ssid = models.CharField(max_length=128)
+    purpose = models.CharField(max_length=16, choices=WirelessNetworkPurpose.choices)
+    security = models.CharField(max_length=32, choices=WirelessNetworkSecurity.choices)
+    status = models.CharField(max_length=16, choices=WirelessNetworkStatus.choices)
+    hidden = models.BooleanField(default=False)
+    client_isolation = models.BooleanField(default=False)
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, related_name="wireless_networks", null=True, blank=True)
+    vlan = models.ForeignKey(
+        NetworkVLAN, on_delete=models.PROTECT, related_name="wireless_networks", null=True, blank=True
+    )
+    subnet = models.ForeignKey(
+        NetworkSubnet, on_delete=models.PROTECT, related_name="wireless_networks", null=True, blank=True
+    )
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("ssid", "site_id", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(purpose__in=WirelessNetworkPurpose.values), name="wifi_purpose_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(security__in=WirelessNetworkSecurity.values), name="wifi_security_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=WirelessNetworkStatus.values), name="wifi_status_valid"
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "site", "ssid"),
+                name="wifi_ssid_unique_in_site",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "status"), name="core_wifi_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.ssid
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Wireless network and entity scopes must match")
+        if not self.ssid or len(self.ssid.encode("utf-8")) > 32:
+            raise ValidationError("SSID must contain between 1 and 32 UTF-8 bytes")
+        for related, label in (
+            (self.site if self.site_id else None, "site"),
+            (self.vlan if self.vlan_id else None, "VLAN"),
+            (self.subnet if self.subnet_id else None, "subnet"),
+        ):
+            if related is not None and (
+                related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
+            ):
+                raise ValidationError(f"Wireless network {label} must use its Workspace scope")
+        if self.vlan_id and self.subnet_id and self.subnet is not None and self.subnet.vlan_id != self.vlan_id:
+            raise ValidationError("Wireless network subnet must belong to the selected VLAN")
+
+
+class DNSZone(TimestampedModel):
+    """An inventoried DNS zone; TekDocs does not query or serve it."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="dns_zones")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="dns_zones", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="dns_zone")
+    name = models.CharField(max_length=253)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("name", "entity_id")
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                "tenant",
+                "organization",
+                name="dns_zone_name_unique_in_workspace",
+                nulls_distinct=False,
+            )
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "name"), name="core_dnszone_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("DNS zone and entity scopes must match")
+
+
+class DNSRecordType(models.TextChoices):
+    A = "A", "A"
+    AAAA = "AAAA", "AAAA"
+    CNAME = "CNAME", "CNAME"
+    MX = "MX", "MX"
+    TXT = "TXT", "TXT"
+    SRV = "SRV", "SRV"
+    CAA = "CAA", "CAA"
+    NS = "NS", "NS"
+    PTR = "PTR", "PTR"
+
+
+class DNSRecord(TimestampedModel):
+    """A type-validated DNS record protected by the exact Workspace network policy."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="dns_records")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="dns_records", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="dns_record")
+    zone = models.ForeignKey(DNSZone, on_delete=models.PROTECT, related_name="records")
+    owner_name = models.CharField(max_length=253)
+    record_type = models.CharField(max_length=8, choices=DNSRecordType.choices)
+    value = models.TextField()
+    ttl = models.PositiveIntegerField(default=3600)
+    priority = models.PositiveSmallIntegerField(null=True, blank=True)
+    weight = models.PositiveSmallIntegerField(null=True, blank=True)
+    port = models.PositiveSmallIntegerField(null=True, blank=True)
+    ip_address = models.ForeignKey(
+        NetworkIPAddress, on_delete=models.PROTECT, related_name="dns_records", null=True, blank=True
+    )
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("zone__name", "owner_name", "record_type", "value", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(record_type__in=DNSRecordType.values), name="dns_record_type_valid"
+            ),
+            models.CheckConstraint(condition=models.Q(ttl__lte=2147483647), name="dns_record_ttl_valid"),
+            models.UniqueConstraint(
+                fields=("zone", "owner_name", "record_type", "value", "priority", "weight", "port"),
+                name="dns_record_value_unique",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "zone"), name="core_dnsrecord_scope_idx"),
+            models.Index(fields=("zone", "owner_name"), name="core_dnsrecord_owner_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.owner_name} {self.record_type}"
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("DNS record and entity scopes must match")
+        for related, label in (
+            (self.zone if self.zone_id else None, "zone"),
+            (self.ip_address if self.ip_address_id else None, "IP address"),
+        ):
+            if related is not None and (
+                related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
+            ):
+                raise ValidationError(f"DNS record {label} must use its Workspace scope")
 
 
 class EntityLinkType(models.TextChoices):

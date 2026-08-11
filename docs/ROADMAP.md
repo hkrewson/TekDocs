@@ -760,7 +760,7 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.2` | **Complete:** VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
 | `0.4.3` | **Complete:** IP addresses, interfaces, MAC records, assignments, and conflict detection. |
 | `0.4.4` | Circuits, providers, handoffs, contracts, and lifecycle reminders. |
-| `0.4.5` | Wireless networks and permission-aware DNS records. |
+| `0.4.5` | **Complete:** wireless networks and permission-aware DNS zones/records; `0.4.4` remains explicitly pending. |
 | `0.4.6` | Relationship-derived network diagrams and accessible tabular equivalents. |
 | `0.4.7` | NetBox-compatible external identifiers plus deterministic import/reconciliation seam. |
 | `0.4.8` | Network search/export, scale testing, upgrade/restore, and isolation remediation. |
@@ -802,6 +802,18 @@ Evidence: `docs/releases/0.4.2.md`.
 - [x] Circuits, wireless/DNS records, diagrams, reconciliation, bulk transfer, recovery, and final scale certification remain later slices.
 
 Evidence: `docs/releases/0.4.3.md`.
+
+### `0.4.5` acceptance criteria
+
+- [x] Wireless networks are stable exact-Workspace Entities with SSID, purpose, security posture, lifecycle state, hidden/client-isolation controls, and optional same-Workspace site, VLAN, and subnet mappings.
+- [x] SSIDs retain exact case, reject empty or greater-than-32-byte UTF-8 input, and cannot duplicate another logical wireless network at the same site. A selected subnet must belong to the selected VLAN.
+- [x] Wireless requests reject unknown fields and never accept, store, search, audit, or return a PSK, RADIUS password, or other customer secret; the interface directs operators to external credential references.
+- [x] DNS zones and A, AAAA, CNAME, MX, TXT, SRV, CAA, NS, and PTR records use canonical names, enforce zone ancestry and type-aware values, prevent CNAME coexistence, and may link A/AAAA values to an exact same-Workspace IP record.
+- [x] Central `networks.view` and MFA-backed `networks.edit`, permission inventory, non-disclosing lookups, forced RLS, database edge/canonical/conflict guards, sibling-client IDOR, direct-write, and property tests protect every route and table.
+- [x] The Network page exposes restrained, searchable, keyboard-accessible Wireless and DNS surfaces with create/edit, mapping, loading, empty, error, and server-denial behavior in MSP and client contexts.
+- [x] This is maintained inventory, not wireless control, DNS serving/resolution, active observation, certificate validation, or secret custody. Circuits remain pending in `0.4.4`; diagrams, reconciliation, recovery, scale, and final certification remain later slices.
+
+Evidence: `docs/releases/0.4.5.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

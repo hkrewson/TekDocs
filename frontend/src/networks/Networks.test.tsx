@@ -31,6 +31,12 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     createIPAddress: vi.fn(), updateIPAddress: vi.fn(),
     listMACAddresses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
     createMACAddress: vi.fn(), updateMACAddress: vi.fn(),
+    listWireless: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createWireless: vi.fn(), updateWireless: vi.fn(),
+    listDNSZones: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createDNSZone: vi.fn(), updateDNSZone: vi.fn(),
+    listDNSRecords: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
+    createDNSRecord: vi.fn(), updateDNSRecord: vi.fn(),
     ...overrides,
   }
 }
@@ -116,6 +122,44 @@ describe('Networks', () => {
     await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
     await user.click(screen.getByRole('button', { name: 'Save MAC address' }))
     await waitFor(() => expect(createMACAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '02:00:00:00:00:01', interface_id: 'interface-1' })))
+  })
+
+  it('creates wireless inventory without accepting a credential value', async () => {
+    const created = { id: 'wifi-1', ssid: 'Acme Staff', purpose: 'corporate' as const, security: 'wpa3_enterprise' as const, status: 'active' as const, hidden: false, client_isolation: true, site_id: null, site_name: null, vlan_id: null, vlan_name: null, vlan_number: null, subnet_id: null, subnet_cidr: null, description: '' }
+    const createWireless = vi.fn().mockResolvedValue(created)
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ createWireless })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'Wireless' }))
+    await screen.findByText('No wireless networks match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add wireless network' }))
+    expect(screen.getByText(/never a Wi-Fi password/i)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('SSID'), 'Acme Staff')
+    await user.click(screen.getByLabelText('Client isolation'))
+    await user.click(screen.getByRole('button', { name: 'Save wireless network' }))
+    await waitFor(() => expect(createWireless).toHaveBeenCalledWith(workspace, expect.objectContaining({ ssid: 'Acme Staff', client_isolation: true })))
+    expect(createWireless.mock.calls[0]?.[1]).not.toHaveProperty('password')
+  })
+
+  it('creates a permission-scoped DNS zone and record', async () => {
+    const zone = { id: 'zone-1', name: 'example.invalid', description: '', record_count: 0 }
+    const createDNSZone = vi.fn().mockResolvedValue(zone)
+    const createDNSRecord = vi.fn().mockResolvedValue({ id: 'record-1', zone_id: zone.id, zone_name: zone.name, owner_name: 'app.example.invalid', record_type: 'A', value: '192.0.2.10', ttl: 300, priority: null, weight: null, port: null, ip_address_id: null, description: '' })
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ createDNSZone, createDNSRecord })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'DNS' }))
+    await screen.findByText('No DNS zones match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add zone' }))
+    await user.type(screen.getByLabelText('Canonical zone name'), 'example.invalid')
+    await user.click(screen.getByRole('button', { name: 'Save zone' }))
+    await waitFor(() => expect(createDNSZone).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: 'Add record' }))
+    await user.type(screen.getByLabelText('Owner name'), 'app.example.invalid')
+    await user.type(screen.getByLabelText('Value'), '192.0.2.10')
+    await user.clear(screen.getByLabelText('TTL')); await user.type(screen.getByLabelText('TTL'), '300')
+    await user.click(screen.getByRole('button', { name: 'Save DNS record' }))
+    await waitFor(() => expect(createDNSRecord).toHaveBeenCalledWith(workspace, expect.objectContaining({ zone_id: 'zone-1', owner_name: 'app.example.invalid', record_type: 'A', value: '192.0.2.10' })))
   })
 
   it('creates a rack from the restrained physical-placement form', async () => {

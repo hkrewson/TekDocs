@@ -149,6 +149,14 @@ from apps.core.network_inventory_views import (
     NetworkRackDetailView,
     NetworkRackListCreateView,
 )
+from apps.core.network_service_views import (
+    DNSRecordDetailView,
+    DNSRecordListCreateView,
+    DNSZoneDetailView,
+    DNSZoneListCreateView,
+    WirelessDetailView,
+    WirelessListCreateView,
+)
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -466,6 +474,26 @@ urlpatterns = [
         MACAddressDetailView.as_view(),
         name="msp-network-mac-address-detail",
     ),
+    path("api/v1/workspaces/msp/networks/wireless", WirelessListCreateView.as_view(), name="msp-network-wireless"),
+    path(
+        "api/v1/workspaces/msp/networks/wireless/<uuid:wireless_entity_id>",
+        WirelessDetailView.as_view(),
+        name="msp-network-wireless-detail",
+    ),
+    path("api/v1/workspaces/msp/networks/dns-zones", DNSZoneListCreateView.as_view(), name="msp-network-dns-zones"),
+    path(
+        "api/v1/workspaces/msp/networks/dns-zones/<uuid:zone_entity_id>",
+        DNSZoneDetailView.as_view(),
+        name="msp-network-dns-zone-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/dns-records", DNSRecordListCreateView.as_view(), name="msp-network-dns-records"
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/dns-records/<uuid:record_entity_id>",
+        DNSRecordDetailView.as_view(),
+        name="msp-network-dns-record-detail",
+    ),
     path(
         "api/v1/custom-field-definitions",
         MSPCustomFieldDefinitionListCreateView.as_view(),
@@ -596,6 +624,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/mac-addresses/<uuid:mac_address_entity_id>",
         MACAddressDetailView.as_view(),
         name="organization-network-mac-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/wireless",
+        WirelessListCreateView.as_view(),
+        name="organization-network-wireless",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/wireless/<uuid:wireless_entity_id>",
+        WirelessDetailView.as_view(),
+        name="organization-network-wireless-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/dns-zones",
+        DNSZoneListCreateView.as_view(),
+        name="organization-network-dns-zones",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/dns-zones/<uuid:zone_entity_id>",
+        DNSZoneDetailView.as_view(),
+        name="organization-network-dns-zone-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/dns-records",
+        DNSRecordListCreateView.as_view(),
+        name="organization-network-dns-records",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/dns-records/<uuid:record_entity_id>",
+        DNSRecordDetailView.as_view(),
+        name="organization-network-dns-record-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",

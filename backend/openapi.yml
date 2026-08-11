@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.3
+  version: 0.4.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1811,6 +1811,9 @@ paths:
           - network_interface
           - network_ip_address
           - network_mac_address
+          - wireless_network
+          - dns_zone
+          - dns_record
           - ''
           type: string
           default: ''
@@ -1828,6 +1831,9 @@ paths:
           * `network_interface` - network_interface
           * `network_ip_address` - network_ip_address
           * `network_mac_address` - network_mac_address
+          * `wireless_network` - wireless_network
+          * `dns_zone` - dns_zone
+          * `dns_record` - dns_record
       - in: query
         name: page
         schema:
@@ -3708,6 +3714,218 @@ paths:
               schema:
                 $ref: '#/components/schemas/NetworkDevice'
           description: ''
+  /api/v1/workspaces/msp/networks/dns-records:
+    get:
+      operationId: workspaces_msp_networks_dns_records_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_dns_records_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+  /api/v1/workspaces/msp/networks/dns-records/{record_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_dns_records_retrieve_2
+      parameters:
+      - in: path
+        name: record_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_dns_records_partial_update
+      parameters:
+      - in: path
+        name: record_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+  /api/v1/workspaces/msp/networks/dns-zones:
+    get:
+      operationId: workspaces_msp_networks_dns_zones_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_dns_zones_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+          description: ''
+  /api/v1/workspaces/msp/networks/dns-zones/{zone_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_dns_zones_retrieve_2
+      parameters:
+      - in: path
+        name: zone_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_dns_zones_partial_update
+      parameters:
+      - in: path
+        name: zone_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+          description: ''
   /api/v1/workspaces/msp/networks/interfaces:
     get:
       operationId: workspaces_msp_networks_interfaces_retrieve
@@ -4449,6 +4667,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VRF'
+          description: ''
+  /api/v1/workspaces/msp/networks/wireless:
+    get:
+      operationId: workspaces_msp_networks_wireless_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_wireless_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
+          description: ''
+  /api/v1/workspaces/msp/networks/wireless/{wireless_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_wireless_retrieve_2
+      parameters:
+      - in: path
+        name: wireless_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_wireless_partial_update
+      parameters:
+      - in: path
+        name: wireless_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
           description: ''
   /api/v1/workspaces/msp/vendors:
     get:
@@ -7293,6 +7617,9 @@ paths:
           - network_interface
           - network_ip_address
           - network_mac_address
+          - wireless_network
+          - dns_zone
+          - dns_record
           - ''
           type: string
           default: ''
@@ -7310,6 +7637,9 @@ paths:
           * `network_interface` - network_interface
           * `network_ip_address` - network_ip_address
           * `network_mac_address` - network_mac_address
+          * `wireless_network` - wireless_network
+          * `dns_zone` - dns_zone
+          * `dns_record` - dns_record
       - in: path
         name: organization_entity_id
         schema:
@@ -7765,6 +8095,268 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-records:
+    get:
+      operationId: workspaces_organizations_networks_dns_records_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_dns_records_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecordWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-records/{record_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_dns_records_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: record_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_dns_records_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: record_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRecordWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-zones:
+    get:
+      operationId: workspaces_organizations_networks_dns_zones_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_dns_zones_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ZoneWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-zones/{zone_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_dns_zones_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: zone_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_dns_zones_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: zone_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedZoneWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/interfaces:
     get:
@@ -8682,6 +9274,137 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VRF'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/wireless:
+    get:
+      operationId: workspaces_organizations_networks_wireless_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_wireless_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WirelessWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/wireless/{wireless_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_wireless_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: wireless_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_wireless_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: wireless_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWirelessWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wireless'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
@@ -10205,6 +10928,29 @@ components:
           maxLength: 240
       required:
       - model_id
+    Collection:
+      type: object
+      properties:
+        results:
+          type: array
+          items: {}
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     Contract:
       type: object
       properties:
@@ -11528,6 +12274,9 @@ components:
       - network_interface
       - network_ip_address
       - network_mac_address
+      - wireless_network
+      - dns_zone
+      - dns_record
       type: string
       description: |-
         * `organization` - organization
@@ -11543,6 +12292,9 @@ components:
         * `network_interface` - network_interface
         * `network_ip_address` - network_ip_address
         * `network_mac_address` - network_mac_address
+        * `wireless_network` - wireless_network
+        * `dns_zone` - dns_zone
+        * `dns_record` - dns_record
     EntityRelationship:
       type: object
       properties:
@@ -11986,7 +12738,7 @@ components:
           default: physical
         status:
           allOf:
-          - $ref: '#/components/schemas/InterfaceWriteStatusEnum'
+          - $ref: '#/components/schemas/Status679Enum'
           default: active
         description:
           type: string
@@ -12013,18 +12765,6 @@ components:
         * `tunnel` - tunnel
         * `wireless` - wireless
         * `other` - other
-    InterfaceWriteStatusEnum:
-      enum:
-      - planned
-      - active
-      - disabled
-      - retired
-      type: string
-      description: |-
-        * `planned` - planned
-        * `active` - active
-        * `disabled` - disabled
-        * `retired` - retired
     Invitation:
       type: object
       properties:
@@ -13151,7 +13891,7 @@ components:
           default: physical
         status:
           allOf:
-          - $ref: '#/components/schemas/InterfaceWriteStatusEnum'
+          - $ref: '#/components/schemas/Status679Enum'
           default: active
         description:
           type: string
@@ -13391,6 +14131,48 @@ components:
           type: string
           maxLength: 160
           minLength: 1
+    PatchedRecordWrite:
+      type: object
+      properties:
+        zone_id:
+          type: string
+          format: uuid
+        owner_name:
+          type: string
+          maxLength: 253
+        record_type:
+          $ref: '#/components/schemas/RecordWriteRecordTypeEnum'
+        value:
+          type: string
+          maxLength: 4096
+        ttl:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          default: 3600
+        priority:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        weight:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        port:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        ip_address_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedSiteWrite:
       type: object
       properties:
@@ -13491,6 +14273,56 @@ components:
           type: string
           default: ''
           maxLength: 64
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+    PatchedWirelessWrite:
+      type: object
+      properties:
+        ssid:
+          type: string
+          maxLength: 128
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/PurposeEnum'
+          default: corporate
+        security:
+          allOf:
+          - $ref: '#/components/schemas/SecurityEnum'
+          default: wpa3_personal
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status679Enum'
+          default: active
+        hidden:
+          type: boolean
+          default: false
+        client_isolation:
+          type: boolean
+          default: false
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        subnet_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+    PatchedZoneWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 253
         description:
           type: string
           default: ''
@@ -13701,24 +14533,136 @@ components:
       - key_fingerprint_valid
       - signature_valid
       - valid
-    RecordTypeEnum:
+    PurposeEnum:
       enum:
-      - organization
-      - person_association
-      - site
-      - location
-      - custom_field_definition
-      - commercial_contract
-      - client_asset
+      - corporate
+      - guest
+      - iot
+      - voice
+      - other
       type: string
       description: |-
-        * `organization` - organization
-        * `person_association` - person_association
-        * `site` - site
-        * `location` - location
-        * `custom_field_definition` - custom_field_definition
-        * `commercial_contract` - commercial_contract
-        * `client_asset` - client_asset
+        * `corporate` - corporate
+        * `guest` - guest
+        * `iot` - iot
+        * `voice` - voice
+        * `other` - other
+    Record:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        zone_id:
+          type: string
+          format: uuid
+        zone_name:
+          type: string
+        owner_name:
+          type: string
+        record_type:
+          type: string
+        value:
+          type: string
+        ttl:
+          type: integer
+        priority:
+          type: integer
+          nullable: true
+        weight:
+          type: integer
+          nullable: true
+        port:
+          type: integer
+          nullable: true
+        ip_address_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+      required:
+      - description
+      - id
+      - ip_address_id
+      - owner_name
+      - port
+      - priority
+      - record_type
+      - ttl
+      - value
+      - weight
+      - zone_id
+      - zone_name
+    RecordWrite:
+      type: object
+      properties:
+        zone_id:
+          type: string
+          format: uuid
+        owner_name:
+          type: string
+          maxLength: 253
+        record_type:
+          $ref: '#/components/schemas/RecordWriteRecordTypeEnum'
+        value:
+          type: string
+          maxLength: 4096
+        ttl:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          default: 3600
+        priority:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        weight:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        port:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        ip_address_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - owner_name
+      - record_type
+      - value
+      - zone_id
+    RecordWriteRecordTypeEnum:
+      enum:
+      - A
+      - AAAA
+      - CNAME
+      - MX
+      - TXT
+      - SRV
+      - CAA
+      - NS
+      - PTR
+      type: string
+      description: |-
+        * `A` - A
+        * `AAAA` - AAAA
+        * `CNAME` - CNAME
+        * `MX` - MX
+        * `TXT` - TXT
+        * `SRV` - SRV
+        * `CAA` - CAA
+        * `NS` - NS
+        * `PTR` - PTR
     RecycleBinItem:
       type: object
       properties:
@@ -13726,7 +14670,7 @@ components:
           type: string
           format: uuid
         record_type:
-          $ref: '#/components/schemas/RecordTypeEnum'
+          $ref: '#/components/schemas/RecycleBinItemRecordTypeEnum'
         label:
           type: string
         archived_at:
@@ -13754,6 +14698,24 @@ components:
       - workspace_id
       - workspace_kind
       - workspace_name
+    RecycleBinItemRecordTypeEnum:
+      enum:
+      - organization
+      - person_association
+      - site
+      - location
+      - custom_field_definition
+      - commercial_contract
+      - client_asset
+      type: string
+      description: |-
+        * `organization` - organization
+        * `person_association` - person_association
+        * `site` - site
+        * `location` - location
+        * `custom_field_definition` - custom_field_definition
+        * `commercial_contract` - commercial_contract
+        * `client_asset` - client_asset
     RecycleBinResult:
       type: object
       properties:
@@ -14016,6 +14978,26 @@ components:
           type: string
           format: uuid
           nullable: true
+    SecurityEnum:
+      enum:
+      - open
+      - owe
+      - wpa2_personal
+      - wpa3_personal
+      - wpa2_enterprise
+      - wpa3_enterprise
+      - mixed_personal
+      - mixed_enterprise
+      type: string
+      description: |-
+        * `open` - open
+        * `owe` - owe
+        * `wpa2_personal` - wpa2_personal
+        * `wpa3_personal` - wpa3_personal
+        * `wpa2_enterprise` - wpa2_enterprise
+        * `wpa3_enterprise` - wpa3_enterprise
+        * `mixed_personal` - mixed_personal
+        * `mixed_enterprise` - mixed_enterprise
     SharedBlockUpdate:
       type: object
       properties:
@@ -14440,6 +15422,18 @@ components:
         * `expired` - Expired
         * `revoked` - Revoked
         * `accepted` - Accepted
+    Status679Enum:
+      enum:
+      - planned
+      - active
+      - disabled
+      - retired
+      type: string
+      description: |-
+        * `planned` - planned
+        * `active` - active
+        * `disabled` - disabled
+        * `retired` - retired
     Subnet:
       type: object
       properties:
@@ -14665,6 +15659,108 @@ components:
       description: |-
         * `msp_private` - MSP private
         * `client_visible` - Client visible
+    Wireless:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ssid:
+          type: string
+        purpose:
+          type: string
+        security:
+          type: string
+        status:
+          type: string
+        hidden:
+          type: boolean
+        client_isolation:
+          type: boolean
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_name:
+          type: string
+          nullable: true
+        vlan_number:
+          type: integer
+          nullable: true
+        subnet_id:
+          type: string
+          format: uuid
+          nullable: true
+        subnet_cidr:
+          type: string
+          nullable: true
+        description:
+          type: string
+      required:
+      - client_isolation
+      - description
+      - hidden
+      - id
+      - purpose
+      - security
+      - site_id
+      - site_name
+      - ssid
+      - status
+      - subnet_cidr
+      - subnet_id
+      - vlan_id
+      - vlan_name
+      - vlan_number
+    WirelessWrite:
+      type: object
+      properties:
+        ssid:
+          type: string
+          maxLength: 128
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/PurposeEnum'
+          default: corporate
+        security:
+          allOf:
+          - $ref: '#/components/schemas/SecurityEnum'
+          default: wpa3_personal
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status679Enum'
+          default: active
+        hidden:
+          type: boolean
+          default: false
+        client_isolation:
+          type: boolean
+          default: false
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        vlan_id:
+          type: string
+          format: uuid
+          nullable: true
+        subnet_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - ssid
     WorkspaceContext:
       type: object
       properties:
@@ -14741,6 +15837,36 @@ components:
       - page
       - page_size
       - results
+    Zone:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        record_count:
+          type: integer
+          readOnly: true
+      required:
+      - description
+      - id
+      - name
+      - record_count
+    ZoneWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 253
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - name
   securitySchemes:
     cookieAuth:
       type: apiKey

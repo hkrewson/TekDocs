@@ -223,6 +223,8 @@ def test_rack_update_rejects_move_or_shrink_around_placed_devices(owner_client, 
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_device_placement_serializes_on_the_rack(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Advisory-lock concurrency certification requires PostgreSQL")
     client = _organization(installation, "Concurrent client")
     site = _site(owner_client, client, "Concurrency site")
     rack_data = _rack(owner_client, client, site)
@@ -284,6 +286,8 @@ def _bind(cursor, tenant_id, organization_id):  # type: ignore[no-untyped-def]
 
 @pytest.mark.django_db(transaction=True)
 def test_postgres_guards_and_forced_rls_reject_cross_workspace_network_writes(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Database guard and runtime-role certification require PostgreSQL")
     first = _organization(installation, "First RLS client")
     sibling = _organization(installation, "Sibling RLS client")
     first_site = _site(owner_client, first, "First RLS site")
@@ -295,8 +299,6 @@ def test_postgres_guards_and_forced_rls_reject_cross_workspace_network_writes(ow
     with pytest.raises(DatabaseError), transaction.atomic():
         NetworkRack.objects.filter(pk=rack.pk).update(site_id=sibling_site_record.id)
 
-    if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         _bind(cursor, installation.tenant.id, sibling.id)
         cursor.execute("SELECT id FROM core_networkrack")

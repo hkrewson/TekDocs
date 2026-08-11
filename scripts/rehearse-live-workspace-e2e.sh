@@ -55,7 +55,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -107,6 +107,9 @@ network_interface = NetworkInterface.objects.get(entity__display_name="ethernet1
 network_subnet = NetworkSubnet.objects.get(entity__display_name="Live management LAN")
 network_ip = NetworkIPAddress.objects.get(address="192.0.2.10")
 network_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:10")
+wireless = WirelessNetwork.objects.get(ssid="Live Staff")
+dns_zone = DNSZone.objects.get(name="live.example.invalid")
+dns_record = DNSRecord.objects.get(owner_name="switch.live.example.invalid", record_type="A")
 assert network_device.organization == organization
 assert network_interface.device == network_device
 assert network_subnet.organization == organization
@@ -114,6 +117,14 @@ assert network_ip.subnet == network_subnet
 assert network_ip.interface == network_interface
 assert network_ip.dns_name == "switch.live.example.invalid"
 assert network_mac.interface == network_interface
+assert wireless.organization == organization
+assert wireless.site == site
+assert wireless.subnet == network_subnet
+assert wireless.client_isolation is True
+assert dns_zone.organization == organization
+assert dns_record.zone == dns_zone
+assert dns_record.value == "192.0.2.10"
+assert dns_record.ip_address == network_ip
 vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
 link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
 assert link.archived_at is None

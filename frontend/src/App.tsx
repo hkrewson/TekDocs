@@ -297,9 +297,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.4.3" />
+      <PageHeader title="Overview" description="TekDocs 0.4.5" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.4.3</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.4.5</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -357,7 +357,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
   assets: { title: 'Assets', description: 'Hardware lifecycle and software records created from retained supplier provenance.', release: '0.3.5' },
   licenses: { title: 'Licenses', description: 'Software entitlements and assignments scoped to this organization.', release: '0.3.6' },
-  networks: { title: 'Networks', description: 'Network.', release: '0.4.3' },
+  networks: { title: 'Networks', description: 'Network.', release: '0.4.5' },
   domains: { title: 'Domains', description: 'Domain registration and DNS records scoped to this organization.', release: '0.7.8' },
   certificates: { title: 'Certificates', description: 'TLS endpoints and certificate evidence scoped to this organization.', release: '0.7.9' },
   credentials: { title: 'Credential references', description: 'Links to externally protected credentials; TekDocs does not store or reveal their values.', release: '0.3.1' },

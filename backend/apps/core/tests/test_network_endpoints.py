@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
-from django.db import DatabaseError, close_old_connections, transaction
+from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from hypothesis import given
@@ -221,6 +221,8 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_duplicate_ip_creation_serializes(installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Advisory-lock concurrency certification requires PostgreSQL")
     organization = _organization(installation, "Concurrent endpoints")
     subnet = _subnet(installation, organization)
     barrier = threading.Barrier(2)

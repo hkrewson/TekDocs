@@ -307,15 +307,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-asset-model-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-detail", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
-    route(
-        "msp-network-racks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
-    ),
-    route(
-        "msp-network-rack-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
-    ),
-    route(
-        "msp-network-devices", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
-    ),
+    route("msp-network-racks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-rack-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-devices", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route(
         "msp-network-device-detail",
         ("GET", "PATCH"),
@@ -339,6 +333,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-network-mac-addresses", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route(
         "msp-network-mac-address-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route("msp-network-wireless", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-wireless-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-dns-zones", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-dns-zone-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-dns-records", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-dns-record-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
     ),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-hardware-assignment-choices", ("GET",), PermissionKey.ASSETS_VIEW),
@@ -649,6 +651,48 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-network-mac-address-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-wireless",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-wireless-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-dns-zones",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-dns-zone-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-dns-records",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-dns-record-detail",
         ("GET", "PATCH"),
         PermissionKey.NETWORKS_VIEW,
         (PermissionKey.NETWORKS_EDIT,),

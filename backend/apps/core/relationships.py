@@ -25,6 +25,9 @@ SEARCHABLE_ENTITY_TYPES = (
     "network_interface",
     "network_ip_address",
     "network_mac_address",
+    "wireless_network",
+    "dns_zone",
+    "dns_record",
 )
 
 

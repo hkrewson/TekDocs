@@ -40,6 +40,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_networkinterface",
     "core_networkipaddress",
     "core_networkmacaddress",
+    "core_wirelessnetwork",
+    "core_dnszone",
+    "core_dnsrecord",
 )
 
 TENANT_SCOPED_TABLES = (

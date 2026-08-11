@@ -91,7 +91,7 @@ test-commercial:
 	docker compose run --rm migrate pytest apps/core/tests/test_commercial.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-networks:
-	docker compose run --rm migrate pytest apps/core/tests/test_network_inventory.py apps/core/tests/test_network_addressing.py apps/core/tests/test_network_endpoints.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_network_inventory.py apps/core/tests/test_network_addressing.py apps/core/tests/test_network_endpoints.py apps/core/tests/test_network_services.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-secret-files:
 	docker compose run --rm migrate pytest apps/core/tests/test_secret_files.py apps/core/tests/test_health.py apps/core/tests/test_email_settings.py -q

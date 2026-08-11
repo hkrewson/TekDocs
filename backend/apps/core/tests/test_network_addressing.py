@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
-from django.db import DatabaseError, close_old_connections, transaction
+from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from hypothesis import given
@@ -183,6 +183,8 @@ def test_overlap_helper_is_family_aware_and_rejects_host_bits():
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_overlapping_subnets_serialize_in_default_namespace(installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Advisory-lock concurrency certification requires PostgreSQL")
     organization = _organization(installation, "Concurrent prefixes")
     barrier = threading.Barrier(2)
 

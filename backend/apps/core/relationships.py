@@ -28,6 +28,8 @@ SEARCHABLE_ENTITY_TYPES = (
     "wireless_network",
     "dns_zone",
     "dns_record",
+    "network_circuit",
+    "network_circuit_handoff",
 )
 
 

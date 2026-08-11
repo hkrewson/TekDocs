@@ -43,6 +43,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_wirelessnetwork",
     "core_dnszone",
     "core_dnsrecord",
+    "core_networkcircuit",
+    "core_networkcircuithandoff",
 )
 
 TENANT_SCOPED_TABLES = (

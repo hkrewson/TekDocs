@@ -252,7 +252,10 @@ class CommercialContractDetailView(APIView):
     @extend_schema(responses={204: None})
     def delete(self, request, organization_entity_id, contract_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
-        archive_contract(record=_record(workspace, contract_entity_id), actor_id=request.user.pk)
+        try:
+            archive_contract(record=_record(workspace, contract_entity_id), actor_id=request.user.pk)
+        except CommercialError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(status=204)
 
 

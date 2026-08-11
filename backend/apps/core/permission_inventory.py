@@ -342,6 +342,11 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route(
         "msp-network-dns-record-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
     ),
+    route("msp-network-circuits", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-circuit-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-network-circuit-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-circuit-handoffs", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
+    route("msp-network-circuit-handoff-detail", ("PATCH",), mutations=(PermissionKey.NETWORKS_EDIT,)),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-hardware-assignment-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route(
@@ -696,6 +701,39 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "PATCH"),
         PermissionKey.NETWORKS_VIEW,
         (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-circuits",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-circuit-choices",
+        ("GET",),
+        PermissionKey.NETWORKS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-circuit-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-circuit-handoffs",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-circuit-handoff-detail",
+        ("PATCH",),
+        mutations=(PermissionKey.NETWORKS_EDIT,),
         organization_scoped=True,
     ),
     route(

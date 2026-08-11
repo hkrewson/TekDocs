@@ -134,6 +134,13 @@ from apps.core.network_addressing_views import (
     VRFDetailView,
     VRFListCreateView,
 )
+from apps.core.network_circuit_views import (
+    CircuitChoiceView,
+    CircuitDetailView,
+    CircuitListCreateView,
+    HandoffDetailView,
+    HandoffListCreateView,
+)
 from apps.core.network_endpoint_views import (
     InterfaceDetailView,
     InterfaceListCreateView,
@@ -494,6 +501,27 @@ urlpatterns = [
         DNSRecordDetailView.as_view(),
         name="msp-network-dns-record-detail",
     ),
+    path("api/v1/workspaces/msp/networks/circuits", CircuitListCreateView.as_view(), name="msp-network-circuits"),
+    path(
+        "api/v1/workspaces/msp/networks/circuits/choices",
+        CircuitChoiceView.as_view(),
+        name="msp-network-circuit-choices",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/circuits/<uuid:circuit_entity_id>",
+        CircuitDetailView.as_view(),
+        name="msp-network-circuit-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/circuits/<uuid:circuit_entity_id>/handoffs",
+        HandoffListCreateView.as_view(),
+        name="msp-network-circuit-handoffs",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/circuits/<uuid:circuit_entity_id>/handoffs/<uuid:handoff_entity_id>",
+        HandoffDetailView.as_view(),
+        name="msp-network-circuit-handoff-detail",
+    ),
     path(
         "api/v1/custom-field-definitions",
         MSPCustomFieldDefinitionListCreateView.as_view(),
@@ -654,6 +682,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/dns-records/<uuid:record_entity_id>",
         DNSRecordDetailView.as_view(),
         name="organization-network-dns-record-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/circuits",
+        CircuitListCreateView.as_view(),
+        name="organization-network-circuits",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/circuits/choices",
+        CircuitChoiceView.as_view(),
+        name="organization-network-circuit-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/circuits/<uuid:circuit_entity_id>",
+        CircuitDetailView.as_view(),
+        name="organization-network-circuit-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/circuits/<uuid:circuit_entity_id>/handoffs",
+        HandoffListCreateView.as_view(),
+        name="organization-network-circuit-handoffs",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/circuits/<uuid:circuit_entity_id>/handoffs/<uuid:handoff_entity_id>",
+        HandoffDetailView.as_view(),
+        name="organization-network-circuit-handoff-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",

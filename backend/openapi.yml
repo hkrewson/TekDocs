@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.5
+  version: 0.4.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1814,6 +1814,8 @@ paths:
           - wireless_network
           - dns_zone
           - dns_record
+          - network_circuit
+          - network_circuit_handoff
           - ''
           type: string
           default: ''
@@ -1834,6 +1836,8 @@ paths:
           * `wireless_network` - wireless_network
           * `dns_zone` - dns_zone
           * `dns_record` - dns_record
+          * `network_circuit` - network_circuit
+          * `network_circuit_handoff` - network_circuit_handoff
       - in: query
         name: page
         schema:
@@ -3607,6 +3611,219 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkChoices'
+          description: ''
+  /api/v1/workspaces/msp/networks/circuits:
+    get:
+      operationId: workspaces_msp_networks_circuits_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_circuits_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+  /api/v1/workspaces/msp/networks/circuits/{circuit_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_circuits_retrieve_2
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_circuits_partial_update
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+  /api/v1/workspaces/msp/networks/circuits/{circuit_entity_id}/handoffs:
+    get:
+      operationId: workspaces_msp_networks_circuits_handoffs_list
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Handoff'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_circuits_handoffs_create
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+  /api/v1/workspaces/msp/networks/circuits/{circuit_entity_id}/handoffs/{handoff_entity_id}:
+    patch:
+      operationId: workspaces_msp_networks_circuits_handoffs_partial_update
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: handoff_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+  /api/v1/workspaces/msp/networks/circuits/choices:
+    get:
+      operationId: workspaces_msp_networks_circuits_choices_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitChoices'
           description: ''
   /api/v1/workspaces/msp/networks/devices:
     get:
@@ -7620,6 +7837,8 @@ paths:
           - wireless_network
           - dns_zone
           - dns_record
+          - network_circuit
+          - network_circuit_handoff
           - ''
           type: string
           default: ''
@@ -7640,6 +7859,8 @@ paths:
           * `wireless_network` - wireless_network
           * `dns_zone` - dns_zone
           * `dns_record` - dns_record
+          * `network_circuit` - network_circuit
+          * `network_circuit_handoff` - network_circuit_handoff
       - in: path
         name: organization_entity_id
         schema:
@@ -7964,6 +8185,269 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkChoices'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits:
+    get:
+      operationId: workspaces_organizations_networks_circuits_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_circuits_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/{circuit_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_circuits_retrieve_2
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_circuits_partial_update
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCircuitWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/{circuit_entity_id}/handoffs:
+    get:
+      operationId: workspaces_organizations_networks_circuits_handoffs_list
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Handoff'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_circuits_handoffs_create
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HandoffWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/{circuit_entity_id}/handoffs/{handoff_entity_id}
+  : patch:
+      operationId: workspaces_organizations_networks_circuits_handoffs_partial_update
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: handoff_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedHandoffWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/choices:
+    get:
+      operationId: workspaces_organizations_networks_circuits_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitChoices'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/devices:
     get:
@@ -10761,6 +11245,27 @@ components:
         * `procedure` - Procedure
         * `guide` - Guide
         * `reference` - Reference
+    Choice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        device_id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - name
     ChoiceResult:
       type: object
       properties:
@@ -10774,6 +11279,235 @@ components:
       required:
       - installations
       - people
+    Circuit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        service_identifier:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+        bandwidth_down_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        bandwidth_up_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        service_starts_on:
+          type: string
+          format: date
+          nullable: true
+        review_on:
+          type: string
+          format: date
+          nullable: true
+        planned_disconnect_on:
+          type: string
+          format: date
+          nullable: true
+        description:
+          type: string
+        handoffs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Handoff'
+        lifecycle_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleEvent'
+          readOnly: true
+      required:
+      - bandwidth_down_mbps
+      - bandwidth_up_mbps
+      - description
+      - handoffs
+      - id
+      - installed_on
+      - kind
+      - lifecycle_events
+      - name
+      - planned_disconnect_on
+      - provider_id
+      - provider_name
+      - review_on
+      - service_identifier
+      - service_starts_on
+      - status
+    CircuitChoices:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        contracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        interfaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        can_view_contracts:
+          type: boolean
+      required:
+      - can_view_contracts
+      - contracts
+      - devices
+      - interfaces
+      - locations
+      - providers
+      - sites
+    CircuitResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Circuit'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        can_view_contracts:
+          type: boolean
+      required:
+      - can_manage
+      - can_view_contracts
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    CircuitWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        provider_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+          nullable: true
+        service_identifier:
+          type: string
+          maxLength: 240
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/CircuitWriteKindEnum'
+          default: internet
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CircuitWriteStatusEnum'
+          default: active
+        bandwidth_down_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        bandwidth_up_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        service_starts_on:
+          type: string
+          format: date
+          nullable: true
+        review_on:
+          type: string
+          format: date
+          nullable: true
+        planned_disconnect_on:
+          type: string
+          format: date
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - name
+      - provider_id
+      - service_identifier
+    CircuitWriteKindEnum:
+      enum:
+      - internet
+      - wan
+      - mpls
+      - dark_fiber
+      - broadband
+      - cellular
+      - voice
+      - other
+      type: string
+      description: |-
+        * `internet` - internet
+        * `wan` - wan
+        * `mpls` - mpls
+        * `dark_fiber` - dark_fiber
+        * `broadband` - broadband
+        * `cellular` - cellular
+        * `voice` - voice
+        * `other` - other
+    CircuitWriteStatusEnum:
+      enum:
+      - ordered
+      - provisioning
+      - active
+      - suspended
+      - disconnected
+      type: string
+      description: |-
+        * `ordered` - ordered
+        * `provisioning` - provisioning
+        * `active` - active
+        * `suspended` - suspended
+        * `disconnected` - disconnected
     ClientAsset:
       type: object
       properties:
@@ -12277,6 +13011,8 @@ components:
       - wireless_network
       - dns_zone
       - dns_record
+      - network_circuit
+      - network_circuit_handoff
       type: string
       description: |-
         * `organization` - organization
@@ -12295,6 +13031,8 @@ components:
         * `wireless_network` - wireless_network
         * `dns_zone` - dns_zone
         * `dns_record` - dns_record
+        * `network_circuit` - network_circuit
+        * `network_circuit_handoff` - network_circuit_handoff
     EntityRelationship:
       type: object
       properties:
@@ -12379,6 +13117,110 @@ components:
         * `email` - Email
         * `choice` - Choice
         * `multi_choice` - Multiple choice
+    Handoff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        side:
+          type: string
+        media:
+          type: string
+        connector:
+          type: string
+        provider_reference:
+          type: string
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        device_id:
+          type: string
+          format: uuid
+          nullable: true
+        device_name:
+          type: string
+          nullable: true
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        interface_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+      required:
+      - connector
+      - description
+      - device_id
+      - device_name
+      - id
+      - interface_id
+      - interface_name
+      - location_id
+      - location_name
+      - media
+      - name
+      - provider_reference
+      - side
+      - site_id
+      - site_name
+    HandoffWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        side:
+          $ref: '#/components/schemas/SideEnum'
+        media:
+          $ref: '#/components/schemas/MediaEnum'
+        connector:
+          type: string
+          default: ''
+          maxLength: 120
+        provider_reference:
+          type: string
+          default: ''
+          maxLength: 240
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        device_id:
+          type: string
+          format: uuid
+          nullable: true
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - media
+      - name
+      - side
     HardwareAssignment:
       type: object
       properties:
@@ -12778,7 +13620,7 @@ components:
           readOnly: true
         state:
           allOf:
-          - $ref: '#/components/schemas/StateEnum'
+          - $ref: '#/components/schemas/InvitationStateEnum'
           readOnly: true
         expires_at:
           type: string
@@ -12845,6 +13687,18 @@ components:
           maxLength: 254
       required:
       - email
+    InvitationStateEnum:
+      enum:
+      - pending
+      - expired
+      - revoked
+      - accepted
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `expired` - Expired
+        * `revoked` - Revoked
+        * `accepted` - Accepted
     KindDd6Enum:
       enum:
       - msp
@@ -12935,6 +13789,33 @@ components:
         * `suspended` - suspended
         * `expired` - expired
         * `terminated` - terminated
+    LifecycleEvent:
+      type: object
+      properties:
+        kind:
+          type: string
+        date:
+          type: string
+          format: date
+        label:
+          type: string
+        state:
+          $ref: '#/components/schemas/LifecycleEventStateEnum'
+      required:
+      - date
+      - kind
+      - label
+      - state
+    LifecycleEventStateEnum:
+      enum:
+      - overdue
+      - today
+      - upcoming
+      type: string
+      description: |-
+        * `overdue` - overdue
+        * `today` - today
+        * `upcoming` - upcoming
     LifecycleStateEnum:
       enum:
       - in_stock
@@ -13128,6 +14009,22 @@ components:
           type: string
       required:
       - html
+    MediaEnum:
+      enum:
+      - copper
+      - fiber
+      - coax
+      - wireless
+      - virtual
+      - other
+      type: string
+      description: |-
+        * `copper` - copper
+        * `fiber` - fiber
+        * `coax` - coax
+        * `wireless` - wireless
+        * `virtual` - virtual
+        * `other` - other
     Member:
       type: object
       properties:
@@ -13683,6 +14580,60 @@ components:
           items:
             type: string
             format: uuid
+    PatchedCircuitWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        provider_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+          nullable: true
+        service_identifier:
+          type: string
+          maxLength: 240
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/CircuitWriteKindEnum'
+          default: internet
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CircuitWriteStatusEnum'
+          default: active
+        bandwidth_down_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        bandwidth_up_mbps:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          nullable: true
+        installed_on:
+          type: string
+          format: date
+          nullable: true
+        service_starts_on:
+          type: string
+          format: date
+          nullable: true
+        review_on:
+          type: string
+          format: date
+          nullable: true
+        planned_disconnect_on:
+          type: string
+          format: date
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedContractWrite:
       type: object
       properties:
@@ -13815,6 +14766,44 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedHandoffWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        side:
+          $ref: '#/components/schemas/SideEnum'
+        media:
+          $ref: '#/components/schemas/MediaEnum'
+        connector:
+          type: string
+          default: ''
+          maxLength: 120
+        provider_reference:
+          type: string
+          default: ''
+          maxLength: 240
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        device_id:
+          type: string
+          format: uuid
+          nullable: true
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedHardwareDetailWrite:
       type: object
       properties:
@@ -15010,6 +15999,14 @@ components:
       required:
       - base_revision_id
       - markdown
+    SideEnum:
+      enum:
+      - a
+      - z
+      type: string
+      description: |-
+        * `a` - a
+        * `z` - z
     Site:
       type: object
       properties:
@@ -15410,18 +16407,6 @@ components:
       - id
       - schema
       - version
-    StateEnum:
-      enum:
-      - pending
-      - expired
-      - revoked
-      - accepted
-      type: string
-      description: |-
-        * `pending` - Pending
-        * `expired` - Expired
-        * `revoked` - Revoked
-        * `accepted` - Accepted
     Status679Enum:
       enum:
       - planned

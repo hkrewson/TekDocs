@@ -13,6 +13,7 @@ from .models import (
     ContractCost,
     Entity,
     EntityVisibility,
+    NetworkCircuit,
     Organization,
     Tenant,
     workspace_for_owner,
@@ -135,6 +136,8 @@ def update_contract(*, record: CommercialContract, actor_id: UUID, values: dict[
 @transaction.atomic
 def archive_contract(*, record: CommercialContract, actor_id: UUID) -> None:
     locked = CommercialContract.objects.select_for_update().select_related("entity").get(pk=record.pk)
+    if NetworkCircuit.objects.filter(contract=locked).exists():
+        raise CommercialError("A contract linked to a network circuit cannot be archived.")
     archived_at = timezone.now()
     locked.costs.filter(archived_at__isnull=True).update(archived_at=archived_at, updated_at=archived_at)
     locked.archived_at = archived_at

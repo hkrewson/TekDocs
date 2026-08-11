@@ -759,11 +759,12 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.1` | **Complete:** addressable racks and network devices, exact-Workspace physical placement, and typed logical relationships. |
 | `0.4.2` | **Complete:** VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
 | `0.4.3` | **Complete:** IP addresses, interfaces, MAC records, assignments, and conflict detection. |
-| `0.4.4` | Circuits, providers, handoffs, contracts, and lifecycle reminders. |
-| `0.4.5` | **Complete:** wireless networks and permission-aware DNS zones/records; `0.4.4` remains explicitly pending. |
-| `0.4.6` | Relationship-derived network diagrams and accessible tabular equivalents. |
-| `0.4.7` | NetBox-compatible external identifiers plus deterministic import/reconciliation seam. |
-| `0.4.8` | Network search/export, scale testing, upgrade/restore, and isolation remediation. |
+| `0.4.4` | **Complete in chronological build `0.4.6`:** circuits, providers, handoffs, contracts, and lifecycle reminders. |
+| `0.4.5` | **Complete:** wireless networks and permission-aware DNS zones/records. |
+| `0.4.6` | **Complete:** packaging checkpoint for the deferred `0.4.4` circuit contract; the application version was not downgraded after `0.4.5`. |
+| `0.4.7` | Relationship-derived network diagrams and accessible tabular equivalents. |
+| `0.4.8` | NetBox-compatible external identifiers plus deterministic import/reconciliation seam. |
+| `0.4.9` | Network search/export, scale testing, upgrade/restore, and isolation remediation. |
 | `0.5.0` | Stabilize and certify network inventory. |
 
 ### `0.4.1` acceptance criteria
@@ -811,9 +812,22 @@ Evidence: `docs/releases/0.4.3.md`.
 - [x] DNS zones and A, AAAA, CNAME, MX, TXT, SRV, CAA, NS, and PTR records use canonical names, enforce zone ancestry and type-aware values, prevent CNAME coexistence, and may link A/AAAA values to an exact same-Workspace IP record.
 - [x] Central `networks.view` and MFA-backed `networks.edit`, permission inventory, non-disclosing lookups, forced RLS, database edge/canonical/conflict guards, sibling-client IDOR, direct-write, and property tests protect every route and table.
 - [x] The Network page exposes restrained, searchable, keyboard-accessible Wireless and DNS surfaces with create/edit, mapping, loading, empty, error, and server-denial behavior in MSP and client contexts.
-- [x] This is maintained inventory, not wireless control, DNS serving/resolution, active observation, certificate validation, or secret custody. Circuits remain pending in `0.4.4`; diagrams, reconciliation, recovery, scale, and final certification remain later slices.
+- [x] This is maintained inventory, not wireless control, DNS serving/resolution, active observation, certificate validation, or secret custody. Circuits were delivered next in chronological build `0.4.6`; diagrams, reconciliation, recovery, scale, and final certification remain later slices.
 
 Evidence: `docs/releases/0.4.5.md`.
+
+### `0.4.4` acceptance criteria (delivered in build `0.4.6`)
+
+- [x] Circuits and their A/Z-side handoffs are stable exact-Workspace Entities. MSP routes remain exact-MSP views and organization routes never aggregate sibling-client records.
+- [x] A circuit resolves one active same-tenant vendor, manufacturer, or partner as provider and may retain one active same-Workspace commercial contract for that same provider. Linked contracts cannot be archived until the dependency is removed.
+- [x] Service identifiers, circuit type/status, directional bandwidth, install/service/review/disconnect dates, and non-secret notes are bounded and validated. Circuit identifiers are unique for one provider in one Workspace.
+- [x] Handoffs may resolve same-Workspace site, location, device, and interface placement. Location requires its site, interface requires its device, device placement cannot contradict the handoff site, and one interface cannot terminate multiple handoffs.
+- [x] Review and planned-disconnect dates produce deterministic lifecycle projections. Contract renewal notice, renewal, and end dates appear only when the caller also has `assets.view`; costs and contract financial terms never enter the network response.
+- [x] Lifecycle reminders in this slice are due-date projections, not notification delivery. The later notification outbox and preference milestones will consume these dates without making network inventory responsible for email or scheduling.
+- [x] Central `networks.view` and MFA-backed `networks.edit`, permission inventory, strict unknown-field rejection, non-disclosing lookups, forced RLS, database ownership/relationship guards, sibling-client IDOR, and direct-write tests protect every route and table.
+- [x] The Network page exposes restrained searchable circuit, contract, lifecycle, and handoff workflows with loading, empty, error, denial, responsive, and keyboard-accessible states in MSP and client contexts.
+
+Evidence: `docs/releases/0.4.6.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

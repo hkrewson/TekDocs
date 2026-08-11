@@ -2257,6 +2257,215 @@ class NetworkMACAddress(TimestampedModel):
             raise ValidationError("Network MAC address interface must use its Workspace scope")
 
 
+class NetworkCircuitKind(models.TextChoices):
+    INTERNET = "internet", "Internet"
+    WAN = "wan", "WAN"
+    MPLS = "mpls", "MPLS"
+    DARK_FIBER = "dark_fiber", "Dark fiber"
+    BROADBAND = "broadband", "Broadband"
+    CELLULAR = "cellular", "Cellular"
+    VOICE = "voice", "Voice"
+    OTHER = "other", "Other"
+
+
+class NetworkCircuitStatus(models.TextChoices):
+    ORDERED = "ordered", "Ordered"
+    PROVISIONING = "provisioning", "Provisioning"
+    ACTIVE = "active", "Active"
+    SUSPENDED = "suspended", "Suspended"
+    DISCONNECTED = "disconnected", "Disconnected"
+
+
+class NetworkCircuit(TimestampedModel):
+    """A provider service with exact Workspace ownership and optional contract provenance."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_circuits")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_circuits", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_circuit")
+    provider = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="provided_network_circuits")
+    contract = models.ForeignKey(
+        CommercialContract, on_delete=models.PROTECT, related_name="network_circuits", null=True, blank=True
+    )
+    service_identifier = models.CharField(max_length=240)
+    kind = models.CharField(max_length=24, choices=NetworkCircuitKind.choices)
+    status = models.CharField(max_length=24, choices=NetworkCircuitStatus.choices)
+    bandwidth_down_mbps = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    bandwidth_up_mbps = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    installed_on = models.DateField(null=True, blank=True)
+    service_starts_on = models.DateField(null=True, blank=True)
+    review_on = models.DateField(null=True, blank=True)
+    planned_disconnect_on = models.DateField(null=True, blank=True)
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(kind__in=NetworkCircuitKind.values), name="circuit_kind_valid"),
+            models.CheckConstraint(
+                condition=models.Q(status__in=NetworkCircuitStatus.values), name="circuit_status_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(bandwidth_down_mbps__isnull=True) | models.Q(bandwidth_down_mbps__gt=0),
+                name="circuit_down_bandwidth_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(bandwidth_up_mbps__isnull=True) | models.Q(bandwidth_up_mbps__gt=0),
+                name="circuit_up_bandwidth_positive",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "organization", "provider", "service_identifier"),
+                name="circuit_service_id_unique",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "status"), name="core_circuit_scope_idx"),
+            models.Index(fields=("tenant", "organization", "provider"), name="core_circuit_provider_idx"),
+            models.Index(fields=("tenant", "organization", "review_on"), name="core_circuit_review_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "network_circuit"
+        ):
+            raise ValidationError("Network circuit entity identity and scope must match")
+        if self.provider_id and (self.provider.tenant_id != self.tenant_id or self.provider_id == self.organization_id):
+            raise ValidationError("Network circuit provider must be another organization in the same tenant")
+        if not self.service_identifier.strip():
+            raise ValidationError("Network circuit service identifier is required")
+        contract = self.contract if self.contract_id else None
+        if contract is not None and (
+            contract.tenant_id != self.tenant_id
+            or contract.organization_id != self.organization_id
+            or contract.provider_id != self.provider_id
+            or contract.archived_at is not None
+        ):
+            raise ValidationError("Network circuit contract must use the same Workspace and provider")
+        if (
+            self.service_starts_on
+            and self.planned_disconnect_on
+            and self.planned_disconnect_on < self.service_starts_on
+        ):
+            raise ValidationError("Circuit disconnect date cannot precede its service start date")
+
+
+class NetworkHandoffSide(models.TextChoices):
+    A = "a", "A side"
+    Z = "z", "Z side"
+
+
+class NetworkHandoffMedia(models.TextChoices):
+    COPPER = "copper", "Copper"
+    FIBER = "fiber", "Fiber"
+    COAX = "coax", "Coax"
+    WIRELESS = "wireless", "Wireless"
+    VIRTUAL = "virtual", "Virtual"
+    OTHER = "other", "Other"
+
+
+class NetworkCircuitHandoff(TimestampedModel):
+    """One physical or logical demarcation for a retained circuit."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_circuit_handoffs")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_circuit_handoffs", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_circuit_handoff")
+    circuit = models.ForeignKey(NetworkCircuit, on_delete=models.PROTECT, related_name="handoffs")
+    side = models.CharField(max_length=1, choices=NetworkHandoffSide.choices)
+    media = models.CharField(max_length=16, choices=NetworkHandoffMedia.choices)
+    connector = models.CharField(max_length=120, blank=True)
+    provider_reference = models.CharField(max_length=240, blank=True)
+    site = models.ForeignKey(
+        Site, on_delete=models.PROTECT, related_name="network_circuit_handoffs", null=True, blank=True
+    )
+    location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, related_name="network_circuit_handoffs", null=True, blank=True
+    )
+    device = models.ForeignKey(
+        NetworkDevice, on_delete=models.PROTECT, related_name="network_circuit_handoffs", null=True, blank=True
+    )
+    interface = models.ForeignKey(
+        NetworkInterface, on_delete=models.PROTECT, related_name="network_circuit_handoffs", null=True, blank=True
+    )
+    description = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("circuit__entity__display_name", "side", "entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(side__in=NetworkHandoffSide.values), name="handoff_side_valid"),
+            models.CheckConstraint(
+                condition=models.Q(media__in=NetworkHandoffMedia.values), name="handoff_media_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(location__isnull=True) | models.Q(site__isnull=False),
+                name="handoff_location_requires_site",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(interface__isnull=True) | models.Q(device__isnull=False),
+                name="handoff_interface_requires_device",
+            ),
+            models.UniqueConstraint(fields=("circuit", "side", "entity"), name="handoff_identity_unique"),
+            models.UniqueConstraint(
+                fields=("interface",),
+                condition=models.Q(interface__isnull=False),
+                name="handoff_interface_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "circuit"), name="core_handoff_scope_idx"),
+            models.Index(fields=("tenant", "organization", "interface"), name="core_handoff_interface_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "network_circuit_handoff"
+        ):
+            raise ValidationError("Circuit handoff entity identity and scope must match")
+        for related, label in (
+            (self.circuit if self.circuit_id else None, "circuit"),
+            (self.site if self.site_id else None, "site"),
+            (self.location if self.location_id else None, "location"),
+            (self.device if self.device_id else None, "device"),
+            (self.interface if self.interface_id else None, "interface"),
+        ):
+            if related is not None and (
+                related.tenant_id != self.tenant_id or related.organization_id != self.organization_id
+            ):
+                raise ValidationError(f"Circuit handoff {label} must use its Workspace scope")
+        if self.location_id and self.location is not None and self.location.site_id != self.site_id:
+            raise ValidationError("Circuit handoff location must belong to its selected site")
+        if self.interface_id and self.interface is not None and self.interface.device_id != self.device_id:
+            raise ValidationError("Circuit handoff interface must belong to its selected device")
+        if (
+            self.device_id
+            and self.site_id
+            and self.device is not None
+            and self.device.site_id not in (None, self.site_id)
+        ):
+            raise ValidationError("Circuit handoff device placement contradicts its selected site")
+
+
 class WirelessNetworkPurpose(models.TextChoices):
     CORPORATE = "corporate", "Corporate"
     GUEST = "guest", "Guest"

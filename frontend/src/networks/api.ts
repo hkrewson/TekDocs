@@ -46,6 +46,11 @@ export type NetworkMACAddress = { id: string; address: string; interface_id: str
 export type WirelessNetwork = { id: string; ssid: string; purpose: 'corporate' | 'guest' | 'iot' | 'voice' | 'other'; security: 'open' | 'owe' | 'wpa2_personal' | 'wpa3_personal' | 'wpa2_enterprise' | 'wpa3_enterprise' | 'mixed_personal' | 'mixed_enterprise'; status: 'planned' | 'active' | 'disabled' | 'retired'; hidden: boolean; client_isolation: boolean; site_id: string | null; site_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; subnet_id: string | null; subnet_cidr: string | null; description: string }
 export type DNSZone = { id: string; name: string; description: string; record_count: number }
 export type DNSRecord = { id: string; zone_id: string; zone_name: string; owner_name: string; record_type: 'A' | 'AAAA' | 'CNAME' | 'MX' | 'TXT' | 'SRV' | 'CAA' | 'NS' | 'PTR'; value: string; ttl: number; priority: number | null; weight: number | null; port: number | null; ip_address_id: string | null; description: string }
+export type CircuitLifecycleEvent = { kind: 'review' | 'disconnect' | 'renewal_notice' | 'renewal' | 'contract_end'; date: string; label: string; state: 'overdue' | 'today' | 'upcoming' }
+export type CircuitContract = { id: string; name: string; status: string; renews_on: string | null; ends_on: string | null; auto_renew: boolean; renewal_notice_days: number }
+export type CircuitHandoff = { id: string; name: string; side: 'a' | 'z'; media: 'copper' | 'fiber' | 'coax' | 'wireless' | 'virtual' | 'other'; connector: string; provider_reference: string; site_id: string | null; site_name: string | null; location_id: string | null; location_name: string | null; device_id: string | null; device_name: string | null; interface_id: string | null; interface_name: string | null; description: string }
+export type NetworkCircuit = { id: string; name: string; provider_id: string; provider_name: string; contract?: CircuitContract | null; service_identifier: string; kind: 'internet' | 'wan' | 'mpls' | 'dark_fiber' | 'broadband' | 'cellular' | 'voice' | 'other'; status: 'ordered' | 'provisioning' | 'active' | 'suspended' | 'disconnected'; bandwidth_down_mbps: string | null; bandwidth_up_mbps: string | null; installed_on: string | null; service_starts_on: string | null; review_on: string | null; planned_disconnect_on: string | null; description: string; handoffs: CircuitHandoff[]; lifecycle_events: CircuitLifecycleEvent[] }
+export type CircuitChoices = { providers: Array<{ id: string; name: string }>; contracts: Array<{ id: string; name: string; provider_id: string }>; sites: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; site_id: string }>; devices: Array<{ id: string; name: string }>; interfaces: Array<{ id: string; name: string; device_id: string }>; can_view_contracts: boolean }
 export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
@@ -55,6 +60,8 @@ export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'interface_id'
 export type WirelessWrite = Pick<WirelessNetwork, 'ssid' | 'purpose' | 'security' | 'status' | 'hidden' | 'client_isolation' | 'site_id' | 'vlan_id' | 'subnet_id' | 'description'>
 export type DNSZoneWrite = Pick<DNSZone, 'name' | 'description'>
 export type DNSRecordWrite = Pick<DNSRecord, 'zone_id' | 'owner_name' | 'record_type' | 'value' | 'ttl' | 'priority' | 'weight' | 'port' | 'ip_address_id' | 'description'>
+export type CircuitWrite = Pick<NetworkCircuit, 'name' | 'provider_id' | 'service_identifier' | 'kind' | 'status' | 'bandwidth_down_mbps' | 'bandwidth_up_mbps' | 'installed_on' | 'service_starts_on' | 'review_on' | 'planned_disconnect_on' | 'description'> & { contract_id: string | null }
+export type HandoffWrite = Pick<CircuitHandoff, 'name' | 'side' | 'media' | 'connector' | 'provider_reference' | 'site_id' | 'location_id' | 'device_id' | 'interface_id' | 'description'>
 
 export type RackWrite = Pick<NetworkRack, 'name' | 'unit_count' | 'status'> & { site_id: string; location_id: string | null }
 export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack_units'> & {
@@ -103,6 +110,12 @@ export interface NetworksClient {
   listDNSRecords(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<DNSRecord>>
   createDNSRecord(workspace: WorkspaceContext, values: DNSRecordWrite): Promise<DNSRecord>
   updateDNSRecord(workspace: WorkspaceContext, id: string, values: DNSRecordWrite): Promise<DNSRecord>
+  listCircuits(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkCircuit> & { can_view_contracts: boolean }>
+  circuitChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<CircuitChoices>
+  createCircuit(workspace: WorkspaceContext, values: CircuitWrite): Promise<NetworkCircuit>
+  updateCircuit(workspace: WorkspaceContext, id: string, values: Partial<CircuitWrite>): Promise<NetworkCircuit>
+  createCircuitHandoff(workspace: WorkspaceContext, circuitId: string, values: HandoffWrite): Promise<CircuitHandoff>
+  updateCircuitHandoff(workspace: WorkspaceContext, circuitId: string, id: string, values: HandoffWrite): Promise<CircuitHandoff>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -200,4 +213,14 @@ export const browserNetworksClient: NetworksClient = {
   },
   createDNSRecord: (workspace, values) => write(`${basePath(workspace)}/dns-records`, 'POST', values),
   updateDNSRecord: (workspace, id, values) => write(`${basePath(workspace)}/dns-records/${encodeURIComponent(id)}`, 'PATCH', values),
+  async listCircuits(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/circuits?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  async circuitChoices(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}/circuits/choices`, { credentials: 'same-origin', signal }))
+  },
+  createCircuit: (workspace, values) => write(`${basePath(workspace)}/circuits`, 'POST', values),
+  updateCircuit: (workspace, id, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(id)}`, 'PATCH', values),
+  createCircuitHandoff: (workspace, circuitId, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs`, 'POST', values),
+  updateCircuitHandoff: (workspace, circuitId, id, values) => write(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs/${encodeURIComponent(id)}`, 'PATCH', values),
 }

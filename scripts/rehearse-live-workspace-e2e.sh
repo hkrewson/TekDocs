@@ -55,7 +55,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -236,6 +236,21 @@ cost = ContractCost.objects.get(contract=contract, archived_at__isnull=True)
 assert str(cost.amount) == "875.50"
 assert cost.currency == "USD"
 assert cost.reference == "LIVE-PRIVATE-RATE"
+circuit = NetworkCircuit.objects.select_related("entity", "provider", "contract").get(
+    entity__display_name="Live headquarters DIA"
+)
+handoff = NetworkCircuitHandoff.objects.select_related("entity", "site", "device", "interface").get(circuit=circuit)
+assert circuit.organization == organization
+assert circuit.provider == vendor
+assert circuit.contract == contract
+assert circuit.service_identifier == "LIVE-DIA-1000"
+assert str(circuit.bandwidth_down_mbps) == "1000.000"
+assert circuit.review_on.isoformat() == "2027-06-15"
+assert handoff.organization == organization
+assert handoff.site == site
+assert handoff.device == network_device
+assert handoff.interface == network_interface
+assert handoff.provider_reference == "LIVE-DEMARC-1"
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

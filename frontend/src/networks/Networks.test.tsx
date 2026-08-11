@@ -37,6 +37,9 @@ function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient 
     createDNSZone: vi.fn(), updateDNSZone: vi.fn(),
     listDNSRecords: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
     createDNSRecord: vi.fn(), updateDNSRecord: vi.fn(),
+    listCircuits: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true, can_view_contracts: true }),
+    circuitChoices: vi.fn().mockResolvedValue({ providers: [{ id: 'provider-1', name: 'Example Carrier' }], contracts: [{ id: 'contract-1', name: 'Internet agreement', provider_id: 'provider-1' }], sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [], devices: [{ id: 'device-1', name: 'Core switch' }], interfaces: [{ id: 'interface-1', name: 'WAN1', device_id: 'device-1' }], can_view_contracts: true }),
+    createCircuit: vi.fn(), updateCircuit: vi.fn(), createCircuitHandoff: vi.fn(), updateCircuitHandoff: vi.fn(),
     ...overrides,
   }
 }
@@ -160,6 +163,34 @@ describe('Networks', () => {
     await user.clear(screen.getByLabelText('TTL')); await user.type(screen.getByLabelText('TTL'), '300')
     await user.click(screen.getByRole('button', { name: 'Save DNS record' }))
     await waitFor(() => expect(createDNSRecord).toHaveBeenCalledWith(workspace, expect.objectContaining({ zone_id: 'zone-1', owner_name: 'app.example.invalid', record_type: 'A', value: '192.0.2.10' })))
+  })
+
+  it('creates a provider circuit and records an exact device handoff', async () => {
+    const circuit = { id: 'circuit-1', name: 'Headquarters DIA', provider_id: 'provider-1', provider_name: 'Example Carrier', contract: { id: 'contract-1', name: 'Internet agreement', status: 'active', renews_on: '2027-09-01', ends_on: '2027-09-30', auto_renew: true, renewal_notice_days: 30 }, service_identifier: 'CKT-1000', kind: 'internet' as const, status: 'active' as const, bandwidth_down_mbps: '1000.000', bandwidth_up_mbps: '1000.000', installed_on: null, service_starts_on: null, review_on: '2027-07-01', planned_disconnect_on: null, description: '', handoffs: [], lifecycle_events: [{ kind: 'review' as const, date: '2027-07-01', label: 'Review circuit', state: 'upcoming' as const }] }
+    const handoff = { id: 'handoff-1', name: 'Carrier demarc', side: 'a' as const, media: 'fiber' as const, connector: 'LC', provider_reference: '', site_id: 'site-1', site_name: 'Headquarters', location_id: null, location_name: null, device_id: 'device-1', device_name: 'Core switch', interface_id: 'interface-1', interface_name: 'WAN1', description: '' }
+    const createCircuit = vi.fn().mockResolvedValue(circuit)
+    const createCircuitHandoff = vi.fn().mockResolvedValue(handoff)
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient({ createCircuit, createCircuitHandoff })} relationshipsClient={relationshipsClient} />)
+    await screen.findByRole('button', { name: 'Core switch' })
+    await user.click(screen.getByRole('button', { name: 'Circuits' }))
+    await screen.findByText('No circuits match this workspace and search.')
+    await user.click(screen.getByRole('button', { name: 'Add circuit' }))
+    await user.type(screen.getByLabelText('Name'), 'Headquarters DIA')
+    await user.selectOptions(screen.getByLabelText('Provider'), 'provider-1')
+    await user.selectOptions(screen.getByLabelText('Contract'), 'contract-1')
+    await user.type(screen.getByLabelText('Service identifier'), 'CKT-1000')
+    await user.click(screen.getByRole('button', { name: 'Save circuit' }))
+    await waitFor(() => expect(createCircuit).toHaveBeenCalledWith(workspace, expect.objectContaining({ provider_id: 'provider-1', contract_id: 'contract-1', service_identifier: 'CKT-1000' })))
+    await user.click(screen.getByRole('button', { name: 'Add handoff' }))
+    await user.type(screen.getByLabelText('Name'), 'Carrier demarc')
+    await user.type(screen.getByLabelText('Connector'), 'LC')
+    await user.selectOptions(screen.getByLabelText('Site'), 'site-1')
+    await user.selectOptions(screen.getByLabelText('Device'), 'device-1')
+    await user.selectOptions(screen.getByLabelText('Interface'), 'interface-1')
+    await user.click(screen.getByRole('button', { name: 'Save handoff' }))
+    await waitFor(() => expect(createCircuitHandoff).toHaveBeenCalledWith(workspace, 'circuit-1', expect.objectContaining({ interface_id: 'interface-1', device_id: 'device-1' })))
+    expect(await screen.findByText(/A side · fiber · LC · WAN1/)).toBeInTheDocument()
   })
 
   it('creates a rack from the restrained physical-placement form', async () => {

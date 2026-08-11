@@ -55,7 +55,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import OrganizationAccessAssignment, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetBoxReference, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetBoxReference, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -103,7 +103,7 @@ assert envelope == {
     "value": "Priority",
 }
 network_device = NetworkDevice.objects.get(entity__display_name="Live Core Switch")
-network_interface = NetworkInterface.objects.get(entity__display_name="ethernet1")
+network_asset = ClientAsset.objects.get(entity__display_name="Live core switch")
 network_subnet = NetworkSubnet.objects.get(entity__display_name="Live management LAN")
 network_ip = NetworkIPAddress.objects.get(address="192.0.2.10")
 network_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:10")
@@ -111,12 +111,15 @@ wireless = WirelessNetwork.objects.get(ssid="Live Staff")
 dns_zone = DNSZone.objects.get(name="live.example.invalid")
 dns_record = DNSRecord.objects.get(owner_name="switch.live.example.invalid", record_type="A")
 assert network_device.organization == organization
-assert network_interface.device == network_device
+assert network_device.hardware_asset == network_asset
+assert network_device.legacy_unbacked is False
 assert network_subnet.organization == organization
 assert network_ip.subnet == network_subnet
-assert network_ip.interface == network_interface
+assert network_ip.interface_id is None
+assert network_ip.hardware_asset == network_asset
 assert network_ip.dns_name == "switch.live.example.invalid"
-assert network_mac.interface == network_interface
+assert network_mac.interface_id is None
+assert network_mac.hardware_asset == network_asset
 assert wireless.organization == organization
 assert wireless.site == site
 assert wireless.subnet == network_subnet
@@ -249,7 +252,7 @@ assert circuit.review_on.isoformat() == "2027-06-15"
 assert handoff.organization == organization
 assert handoff.site == site
 assert handoff.device == network_device
-assert handoff.interface == network_interface
+assert handoff.interface_id is None
 assert handoff.provider_reference == "LIVE-DEMARC-1"
 netbox_reference = NetBoxReference.objects.select_related("entity", "workspace").get(
     entity__display_name="Live Core Rack", archived_at__isnull=True

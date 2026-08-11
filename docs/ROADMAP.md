@@ -765,7 +765,7 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.7` | **Complete:** NetBox-compatible identifiers plus a deterministic, provider-input reconciliation seam. |
 | `0.4.8` | **Complete:** exact-Workspace network search/export, scale testing, upgrade/restore, and isolation stabilization. |
 | `0.4.9` | **Complete:** simplify the TekDocs network boundary with asset-backed devices, direct asset MAC/IP ownership, and removal of Interface/VRF requirements from ordinary workflows while preserving legacy data. |
-| `0.5.0` | Stabilize and certify network inventory. |
+| `0.5.0` | **Complete:** formally stabilize and certify lightweight network inventory without adding another domain family. |
 
 ### `0.4.1` acceptance criteria
 
@@ -863,6 +863,18 @@ Evidence: `docs/releases/0.4.8.md`.
 - [x] Backend model/service/trigger tests, direct-write and sibling-client negatives, frontend component/accessibility states, OpenAPI/migration drift, a `0.4.8` legacy-data upgrade, and independent current-version backup/restore agree with ADR 0047.
 
 Evidence: `docs/releases/0.4.9.md`.
+
+### `0.5.0` acceptance criteria
+
+- [x] The certified product boundary is hardware/rack placement, VLANs/subnets/IP/MAC, wireless/DNS, circuits/handoffs, relationships/diagrams, exact-Workspace search/export, and NetBox identity/reconciliation preview. It adds no new domain family or live integration authority.
+- [x] New network devices remain asset-backed and direct address-to-asset projections remain field-authorized. Interface/VRF-era records stay explicit, readable, exportable, reversible, hidden from ordinary authoring, and unscheduled for destructive removal.
+- [x] MSP scope remains MSP-owned rather than tenant-wide; client scope remains exact-client. Central permissions, scoped queries, non-disclosing IDOR behavior, PostgreSQL forced RLS, relationship guards, and field-level asset/contract boundaries compose across every network route.
+- [x] Canonical values, containment, overlap, duplicate IP/MAC, rack placement, handoff uniqueness, DNS rules, and reconciliation identity remain guarded under direct and concurrent PostgreSQL writes.
+- [x] The named `make test-network-certification` gate composes all network families, NetBox, relationships, permission/IDOR, RLS, migrations, 100-client/10,000-Entity performance/query ceilings, and frontend/accessibility coverage.
+- [x] Exact `0.4.9` production-image upgrade, independent backup/restore, real browser-to-Django-to-PostgreSQL behavior, security scans, clean install, and production-image rehearsal pass without weakening an earlier release gate.
+- [x] Architecture, security baseline, threat/risk register, ADR 0048, OpenAPI, version metadata, roadmap, and release evidence agree. Risks `TD-RISK-031` through `TD-RISK-038` are mitigated with recurring owners; hosted publication and external review remain explicitly unverified.
+
+Evidence: `docs/releases/0.5.0.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

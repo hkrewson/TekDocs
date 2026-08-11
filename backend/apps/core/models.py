@@ -1825,8 +1825,176 @@ class PersonAssociation(TimestampedModel):
                 raise ValidationError("Person association location must use its workspace scope")
 
 
+class NetworkRackStatus(models.TextChoices):
+    PLANNED = "planned", "Planned"
+    ACTIVE = "active", "Active"
+    RETIRED = "retired", "Retired"
+
+
+class NetworkRack(TimestampedModel):
+    """An addressable equipment rack in one exact physical Workspace location."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_racks")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_racks", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_rack")
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, related_name="network_racks")
+    location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, related_name="network_racks", null=True, blank=True
+    )
+    unit_count = models.PositiveSmallIntegerField(default=42)
+    status = models.CharField(max_length=16, choices=NetworkRackStatus.choices, default=NetworkRackStatus.ACTIVE)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(unit_count__gte=1, unit_count__lte=100), name="rack_units_valid"),
+            models.CheckConstraint(condition=models.Q(status__in=NetworkRackStatus.values), name="rack_status_valid"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "site"), name="core_netrack_scope_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network rack and entity scopes must match")
+        if self.site_id and (
+            self.site.tenant_id != self.tenant_id or self.site.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network rack site must use its Workspace scope")
+        location = self.location if self.location_id else None
+        if location is not None and (
+            location.tenant_id != self.tenant_id
+            or location.organization_id != self.organization_id
+            or location.site_id != self.site_id
+        ):
+            raise ValidationError("Network rack location must belong to its selected site and Workspace")
+
+
+class NetworkDeviceRole(models.TextChoices):
+    ROUTER = "router", "Router"
+    SWITCH = "switch", "Switch"
+    FIREWALL = "firewall", "Firewall"
+    WIRELESS_CONTROLLER = "wireless_controller", "Wireless controller"
+    ACCESS_POINT = "access_point", "Access point"
+    LOAD_BALANCER = "load_balancer", "Load balancer"
+    OTHER = "other", "Other"
+
+
+class NetworkDeviceStatus(models.TextChoices):
+    PLANNED = "planned", "Planned"
+    ACTIVE = "active", "Active"
+    OFFLINE = "offline", "Offline"
+    RETIRED = "retired", "Retired"
+
+
+class NetworkDevice(TimestampedModel):
+    """A network role and physical placement optionally backed by one hardware asset."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_devices")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="network_device")
+    role = models.CharField(max_length=32, choices=NetworkDeviceRole.choices)
+    status = models.CharField(max_length=16, choices=NetworkDeviceStatus.choices, default=NetworkDeviceStatus.ACTIVE)
+    hardware_asset = models.OneToOneField(
+        ClientAsset,
+        on_delete=models.PROTECT,
+        related_name="network_device",
+        null=True,
+        blank=True,
+    )
+    site = models.ForeignKey(Site, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True)
+    location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True
+    )
+    rack = models.ForeignKey(
+        NetworkRack, on_delete=models.PROTECT, related_name="network_devices", null=True, blank=True
+    )
+    rack_unit = models.PositiveSmallIntegerField(null=True, blank=True)
+    rack_units = models.PositiveSmallIntegerField(default=1)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(role__in=NetworkDeviceRole.values), name="network_device_role_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=NetworkDeviceStatus.values), name="network_device_status_valid"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(rack__isnull=True, rack_unit__isnull=True, rack_units=1)
+                    | models.Q(rack__isnull=False, rack_unit__isnull=False, rack_units__gte=1, rack_units__lte=100)
+                ),
+                name="network_device_rack_placement_complete",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(location__isnull=True) | models.Q(site__isnull=False),
+                name="network_device_location_requires_site",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "role"), name="core_netdevice_scope_idx"),
+            models.Index(fields=("rack", "rack_unit"), name="core_netdevice_rack_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network device and entity scopes must match")
+        hardware_asset = self.hardware_asset if self.hardware_asset_id else None
+        if hardware_asset is not None and (
+            hardware_asset.tenant_id != self.tenant_id
+            or hardware_asset.organization_id != self.organization_id
+            or hardware_asset.product.kind != CatalogProductKind.HARDWARE
+        ):
+            raise ValidationError("Network device hardware asset must be hardware in the same Workspace")
+        site = self.site if self.site_id else None
+        if site is not None and (
+            site.tenant_id != self.tenant_id or site.organization_id != self.organization_id
+        ):
+            raise ValidationError("Network device site must use its Workspace scope")
+        location = self.location if self.location_id else None
+        if location is not None and (
+            location.tenant_id != self.tenant_id
+            or location.organization_id != self.organization_id
+            or location.site_id != self.site_id
+        ):
+            raise ValidationError("Network device location must belong to its selected site and Workspace")
+        rack = self.rack if self.rack_id else None
+        if rack is not None and (
+            rack.tenant_id != self.tenant_id
+            or rack.organization_id != self.organization_id
+            or rack.site_id != self.site_id
+            or rack.location_id != self.location_id
+        ):
+            raise ValidationError("Network device rack must match its physical Workspace location")
+
+
 class EntityLinkType(models.TextChoices):
     RELATED_TO = "related_to", "Related to"
+    CONNECTED_TO = "connected_to", "Connected to"
     DEPENDS_ON = "depends_on", "Depends on"
     MANAGED_BY = "managed_by", "Managed by"
     SUPPLIED_BY = "supplied_by", "Supplied by"

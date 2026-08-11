@@ -82,6 +82,7 @@ jobs:
           docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
           make test-documentation-certification
           make test-inventory-certification
+          make test-networks
       - name: Collect logs
         if: always()
         run: docker compose logs --no-color > compose.log

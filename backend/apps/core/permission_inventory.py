@@ -306,6 +306,22 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-asset-csv-apply", ("POST",), mutations=(PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-model-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-detail", ("GET",), PermissionKey.ASSETS_VIEW),
+    route("msp-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route(
+        "msp-network-racks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route(
+        "msp-network-rack-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route(
+        "msp-network-devices", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)
+    ),
+    route(
+        "msp-network-device-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+    ),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-hardware-assignment-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route(
@@ -505,6 +521,35 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "POST"),
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         (PermissionKey.CREDENTIAL_REFERENCES_MANAGE,),
+        organization_scoped=True,
+    ),
+    route("organization-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True),
+    route(
+        "organization-network-racks",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-rack-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-devices",
+        ("GET", "POST"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-network-device-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
         organization_scoped=True,
     ),
     route(

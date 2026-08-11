@@ -756,7 +756,7 @@ Evidence: `docs/releases/0.4.0.md`.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.4.1` | Racks, network devices, and physical/logical placement relationships. |
+| `0.4.1` | **Complete:** addressable racks and network devices, exact-Workspace physical placement, and typed logical relationships. |
 | `0.4.2` | VLANs, VRFs, subnets, CIDR validation, overlap policy, and property tests. |
 | `0.4.3` | Addresses, interfaces, MAC records, assignments, and conflict detection. |
 | `0.4.4` | Circuits, providers, handoffs, contracts, and lifecycle reminders. |
@@ -765,6 +765,19 @@ Evidence: `docs/releases/0.4.0.md`.
 | `0.4.7` | NetBox-compatible external identifiers plus deterministic import/reconciliation seam. |
 | `0.4.8` | Network search/export, scale testing, upgrade/restore, and isolation remediation. |
 | `0.5.0` | Stabilize and certify network inventory. |
+
+### `0.4.1` acceptance criteria
+
+- [x] Rack and network-device records use stable Entities and the installation's explicit MSP/organization Workspace owner; list, detail, and mutation routes never aggregate client workspaces.
+- [x] A rack resolves to one active same-Workspace site and optional location. A device may be unplaced, placed at a same-Workspace site/location, or placed at a bounded rack unit; rack placement inherits and cannot contradict the rack's physical location.
+- [x] PostgreSQL and the application reject foreign/archived locations, non-hardware asset pointers, invalid rack bounds, and overlapping unit reservations, including direct or concurrent writes.
+- [x] A network device may retain one optional same-Workspace hardware-asset pointer without copying or weakening catalog, serial, lifecycle, or provenance ownership.
+- [x] Network devices participate in permission-filtered entity search, backlinks, and typed `connected_to`, `depends_on`, and ordinary logical links through the existing relationship policy service.
+- [x] MSP and organization Network pages expose restrained searchable tables, accessible create/edit and placement workflows, loading/empty/error/denial states, and responsive behavior. `networks.view` and MFA-backed `networks.edit` remain authoritative server permissions.
+- [x] Backend allow/deny, sibling-client, cross-tenant, direct-write, overlap/concurrency, forced-RLS, migration, OpenAPI, frontend component, and real browser-to-Django-to-PostgreSQL evidence pass in Docker Compose.
+- [x] VLANs, VRFs, subnets, addresses, interfaces, circuits, wireless records, diagrams, NetBox reconciliation, bulk transfer, and recycle-bin recovery remain assigned to later network slices.
+
+Evidence: `docs/releases/0.4.1.md`.
 
 ## Client portal and notifications: `0.5.x` → `0.6.0`
 

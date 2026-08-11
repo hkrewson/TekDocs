@@ -11,7 +11,15 @@ from django.utils import timezone
 from .models import AuditEvent, Entity, EntityLink, EntityLinkType, Organization
 from .workspaces import ResolvedWorkspace
 
-SEARCHABLE_ENTITY_TYPES = ("organization", "person", "site", "location", "client_asset")
+SEARCHABLE_ENTITY_TYPES = (
+    "organization",
+    "person",
+    "site",
+    "location",
+    "client_asset",
+    "network_rack",
+    "network_device",
+)
 
 
 class EntityRelationshipError(ValueError):
@@ -39,6 +47,13 @@ class LinkTypeDefinition:
 
 LINK_TYPES: tuple[LinkTypeDefinition, ...] = (
     LinkTypeDefinition(EntityLinkType.RELATED_TO, "Related to", "Related to", symmetric=True),
+    LinkTypeDefinition(
+        EntityLinkType.CONNECTED_TO,
+        "Connected to",
+        "Connected to",
+        symmetric=True,
+        target_types=("network_device",),
+    ),
     LinkTypeDefinition(EntityLinkType.DEPENDS_ON, "Depends on", "Required by"),
     LinkTypeDefinition(EntityLinkType.MANAGED_BY, "Managed by", "Manages", target_types=("organization", "person")),
     LinkTypeDefinition(

@@ -126,6 +126,13 @@ from apps.core.inventory_views import (
     ClientHardwareLifecycleView,
     ClientVendorListView,
 )
+from apps.core.network_inventory_views import (
+    NetworkChoiceListView,
+    NetworkDeviceDetailView,
+    NetworkDeviceListCreateView,
+    NetworkRackDetailView,
+    NetworkRackListCreateView,
+)
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -378,6 +385,23 @@ urlpatterns = [
     path("api/v1/people/<uuid:person_entity_id>", MSPPersonDetailView.as_view(), name="msp-person-detail"),
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
+    path("api/v1/workspaces/msp/networks/choices", NetworkChoiceListView.as_view(), name="msp-network-choices"),
+    path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
+    path(
+        "api/v1/workspaces/msp/networks/racks/<uuid:rack_entity_id>",
+        NetworkRackDetailView.as_view(),
+        name="msp-network-rack-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/devices",
+        NetworkDeviceListCreateView.as_view(),
+        name="msp-network-devices",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/devices/<uuid:device_entity_id>",
+        NetworkDeviceDetailView.as_view(),
+        name="msp-network-device-detail",
+    ),
     path(
         "api/v1/custom-field-definitions",
         MSPCustomFieldDefinitionListCreateView.as_view(),
@@ -423,6 +447,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/people",
         OrganizationPeopleListCreateView.as_view(),
         name="organization-people-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/choices",
+        NetworkChoiceListView.as_view(),
+        name="organization-network-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/racks",
+        NetworkRackListCreateView.as_view(),
+        name="organization-network-racks",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/racks/<uuid:rack_entity_id>",
+        NetworkRackDetailView.as_view(),
+        name="organization-network-rack-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/devices",
+        NetworkDeviceListCreateView.as_view(),
+        name="organization-network-devices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/devices/<uuid:device_entity_id>",
+        NetworkDeviceDetailView.as_view(),
+        name="organization-network-device-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/products",

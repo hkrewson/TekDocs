@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.4.0
+  version: 0.4.1
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1803,6 +1803,8 @@ paths:
           - site
           - location
           - client_asset
+          - network_rack
+          - network_device
           - ''
           type: string
           default: ''
@@ -1812,6 +1814,8 @@ paths:
           * `site` - site
           * `location` - location
           * `client_asset` - client_asset
+          * `network_rack` - network_rack
+          * `network_device` - network_device
       - in: query
         name: page
         schema:
@@ -3571,6 +3575,232 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/networks/choices:
+    get:
+      operationId: workspaces_msp_networks_choices_retrieve
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkChoices'
+          description: ''
+  /api/v1/workspaces/msp/networks/devices:
+    get:
+      operationId: workspaces_msp_networks_devices_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDeviceResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_devices_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/msp/networks/devices/{device_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_devices_retrieve_2
+      parameters:
+      - in: path
+        name: device_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_devices_partial_update
+      parameters:
+      - in: path
+        name: device_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/msp/networks/racks:
+    get:
+      operationId: workspaces_msp_networks_racks_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRackResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_racks_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
+          description: ''
+  /api/v1/workspaces/msp/networks/racks/{rack_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_racks_retrieve_2
+      parameters:
+      - in: path
+        name: rack_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
+          description: ''
+    patch:
+      operationId: workspaces_msp_networks_racks_partial_update
+      parameters:
+      - in: path
+        name: rack_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
           description: ''
   /api/v1/workspaces/msp/vendors:
     get:
@@ -6407,6 +6637,8 @@ paths:
           - site
           - location
           - client_asset
+          - network_rack
+          - network_device
           - ''
           type: string
           default: ''
@@ -6416,6 +6648,8 @@ paths:
           * `site` - site
           * `location` - location
           * `client_asset` - client_asset
+          * `network_rack` - network_rack
+          * `network_device` - network_device
       - in: path
         name: organization_entity_id
         schema:
@@ -6719,6 +6953,289 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChoiceResult'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/choices:
+    get:
+      operationId: workspaces_organizations_networks_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkChoices'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/devices:
+    get:
+      operationId: workspaces_organizations_networks_devices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDeviceResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_devices_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/devices/{device_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_devices_retrieve_2
+      parameters:
+      - in: path
+        name: device_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_devices_partial_update
+      parameters:
+      - in: path
+        name: device_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks:
+    get:
+      operationId: workspaces_organizations_networks_racks_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRackResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_racks_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkRackWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks/{rack_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_racks_retrieve_2
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: rack_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
+          description: ''
+    patch:
+      operationId: workspaces_organizations_networks_racks_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: rack_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRackWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRack'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/people:
     get:
@@ -9455,6 +9972,7 @@ components:
     EntityLinkTypeEnum:
       enum:
       - related_to
+      - connected_to
       - depends_on
       - managed_by
       - supplied_by
@@ -9466,6 +9984,7 @@ components:
       type: string
       description: |-
         * `related_to` - Related to
+        * `connected_to` - Connected to
         * `depends_on` - Depends on
         * `managed_by` - Managed by
         * `supplied_by` - Supplied by
@@ -9555,6 +10074,8 @@ components:
       - site
       - location
       - client_asset
+      - network_rack
+      - network_device
       type: string
       description: |-
         * `organization` - organization
@@ -9562,6 +10083,8 @@ components:
         * `site` - site
         * `location` - location
         * `client_asset` - client_asset
+        * `network_rack` - network_rack
+        * `network_device` - network_device
     EntityRelationship:
       type: object
       properties:
@@ -10201,6 +10724,307 @@ components:
       - name
       - specification_version_id
       - specifications
+    NetworkChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - id
+      - name
+    NetworkChoices:
+      type: object
+      properties:
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkChoice'
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkChoice'
+        racks:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkChoice'
+        hardware_assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkChoice'
+      required:
+      - hardware_assets
+      - locations
+      - racks
+      - sites
+    NetworkDevice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        hardware_asset_name:
+          type: string
+          nullable: true
+          readOnly: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        rack_id:
+          type: string
+          format: uuid
+          nullable: true
+        rack_name:
+          type: string
+          nullable: true
+        rack_unit:
+          type: integer
+          nullable: true
+        rack_units:
+          type: integer
+      required:
+      - hardware_asset_id
+      - hardware_asset_name
+      - id
+      - location_id
+      - location_name
+      - name
+      - rack_id
+      - rack_name
+      - rack_unit
+      - rack_units
+      - role
+      - site_id
+      - site_name
+      - status
+    NetworkDeviceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkDevice'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        can_view_relationships:
+          type: boolean
+        can_create_relationships:
+          type: boolean
+        can_archive_relationships:
+          type: boolean
+      required:
+      - can_archive_relationships
+      - can_create_relationships
+      - can_manage
+      - can_view_relationships
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    NetworkDeviceWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        role:
+          $ref: '#/components/schemas/NetworkDeviceWriteRoleEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NetworkDeviceWriteStatusEnum'
+          default: active
+        hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        rack_id:
+          type: string
+          format: uuid
+          nullable: true
+        rack_unit:
+          type: integer
+          maximum: 100
+          minimum: 1
+          nullable: true
+        rack_units:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      required:
+      - name
+      - role
+    NetworkDeviceWriteRoleEnum:
+      enum:
+      - router
+      - switch
+      - firewall
+      - wireless_controller
+      - access_point
+      - load_balancer
+      - other
+      type: string
+      description: |-
+        * `router` - router
+        * `switch` - switch
+        * `firewall` - firewall
+        * `wireless_controller` - wireless_controller
+        * `access_point` - access_point
+        * `load_balancer` - load_balancer
+        * `other` - other
+    NetworkDeviceWriteStatusEnum:
+      enum:
+      - planned
+      - active
+      - offline
+      - retired
+      type: string
+      description: |-
+        * `planned` - planned
+        * `active` - active
+        * `offline` - offline
+        * `retired` - retired
+    NetworkRack:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        site_id:
+          type: string
+          format: uuid
+        site_name:
+          type: string
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        unit_count:
+          type: integer
+        status:
+          type: string
+        device_count:
+          type: integer
+          readOnly: true
+      required:
+      - device_count
+      - id
+      - location_id
+      - location_name
+      - name
+      - site_id
+      - site_name
+      - status
+      - unit_count
+    NetworkRackResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkRack'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    NetworkRackWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        site_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        unit_count:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 42
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NetworkRackWriteStatusEnum'
+          default: active
+      required:
+      - name
+      - site_id
+    NetworkRackWriteStatusEnum:
+      enum:
+      - planned
+      - active
+      - retired
+      type: string
+      description: |-
+        * `planned` - planned
+        * `active` - active
+        * `retired` - retired
     OidcProvider:
       type: object
       properties:
@@ -10620,6 +11444,66 @@ components:
         base_revision_id:
           type: string
           format: uuid
+    PatchedNetworkDeviceWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        role:
+          $ref: '#/components/schemas/NetworkDeviceWriteRoleEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NetworkDeviceWriteStatusEnum'
+          default: active
+        hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+        site_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        rack_id:
+          type: string
+          format: uuid
+          nullable: true
+        rack_unit:
+          type: integer
+          maximum: 100
+          minimum: 1
+          nullable: true
+        rack_units:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+    PatchedNetworkRackWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        site_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        unit_count:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 42
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NetworkRackWriteStatusEnum'
+          default: active
     PatchedOrganizationAccessWrite:
       type: object
       properties:

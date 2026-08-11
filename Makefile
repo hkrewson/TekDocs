@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-auth-abuse test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -89,6 +89,9 @@ test-inventory-certification:
 
 test-commercial:
 	docker compose run --rm migrate pytest apps/core/tests/test_commercial.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+
+test-networks:
+	docker compose run --rm migrate pytest apps/core/tests/test_network_inventory.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-secret-files:
 	docker compose run --rm migrate pytest apps/core/tests/test_secret_files.py apps/core/tests/test_health.py apps/core/tests/test_email_settings.py -q

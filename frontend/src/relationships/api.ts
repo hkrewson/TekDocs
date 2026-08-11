@@ -2,6 +2,7 @@ import { AuthRequestError, browserCsrfToken } from '../auth/api'
 
 export type EntityLinkType =
   | 'related_to'
+  | 'connected_to'
   | 'depends_on'
   | 'managed_by'
   | 'supplied_by'
@@ -14,7 +15,7 @@ export type EntityLinkType =
 export type EntityReference = {
   id: string
   display_name: string
-  entity_type: 'organization' | 'person' | 'site' | 'location' | 'client_asset'
+  entity_type: 'organization' | 'person' | 'site' | 'location' | 'client_asset' | 'network_rack' | 'network_device'
   visibility: 'msp_private' | 'client_visible'
   workspace_label: string
   eligible_link_types: EntityLinkType[]

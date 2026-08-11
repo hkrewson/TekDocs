@@ -65,6 +65,7 @@ def test_link_type_catalog_is_bounded_and_requires_membership(owner_client, clie
     assert response.status_code == 200
     assert [item["value"] for item in response.json()] == [
         "related_to",
+        "connected_to",
         "depends_on",
         "managed_by",
         "supplied_by",

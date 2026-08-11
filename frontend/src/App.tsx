@@ -56,6 +56,8 @@ import type { DocumentsClient } from './documentation/api'
 import { browserInventoryClient } from './inventory/api'
 import { browserCommercialClient } from './commercial/api'
 import type { InventoryClient } from './inventory/api'
+import { browserNetworksClient } from './networks/api'
+import type { NetworksClient } from './networks/api'
 import { Organizations } from './organizations/Organizations'
 import { People } from './people/People'
 import { browserPeopleClient } from './people/api'
@@ -79,6 +81,7 @@ const Assets = lazy(async () => ({ default: (await import('./inventory/Assets'))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
+const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
 
 type NavigationItem = {
   label: string
@@ -295,7 +298,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.4.0 certifies hardware, software, and external credential-reference workflows." />
+      <PageHeader title="Overview" description="TekDocs 0.4.1 begins network inventory with racks, devices, and placement." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
@@ -322,6 +325,7 @@ function Overview() {
             ['Software installations and licensing', 'Available'],
             ['MSP-owned operational inventory', 'Available'],
             ['Derived client vendors', 'Available'],
+            ['Racks and network-device placement', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
       </section>
@@ -365,7 +369,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, networksClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; networksClient: NetworksClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -382,6 +386,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
   if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -393,7 +398,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, networksClient = browserNetworksClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -407,6 +412,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
   inventoryClient?: InventoryClient
+  networksClient?: NetworksClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
   signOutError?: string | null
@@ -472,10 +478,11 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
             <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
+            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} networksClient={networksClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
@@ -485,7 +492,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, networksClient = browserNetworksClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -499,6 +506,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
   inventoryClient?: InventoryClient
+  networksClient?: NetworksClient
   initialAuthContext?: AuthenticatedContext
 }) {
   const application = (
@@ -518,6 +526,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           credentialReferencesClient={credentialReferencesClient}
           catalogClient={catalogClient}
           inventoryClient={inventoryClient}
+          networksClient={networksClient}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}

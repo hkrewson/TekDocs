@@ -32,6 +32,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_softwarelicenseevent",
     "core_commercialcontract",
     "core_contractcost",
+    "core_networkrack",
+    "core_networkdevice",
 )
 
 TENANT_SCOPED_TABLES = (

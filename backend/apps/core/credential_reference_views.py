@@ -5,13 +5,14 @@ from uuid import UUID
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .credential_references import (
     archive_credential_reference,
     create_credential_reference,
@@ -75,7 +76,15 @@ class CredentialReferenceSerializer(serializers.Serializer):
 
 class CredentialReferenceResultSerializer(serializers.Serializer):
     results = CredentialReferenceSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
+
+
+class CredentialReferenceQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
 
 
 def _msp_workspace(request, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
@@ -91,32 +100,47 @@ def _organization_workspace(request, organization_entity_id: UUID, permission: P
     return workspace
 
 
-def _serialize(reference: CredentialReference, workspace: ResolvedWorkspace) -> dict[str, object]:
+def _serialize(
+    reference: CredentialReference, *, can_manage: bool, can_open: bool
+) -> dict[str, object]:
     return {
         "id": reference.entity_id,
         "title": reference.entity.display_name,
         "provider": reference.provider,
         "provider_label": reference.get_provider_display(),
         "updated_at": reference.updated_at,
-        "can_manage": context_has_permission(
-            workspace.member, PermissionKey.CREDENTIAL_REFERENCES_MANAGE, organization=workspace.organization
-        ),
-        "can_open": context_has_permission(
-            workspace.member, PermissionKey.CREDENTIAL_REFERENCES_OPEN, organization=workspace.organization
-        ),
+        "can_manage": can_manage,
+        "can_open": can_open,
     }
 
 
 def _list(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
-    q = str(request.query_params.get("q", "")).strip()[:240]
+    query = CredentialReferenceQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    page = paginate(
+        query_references(scope=workspace.data_scope, q=values["q"]),
+        page=values["page"],
+        page_size=values["page_size"],
+    )
+    can_manage = context_has_permission(
+        workspace.member,
+        PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
+        organization=workspace.organization,
+    )
+    can_open = context_has_permission(
+        workspace.member,
+        PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+        organization=workspace.organization,
+    )
     return Response(
         {
-            "results": [_serialize(item, workspace) for item in query_references(scope=workspace.data_scope, q=q)],
-            "can_manage": context_has_permission(
-                workspace.member,
-                PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
-                organization=workspace.organization,
-            ),
+            "results": [_serialize(item, can_manage=can_manage, can_open=can_open) for item in page.records],
+            "page": page.page,
+            "page_size": page.page_size,
+            "count": page.count,
+            "has_more": page.has_more,
+            "can_manage": can_manage,
         }
     )
 
@@ -130,7 +154,18 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         actor_id=request.user.pk,
         **serializer.validated_data,
     )
-    return Response(_serialize(reference, workspace), status=201)
+    return Response(
+        _serialize(
+            reference,
+            can_manage=True,
+            can_open=context_has_permission(
+                workspace.member,
+                PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+                organization=workspace.organization,
+            ),
+        ),
+        status=201,
+    )
 
 
 def _get(workspace: ResolvedWorkspace, entity_id: UUID) -> CredentialReference:
@@ -144,11 +179,23 @@ def _update(workspace: ResolvedWorkspace, request, entity_id: UUID) -> Response:
     if not serializer.validated_data:
         raise serializers.ValidationError("Provide a title or replacement private link.")
     update_credential_reference(reference=reference, actor_id=request.user.pk, **serializer.validated_data)
-    return Response(_serialize(reference, workspace))
+    return Response(
+        _serialize(
+            reference,
+            can_manage=True,
+            can_open=context_has_permission(
+                workspace.member,
+                PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+                organization=workspace.organization,
+            ),
+        )
+    )
 
 
 class MSPCredentialReferenceListCreateView(APIView):
-    @extend_schema(parameters=[OpenApiParameter("q", str)], responses={200: CredentialReferenceResultSerializer})
+    @extend_schema(
+        parameters=[CredentialReferenceQuerySerializer], responses={200: CredentialReferenceResultSerializer}
+    )
     def get(self, request):  # type: ignore[no-untyped-def]
         return _list(_msp_workspace(request, PermissionKey.CREDENTIAL_REFERENCES_VIEW), request)
 
@@ -158,7 +205,9 @@ class MSPCredentialReferenceListCreateView(APIView):
 
 
 class OrganizationCredentialReferenceListCreateView(APIView):
-    @extend_schema(parameters=[OpenApiParameter("q", str)], responses={200: CredentialReferenceResultSerializer})
+    @extend_schema(
+        parameters=[CredentialReferenceQuerySerializer], responses={200: CredentialReferenceResultSerializer}
+    )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _list(
             _organization_workspace(request, organization_entity_id, PermissionKey.CREDENTIAL_REFERENCES_VIEW), request

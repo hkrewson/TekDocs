@@ -45,3 +45,9 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 Production startup must fail for missing or placeholder secrets, wildcard hosts/origins, insecure cookies, inadequate HSTS, mismatched public/CSRF origins, incomplete OIDC settings, debug mode, or an unsupported database configuration. The development Compose stack's HTTP origin requires the explicit localhost-only insecure-public-URL acknowledgement.
 
 See `docs/THREAT_MODEL.md` for the initial abuse analysis. Security reports are handled according to root `SECURITY.md` once the public repository is published.
+
+## Inventory and external-reference certification
+
+Operational collection pagination is never an authorization mechanism. TekDocs resolves the exact MSP or organization Workspace and central permission before applying a bounded page; count and continuation metadata therefore describe only that authorized Workspace. Cost-denied contract responses omit the complete protected member, and list/search responses never contain 1Password Private Links. Provider handoff remains a separately authorized redirect with value-free audit metadata, and the interface tells operators to replace a stale pointer rather than implying that TekDocs validated the provider item.
+
+The `0.3.12` inventory gate runs on PostgreSQL and combines competing seat allocations, immutable provenance recovery, CSV/bulk rollback, archived-pointer denial, cross-Workspace IDOR, forced RLS, bounded reference performance, migration state, and clean upgrade/restore rehearsals. This does not turn the structural attachment scanner into an external signature engine or make the host/container administrator untrusted.

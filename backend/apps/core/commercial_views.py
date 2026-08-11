@@ -18,6 +18,7 @@ from apps.accounts.policy import (
     require_permission,
 )
 
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .commercial import (
     CommercialError,
     archive_contract,
@@ -115,7 +116,10 @@ class ContractSerializer(serializers.Serializer):
 
 class ContractResultSerializer(serializers.Serializer):
     results = ContractSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     can_view_costs = serializers.BooleanField()
 
@@ -127,6 +131,10 @@ class ProviderChoiceSerializer(serializers.Serializer):
 
 class ProviderChoiceResultSerializer(serializers.Serializer):
     results = ProviderChoiceSerializer(many=True)
+
+
+class ContractQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
 
 
 def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
@@ -162,7 +170,7 @@ def _require_cost_access(workspace: ResolvedWorkspace) -> None:
 
 
 class CommercialContractListCreateView(APIView):
-    @extend_schema(responses={200: ContractResultSerializer})
+    @extend_schema(parameters=[ContractQuerySerializer], responses={200: ContractResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         can_manage = context_has_permission(
@@ -171,15 +179,22 @@ class CommercialContractListCreateView(APIView):
         can_view_costs = context_has_permission(
             workspace.member, PermissionKey.COSTS_VIEW, organization=workspace.organization
         )
+        query = ContractQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
         records = contracts_for_scope(
             workspace.data_scope,
-            query=request.query_params.get("q", ""),
+            query=values["q"],
             include_costs=can_view_costs,
         )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
         return Response(
             {
-                "results": [_serialized(record, workspace) for record in records],
-                "count": records.count(),
+                "results": [_serialized(record, workspace) for record in page.records],
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
                 "can_manage": can_manage,
                 "can_view_costs": can_view_costs,
             }

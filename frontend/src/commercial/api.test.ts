@@ -12,7 +12,7 @@ describe('commercial API client', () => {
 
   it('uses exact client routes, encoded identifiers, CSRF, and every mutation contract', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
-    await browserCommercialClient.listContracts(workspace, 'managed support')
+    await browserCommercialClient.listContracts(workspace, 'managed support', 2)
     await browserCommercialClient.providerChoices(workspace)
     await browserCommercialClient.createContract(workspace, { name: 'Managed support' })
     await browserCommercialClient.updateContract(workspace, 'contract/1', { status: 'active' })
@@ -22,7 +22,7 @@ describe('commercial API client', () => {
     await browserCommercialClient.archiveContract(workspace, 'contract/1')
 
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-      '/api/v1/workspaces/organizations/client%2F1/contracts?q=managed%20support',
+      '/api/v1/workspaces/organizations/client%2F1/contracts?q=managed+support&page=2&page_size=50',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
     const costPatch = vi.mocked(fetch).mock.calls.find(([path, options]) => {
@@ -34,9 +34,9 @@ describe('commercial API client', () => {
   })
 
   it('uses the explicit MSP contracts boundary', async () => {
-    await browserCommercialClient.listContracts({ kind: 'msp', id: 'tenant/1' } as never, '')
+    await browserCommercialClient.listContracts({ kind: 'msp', id: 'tenant/1' } as never, '', 1)
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-      '/api/v1/workspaces/msp/contracts?q=',
+      '/api/v1/workspaces/msp/contracts?q=&page=1&page_size=50',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
   })
@@ -45,7 +45,7 @@ describe('commercial API client', () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ amount: ['A non-negative amount is required.'] }), { status: 400 }),
     )
-    await expect(browserCommercialClient.listContracts({ kind: 'organization', id: 'client' } as never, '')).rejects.toThrow(
+    await expect(browserCommercialClient.listContracts({ kind: 'organization', id: 'client' } as never, '', 1)).rejects.toThrow(
       'A non-negative amount is required.',
     )
   })

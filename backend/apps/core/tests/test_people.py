@@ -338,6 +338,8 @@ def test_people_can_reference_active_structured_placement_only_within_their_work
     association = PersonAssociation.objects.get(person__entity_id=created.json()["id"])
     assert isinstance(association.site, Site)
     assert isinstance(association.structured_location, Location)
+    assert association.person.entity.organization_id is None
+    assert association.person.entity.workspace.organization_id is None
 
 
 @pytest.mark.django_db(transaction=True)

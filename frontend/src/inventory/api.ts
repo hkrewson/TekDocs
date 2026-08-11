@@ -87,7 +87,7 @@ export type AssetCsvPreview = {
 }
 
 export interface InventoryClient {
-  listAssets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: ClientAsset[]; count: number; can_manage: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }>
+  listAssets(workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<{ results: ClientAsset[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }>
   listModelChoices(workspace: WorkspaceContext, query: string, signal?: AbortSignal): Promise<{ results: ModelChoice[] }>
   createAsset(workspace: WorkspaceContext, modelId: string, name: string): Promise<ClientAsset>
   bulkAssets(workspace: WorkspaceContext, assetIds: string[], action: 'set_hardware_state' | 'archive', lifecycleState?: HardwareProfile['lifecycle_state']): Promise<{ action: string; processed: number }>
@@ -98,7 +98,7 @@ export interface InventoryClient {
   unassignHardware(workspace: WorkspaceContext, assetId: string): Promise<HardwareProfile>
   disposeHardware(workspace: WorkspaceContext, assetId: string, values: { disposed_on: string; method: string; reason: string }): Promise<HardwareProfile>
   updateSoftwareInstallation(workspace: WorkspaceContext, assetId: string, values: Partial<SoftwareInstallation>): Promise<SoftwareInstallation>
-  listLicenses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: SoftwareLicense[]; count: number; can_manage: boolean }>
+  listLicenses(workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<{ results: SoftwareLicense[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }>
   createLicense(workspace: WorkspaceContext, values: object): Promise<SoftwareLicense>
   updateLicense(workspace: WorkspaceContext, licenseId: string, values: object): Promise<SoftwareLicense>
   softwareChoices(workspace: WorkspaceContext): Promise<SoftwareChoices>
@@ -159,7 +159,7 @@ async function mutateForm<T>(path: string, body: FormData): Promise<T> {
 }
 
 export const browserInventoryClient: InventoryClient = {
-  listAssets: (workspace, signal) => get(`${basePath(workspace)}/assets`, signal),
+  listAssets: (workspace, page, signal) => get(`${basePath(workspace)}/assets?page=${page}&page_size=50`, signal),
   listModelChoices: (workspace, query, signal) => get(`${basePath(workspace)}/assets/model-choices?q=${encodeURIComponent(query)}`, signal),
   async createAsset(workspace, modelId, name) {
     return mutate(`${basePath(workspace)}/assets`, 'POST', { model_id: modelId, name })
@@ -176,7 +176,7 @@ export const browserInventoryClient: InventoryClient = {
   unassignHardware: (workspace, assetId) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'DELETE'),
   disposeHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/dispose`, 'POST', values),
   updateSoftwareInstallation: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/software`, 'PATCH', values),
-  listLicenses: (workspace, signal) => get(`${basePath(workspace)}/licenses`, signal),
+  listLicenses: (workspace, page, signal) => get(`${basePath(workspace)}/licenses?page=${page}&page_size=50`, signal),
   createLicense: (workspace, values) => mutate(`${basePath(workspace)}/licenses`, 'POST', values),
   updateLicense: (workspace, licenseId, values) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}`, 'PATCH', values),
   softwareChoices: (workspace) => get(`${basePath(workspace)}/licenses/choices`),

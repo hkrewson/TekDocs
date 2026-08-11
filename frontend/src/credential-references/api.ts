@@ -10,11 +10,11 @@ export type CredentialReference = {
   can_open: boolean
 }
 
-export type CredentialReferenceResult = { results: CredentialReference[]; can_manage: boolean }
+export type CredentialReferenceResult = { results: CredentialReference[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type CredentialReferenceDraft = { title: string; provider: 'onepassword'; reference_url: string }
 
 export interface CredentialReferencesClient {
-  list(workspace: WorkspaceContext | null, query: string, signal?: AbortSignal): Promise<CredentialReferenceResult>
+  list(workspace: WorkspaceContext | null, query: string, page: number, signal?: AbortSignal): Promise<CredentialReferenceResult>
   create(workspace: WorkspaceContext | null, draft: CredentialReferenceDraft): Promise<CredentialReference>
   update(workspace: WorkspaceContext | null, id: string, draft: Partial<Pick<CredentialReferenceDraft, 'title' | 'reference_url'>>): Promise<CredentialReference>
   archive(workspace: WorkspaceContext | null, id: string): Promise<void>
@@ -50,9 +50,9 @@ async function mutate<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body
 }
 
 export const browserCredentialReferencesClient: CredentialReferencesClient = {
-  async list(workspace, query, signal) {
-    const suffix = query ? `?q=${encodeURIComponent(query)}` : ''
-    return parse<CredentialReferenceResult>(await fetch(`${collectionPath(workspace)}${suffix}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  async list(workspace, query, page, signal) {
+    const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '50' })
+    return parse<CredentialReferenceResult>(await fetch(`${collectionPath(workspace)}?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
   create: (workspace, draft) => mutate(collectionPath(workspace), 'POST', draft),
   update: (workspace, id, draft) => mutate(`${collectionPath(workspace)}/${encodeURIComponent(id)}`, 'PATCH', draft),

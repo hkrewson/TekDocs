@@ -37,7 +37,7 @@ const softwareAsset: ClientAsset = {
 
 function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryClient {
   return {
-    listAssets: vi.fn().mockResolvedValue({ results: [asset], count: 1, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
+    listAssets: vi.fn().mockResolvedValue({ results: [asset], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
     listModelChoices: vi.fn().mockResolvedValue({ results: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', product_id: 'product-1', product_name: 'EdgeSwitch', kind: 'hardware', supplier_id: 'supplier-1', supplier_name: 'Northwind', revision: 1, specification_version_id: 'version-1', specifications: { ports: 24 } }] }),
     createAsset: vi.fn().mockResolvedValue(asset),
     bulkAssets: vi.fn().mockResolvedValue({ action: 'set_hardware_state', processed: 1 }),
@@ -48,7 +48,7 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     unassignHardware: vi.fn().mockResolvedValue(asset.hardware),
     disposeHardware: vi.fn().mockResolvedValue(asset.hardware),
     updateSoftwareInstallation: vi.fn(),
-    listLicenses: vi.fn().mockResolvedValue({ results: [], count: 0, can_manage: true }),
+    listLicenses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true }),
     createLicense: vi.fn(),
     updateLicense: vi.fn(),
     softwareChoices: vi.fn().mockResolvedValue({ installations: [], people: [] }),
@@ -157,7 +157,7 @@ describe('Assets', () => {
     const updateSoftwareInstallation = vi.fn().mockResolvedValue(updated)
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient({
-      listAssets: vi.fn().mockResolvedValue({ results: [softwareAsset], count: 1, can_manage: true }),
+      listAssets: vi.fn().mockResolvedValue({ results: [softwareAsset], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
       updateSoftwareInstallation,
     })} />)
     expect(await screen.findByRole('heading', { name: 'Software installation' })).toBeInTheDocument()

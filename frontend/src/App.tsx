@@ -295,7 +295,7 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.3.11 adds controlled, preview-first CSV transfer for exact-workspace asset inventory." />
+      <PageHeader title="Overview" description="TekDocs 0.3.12 stabilizes bounded inventory and external credential-reference workflows." />
       <section className="content-section">
         <div className="section-heading"><h2>Foundation status</h2><span>Milestone 0.2.0</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">

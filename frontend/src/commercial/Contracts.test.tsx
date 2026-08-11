@@ -14,7 +14,7 @@ const contract: CommercialContract = {
 
 function commercialClient(overrides: Partial<CommercialClient> = {}): CommercialClient {
   return {
-    listContracts: vi.fn().mockResolvedValue({ results: [contract], count: 1, can_manage: true, can_view_costs: true }),
+    listContracts: vi.fn().mockResolvedValue({ results: [contract], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }),
     providerChoices: vi.fn().mockResolvedValue({ results: [{ id: 'provider-1', name: 'Northwind' }] }),
     createContract: vi.fn().mockResolvedValue(contract), updateContract: vi.fn().mockResolvedValue(contract),
     archiveContract: vi.fn().mockResolvedValue(undefined),
@@ -55,7 +55,7 @@ describe('Contracts', () => {
   })
 
   it('does not render cost controls or values when the projection is denied', async () => {
-    render(<Contracts workspace={workspace} client={commercialClient({ listContracts: vi.fn().mockResolvedValue({ results: [{ ...contract, costs: undefined }], count: 1, can_manage: true, can_view_costs: false }) })} />)
+    render(<Contracts workspace={workspace} client={commercialClient({ listContracts: vi.fn().mockResolvedValue({ results: [{ ...contract, costs: undefined }], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: false }) })} />)
     expect(await screen.findByText(/Financial terms are hidden/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add cost' })).not.toBeInTheDocument()
     expect(screen.queryByText('19.50')).not.toBeInTheDocument()
@@ -65,8 +65,8 @@ describe('Contracts', () => {
     const costed = { ...contract, costs: [{ id: 'cost-1', label: 'Private rate', amount: '875.50', currency: 'USD', billing_interval: 'monthly' as const, quantity: '1.000', starts_on: null, ends_on: null, reference: '' }] }
     const listContracts = vi.fn().mockImplementation((activeWorkspace: { id: string }) => Promise.resolve(
       activeWorkspace.id === 'client-1'
-        ? { results: [costed], count: 1, can_manage: true, can_view_costs: true }
-        : { results: [], count: 0, can_manage: true, can_view_costs: false },
+        ? { results: [costed], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }
+        : { results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true, can_view_costs: false },
     ))
     const client = commercialClient({ listContracts })
     const user = userEvent.setup()

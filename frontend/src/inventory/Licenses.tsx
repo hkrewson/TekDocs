@@ -3,6 +3,7 @@ import { Pencil, Plus, UserPlus, X } from 'lucide-react'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import type { InventoryClient, SoftwareChoices, SoftwareLicense } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
+import { CollectionPagination } from '../CollectionPagination'
 
 type LicenseMode = 'read' | 'create' | 'edit' | 'seat' | 'link'
 type LicenseFormState = {
@@ -82,19 +83,22 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
   const [linkId, setLinkId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageState, setPageState] = useState({ pageSize: 50, count: 0, hasMore: false })
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([client.listLicenses(workspace, controller.signal), client.softwareChoices(workspace)])
+    Promise.all([client.listLicenses(workspace, page, controller.signal), client.softwareChoices(workspace)])
       .then(([result, available]) => {
         setRecords(result.results)
         setCanManage(result.can_manage)
+        setPageState({ pageSize: result.page_size, count: result.count, hasMore: result.has_more })
         setChoices(available)
         setPhase('ready')
       })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client, workspace])
+  }, [client, page, workspace])
 
   const selected = useMemo(
     () => records.find((record) => record.id === selectedId) ?? records[0],
@@ -133,7 +137,7 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Licenses unavailable</h2><p>The workspace license inventory could not be loaded.</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
       <section className="content-section inventory-index">
-        {records.length === 0 ? <p className="empty-state">No software licenses have been recorded.</p> : <ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => { setSelectedId(record.id); setMode('read') }}><strong>{record.name}</strong><span>{record.product_name} · {record.active_seats}/{record.seat_limit} seats</span></button></li>)}</ul>}
+        {records.length === 0 ? <p className="empty-state">No software licenses have been recorded.</p> : <><ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => { setSelectedId(record.id); setMode('read') }}><strong>{record.name}</strong><span>{record.product_name} · {record.active_seats}/{record.seat_limit} seats</span></button></li>)}</ul><CollectionPagination label="Licenses" page={page} pageSize={pageState.pageSize} count={pageState.count} hasMore={pageState.hasMore} onPageChange={(next) => { setPhase('loading'); setSelectedId(null); setMode('read'); setPage(next) }} /></>}
       </section>
       <section className="content-section inventory-detail">
         {selected ? <LicenseDetail record={selected} canManage={canManage} choices={choices} mode={mode} setMode={setMode} seat={seat} setSeat={setSeat} linkId={linkId} setLinkId={setLinkId} busy={busy} perform={perform} client={client} workspace={workspace} beginEdit={() => { setForm(formFromLicense(selected)); setMode('edit') }} /> : <p className="empty-state">Choose a license to inspect its entitlement.</p>}

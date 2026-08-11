@@ -167,7 +167,7 @@ async function mockWorkspaceApplication(page: Page) {
     }
     if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
     if (url.pathname.endsWith('/documents')) return route.fulfill({ json: { results: [], count: 0 } })
-    if (url.pathname.endsWith('/assets')) return route.fulfill({ json: { results: [], count: 0, can_manage: true } })
+    if (url.pathname.endsWith('/assets')) return route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true, can_view_relationships: true, can_create_relationships: true, can_archive_relationships: true } })
     if (url.pathname.endsWith('/products')) return route.fulfill({ json: { results: [], count: 0 } })
     if (url.pathname.endsWith('/specification-definitions')) return route.fulfill({ json: { results: [], count: 0 } })
     const id = url.pathname.split('/').at(-1)

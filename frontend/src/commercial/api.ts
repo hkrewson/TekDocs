@@ -31,13 +31,16 @@ export type CommercialContract = {
 
 export type CommercialResult = {
   results: CommercialContract[]
+  page: number
+  page_size: number
   count: number
+  has_more: boolean
   can_manage: boolean
   can_view_costs: boolean
 }
 
 export interface CommercialClient {
-  listContracts(workspace: WorkspaceContext, query: string, signal?: AbortSignal): Promise<CommercialResult>
+  listContracts(workspace: WorkspaceContext, query: string, page: number, signal?: AbortSignal): Promise<CommercialResult>
   providerChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: Array<{ id: string; name: string }> }>
   createContract(workspace: WorkspaceContext, values: object): Promise<CommercialContract>
   updateContract(workspace: WorkspaceContext, contractId: string, values: object): Promise<CommercialContract>
@@ -88,7 +91,10 @@ async function mutate<T>(path: string, method: string, body?: object): Promise<T
 }
 
 export const browserCommercialClient: CommercialClient = {
-  listContracts: (workspace, query, signal) => get(`${basePath(workspace)}?q=${encodeURIComponent(query)}`, signal),
+  listContracts: (workspace, query, page, signal) => {
+    const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '50' })
+    return get(`${basePath(workspace)}?${parameters}`, signal)
+  },
   providerChoices: (workspace, signal) => get(`${basePath(workspace)}/providers`, signal),
   createContract: (workspace, values) => mutate(basePath(workspace), 'POST', values),
   updateContract: (workspace, contractId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(contractId)}`, 'PATCH', values),

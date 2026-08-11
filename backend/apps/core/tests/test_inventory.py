@@ -1,14 +1,16 @@
 import csv
 import io
 import secrets
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
@@ -25,6 +27,7 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.rls_contract import RUNTIME_ROLE
+from apps.core.software_inventory import SoftwareInventoryError, assign_seat
 
 HARDWARE_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -407,6 +410,19 @@ def test_asset_relationships_and_atomic_bulk_actions_remain_exact_workspace(owne
     assert cross_scope.status_code == 400
     assert ClientAsset.objects.get(entity_id=first["id"]).archived_at is None
 
+    retained_before = ClientAsset.objects.select_related("entity", "hardware").get(entity_id=first["id"])
+    retained_identity = {
+        "entity_id": retained_before.entity_id,
+        "workspace_id": retained_before.entity.workspace_id,
+        "supplier_id": retained_before.supplier_id,
+        "product_id": retained_before.product_id,
+        "model_id": retained_before.model_id,
+        "model_revision_id": retained_before.model_revision_id,
+        "specification_version_id": retained_before.specification_version_id,
+        "provenance_checksum": retained_before.provenance_checksum,
+        "lifecycle_state": retained_before.hardware.lifecycle_state,
+    }
+
     archived = owner_client.post(
         bulk_url,
         {"asset_ids": [first["id"], second["id"]], "action": "archive"},
@@ -431,6 +447,18 @@ def test_asset_relationships_and_atomic_bulk_actions_remain_exact_workspace(owne
     )
     assert restored.status_code == 204
     assert owner_client.get(collection).json()["count"] == 2
+    retained_after = ClientAsset.objects.select_related("entity", "hardware").get(entity_id=first["id"])
+    assert {
+        "entity_id": retained_after.entity_id,
+        "workspace_id": retained_after.entity.workspace_id,
+        "supplier_id": retained_after.supplier_id,
+        "product_id": retained_after.product_id,
+        "model_id": retained_after.model_id,
+        "model_revision_id": retained_after.model_revision_id,
+        "specification_version_id": retained_after.specification_version_id,
+        "provenance_checksum": retained_after.provenance_checksum,
+        "lifecycle_state": retained_after.hardware.lifecycle_state,
+    } == retained_identity
 
 
 @pytest.mark.django_db
@@ -786,6 +814,27 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
         content_type="application/json",
     ).json()
     second_installation_id = second_asset["software_installation"]["id"]
+    asset_collection = reverse(
+        "organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}
+    )
+    first_asset_page = owner_client.get(asset_collection, {"page": 1, "page_size": 1})
+    assert first_asset_page.status_code == 200
+    assert first_asset_page.json()["count"] == 2
+    assert first_asset_page.json()["has_more"] is True
+    assert len(first_asset_page.json()["results"]) == 1
+    assert owner_client.get(asset_collection, {"page": 2, "page_size": 1}).json()["has_more"] is False
+    assert owner_client.get(asset_collection, {"page_size": 101}).status_code == 400
+
+    license_collection = reverse(
+        "organization-software-license-list-create", kwargs={"organization_entity_id": client.entity_id}
+    )
+    license_page = owner_client.get(license_collection, {"page": 1, "page_size": 1})
+    assert license_page.status_code == 200
+    assert license_page.json()["page"] == 1
+    assert license_page.json()["page_size"] == 1
+    assert license_page.json()["count"] == 1
+    assert license_page.json()["has_more"] is False
+    assert owner_client.get(license_collection, {"page_size": 101}).status_code == 400
     linked = owner_client.post(
         reverse(
             "organization-software-license-installation",
@@ -891,7 +940,55 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
         "event_type", flat=True
     )
     assert set(event_types) == {"created", "installation_linked", "seat_assigned", "seat_revoked", "details_updated"}
-    assert ClientSoftwareInstallation.objects.get(asset__entity_id=asset["id"]).status == "installed"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_license_seat_allocation_never_exceeds_limit(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Seat-allocation concurrency certification requires PostgreSQL")
+    supplier = _organization(installation, "Concurrent License Supplier", "vendor")
+    client = _organization(installation, "Concurrent License Client", "client")
+    asset = _software_asset(owner_client, installation, supplier, client, name="Concurrent endpoint agent")
+    people = []
+    for index in range(2):
+        response = owner_client.post(
+            reverse("organization-people-list-create", kwargs={"organization_entity_id": client.entity_id}),
+            {
+                "full_name": f"Concurrent User {index}",
+                "kind": "contact",
+                "email": f"concurrent-{index}@example.invalid",
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        people.append(uuid.UUID(response.json()["association_id"]))
+    created = owner_client.post(
+        reverse("organization-software-license-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"name": "One-seat entitlement", "asset_id": asset["id"], "kind": "subscription", "seat_limit": 1},
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    license_id = uuid.UUID(created.json()["id"])
+    barrier = threading.Barrier(2)
+
+    def allocate(person_id):  # type: ignore[no-untyped-def]
+        close_old_connections()
+        try:
+            barrier.wait(timeout=5)
+            record = installation.tenant.software_licenses.get(entity_id=license_id)
+            assign_seat(license_record=record, actor_id=installation.owner.id, person_id=person_id)
+            return "assigned"
+        except SoftwareInventoryError:
+            return "full"
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = sorted(executor.map(allocate, people))
+    assert outcomes == ["assigned", "full"]
+    license_record = installation.tenant.software_licenses.get(entity_id=license_id)
+    assert license_record.seats.filter(revoked_at__isnull=True).count() == 1
+    assert SoftwareLicenseEvent.objects.filter(license=license_record, event_type="seat_assigned").count() == 1
 
 
 @pytest.mark.django_db(transaction=True)

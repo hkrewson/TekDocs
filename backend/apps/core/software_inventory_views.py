@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import InventoryError, assets_for_scope, require_operational_owner
 from .models import (
     ClientAsset,
@@ -144,7 +145,10 @@ class SoftwareLicenseSerializer(serializers.Serializer):
 
 class LicenseResultSerializer(serializers.Serializer):
     results = SoftwareLicenseSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
 
 
@@ -193,15 +197,20 @@ class ClientSoftwareInstallationDetailView(APIView):
 
 
 class SoftwareLicenseListCreateView(APIView):
-    @extend_schema(responses={200: LicenseResultSerializer})
+    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: LicenseResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
-        records = licenses_for_scope(workspace.data_scope)
+        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        page = paginate(licenses_for_scope(workspace.data_scope), **query.validated_data)
         return Response(
             LicenseResultSerializer(
                 {
-                    "results": records,
-                    "count": records.count(),
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
                     "can_manage": context_has_permission(
                         workspace.member, PermissionKey.ASSETS_EDIT, organization=workspace.organization
                     ),

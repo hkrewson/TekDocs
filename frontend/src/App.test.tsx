@@ -58,7 +58,7 @@ const sitesClient = {
   updateLocation: vi.fn(),
   archiveLocation: vi.fn(),
 } as unknown as SitesClient
-const listAssets = vi.fn().mockResolvedValue({ results: [], count: 0, can_manage: true })
+const listAssets = vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true })
 const inventoryClient = {
   listAssets,
   listModelChoices: vi.fn().mockResolvedValue({ results: [] }),
@@ -86,6 +86,7 @@ describe('application shell', () => {
     expect(await screen.findByText('No assets have been created for this MSP workspace.')).toBeInTheDocument()
     expect(listAssets).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'msp', id: authContext.tenant.id, organization: null }),
+      1,
       expect.any(AbortSignal),
     )
   })

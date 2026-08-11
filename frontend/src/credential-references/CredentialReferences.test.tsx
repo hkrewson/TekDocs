@@ -17,7 +17,7 @@ const reference = {
 
 function client(overrides: Partial<CredentialReferencesClient> = {}): CredentialReferencesClient {
   return {
-    list: vi.fn().mockResolvedValue({ results: [reference], can_manage: true }),
+    list: vi.fn().mockResolvedValue({ results: [reference], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true }),
     create: vi.fn().mockResolvedValue(reference),
     update: vi.fn().mockResolvedValue(reference),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -62,5 +62,18 @@ describe('CredentialReferences', () => {
     render(<CredentialReferences workspace={null} client={api} />)
     await user.click(await screen.findByRole('button', { name: 'Archive Firewall administrator' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('The 1Password item and its access remain unchanged')
+  })
+
+  it('explains stale provider links and changes pages through the bounded API', async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ results: [reference], page: 1, page_size: 50, count: 51, has_more: true, can_manage: true })
+      .mockResolvedValueOnce({ results: [{ ...reference, id: 'reference-51', title: 'Last reference' }], page: 2, page_size: 50, count: 51, has_more: false, can_manage: true })
+    const user = userEvent.setup()
+    render(<CredentialReferences workspace={null} client={client({ list })} />)
+
+    expect(await screen.findByText(/TekDocs cannot check whether an item still exists/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Last reference')).toBeInTheDocument()
+    expect(list).toHaveBeenLastCalledWith(null, '', 2, expect.any(AbortSignal))
   })
 })

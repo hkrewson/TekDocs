@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.3.11
+  version: 0.3.12
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -585,9 +585,25 @@ paths:
       operationId: credential_references_retrieve
       parameters:
       - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
         name: q
         schema:
           type: string
+          default: ''
+          maxLength: 240
       tags:
       - credential-references
       security:
@@ -2650,6 +2666,21 @@ paths:
   /api/v1/workspaces/msp/assets:
     get:
       operationId: workspaces_msp_assets_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - workspaces
       security:
@@ -3096,6 +3127,27 @@ paths:
   /api/v1/workspaces/msp/contracts:
     get:
       operationId: workspaces_msp_contracts_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
       tags:
       - workspaces
       security:
@@ -3312,6 +3364,21 @@ paths:
   /api/v1/workspaces/msp/licenses:
     get:
       operationId: workspaces_msp_licenses_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - workspaces
       security:
@@ -3611,6 +3678,20 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - workspaces
       security:
@@ -4647,6 +4728,26 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
       tags:
       - workspaces
       security:
@@ -4921,9 +5022,25 @@ paths:
           format: uuid
         required: true
       - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
         name: q
         schema:
           type: string
+          default: ''
+          maxLength: 240
       tags:
       - workspaces
       security:
@@ -6352,6 +6469,20 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
       tags:
       - workspaces
       security:
@@ -8073,8 +8204,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ClientAsset'
+        page:
+          type: integer
+        page_size:
+          type: integer
         count:
           type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
         can_view_relationships:
@@ -8089,6 +8226,9 @@ components:
       - can_manage
       - can_view_relationships
       - count
+      - has_more
+      - page
+      - page_size
       - results
     ClientAssetWrite:
       type: object
@@ -8164,8 +8304,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Contract'
+        page:
+          type: integer
+        page_size:
+          type: integer
         count:
           type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
         can_view_costs:
@@ -8174,6 +8320,9 @@ components:
       - can_manage
       - can_view_costs
       - count
+      - has_more
+      - page
+      - page_size
       - results
     ContractWrite:
       type: object
@@ -8342,10 +8491,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CredentialReference'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
       required:
       - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
       - results
     CredentialReferenceWrite:
       type: object
@@ -9757,13 +9918,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SoftwareLicense'
+        page:
+          type: integer
+        page_size:
+          type: integer
         count:
           type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
       required:
       - can_manage
       - count
+      - has_more
+      - page
+      - page_size
       - results
     LicenseWrite:
       type: object

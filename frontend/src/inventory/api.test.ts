@@ -9,7 +9,7 @@ describe('inventory API client', () => {
 
   it('uses exact client routes and CSRF for asset creation', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
-    await browserInventoryClient.listAssets(workspace)
+    await browserInventoryClient.listAssets(workspace, 2)
     await browserInventoryClient.listModelChoices(workspace, 'edge switch')
     await browserInventoryClient.createAsset(workspace, 'model/1', 'Core switch')
     await browserInventoryClient.listVendors(workspace)
@@ -24,12 +24,12 @@ describe('inventory API client', () => {
 
   it('uses dedicated MSP-owned routes without an organization identifier', async () => {
     const workspace = { kind: 'msp', id: 'tenant/1' } as never
-    await browserInventoryClient.listAssets(workspace)
-    await browserInventoryClient.listLicenses(workspace)
+    await browserInventoryClient.listAssets(workspace, 1)
+    await browserInventoryClient.listLicenses(workspace, 3)
     await browserInventoryClient.listVendors(workspace)
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets', expect.any(Object))
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets?page=1&page_size=50', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses?page=3&page_size=50', expect.any(Object))
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors', expect.any(Object))
   })
 

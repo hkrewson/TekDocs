@@ -98,6 +98,32 @@ def test_msp_contracts_are_not_an_aggregate_of_client_contracts(owner_client, in
 
 
 @pytest.mark.django_db
+def test_contract_collection_is_bounded_without_changing_cost_projection(owner_client, installation):
+    client = organization(installation, "Paged Client", "client")
+    provider = organization(installation, "Paged Provider", "vendor")
+    collection = reverse(
+        "organization-commercial-contract-list-create", kwargs={"organization_entity_id": client.entity_id}
+    )
+    for name in ("Alpha agreement", "Beta agreement", "Gamma agreement"):
+        response = owner_client.post(
+            collection,
+            {"name": name, "provider_id": str(provider.entity_id), "kind": "service"},
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    first = owner_client.get(collection, {"page": 1, "page_size": 2}).json()
+    assert [item["name"] for item in first["results"]] == ["Alpha agreement", "Beta agreement"]
+    assert first["count"] == 3
+    assert first["has_more"] is True
+    assert all("costs" in item for item in first["results"])
+    last = owner_client.get(collection, {"page": 2, "page_size": 2}).json()
+    assert [item["name"] for item in last["results"]] == ["Gamma agreement"]
+    assert last["has_more"] is False
+    assert owner_client.get(collection, {"page_size": 101}).status_code == 400
+
+
+@pytest.mark.django_db
 def test_contract_cost_crud_and_search_never_use_financial_values(owner_client, installation):
     client = organization(installation, "Commercial Client", "client")
     provider = organization(installation, "Managed Provider", "vendor")

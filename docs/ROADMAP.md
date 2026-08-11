@@ -580,7 +580,7 @@ Evidence: `docs/releases/0.3.0.md`.
 | `0.3.9` | **Complete:** explicit immutable MSP/organization Workspace identities, non-null Entity ownership, data backfill, workspace-bound RLS input, and non-orphaning organization retention. |
 | `0.3.10` | **Complete:** attachment-provider/scanner quarantine boundary, hostile-file corpus, exact-workspace asset relationships, and atomic bounded bulk operations. |
 | `0.3.11` | **Complete:** canonical asset CSV import/export, signed dry-run review, bounded validation, deterministic retry identity, atomic apply, and secret-safe exclusions. |
-| `0.3.12` | Inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
+| `0.3.12` | **Complete:** inventory/credential-reference stabilization, workspace/reference-data performance, restore, upgrade, and accessibility evidence. |
 | `0.4.0` | Stabilize and certify external credential references and hardware/software inventory. |
 
 ### `0.3.1` acceptance criteria
@@ -725,6 +725,19 @@ Evidence: `docs/releases/0.3.10.md`.
 - [x] Backend hostile-file, duplicate-identifier, retry, formula-escape, MSP/client isolation, frontend component, OpenAPI, Compose, architecture, threat-model, risk, and release evidence agree at `0.3.11`.
 
 Evidence: `docs/releases/0.3.11.md`.
+
+### `0.3.12` acceptance criteria
+
+- [x] Asset, software-license, commercial-contract, and credential-reference collections use validated bounded pagination with stable ordering, exact counts, and no unbounded serialization; reference-data choices retain explicit server caps.
+- [x] Representative PostgreSQL data spans 100 client workspaces and includes supplier catalogs, hardware/software assets, lifecycle history, licenses/seats, contracts/costs, and credential references. Authorized first/middle/last-page reads retain fixed query ceilings and p95 below 500 ms without cross-workspace caches.
+- [x] Concurrent seat allocation cannot exceed the retained limit, bulk/CSV retry and rollback remain atomic, archive/recovery retains exact Workspace ownership and provenance, and archived credential references cannot be listed, opened, or guessed.
+- [x] Credential-reference guidance explains stale or moved provider items, replacement through a new Private Link, and the fact that TekDocs cannot validate provider access or item existence without weakening external custody. Provider links and customer values remain absent from list/search/export/audit/browser content.
+- [x] Cost-denied collection pagination, counts, search, errors, CSV, and reference fixtures expose no cost member, value, total, count, ordering, or timing-dependent filter path; MSP pages remain exact-MSP views rather than client aggregates.
+- [x] The inventory and credential-reference interfaces expose accessible pagination, loading, empty, denial, stale-workspace, confirmation, and keyboard/focus behavior across MSP and client contexts; one non-mocked browser journey covers the retained provider handoff and inventory navigation.
+- [x] A `0.3.11` to `0.3.12` upgrade rehearsal preserves representative Workspace, catalog revision, asset provenance, lifecycle, license/seat, contract/cost, CSV retry identity, and credential-reference records. A separate database/media backup-and-restore rehearsal preserves the same database identities without treating provider links as retrievable secrets.
+- [x] A dedicated inventory certification gate composes inventory, commercial, credential-reference, permission/IDOR, forced-RLS, migration, concurrency, reference-performance, and recovery suites. OpenAPI, architecture, security/threat model, risks, Compose, production images, version metadata, and release evidence agree at `0.3.12`.
+
+Evidence: `docs/releases/0.3.12.md`.
 
 ## Network inventory: `0.4.x` → `0.5.0`
 

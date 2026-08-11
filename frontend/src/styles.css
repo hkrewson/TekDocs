@@ -865,3 +865,28 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .specification-row { grid-template-columns: 1fr 1fr; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .catalog-definition-list li, .catalog-model-heading { align-items: flex-start; flex-direction: column; }
 }
+/* Bounded collection navigation */
+.collection-pagination {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  font-size: 0.82rem;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.collection-pagination > div {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+}
+
+@media (max-width: 640px) {
+  .collection-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

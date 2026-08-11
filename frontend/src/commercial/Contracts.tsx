@@ -3,6 +3,7 @@ import { Archive, Pencil, Plus } from 'lucide-react'
 import type { FormEvent } from 'react'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { CommercialClient, CommercialContract, ContractCost } from './api'
+import { CollectionPagination } from '../CollectionPagination'
 
 type ContractForm = {
   name: string; provider_id: string; kind: CommercialContract['kind']; status: CommercialContract['status']
@@ -43,17 +44,20 @@ export function Contracts({ workspace, client }: { workspace: WorkspaceContext; 
   const [cost, setCost] = useState<CostForm>(blankCost)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageState, setPageState] = useState({ pageSize: 50, count: 0, hasMore: false })
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([client.listContracts(workspace, query, controller.signal), client.providerChoices(workspace, controller.signal)])
+    Promise.all([client.listContracts(workspace, query, page, controller.signal), client.providerChoices(workspace, controller.signal)])
       .then(([result, choices]) => {
         setRecords(result.results); setCanManage(result.can_manage); setCanViewCosts(result.can_view_costs)
+        setPageState({ pageSize: result.page_size, count: result.count, hasMore: result.has_more })
         setProviders(choices.results); setPhase('ready')
       })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client, query, workspace])
+  }, [client, page, query, workspace])
 
   const selected = useMemo(() => records.find((item) => item.id === selectedId) ?? records[0], [records, selectedId])
   function replace(record: CommercialContract) {
@@ -74,12 +78,12 @@ export function Contracts({ workspace, client }: { workspace: WorkspaceContext; 
 
   return <>
     <header className="page-header"><div><h1>Services & contracts</h1><p>Provider agreements, renewal terms, and permission-controlled costs.</p></div>{canManage && <button type="button" className="primary-button" onClick={() => { setContract(blankContract); setModal('create') }}><Plus size={16} />New contract</button>}</header>
-    <label className="search-field"><span className="sr-only">Search contracts</span><input type="search" value={query} placeholder="Search contracts, providers, or references" onChange={(event) => setQuery(event.target.value)} /></label>
+    <label className="search-field"><span className="sr-only">Search contracts</span><input type="search" value={query} placeholder="Search contracts, providers, or references" onChange={(event) => { setPhase('loading'); setQuery(event.target.value); setPage(1) }} /></label>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && <section className="content-section" role="status">Loading contracts…</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Contracts unavailable</h2><p>The workspace commercial records could not be loaded.</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
-      <section className="content-section inventory-index">{records.length === 0 ? <p className="empty-state">No matching contracts have been recorded.</p> : <ul className="inventory-list">{records.map((item) => <li key={item.id}><button type="button" className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.provider_name} · {item.status}</span></button></li>)}</ul>}</section>
+      <section className="content-section inventory-index">{records.length === 0 ? <p className="empty-state">No matching contracts have been recorded.</p> : <><ul className="inventory-list">{records.map((item) => <li key={item.id}><button type="button" className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.provider_name} · {item.status}</span></button></li>)}</ul><CollectionPagination label="Contracts" page={page} pageSize={pageState.pageSize} count={pageState.count} hasMore={pageState.hasMore} onPageChange={(next) => { setPhase('loading'); setSelectedId(null); setPage(next) }} /></>}</section>
       <section className="content-section inventory-detail">{selected ? <>
         <div className="section-heading"><div><h2>{selected.name}</h2><p>{selected.provider_name} · {selected.kind}</p></div><span className="lifecycle-state">{selected.status}</span></div>
         <p>{selected.description || 'No service description recorded.'}</p>

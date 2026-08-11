@@ -15,8 +15,10 @@ live_compose() {
 cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
-    echo "Live workspace journey failed; recent service logs follow." >&2
-    live_compose logs --no-color --tail=120 backend frontend >&2 || true
+    echo "Live workspace journey failed; recent backend logs follow." >&2
+    live_compose logs --no-color --tail=200 migrate backend >&2 || true
+    echo "Recent frontend access logs follow." >&2
+    live_compose logs --no-color --tail=30 frontend >&2 || true
   fi
   live_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   docker image rm -f "$playwright_image" >/dev/null 2>&1 || true

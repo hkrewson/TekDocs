@@ -20,6 +20,7 @@ from .asset_csv import (
     preview_assets_csv,
     template_csv,
 )
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import (
     InventoryError,
     assets_for_scope,
@@ -320,7 +321,10 @@ class ClientAssetSerializer(serializers.Serializer):
 
 class ClientAssetResultSerializer(serializers.Serializer):
     results = ClientAssetSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     can_view_relationships = serializers.BooleanField()
     can_create_relationships = serializers.BooleanField()
@@ -364,15 +368,20 @@ def _asset(workspace: ResolvedWorkspace, asset_entity_id: UUID) -> ClientAsset:
 
 
 class ClientAssetListCreateView(APIView):
-    @extend_schema(responses={200: ClientAssetResultSerializer})
+    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: ClientAssetResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
-        assets = assets_for_scope(workspace.data_scope)
+        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        page = paginate(assets_for_scope(workspace.data_scope), **query.validated_data)
         return Response(
             ClientAssetResultSerializer(
                 {
-                    "results": assets,
-                    "count": assets.count(),
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
                     "can_manage": context_has_permission(
                         workspace.member, PermissionKey.ASSETS_EDIT, organization=workspace.organization
                     ),

@@ -94,6 +94,34 @@ def test_runtime_credential_references_are_forced_to_the_selected_workspace():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_runtime_organization_scope_can_create_tenant_person_identity():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Person identity tenant", slug=f"person-{uuid.uuid4()}")
+    organization = _organization(tenant, "Person identity client")
+    entity_id = uuid.uuid4()
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, tenant.id, "organization", organization.id)
+        cursor.execute(
+            "SELECT id FROM core_workspace WHERE tenant_id = %s AND kind = 'msp'",
+            [tenant.id],
+        )
+        msp_workspace_id = cursor.fetchone()[0]
+        cursor.execute(
+            "INSERT INTO core_entity "
+            "(id, tenant_id, workspace_id, organization_id, entity_type, display_name, custom_fields, "
+            "visibility, archived_at, created_at, updated_at) "
+            "VALUES (%s, %s, %s, NULL, 'person', 'Runtime person', '{}'::jsonb, "
+            "'msp_private', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            [entity_id, tenant.id, msp_workspace_id],
+        )
+        cursor.execute("SELECT id FROM core_entity WHERE id = %s", [entity_id])
+        assert cursor.fetchone() == (entity_id,)
+
+
+@pytest.mark.django_db(transaction=True)
 def test_runtime_role_is_constrained_and_forced_rls_inventory_is_complete():
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role certification requires PostgreSQL")

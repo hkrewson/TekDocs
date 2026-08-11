@@ -109,6 +109,65 @@ def test_credential_reference_api_omits_private_link_and_records_value_free_audi
     assert event.metadata == {}
 
 
+def test_credential_reference_collection_is_bounded_and_archive_closes_every_read_path(installation):
+    _result, client, first, _second = installation
+    collection = reverse(
+        "organization-credential-reference-list-create",
+        kwargs={"organization_entity_id": first.entity_id},
+    )
+    created = []
+    for title in ("Alpha administrator", "Beta administrator", "Gamma administrator"):
+        response = client.post(
+            collection,
+            {"title": title, "provider": "onepassword", "reference_url": PRIVATE_LINK},
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        created.append(response.json())
+
+    first_page = client.get(collection, {"page": 1, "page_size": 2})
+    assert first_page.status_code == 200
+    assert first_page.json() | {"results": []} == {
+        "results": [],
+        "page": 1,
+        "page_size": 2,
+        "count": 3,
+        "has_more": True,
+        "can_manage": True,
+    }
+    assert [item["title"] for item in first_page.json()["results"]] == [
+        "Alpha administrator",
+        "Beta administrator",
+    ]
+    second_page = client.get(collection, {"page": 2, "page_size": 2}).json()
+    assert [item["title"] for item in second_page["results"]] == ["Gamma administrator"]
+    assert second_page["has_more"] is False
+    assert client.get(collection, {"page_size": 101}).status_code == 400
+
+    target = created[1]
+    detail = reverse(
+        "organization-credential-reference-detail",
+        kwargs={
+            "organization_entity_id": first.entity_id,
+            "credential_reference_entity_id": target["id"],
+        },
+    )
+    opened = reverse(
+        "organization-credential-reference-open",
+        kwargs={
+            "organization_entity_id": first.entity_id,
+            "credential_reference_entity_id": target["id"],
+        },
+    )
+    assert client.delete(detail).status_code == 204
+    assert client.get(opened).status_code == 404
+    assert [item["title"] for item in client.get(collection).json()["results"]] == [
+        "Alpha administrator",
+        "Gamma administrator",
+    ]
+    assert AuditEvent.objects.get(action="credential_reference.archived", entity_id=target["id"]).metadata == {}
+
+
 def test_client_scope_blocks_sibling_reference_idor_and_secret_shaped_fields(installation):
     _result, client, first, second = installation
     first_collection = reverse(

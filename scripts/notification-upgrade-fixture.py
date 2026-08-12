@@ -59,13 +59,20 @@ def create_fixture():
                 payload={"role": "client_user"},
             )
         assert dispatch_due_outbox_events(tenant=result.tenant) == 1
-    print("Historical 0.5.4 outbox event delivered")
+    print("Historical 0.5.5 inbox notification projected")
 
 
 def verify_fixture():
     from django.db import transaction
 
-    from apps.core.models import InboxNotification, InstallationState, Organization
+    from apps.core.models import (
+        InboxNotification,
+        InstallationState,
+        NotificationEmailDelivery,
+        NotificationEmailState,
+        Organization,
+    )
+    from apps.core.notification_email import dispatch_due_notification_emails
     from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events, enqueue_outbox_event
     from apps.core.rls import OrganizationRLSMode, rls_scope
     from apps.core.scoping import DataScope
@@ -76,7 +83,8 @@ def verify_fixture():
         organization = Organization.scoped.for_tenant(state.tenant).get(
             entity__display_name="Notification Upgrade Client"
         )
-        assert InboxNotification.scoped.for_tenant(state.tenant).count() == 0
+        assert InboxNotification.scoped.for_tenant(state.tenant).count() == 1
+        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).count() == 0
         invitation = _invitation(
             tenant=state.tenant,
             organization=organization,
@@ -93,10 +101,15 @@ def verify_fixture():
                 payload={"role": "client_user"},
             )
         assert dispatch_due_outbox_events(tenant=state.tenant) == 1
-        notification = InboxNotification.scoped.for_tenant(state.tenant).get()
+        assert InboxNotification.scoped.for_tenant(state.tenant).count() == 2
+        notification = InboxNotification.scoped.for_tenant(state.tenant).order_by("-created_at").first()
+        assert notification is not None
         assert notification.recipient_id == state.owner.id
         assert notification.surface == "msp"
-    print("Historical event retained without replay; current event projected exactly once")
+        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).count() == 1
+        assert dispatch_due_notification_emails(tenant=state.tenant) == 1
+        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).get().state == NotificationEmailState.DELIVERED
+    print("Historical inbox retained without email backfill; current event emailed exactly once")
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

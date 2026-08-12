@@ -9,7 +9,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import InstallationMemberContext, require_client_portal_member, require_installation_member
 
-from .models import InboxNotification, NotificationSurface
+from .models import InboxNotification, NotificationPreference, NotificationSurface
+from .notification_email import preference_for
 from .notifications import (
     NotificationProjection,
     authorize_notification,
@@ -44,6 +45,20 @@ class InboxNotificationResultSerializer(serializers.Serializer):
 
 class InboxNotificationReadSerializer(serializers.Serializer):
     read = serializers.BooleanField()
+
+
+class NotificationPreferenceSerializer(serializers.Serializer):
+    email_enabled = serializers.BooleanField()
+    invitation_events = serializers.BooleanField()
+    publication_events = serializers.BooleanField()
+
+
+def _preference_payload(preference: NotificationPreference) -> dict[str, bool]:
+    return {
+        "email_enabled": preference.email_enabled,
+        "invitation_events": preference.invitation_events,
+        "publication_events": preference.publication_events,
+    }
 
 
 def _serialized_projection(projection: NotificationProjection) -> dict[str, object]:
@@ -125,6 +140,27 @@ class NotificationReadView(NotificationSurfaceMixin, APIView):
         return response
 
 
+class NotificationPreferenceView(NotificationSurfaceMixin, APIView):
+    def get(self, request: Request) -> Response:
+        context = self.context(request)
+        preference = preference_for(tenant=context.tenant, user_id=context.user.id, surface=self.surface)
+        response = Response(NotificationPreferenceSerializer(_preference_payload(preference)).data)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    def patch(self, request: Request) -> Response:
+        context = self.context(request)
+        preference = preference_for(tenant=context.tenant, user_id=context.user.id, surface=self.surface)
+        serializer = NotificationPreferenceSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        for field, value in serializer.validated_data.items():
+            setattr(preference, field, value)
+        preference.save()
+        response = Response(NotificationPreferenceSerializer(_preference_payload(preference)).data)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class MSPNotificationListView(NotificationListView):
     surface = NotificationSurface.MSP
 
@@ -163,3 +199,41 @@ class ClientPortalNotificationReadView(NotificationReadView):
     )
     def patch(self, request, notification_id: UUID):  # type: ignore[no-untyped-def]
         return super().patch(request, notification_id)
+
+
+class MSPNotificationPreferenceView(NotificationPreferenceView):
+    surface = NotificationSurface.MSP
+
+    @extend_schema(
+        operation_id="msp_notification_preferences_retrieve",
+        responses={200: NotificationPreferenceSerializer},
+    )
+    def get(self, request: Request) -> Response:
+        return super().get(request)
+
+    @extend_schema(
+        operation_id="msp_notification_preferences_update",
+        request=NotificationPreferenceSerializer,
+        responses={200: NotificationPreferenceSerializer},
+    )
+    def patch(self, request: Request) -> Response:
+        return super().patch(request)
+
+
+class ClientPortalNotificationPreferenceView(NotificationPreferenceView):
+    surface = NotificationSurface.CLIENT_PORTAL
+
+    @extend_schema(
+        operation_id="client_portal_notification_preferences_retrieve",
+        responses={200: NotificationPreferenceSerializer},
+    )
+    def get(self, request: Request) -> Response:
+        return super().get(request)
+
+    @extend_schema(
+        operation_id="client_portal_notification_preferences_update",
+        request=NotificationPreferenceSerializer,
+        responses={200: NotificationPreferenceSerializer},
+    )
+    def patch(self, request: Request) -> Response:
+        return super().patch(request)

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.5
+  version: 0.5.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2184,6 +2184,44 @@ paths:
           description: Invalid or oversized Markdown
         '403':
           description: Documentation view permission required
+  /api/v1/notification-preferences:
+    get:
+      operationId: msp_notification_preferences_retrieve
+      tags:
+      - notification-preferences
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+    patch:
+      operationId: msp_notification_preferences_update
+      tags:
+      - notification-preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
   /api/v1/notifications:
     get:
       operationId: msp_notifications_list
@@ -2585,6 +2623,44 @@ paths:
           description: ''
         '409':
           description: Integrity conflict
+  /api/v1/portal/notification-preferences:
+    get:
+      operationId: client_portal_notification_preferences_retrieve
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+    patch:
+      operationId: client_portal_notification_preferences_update
+      tags:
+      - portal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreference'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
   /api/v1/portal/notifications:
     get:
       operationId: client_portal_notifications_list
@@ -15513,6 +15589,19 @@ components:
       - page
       - page_size
       - results
+    NotificationPreference:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        invitation_events:
+          type: boolean
+        publication_events:
+          type: boolean
+      required:
+      - email_enabled
+      - invitation_events
+      - publication_events
     NotificationTarget:
       type: object
       properties:
@@ -16193,6 +16282,15 @@ components:
           allOf:
           - $ref: '#/components/schemas/NetworkRackWriteStatusEnum'
           default: active
+    PatchedNotificationPreference:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        invitation_events:
+          type: boolean
+        publication_events:
+          type: boolean
     PatchedOrganizationAccessWrite:
       type: object
       properties:

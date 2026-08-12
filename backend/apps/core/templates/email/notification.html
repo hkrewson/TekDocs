@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>{{ product_name }} notification</title></head>
+  <body style="margin:0;background:#f3f2ee;color:#23241f;font-family:Arial,sans-serif">
+    <main style="max-width:600px;margin:0 auto;padding:32px 20px">
+      <div style="background:#ffffff;border:1px solid #d8d5cd;padding:28px">
+        <p style="margin:0 0 18px;font-size:16px;font-weight:700">{{ product_name }}</p>
+        <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3">{{ notification_title }}</h1>
+        <p style="margin:0 0 22px;font-size:15px;line-height:1.6">{{ notification_message }}</p>
+        <p style="margin:0"><a href="{{ app_url }}" style="display:inline-block;background:#315b4c;color:#ffffff;padding:11px 18px;text-decoration:none;font-weight:700">Open {{ product_name }}</a></p>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#5b5d56">This message contains no credentials or document content. Access is checked again when you sign in.</p>
+      </div>
+    </main>
+  </body>
+</html>

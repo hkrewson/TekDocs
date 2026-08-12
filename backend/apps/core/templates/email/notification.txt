@@ -1,0 +1,8 @@
+{{ notification_title }}
+
+{{ notification_message }}
+
+Sign in to TekDocs to review the current authorized record:
+{{ app_url }}
+
+This message contains no credentials or document content. Access is checked again when you sign in.

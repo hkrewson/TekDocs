@@ -885,10 +885,10 @@ Evidence: `docs/releases/0.5.0.md`.
 | `0.5.3` | Read-only client document/reference browsing with unmistakable MSP-private/client-visible states. |
 | `0.5.4` | Transactional event outbox, idempotent delivery jobs, and retry/dead-letter behavior. |
 | `0.5.5` | In-app notification inbox and permission-filtered event payloads. |
-| `0.5.6` | SMTP delivery, templates, bounce/failure handling, and redaction tests. |
-| `0.5.7` | Notification preferences, batching, digests, and quiet-time behavior. |
+| `0.5.6` | SMTP delivery, secure templates, immediate preferences, retry/failure handling, and mail-outage recovery. |
+| `0.5.7` | Notification batching, digests, quiet-time behavior, and delivery administration. |
 | `0.5.8` | Document review/expiry reminders and calendar-feed seam. |
-| `0.5.9` | Portal/notification stabilization, accessibility, mail-outage, load, and upgrade evidence. |
+| `0.5.9` | Portal/notification stabilization, accessibility, long-history/load behavior, and consolidated upgrade evidence. |
 | `0.6.0` | Stabilize and certify controlled client access and notifications. |
 
 ### `0.5.1` acceptance criteria
@@ -948,6 +948,18 @@ Evidence: `docs/releases/0.5.4.md`.
 - [x] Backend projection/API/direct-write tests, frontend component/API/accessibility gates, permission inventory, migration/OpenAPI drift, and exact `0.5.4` upgrade evidence agree. Historical events already consumed by `0.5.4` are deliberately not backfilled.
 
 Evidence: `docs/releases/0.5.5.md`.
+
+### `0.5.6` acceptance criteria
+
+- [x] Every newly projected inbox notification receives one idempotent SMTP delivery row without storing its destination address, rendered copy, document content, publication reason, credentials, or raw exception/SMTP response.
+- [x] A separate scheduled dispatcher re-authorizes current membership, topic, source, organization, and surface access immediately before delivery. Revoked records are suppressed rather than becoming an email oracle.
+- [x] Fixed autoescaped text and HTML templates use a generic subject, bounded permission-filtered copy, one generic application link, and a deterministic Message-ID. Raw HTML, arbitrary templates, and authored links are not accepted.
+- [x] Temporary SMTP failures use bounded exponential retry and safe error codes; permanent synchronous recipient rejection dead-letters. A crash after SMTP acceptance can still duplicate delivery, so deterministic Message-ID is supplied for downstream correlation.
+- [x] MSP and portal users can independently disable all email, invitation events, or publication events. Preferences are checked at send time, CSRF protected, scoped by surface, undeletable, and guarded by membership plus forced RLS.
+- [x] Existing `0.5.5` inbox rows are not backfilled into email on upgrade. Production-shaped upgrade and SMTP-outage rehearsals prove that new work is queued once, survives mail downtime without blocking the inbox, and delivers after recovery.
+- [x] Backend rendering/dispatch/direct-write tests, permission and RLS matrices, frontend accessibility/API tests, OpenAPI/migration/version drift, ADR 0054, and release evidence agree.
+
+Evidence: `docs/releases/0.5.6.md`.
 
 ## API and integrations: `0.6.x` → `0.7.0`
 

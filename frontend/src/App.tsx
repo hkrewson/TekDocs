@@ -301,9 +301,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.5.5" />
+      <PageHeader title="Overview" description="TekDocs 0.5.6" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.5.5</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.5.6</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -326,6 +326,7 @@ function Overview() {
             ['Client portal identity boundary', 'Available'],
             ['Read-only client publication portal', 'Available'],
             ['Permission-filtered notification inbox', 'Available'],
+            ['Retryable SMTP notifications', 'Available'],
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],

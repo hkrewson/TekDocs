@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_NOTIFICATION_UPGRADE_FROM_REF:-dbe0b53}
+baseline_ref=${TEKDOCS_NOTIFICATION_UPGRADE_FROM_REF:-848b862}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-notification-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -41,17 +41,17 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-[ "$baseline_version" = "0.5.4" ] || { echo "Notification upgrade expected baseline 0.5.4, found $baseline_version" >&2; exit 1; }
-[ "$current_version" = "0.5.5" ] || { echo "Notification upgrade expected current version 0.5.5, found $current_version" >&2; exit 1; }
+[ "$baseline_version" = "0.5.5" ] || { echo "Notification upgrade expected baseline 0.5.5, found $baseline_version" >&2; exit 1; }
+[ "$current_version" = "0.5.6" ] || { echo "Notification upgrade expected current version 0.5.6, found $current_version" >&2; exit 1; }
 
-echo "Creating delivered historical event in TekDocs $baseline_version"
+echo "Creating a historical inbox notification in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/scripts/notification-upgrade-fixture.py"
 baseline_compose down --remove-orphans
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
-echo "Applying TekDocs $current_version and validating notification projection"
+echo "Applying TekDocs $current_version and validating SMTP queue compatibility"
 current_compose up -d --build --wait backend
 current_compose exec -T -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/scripts/notification-upgrade-fixture.py"

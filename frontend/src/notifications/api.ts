@@ -22,9 +22,17 @@ export type NotificationResult = {
   has_more: boolean
 }
 
+export type NotificationPreferences = {
+  email_enabled: boolean
+  invitation_events: boolean
+  publication_events: boolean
+}
+
 export interface NotificationsClient {
   list(): Promise<NotificationResult>
   setRead(id: string, read: boolean): Promise<InboxNotification>
+  getPreferences(): Promise<NotificationPreferences>
+  updatePreferences(preferences: NotificationPreferences): Promise<NotificationPreferences>
 }
 
 async function decode<T>(response: Response): Promise<T> {
@@ -34,6 +42,7 @@ async function decode<T>(response: Response): Promise<T> {
 
 export function createBrowserNotificationsClient(portal = false): NotificationsClient {
   const base = portal ? '/api/v1/portal/notifications' : '/api/v1/notifications'
+  const preferencesPath = portal ? '/api/v1/portal/notification-preferences' : '/api/v1/notification-preferences'
   return {
     async list() {
       return decode(await fetch(base, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
@@ -46,6 +55,19 @@ export function createBrowserNotificationsClient(portal = false): NotificationsC
         credentials: 'same-origin',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': token },
         body: JSON.stringify({ read }),
+      }))
+    },
+    async getPreferences() {
+      return decode(await fetch(preferencesPath, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+    },
+    async updatePreferences(preferences) {
+      const token = browserCsrfToken()
+      if (!token) throw new Error('The browser security token is unavailable. Refresh and try again.')
+      return decode(await fetch(preferencesPath, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': token },
+        body: JSON.stringify(preferences),
       }))
     },
   }

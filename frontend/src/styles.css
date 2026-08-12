@@ -100,6 +100,8 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .notification-popover > header { min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--border); }
 .notification-popover h2 { margin: 0; font-size: 14px; }
 .notification-popover > header span { color: var(--muted); font-size: 11px; }
+.notification-toolbar { min-height: 34px; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; border-bottom: 1px solid var(--border); }
+.notification-toolbar button { padding: 4px 2px; color: var(--accent); background: transparent; border: 0; font-size: 11px; cursor: pointer; }
 .notification-state { margin: 0; padding: 20px 14px; color: var(--muted); font-size: 13px; }
 .notification-state p { margin: 0 0 10px; }
 .notification-state button { min-height: 32px; padding: 0 10px; color: var(--text); background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; cursor: pointer; }
@@ -114,6 +116,14 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .notification-content time { color: var(--quiet); font-size: 10px; }
 .notification-read-toggle { align-self: start; width: 30px; height: 30px; display: grid; place-items: center; margin: 8px 5px 0 0; padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
 .notification-read-toggle:hover { color: var(--text); background: #e7e4dc; }
+.notification-preferences { display: grid; gap: 13px; padding: 16px 14px; }
+.notification-preferences label { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.notification-preferences input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.notification-preferences p { margin: 2px 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.notification-preferences > div { display: flex; align-items: center; gap: 10px; }
+.notification-preferences button { min-height: 32px; padding: 0 11px; color: #fff; background: var(--accent); border: 0; border-radius: 6px; font-weight: 650; cursor: pointer; }
+.notification-preferences button:disabled { opacity: .65; cursor: wait; }
+.notification-preferences span { color: var(--muted); font-size: 11px; }
 .main-content { width: min(1180px, 100%); padding: 28px 32px 64px; }
 .page-header { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .page-header h1 { margin: 0 0 6px; font-size: 25px; line-height: 1.2; letter-spacing: -.018em; }

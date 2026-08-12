@@ -179,8 +179,10 @@ from apps.core.network_service_views import (
 from apps.core.network_transfer_views import NetworkCsvExportView, NetworkSearchView
 from apps.core.notification_views import (
     ClientPortalNotificationListView,
+    ClientPortalNotificationPreferenceView,
     ClientPortalNotificationReadView,
     MSPNotificationListView,
+    MSPNotificationPreferenceView,
     MSPNotificationReadView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
@@ -256,6 +258,11 @@ urlpatterns = [
         ClientPortalNotificationReadView.as_view(),
         name="client-portal-notification-read",
     ),
+    path(
+        "api/v1/portal/notification-preferences",
+        ClientPortalNotificationPreferenceView.as_view(),
+        name="client-portal-notification-preferences",
+    ),
     path("api/v1/portal/documents", ClientPortalDocumentListView.as_view(), name="client-portal-document-list"),
     path(
         "api/v1/portal/documents/<uuid:publication_entity_id>",
@@ -273,6 +280,11 @@ urlpatterns = [
         "api/v1/notifications/<uuid:notification_id>",
         MSPNotificationReadView.as_view(),
         name="notification-read",
+    ),
+    path(
+        "api/v1/notification-preferences",
+        MSPNotificationPreferenceView.as_view(),
+        name="notification-preferences",
     ),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),

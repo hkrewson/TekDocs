@@ -21,6 +21,8 @@ describe('NotificationInbox', () => {
     const client = {
       list: vi.fn().mockResolvedValue({ results: [notification], unread_count: 1, has_more: false }),
       setRead,
+      getPreferences: vi.fn(),
+      updatePreferences: vi.fn(),
     } satisfies NotificationsClient
     const onOpen = vi.fn()
     const user = userEvent.setup()
@@ -42,6 +44,8 @@ describe('NotificationInbox', () => {
         .mockRejectedValueOnce(new Error('Notifications could not be loaded.'))
         .mockResolvedValueOnce({ results: [], unread_count: 0, has_more: false }),
       setRead: vi.fn(),
+      getPreferences: vi.fn(),
+      updatePreferences: vi.fn(),
     } as unknown as NotificationsClient
     const user = userEvent.setup()
     render(<NotificationInbox client={client} onOpen={vi.fn()} />)
@@ -50,5 +54,31 @@ describe('NotificationInbox', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Notifications could not be loaded.')
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No notifications yet.')).toBeInTheDocument()
+  })
+
+  it('loads and saves explicit email preferences', async () => {
+    const preferences = { email_enabled: true, invitation_events: true, publication_events: true }
+    const updatePreferences = vi.fn().mockResolvedValue({ ...preferences, publication_events: false })
+    const client = {
+      list: vi.fn().mockResolvedValue({ results: [], unread_count: 0, has_more: false }),
+      setRead: vi.fn(),
+      getPreferences: vi.fn().mockResolvedValue(preferences),
+      updatePreferences,
+    } satisfies NotificationsClient
+    const user = userEvent.setup()
+    render(<NotificationInbox client={client} onOpen={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+    await user.click(await screen.findByRole('button', { name: 'Email preferences' }))
+    const publications = await screen.findByRole('checkbox', { name: 'Published documentation' })
+    await user.click(publications)
+    await user.click(screen.getByRole('button', { name: 'Save preferences' }))
+
+    expect(updatePreferences).toHaveBeenCalledWith({
+      email_enabled: true,
+      invitation_events: true,
+      publication_events: false,
+    })
+    expect(await screen.findByText('Email preferences saved.')).toBeInTheDocument()
   })
 })

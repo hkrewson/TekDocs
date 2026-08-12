@@ -17,6 +17,7 @@ from .models import (
     DocumentPublication,
     DocumentPublicationControlEvent,
     InboxNotification,
+    NotificationEmailDelivery,
     NotificationSurface,
     OutboxEvent,
     PublicationControlAction,
@@ -144,6 +145,20 @@ def project_inbox_notifications(event: OutboxEvent) -> None:
                 )
             )
     InboxNotification.objects.bulk_create(rows, ignore_conflicts=True)
+    notifications = InboxNotification.objects.filter(event=event).select_related("organization")
+    NotificationEmailDelivery.objects.bulk_create(
+        [
+            NotificationEmailDelivery(
+                tenant=notification.tenant,
+                organization=notification.organization,
+                notification=notification,
+                recipient=notification.recipient,
+                surface=notification.surface,
+            )
+            for notification in notifications
+        ],
+        ignore_conflicts=True,
+    )
 
 
 def _publication_for_notification(

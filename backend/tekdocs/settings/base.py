@@ -272,7 +272,11 @@ CELERY_BEAT_SCHEDULE = {
     "dispatch-transactional-outbox": {
         "task": "apps.core.tasks.dispatch_outbox_events",
         "schedule": 60.0,
-    }
+    },
+    "dispatch-notification-emails": {
+        "task": "apps.core.tasks.dispatch_notification_emails",
+        "schedule": 60.0,
+    },
 }
 
 LOGGING = {

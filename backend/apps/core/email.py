@@ -18,6 +18,7 @@ class TransactionalTemplate(StrEnum):
     RECOVERY_UNAVAILABLE = "password_reset_unavailable"
     CREDENTIAL_CHANGED = "password_changed"
     MFA_CHANGED = "mfa_changed"
+    NOTIFICATION = "notification"
 
 
 def send_transactional_email(
@@ -26,6 +27,7 @@ def send_transactional_email(
     subject: str,
     recipient: str,
     context: dict[str, Any] | None = None,
+    message_id: str | None = None,
 ) -> int:
     normalized_recipient = recipient.strip()
     if "\r" in normalized_recipient or "\n" in normalized_recipient:
@@ -33,6 +35,13 @@ def send_transactional_email(
     validate_email(normalized_recipient)
     if "\r" in subject or "\n" in subject:
         raise ValidationError("Email subjects cannot contain newlines.")
+    if message_id is not None and (
+        "\r" in message_id
+        or "\n" in message_id
+        or not message_id.startswith("<")
+        or not message_id.endswith(">")
+    ):
+        raise ValidationError("Email message identifiers must be a bracketed value.")
 
     template_context = {"product_name": "TekDocs", **(context or {})}
     text_body = render_to_string(f"email/{template.value}.txt", template_context).strip()
@@ -42,9 +51,27 @@ def send_transactional_email(
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[normalized_recipient],
+        headers={"Message-ID": message_id} if message_id is not None else None,
     )
     message.attach_alternative(html_body, "text/html")
     return message.send(fail_silently=False)
+
+
+def send_notification_email(
+    *,
+    recipient: str,
+    title: str,
+    message: str,
+    app_url: str,
+    delivery_id: str,
+) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.NOTIFICATION,
+        subject="TekDocs notification",
+        recipient=recipient,
+        context={"notification_title": title, "notification_message": message, "app_url": app_url},
+        message_id=f"<tekdocs-notification-{delivery_id}@notification.tekdocs.invalid>",
+    )
 
 
 def send_system_test_email(recipient: str) -> int:

@@ -7,7 +7,12 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from apps.core.email import TransactionalTemplate, send_system_test_email, send_transactional_email
+from apps.core.email import (
+    TransactionalTemplate,
+    send_notification_email,
+    send_system_test_email,
+    send_transactional_email,
+)
 
 
 def test_transactional_email_renders_text_and_html_parts(settings):
@@ -45,6 +50,28 @@ def test_transactional_email_rejects_header_injection():
             recipient="operator@example.com",
         )
     assert mail.outbox == []
+
+
+def test_notification_email_uses_generic_headers_and_escapes_display_values(settings):
+    settings.DEFAULT_FROM_EMAIL = "TekDocs <noreply@example.com>"
+
+    delivered = send_notification_email(
+        recipient="reader@example.com",
+        title='<script>alert("title")</script>',
+        message='<img src=x onerror="alert(1)">',
+        app_url="https://tekdocs.example.test",
+        delivery_id="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert delivered == 1
+    message = mail.outbox[0]
+    assert message.subject == "TekDocs notification"
+    assert "script" not in message.subject
+    html = message.alternatives[0].content
+    assert "&lt;script&gt;" in html
+    assert "<script>" not in html
+    assert "<img src=x" not in html
+    assert message.extra_headers["Message-ID"].endswith("@notification.tekdocs.invalid>")
 
 
 def test_operator_command_reports_delivery_without_recipient_or_content():

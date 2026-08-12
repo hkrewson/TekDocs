@@ -3720,3 +3720,132 @@ class InboxNotification(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Inbox notifications cannot be deleted")
+
+
+class NotificationPreference(models.Model):
+    """Per-surface email choices; security and invitation-token mail is outside this boundary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="notification_preferences")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="notification_preferences",
+    )
+    surface = models.CharField(max_length=20, choices=NotificationSurface.choices)
+    email_enabled = models.BooleanField(default=True)
+    invitation_events = models.BooleanField(default=True)
+    publication_events = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "user", "surface"),
+                name="unique_notification_preference_surface",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surface__in=NotificationSurface.values),
+                name="notification_preference_surface_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}:{self.surface}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Notification preferences cannot be deleted")
+
+
+class NotificationEmailState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    DELIVERED = "delivered", "Delivered"
+    SUPPRESSED = "suppressed", "Suppressed"
+    DEAD_LETTER = "dead_letter", "Dead letter"
+
+
+class NotificationEmailDelivery(models.Model):
+    """A value-minimized SMTP work item linked to one authorized inbox edge."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="notification_email_deliveries")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="notification_email_deliveries",
+    )
+    notification = models.OneToOneField(
+        InboxNotification,
+        on_delete=models.PROTECT,
+        related_name="email_delivery",
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="notification_email_deliveries",
+    )
+    surface = models.CharField(max_length=20, choices=NotificationSurface.choices)
+    state = models.CharField(
+        max_length=20,
+        choices=NotificationEmailState.choices,
+        default=NotificationEmailState.PENDING,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(attempts__lte=100), name="notification_email_attempts_bounded"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state=NotificationEmailState.DELIVERED,
+                        delivered_at__isnull=False,
+                        locked_at__isnull=True,
+                    )
+                    | models.Q(
+                        state__in=[
+                            NotificationEmailState.PENDING,
+                            NotificationEmailState.SUPPRESSED,
+                            NotificationEmailState.DEAD_LETTER,
+                        ],
+                        delivered_at__isnull=True,
+                        locked_at__isnull=True,
+                    )
+                    | models.Q(
+                        state=NotificationEmailState.PROCESSING,
+                        delivered_at__isnull=True,
+                        locked_at__isnull=False,
+                    )
+                ),
+                name="notification_email_state_timestamps_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "state", "available_at", "created_at"),
+                name="core_notice_email_due_idx",
+            ),
+            models.Index(
+                fields=("tenant", "recipient", "surface", "created_at"),
+                name="core_notice_email_user_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Notification email deliveries cannot be deleted")

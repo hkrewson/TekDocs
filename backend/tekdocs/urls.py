@@ -50,10 +50,14 @@ from apps.core.commercial_views import (
     ContractCostListCreateView,
 )
 from apps.core.compliance_catalog_views import (
+    MSPComplianceAssignmentListView,
+    MSPComplianceAssignmentReviewView,
     MSPComplianceCatalogRevisionDetailView,
     MSPComplianceCatalogRevisionListCreateView,
     MSPComplianceFrameworkDetailView,
     MSPComplianceFrameworkListCreateView,
+    OrganizationComplianceAssignmentListView,
+    OrganizationComplianceAssignmentReviewView,
     OrganizationComplianceCatalogRevisionDetailView,
     OrganizationComplianceCatalogRevisionListCreateView,
     OrganizationComplianceFrameworkDetailView,
@@ -641,6 +645,16 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/revisions/<int:revision_number>",
         MSPComplianceCatalogRevisionDetailView.as_view(),
         name="msp-compliance-catalog-revision-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/assignments",
+        MSPComplianceAssignmentListView.as_view(),
+        name="msp-compliance-assignment-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/controls/<uuid:control_entity_id>/review",
+        MSPComplianceAssignmentReviewView.as_view(),
+        name="msp-compliance-assignment-review",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1570,6 +1584,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/revisions/<int:revision_number>",
         OrganizationComplianceCatalogRevisionDetailView.as_view(),
         name="organization-compliance-catalog-revision-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/assignments",
+        OrganizationComplianceAssignmentListView.as_view(),
+        name="organization-compliance-assignment-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/controls/<uuid:control_entity_id>/review",
+        OrganizationComplianceAssignmentReviewView.as_view(),
+        name="organization-compliance-assignment-review",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

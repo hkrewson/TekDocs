@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.1
+  version: 0.7.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5804,6 +5804,80 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/assignments:
+    get:
+      operationId: msp_compliance_assignment_list
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceAssignmentResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/controls/{control_entity_id}/review:
+    post:
+      operationId: msp_compliance_assignment_review
+      parameters:
+      - in: path
+        name: control_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceAssignment'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/revisions:
     get:
       operationId: msp_compliance_catalog_revision_list
@@ -10704,6 +10778,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceFramework'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/assignments:
+    get:
+      operationId: organization_compliance_assignment_list
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceAssignmentResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/controls/{control_entity_id}/review
+  : post:
+      operationId: organization_compliance_assignment_review
+      parameters:
+      - in: path
+        name: control_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceAssignmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceAssignment'
           description: ''
           headers:
             X-Request-ID:
@@ -18980,6 +19140,148 @@ components:
       - page
       - page_size
       - results
+    ComplianceAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        framework_id:
+          type: string
+          format: uuid
+        control_id:
+          type: string
+          format: uuid
+        control_identifier:
+          type: string
+        control_title:
+          type: string
+        control_revision:
+          type: integer
+        applicability:
+          type: string
+        implementation_status:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        review_due_date:
+          type: string
+          format: date
+          nullable: true
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceAssignmentReview'
+      required:
+      - applicability
+      - control_id
+      - control_identifier
+      - control_revision
+      - control_title
+      - framework_id
+      - id
+      - implementation_status
+      - owner
+      - owner_id
+      - review_due_date
+      - reviews
+    ComplianceAssignmentResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceAssignment'
+        owner_choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceOwnerChoice'
+      required:
+      - owner_choices
+      - results
+    ComplianceAssignmentReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        control_revision:
+          type: integer
+        applicability:
+          type: string
+        implementation_status:
+          type: string
+        decision:
+          type: string
+        note:
+          type: string
+        reviewed_by:
+          type: string
+        reviewed_at:
+          type: string
+          format: date-time
+      required:
+      - applicability
+      - control_revision
+      - decision
+      - id
+      - implementation_status
+      - note
+      - reviewed_at
+      - reviewed_by
+    ComplianceAssignmentWrite:
+      type: object
+      properties:
+        applicability:
+          enum:
+          - unassessed
+          - applicable
+          - not_applicable
+          type: string
+          description: |-
+            * `unassessed` - unassessed
+            * `applicable` - applicable
+            * `not_applicable` - not_applicable
+          x-spec-enum-id: adf6b830c47f3600
+        implementation_status:
+          enum:
+          - not_started
+          - planned
+          - in_progress
+          - implemented
+          - not_implemented
+          type: string
+          description: |-
+            * `not_started` - not_started
+            * `planned` - planned
+            * `in_progress` - in_progress
+            * `implemented` - implemented
+            * `not_implemented` - not_implemented
+          x-spec-enum-id: 9b3d83a88ffd7d95
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_due_date:
+          type: string
+          format: date
+          nullable: true
+        decision:
+          type: string
+          maxLength: 120
+        note:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - applicability
+      - decision
+      - implementation_status
     ComplianceCatalogEntry:
       type: object
       properties:
@@ -19168,6 +19470,17 @@ components:
       required:
       - name
       - version_label
+    ComplianceOwnerChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+      required:
+      - display_name
+      - id
     Conflict:
       type: object
       properties:

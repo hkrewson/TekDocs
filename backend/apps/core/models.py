@@ -4600,3 +4600,105 @@ class ComplianceCatalogEntry(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Compliance catalog entries are retained")
+
+
+class ComplianceApplicability(models.TextChoices):
+    UNASSESSED = "unassessed", "Not evaluated"
+    APPLICABLE = "applicable", "Applicable"
+    NOT_APPLICABLE = "not_applicable", "Not applicable"
+
+
+class ComplianceImplementationStatus(models.TextChoices):
+    NOT_STARTED = "not_started", "Not started"
+    PLANNED = "planned", "Planned"
+    IN_PROGRESS = "in_progress", "In progress"
+    IMPLEMENTED = "implemented", "Implemented"
+    NOT_IMPLEMENTED = "not_implemented", "Not implemented"
+
+
+class ComplianceControlAssignment(TimestampedModel):
+    """Current exact-Workspace applicability and ownership state for one stable control."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_assignments")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_assignments")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_assignments", null=True, blank=True
+    )
+    framework = models.ForeignKey(ComplianceFramework, on_delete=models.PROTECT, related_name="assignments")
+    control = models.ForeignKey(ComplianceControl, on_delete=models.PROTECT, related_name="assignments")
+    control_revision = models.ForeignKey(
+        ComplianceControlRevision, on_delete=models.PROTECT, related_name="assignments"
+    )
+    applicability = models.CharField(
+        max_length=20, choices=ComplianceApplicability.choices, default=ComplianceApplicability.UNASSESSED
+    )
+    implementation_status = models.CharField(
+        max_length=24,
+        choices=ComplianceImplementationStatus.choices,
+        default=ComplianceImplementationStatus.NOT_STARTED,
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_compliance_assignments",
+        null=True,
+        blank=True,
+    )
+    review_due_date = models.DateField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("framework_id", "control_id")
+        constraints = [
+            models.UniqueConstraint(fields=("workspace", "control"), name="compliance_assignment_unique")
+        ]
+        indexes = [models.Index(fields=("workspace", "implementation_status"), name="core_compassign_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.control} assignment"
+
+
+class ComplianceAssignmentReview(models.Model):
+    """Append-only review decision and exact assignment-state snapshot."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_assignment_reviews")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_assignment_reviews")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_assignment_reviews", null=True, blank=True
+    )
+    assignment = models.ForeignKey(
+        ComplianceControlAssignment, on_delete=models.PROTECT, related_name="reviews"
+    )
+    control_revision = models.ForeignKey(
+        ComplianceControlRevision, on_delete=models.PROTECT, related_name="assignment_reviews"
+    )
+    applicability = models.CharField(max_length=20, choices=ComplianceApplicability.choices)
+    implementation_status = models.CharField(max_length=24, choices=ComplianceImplementationStatus.choices)
+    decision = models.CharField(max_length=120)
+    note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="compliance_assignment_reviews"
+    )
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-reviewed_at", "id")
+        indexes = [models.Index(fields=("workspace", "reviewed_at"), name="core_compreview_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Review of {self.assignment} at {self.reviewed_at}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance assignment reviews are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance assignment reviews are retained")

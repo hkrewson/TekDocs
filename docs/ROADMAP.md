@@ -1102,7 +1102,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.7.1` | **Complete:** Compliance frameworks and versioned control catalogs. |
-| `0.7.2` | Applicability, owners, status, reviews, and scoped control assignments. |
+| `0.7.2` | **Complete:** Applicability, owners, status, reviews, and scoped control assignments. |
 | `0.7.3` | Evidence links, collection windows, review history, and permission-aware reuse. |
 | `0.7.4` | Risks, treatments, acceptance, deadlines, and reporting. |
 | `0.7.5` | Immutable evidence bundles with manifests, digest, signing, and export. |
@@ -1125,6 +1125,16 @@ Evidence: `docs/releases/0.7.0.md`.
 - [x] Permission/IDOR, database-retention, RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0063, and release evidence agree at `0.7.1`. Applicability, evidence, risk, and review domain families are not added.
 
 Evidence: `docs/releases/0.7.1.md`.
+
+### `0.7.2` acceptance criteria
+
+- [x] One exact-Workspace assignment per stable control records applicability, implementation status, an optional authorized user owner, and review due date without changing catalog content.
+- [x] Every decision appends a retained review pinned to the exact control revision and state; current assignment identity cannot be retargeted and review evidence cannot be edited or deleted through Django or PostgreSQL.
+- [x] Owner choices and saves are filtered through current tenant membership, exact-client reachability, and central `compliance.view`; assignment never grants access and contacts are not treated as login identities.
+- [x] MSP and organization APIs, the Compliance surface, permission inventory, IDOR matrix, database guards, and forced RLS use one explicit Workspace and do not aggregate clients.
+- [x] Schema migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0064, and release evidence agree at `0.7.2`. Evidence, risks, and signed bundles remain later slices.
+
+Evidence: `docs/releases/0.7.2.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

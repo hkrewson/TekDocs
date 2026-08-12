@@ -21,7 +21,14 @@ from .compliance_catalogs import (
     create_framework,
     frameworks_for_scope,
 )
-from .models import ComplianceFramework
+from .compliance_operations import (
+    AssignmentInput,
+    ComplianceOperationError,
+    assignments_for_scope,
+    owner_choices_for_framework,
+    record_assignment_review,
+)
+from .models import ComplianceControlAssignment, ComplianceFramework
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -280,4 +287,111 @@ class OrganizationComplianceCatalogRevisionListCreateView(ComplianceCatalogRevis
 
 @extend_schema_view(get=extend_schema(operation_id="organization_compliance_catalog_revision_retrieve"))
 class OrganizationComplianceCatalogRevisionDetailView(ComplianceCatalogRevisionDetailView):
+    pass
+
+
+class ComplianceAssignmentWriteSerializer(StrictSerializer):
+    applicability = serializers.ChoiceField(choices=("unassessed", "applicable", "not_applicable"))
+    implementation_status = serializers.ChoiceField(
+        choices=("not_started", "planned", "in_progress", "implemented", "not_implemented")
+    )
+    owner_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    review_due_date = serializers.DateField(required=False, allow_null=True, default=None)
+    decision = serializers.CharField(max_length=120, trim_whitespace=True)
+    note = serializers.CharField(max_length=20_000, required=False, allow_blank=True, default="")
+
+
+class ComplianceAssignmentReviewSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    control_revision = serializers.IntegerField(source="control_revision.revision_number")
+    applicability = serializers.CharField()
+    implementation_status = serializers.CharField()
+    decision = serializers.CharField()
+    note = serializers.CharField()
+    reviewed_by = serializers.CharField(source="reviewed_by.display_name")
+    reviewed_at = serializers.DateTimeField()
+
+
+class ComplianceAssignmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    framework_id = serializers.UUIDField(source="framework.entity_id")
+    control_id = serializers.UUIDField(source="control.entity_id")
+    control_identifier = serializers.CharField(source="control_revision.identifier")
+    control_title = serializers.CharField(source="control_revision.title")
+    control_revision = serializers.IntegerField(source="control_revision.revision_number")
+    applicability = serializers.CharField()
+    implementation_status = serializers.CharField()
+    owner_id = serializers.UUIDField(allow_null=True)
+    owner = serializers.CharField(source="owner.display_name", allow_null=True)
+    review_due_date = serializers.DateField(allow_null=True)
+    reviews = ComplianceAssignmentReviewSerializer(many=True)
+
+
+class ComplianceOwnerChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    display_name = serializers.CharField()
+
+
+class ComplianceAssignmentResultSerializer(serializers.Serializer):
+    results = ComplianceAssignmentSerializer(many=True)
+    owner_choices = ComplianceOwnerChoiceSerializer(many=True)
+
+
+def _assignment(workspace: ResolvedWorkspace, assignment_id: UUID) -> ComplianceControlAssignment:
+    return cast(
+        ComplianceControlAssignment,
+        get_object_or_404(assignments_for_scope(workspace.data_scope), pk=assignment_id),
+    )
+
+
+class ComplianceAssignmentListView(APIView):
+    @extend_schema(responses={200: ComplianceAssignmentResultSerializer})
+    def get(self, request, framework_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.COMPLIANCE_VIEW)
+        framework = _record(workspace, framework_entity_id)
+        records = assignments_for_scope(workspace.data_scope).filter(framework=framework)
+        return Response(
+            {
+                "results": ComplianceAssignmentSerializer(records, many=True).data,
+                "owner_choices": owner_choices_for_framework(framework),
+            }
+        )
+
+
+class ComplianceAssignmentReviewView(APIView):
+    @extend_schema(request=ComplianceAssignmentWriteSerializer, responses={200: ComplianceAssignmentSerializer})
+    def post(self, request, framework_entity_id, control_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.COMPLIANCE_EDIT)
+        framework = _record(workspace, framework_entity_id)
+        serializer = ComplianceAssignmentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            assignment = record_assignment_review(
+                framework=framework,
+                control_entity_id=control_entity_id,
+                actor_id=request.user.pk,
+                value=AssignmentInput(**serializer.validated_data),
+            )
+        except ComplianceOperationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(ComplianceAssignmentSerializer(_assignment(workspace, assignment.pk)).data)
+
+
+@extend_schema_view(get=extend_schema(operation_id="msp_compliance_assignment_list"))
+class MSPComplianceAssignmentListView(ComplianceAssignmentListView):
+    pass
+
+
+@extend_schema_view(post=extend_schema(operation_id="msp_compliance_assignment_review"))
+class MSPComplianceAssignmentReviewView(ComplianceAssignmentReviewView):
+    pass
+
+
+@extend_schema_view(get=extend_schema(operation_id="organization_compliance_assignment_list"))
+class OrganizationComplianceAssignmentListView(ComplianceAssignmentListView):
+    pass
+
+
+@extend_schema_view(post=extend_schema(operation_id="organization_compliance_assignment_review"))
+class OrganizationComplianceAssignmentReviewView(ComplianceAssignmentReviewView):
     pass

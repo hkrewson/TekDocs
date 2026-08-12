@@ -9,7 +9,12 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.compliance_catalogs import ControlInput, create_catalog_version, create_framework, frameworks_for_scope
-from apps.core.models import ComplianceCatalogEntry, ComplianceCatalogRevision, InstallationState
+from apps.core.compliance_operations import AssignmentInput, record_assignment_review
+from apps.core.models import (
+    ComplianceCatalogEntry,
+    ComplianceCatalogRevision,
+    InstallationState,
+)
 from apps.core.organizations import create_organization
 from apps.core.scoping import DataScope
 
@@ -199,6 +204,89 @@ def test_catalog_input_is_strict_and_rejects_duplicate_control_identity(owner_cl
     )
     assert ComplianceCatalogRevision.objects.count() == 0
     assert ComplianceCatalogEntry.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_assignments_pin_current_control_revision_and_retain_review_history(installation):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="Review baseline",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("R-1", "Review me")],
+    )
+    control_record = framework.controls.get()
+    first = record_assignment_review(
+        framework=framework,
+        control_entity_id=control_record.entity_id,
+        actor_id=installation.owner.id,
+        value=AssignmentInput(applicability="applicable", implementation_status="planned", decision="Accepted"),
+    )
+    second = record_assignment_review(
+        framework=framework,
+        control_entity_id=control_record.entity_id,
+        actor_id=installation.owner.id,
+        value=AssignmentInput(applicability="applicable", implementation_status="implemented", decision="Verified"),
+    )
+    assert first.pk == second.pk
+    assert list(second.reviews.values_list("decision", flat=True)) == ["Verified", "Accepted"]
+    with pytest.raises(ValidationError):
+        second.reviews.first().delete()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        second.reviews.filter(decision="Accepted").update(decision="Rewritten")
+
+
+@pytest.mark.django_db
+def test_assignment_api_is_exact_workspace_scoped(owner_client, installation):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="API baseline",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("A-1", "API control")],
+    )
+    control_record = framework.controls.get()
+    url = reverse(
+        "msp-compliance-assignment-review",
+        kwargs={
+            "framework_entity_id": framework.entity_id,
+            "control_entity_id": control_record.entity_id,
+        },
+    )
+    response = owner_client.post(
+        url,
+        {
+            "applicability": "applicable",
+            "implementation_status": "in_progress",
+            "decision": "Work started",
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert response.json()["control_id"] == str(control_record.entity_id)
+    listing = owner_client.get(
+        reverse("msp-compliance-assignment-list", kwargs={"framework_entity_id": framework.entity_id})
+    )
+    assert listing.status_code == 200
+    assert listing.json()["results"][0]["reviews"][0]["decision"] == "Work started"
+    assert listing.json()["owner_choices"][0]["display_name"] == installation.owner.display_name
+    denied = owner_client.post(
+        url,
+        {
+            "applicability": "applicable",
+            "implementation_status": "implemented",
+            "owner_id": "00000000-0000-4000-8000-000000000099",
+            "decision": "Invalid owner",
+        },
+        content_type="application/json",
+    )
+    assert denied.status_code == 400
 
 
 @pytest.mark.django_db(transaction=True)

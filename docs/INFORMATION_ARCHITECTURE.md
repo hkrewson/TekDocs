@@ -39,7 +39,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Products | Supplier-catalog entry point; aggregate view remains later | assets consume products through the Assets workflow | Supplier-owned product/model templates, versioned specifications, and client-visible STATIC publication associations | supplier workspace `0.3.3`; documentation/provenance `0.3.4` |
 | Tickets | MSP service queue | Client service requests | — | post-`1.0` placeholder |
 | Accounting | MSP billing, purchasing, quotes, recurring work, and expenses | — | — | post-`1.0` placeholder |
-| Compliance | MSP-owned versioned frameworks and control catalogs | client-owned versioned frameworks and control catalogs | supplier catalog use is not currently exposed | catalog foundation `0.7.1`; assignments/evidence/risks `0.7.2`–`0.7.5` |
+| Compliance | MSP-owned frameworks, catalogs, and control assignments | client-owned frameworks, catalogs, and exact-client control assignments | supplier catalog use is not currently exposed | catalog foundation `0.7.1`; assignments `0.7.2`; evidence/risks `0.7.3`–`0.7.5` |
 | Activity, integrations | MSP governance and provider administration | only explicitly client-capable governance views | only explicitly supplier-capable views when introduced | integration runtime certified `0.7.0`; activity expansion later |
 
 ## ITFlow-informed terminology

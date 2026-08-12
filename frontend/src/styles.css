@@ -870,6 +870,11 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .compliance-control-list p { margin: 0; white-space: pre-wrap; }
 .compliance-control-list details { margin-top: 10px; }
 .compliance-control-list pre { margin: 8px 0 0; padding: 10px; white-space: pre-wrap; font-family: inherit; background: var(--surface-subtle); border-radius: 6px; }
+.compliance-assignment-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.compliance-assignment-form label { display: grid; gap: 5px; }
+.compliance-assignment-form label > span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.compliance-assignment-form input, .compliance-assignment-form select, .compliance-assignment-form textarea { width: 100%; min-height: 36px; padding: 7px 9px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; }
+.compliance-assignment-form .wide-field { grid-column: 1 / -1; }
 .compliance-catalog-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .compliance-catalog-fields label, .compliance-framework-name, .compliance-control-editor label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .compliance-catalog-fields .wide-field { grid-column: 1 / -1; }
@@ -1101,6 +1106,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .integration-export-choices label small { color: var(--muted); text-transform: capitalize; }
 
 @media (max-width: 720px) {
+  .compliance-assignment-form { grid-template-columns: 1fr; }
   .token-create-form, .token-permissions { grid-template-columns: 1fr; }
   .token-create-form fieldset, .token-create-form .settings-actions { grid-column: 1; }
   .token-secret { grid-template-columns: auto minmax(0, 1fr) auto; }

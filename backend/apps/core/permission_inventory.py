@@ -128,6 +128,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.COMPLIANCE_EDIT,),
     ),
     route("msp-compliance-catalog-revision-detail", ("GET",), PermissionKey.COMPLIANCE_VIEW),
+    route("msp-compliance-assignment-list", ("GET",), PermissionKey.COMPLIANCE_VIEW),
+    route("msp-compliance-assignment-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
@@ -1234,6 +1236,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-compliance-catalog-revision-detail",
         ("GET",),
         PermissionKey.COMPLIANCE_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-assignment-list", ("GET",), PermissionKey.COMPLIANCE_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-assignment-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,),
         organization_scoped=True,
     ),
 )

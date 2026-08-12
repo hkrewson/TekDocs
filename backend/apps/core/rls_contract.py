@@ -58,6 +58,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_compliancecontrol",
     "core_compliancecontrolrevision",
     "core_compliancecatalogentry",
+    "core_compliancecontrolassignment",
+    "core_complianceassignmentreview",
 )
 
 TENANT_SCOPED_TABLES = (

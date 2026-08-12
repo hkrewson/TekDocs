@@ -4995,3 +4995,56 @@ class ComplianceEvidenceBundle(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Compliance evidence bundles are retained")
+
+
+class ReminderDomain(models.TextChoices):
+    COMPLIANCE = "compliance", "Compliance"
+    INVENTORY = "inventory", "Inventory"
+    DOMAIN = "domain", "Domain"
+
+
+class ReminderRecurrence(models.TextChoices):
+    NONE = "none", "Does not repeat"
+    ANNUAL = "annual", "Annual"
+
+
+class ReminderSchedule(TimestampedModel):
+    """One exact-Workspace schedule shared by deadline-producing domains."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="reminder_schedules")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="reminder_schedules")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="reminder_schedules", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="reminder_schedule")
+    source_entity = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="reminder_schedules")
+    domain = models.CharField(max_length=20, choices=ReminderDomain.choices)
+    kind = models.CharField(max_length=48)
+    title = models.CharField(max_length=240)
+    due_on = models.DateField()
+    lead_days = models.PositiveSmallIntegerField(default=30)
+    recurrence = models.CharField(max_length=16, choices=ReminderRecurrence.choices, default=ReminderRecurrence.NONE)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_reminder_schedules", null=True, blank=True
+    )
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_reminder_schedules"
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("due_on", "title", "id")
+        indexes = [models.Index(fields=("workspace", "active", "due_on"), name="core_reminder_due_idx")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(lead_days__lte=3650), name="reminder_lead_days_bounded"),
+            models.UniqueConstraint(
+                fields=("workspace", "source_entity", "kind", "due_on"), name="reminder_source_kind_due_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title

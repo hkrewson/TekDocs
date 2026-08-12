@@ -40,6 +40,7 @@ This document defines which navigation families belong to the MSP and organizati
 | Tickets | MSP service queue | Client service requests | — | post-`1.0` placeholder |
 | Accounting | MSP billing, purchasing, quotes, recurring work, and expenses | — | — | post-`1.0` placeholder |
 | Compliance | MSP-owned frameworks, catalogs, assignments, reusable evidence, risks, and signed evidence bundles | client-owned frameworks, exact-client assignments, reusable evidence, risks, and signed evidence bundles | supplier catalog use is not currently exposed | catalogs `0.7.1`; assignments `0.7.2`; evidence `0.7.3`; risks `0.7.4`; bundles `0.7.5` |
+| Deadlines | MSP-owned compliance and inventory reminder schedules with authenticated calendar export | exact-client schedules and calendar export | supplier-owned deadlines remain ordinary organization data | shared schedule boundary `0.7.6`; notification emission `0.7.10` |
 | Activity, integrations | MSP governance and provider administration | only explicitly client-capable governance views | only explicitly supplier-capable views when introduced | integration runtime certified `0.7.0`; activity expansion later |
 
 ## ITFlow-informed terminology

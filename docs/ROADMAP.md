@@ -1106,7 +1106,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.3` | **Complete:** Evidence links, collection windows, review history, and permission-aware reuse. |
 | `0.7.4` | **Complete:** Risks, treatments, acceptance, deadlines, and reporting. |
 | `0.7.5` | **Complete:** Immutable evidence bundles with manifests, digest, signing, and export. |
-| `0.7.6` | Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
+| `0.7.6` | **Complete:** Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
 | `0.7.8` | Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
 | `0.7.9` | Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
@@ -1164,6 +1164,16 @@ Evidence: `docs/releases/0.7.4.md`.
 - [x] Migration, permission/IDOR inventory, OpenAPI/generated client, frontend, security architecture, ADR 0067, risk disposition, and release evidence agree at `0.7.5`.
 
 Evidence: `docs/releases/0.7.5.md`.
+
+### `0.7.6` acceptance criteria
+
+- [x] One Entity-backed schedule can describe a compliance, inventory, or future domain deadline while retaining an exact source Entity, due date, bounded lead time, optional authorized owner, and recurrence.
+- [x] Dedicated `deadlines.view` and MFA-backed `deadlines.edit` permissions compose through built-in and custom roles without granting access to the source object or another Workspace.
+- [x] Strict MSP/organization APIs list and create schedules only inside the selected Workspace; source type and owner authority are revalidated and sibling identifiers remain non-disclosing.
+- [x] Authenticated calendar export emits a bounded RFC 5545-compatible feed with stable UIDs and private/no-store delivery. It is an authorized download, not a public bearer calendar URL.
+- [x] PostgreSQL validates immutable source/scope/actor identity, forces exact-Workspace RLS, and migration, permission/IDOR, OpenAPI/client, security, ADR 0068, risk, and release evidence agree at `0.7.6`.
+
+Evidence: `docs/releases/0.7.6.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

@@ -150,6 +150,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.COMPLIANCE_VIEW,
         (PermissionKey.COMPLIANCE_EDIT,),
     ),
+    route(
+        "msp-reminder-list-create",
+        ("GET", "POST"),
+        PermissionKey.DEADLINES_VIEW,
+        (PermissionKey.DEADLINES_EDIT,),
+    ),
+    route("msp-reminder-calendar", ("GET",), PermissionKey.DEADLINES_VIEW),
     route("msp-compliance-assignment-evidence-link", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route(
         "msp-document-reference-list-create",
@@ -1308,6 +1315,19 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "POST"),
         PermissionKey.COMPLIANCE_VIEW,
         (PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-reminder-list-create",
+        ("GET", "POST"),
+        PermissionKey.DEADLINES_VIEW,
+        (PermissionKey.DEADLINES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-reminder-calendar",
+        ("GET",),
+        PermissionKey.DEADLINES_VIEW,
         organization_scoped=True,
     ),
 )

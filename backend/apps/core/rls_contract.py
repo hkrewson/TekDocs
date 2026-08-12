@@ -66,6 +66,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_compliancerisk",
     "core_complianceriskevent",
     "core_complianceevidencebundle",
+    "core_reminderschedule",
 )
 
 TENANT_SCOPED_TABLES = (

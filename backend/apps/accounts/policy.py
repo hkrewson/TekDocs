@@ -87,6 +87,8 @@ class PermissionKey(StrEnum):
     CREDENTIAL_REFERENCES_OPEN = "credential_references.open"
     COMPLIANCE_VIEW = "compliance.view"
     COMPLIANCE_EDIT = "compliance.edit"
+    DEADLINES_VIEW = "deadlines.view"
+    DEADLINES_EDIT = "deadlines.edit"
     INTEGRATIONS_VIEW = "integrations.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
     NOTIFICATIONS_MANAGE = "notifications.manage"
@@ -175,6 +177,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.CREDENTIAL_REFERENCES_OPEN, "Open credential references", "Credential references"),
     _permission(PermissionKey.COMPLIANCE_VIEW, "View compliance evidence", "Compliance"),
     _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
+    _permission(PermissionKey.DEADLINES_VIEW, "View deadline schedules", "Deadlines"),
+    _permission(PermissionKey.DEADLINES_EDIT, "Manage deadline schedules", "Deadlines", mfa=True),
     _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
     _permission(PermissionKey.INTEGRATIONS_MANAGE, "Manage integrations", "Integrations", mfa=True),
     _permission(PermissionKey.NOTIFICATIONS_MANAGE, "Manage notification delivery", "Administration", mfa=True),
@@ -194,6 +198,7 @@ IMPLEMENTED_READS = frozenset(
         PermissionKey.ASSETS_VIEW,
         PermissionKey.NETWORKS_VIEW,
         PermissionKey.COMPLIANCE_VIEW,
+        PermissionKey.DEADLINES_VIEW,
         PermissionKey.INTEGRATIONS_VIEW,
     }
 )
@@ -214,6 +219,7 @@ TECHNICIAN_MUTATIONS = frozenset(
         PermissionKey.ASSETS_EDIT,
         PermissionKey.NETWORKS_EDIT,
         PermissionKey.COMPLIANCE_EDIT,
+        PermissionKey.DEADLINES_EDIT,
     }
 )
 ADMINISTRATOR_PERMISSIONS = frozenset(

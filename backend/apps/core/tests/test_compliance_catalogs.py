@@ -22,6 +22,7 @@ from apps.core.models import (
     InstallationState,
 )
 from apps.core.organizations import create_organization
+from apps.core.reminders import ReminderInput, calendar_bytes, create_reminder
 from apps.core.scoping import DataScope
 from apps.core.workspaces import resolve_msp_workspace
 
@@ -54,6 +55,42 @@ def control(identifier: str, title: str, *, control_id=None, guidance=""):
         guidance=guidance,
         control_id=control_id,
     )
+
+
+@pytest.mark.django_db
+def test_shared_reminder_schedule_and_calendar_are_exact_workspace_scoped(installation, owner_client):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="Deadline baseline",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("TD-1", "Annual review")],
+    )
+    workspace = resolve_msp_workspace(installation.owner)
+    due_on = timezone.localdate() + timedelta(days=30)
+    reminder = create_reminder(
+        workspace=workspace,
+        actor_id=installation.owner.id,
+        value=ReminderInput(
+            source_entity_id=framework.entity_id,
+            domain="compliance",
+            kind="annual_review",
+            title="Review baseline",
+            due_on=due_on,
+            lead_days=14,
+        ),
+    )
+
+    listed = owner_client.get(reverse("msp-reminder-list-create"))
+    assert listed.status_code == 200
+    assert listed.json()[0]["id"] == str(reminder.entity_id)
+    exported = owner_client.get(reverse("msp-reminder-calendar"))
+    assert exported.status_code == 200
+    assert b"UID:" + str(reminder.id).encode() + b"@tekdocs" in exported.content
+    assert calendar_bytes(workspace=workspace).endswith(b"END:VCALENDAR\r\n")
 
 
 @pytest.mark.django_db

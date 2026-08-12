@@ -182,6 +182,12 @@ from apps.core.netbox_reconciliation_views import (
     NetBoxReferenceCollectionView,
     NetBoxReferenceDetailView,
 )
+from apps.core.reminder_views import (
+    MSPReminderCalendarView,
+    MSPReminderListCreateView,
+    OrganizationReminderCalendarView,
+    OrganizationReminderListCreateView,
+)
 from apps.core.network_addressing_views import (
     SubnetDetailView,
     SubnetListCreateView,
@@ -700,6 +706,16 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/bundles",
         MSPBundleListCreateView.as_view(),
         name="msp-compliance-bundle-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/reminders",
+        MSPReminderListCreateView.as_view(),
+        name="msp-reminder-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/reminders/calendar.ics",
+        MSPReminderCalendarView.as_view(),
+        name="msp-reminder-calendar",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1669,6 +1685,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/bundles",
         OrganizationBundleListCreateView.as_view(),
         name="organization-compliance-bundle-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/reminders",
+        OrganizationReminderListCreateView.as_view(),
+        name="organization-reminder-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/reminders/calendar.ics",
+        OrganizationReminderCalendarView.as_view(),
+        name="organization-reminder-calendar",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

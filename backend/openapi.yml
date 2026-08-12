@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.5
+  version: 0.7.6
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -9308,6 +9308,83 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/reminders:
+    get:
+      operationId: msp_reminder_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reminder'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_reminder_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/reminders/calendar.ics:
+    get:
+      operationId: msp_reminder_calendar
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            text/calendar:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/vendors:
     get:
       operationId: workspaces_msp_vendors_retrieve
@@ -18063,6 +18140,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/reminders:
+    get:
+      operationId: organization_reminder_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reminder'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_reminder_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReminderWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/reminders/calendar.ics:
+    get:
+      operationId: organization_reminder_calendar
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            text/calendar:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/sites:
     get:
       operationId: sites_organization_list
@@ -26854,6 +27029,107 @@ components:
       - page
       - page_size
       - results
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_entity_id:
+          type: string
+          format: uuid
+        source:
+          type: string
+        domain:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        due_on:
+          type: string
+          format: date
+        lead_days:
+          type: integer
+        recurrence:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - active
+      - created_at
+      - domain
+      - due_on
+      - id
+      - kind
+      - lead_days
+      - owner
+      - owner_id
+      - recurrence
+      - source
+      - source_entity_id
+      - title
+    ReminderWrite:
+      type: object
+      properties:
+        source_entity_id:
+          type: string
+          format: uuid
+        domain:
+          enum:
+          - compliance
+          - inventory
+          - domain
+          type: string
+          description: |-
+            * `compliance` - compliance
+            * `inventory` - inventory
+            * `domain` - domain
+          x-spec-enum-id: bb4b79ed64be8757
+        kind:
+          type: string
+          pattern: ^[a-z0-9_]{1,48}$
+        title:
+          type: string
+          maxLength: 240
+        due_on:
+          type: string
+          format: date
+        lead_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+          default: 30
+        recurrence:
+          enum:
+          - none
+          - annual
+          type: string
+          description: |-
+            * `none` - none
+            * `annual` - annual
+          x-spec-enum-id: e28951d1aeafc9e0
+          default: none
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - domain
+      - due_on
+      - kind
+      - source_entity_id
+      - title
     ReuseAudience:
       type: object
       properties:

@@ -2804,6 +2804,38 @@ export interface paths {
         readonly patch: operations["workspaces_msp_networks_wireless_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/reminders": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_reminder_list"];
+        readonly put?: never;
+        readonly post: operations["msp_reminder_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/reminders/calendar.ics": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_reminder_calendar"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/vendors": {
         readonly parameters: {
             readonly query?: never;
@@ -5054,6 +5086,38 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["recycle_bin_organization_restore"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/reminders": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_reminder_list"];
+        readonly put?: never;
+        readonly post: operations["organization_reminder_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/reminders/calendar.ics": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_reminder_calendar"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -8755,6 +8819,52 @@ export interface components {
             readonly page_size: number;
             readonly count: number;
             readonly has_more: boolean;
+        };
+        readonly Reminder: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly source_entity_id: string;
+            readonly source: string;
+            readonly domain: string;
+            readonly kind: string;
+            readonly title: string;
+            /** Format: date */
+            readonly due_on: string;
+            readonly lead_days: number;
+            readonly recurrence: string;
+            /** Format: uuid */
+            readonly owner_id: string | null;
+            readonly owner: string | null;
+            readonly active: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly ReminderWrite: {
+            /** Format: uuid */
+            readonly source_entity_id: string;
+            /**
+             * @description * `compliance` - compliance
+             *     * `inventory` - inventory
+             *     * `domain` - domain
+             * @enum {string}
+             */
+            readonly domain: "compliance" | "inventory" | "domain";
+            readonly kind: string;
+            readonly title: string;
+            /** Format: date */
+            readonly due_on: string;
+            /** @default 30 */
+            readonly lead_days: number;
+            /**
+             * @description * `none` - none
+             *     * `annual` - annual
+             * @default none
+             * @enum {string}
+             */
+            readonly recurrence: "none" | "annual";
+            /** Format: uuid */
+            readonly owner_id?: string | null;
         };
         readonly ReuseAudience: {
             /** Format: uuid */
@@ -16743,6 +16853,75 @@ export interface operations {
             };
         };
     };
+    readonly msp_reminder_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Reminder"][];
+                };
+            };
+        };
+    };
+    readonly msp_reminder_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ReminderWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ReminderWrite"];
+                readonly "multipart/form-data": components["schemas"]["ReminderWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Reminder"];
+                };
+            };
+        };
+    };
+    readonly msp_reminder_calendar: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/calendar": string;
+                };
+            };
+        };
+    };
     readonly workspaces_msp_vendors_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -22814,6 +22993,81 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly organization_reminder_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Reminder"][];
+                };
+            };
+        };
+    };
+    readonly organization_reminder_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ReminderWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ReminderWrite"];
+                readonly "multipart/form-data": components["schemas"]["ReminderWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Reminder"];
+                };
+            };
+        };
+    };
+    readonly organization_reminder_calendar: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/calendar": string;
                 };
             };
         };

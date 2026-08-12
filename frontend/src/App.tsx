@@ -53,6 +53,8 @@ import { browserCredentialReferencesClient } from './credential-references/api'
 import type { CredentialReferencesClient } from './credential-references/api'
 import { browserDocumentsClient } from './documentation/api'
 import type { DocumentsClient } from './documentation/api'
+import { browserDomainsClient } from './domains/api'
+import type { DomainsClient } from './domains/api'
 import { browserInventoryClient } from './inventory/api'
 import { browserCommercialClient } from './commercial/api'
 import type { InventoryClient } from './inventory/api'
@@ -92,6 +94,7 @@ const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors'
 const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
 const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
 const Compliance = lazy(async () => ({ default: (await import('./compliance/Compliance')).Compliance }))
+const Domains = lazy(async () => ({ default: (await import('./domains/Domains')).Domains }))
 
 type NavigationItem = {
   label: string
@@ -310,9 +313,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.7.7" />
+      <PageHeader title="Overview" description="TekDocs 0.7.8" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.7.7</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.7.8</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -388,7 +391,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, networksClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; networksClient?: NetworksClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -408,6 +411,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
   if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
+  if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -419,7 +423,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -436,6 +440,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   notificationsClient?: NotificationsClient
   webhooksClient?: WebhooksClient
   complianceClient?: ComplianceClient
+  domainsClient?: DomainsClient
   networksClient?: NetworksClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
@@ -514,10 +519,11 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
             <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />
             <Route path="/compliance" element={<Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={null} client={complianceClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks', '/integrations', '/compliance'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks', '/integrations', '/compliance', '/domains'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} networksClient={networksClient} />} />)}
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
@@ -527,7 +533,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, networksClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -544,6 +550,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   notificationsClient?: NotificationsClient
   webhooksClient?: WebhooksClient
   complianceClient?: ComplianceClient
+  domainsClient?: DomainsClient
   networksClient?: NetworksClient
   initialAuthContext?: AuthenticatedContext
 }) {
@@ -572,6 +579,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           notificationsClient={notificationsClient}
           webhooksClient={webhooksClient}
           complianceClient={complianceClient}
+          domainsClient={domainsClient}
           networksClient={networksClient}
           onSignOut={signOut}
           signingOut={signingOut}

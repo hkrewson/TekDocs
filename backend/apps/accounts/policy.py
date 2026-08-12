@@ -89,6 +89,8 @@ class PermissionKey(StrEnum):
     COMPLIANCE_EDIT = "compliance.edit"
     DEADLINES_VIEW = "deadlines.view"
     DEADLINES_EDIT = "deadlines.edit"
+    DOMAINS_VIEW = "domains.view"
+    DOMAINS_EDIT = "domains.edit"
     INTEGRATIONS_VIEW = "integrations.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
     NOTIFICATIONS_MANAGE = "notifications.manage"
@@ -179,6 +181,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
     _permission(PermissionKey.DEADLINES_VIEW, "View deadline schedules", "Deadlines"),
     _permission(PermissionKey.DEADLINES_EDIT, "Manage deadline schedules", "Deadlines", mfa=True),
+    _permission(PermissionKey.DOMAINS_VIEW, "View domains", "Domains"),
+    _permission(PermissionKey.DOMAINS_EDIT, "Manage domains", "Domains", mfa=True),
     _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
     _permission(PermissionKey.INTEGRATIONS_MANAGE, "Manage integrations", "Integrations", mfa=True),
     _permission(PermissionKey.NOTIFICATIONS_MANAGE, "Manage notification delivery", "Administration", mfa=True),
@@ -199,6 +203,7 @@ IMPLEMENTED_READS = frozenset(
         PermissionKey.NETWORKS_VIEW,
         PermissionKey.COMPLIANCE_VIEW,
         PermissionKey.DEADLINES_VIEW,
+        PermissionKey.DOMAINS_VIEW,
         PermissionKey.INTEGRATIONS_VIEW,
     }
 )
@@ -220,6 +225,7 @@ TECHNICIAN_MUTATIONS = frozenset(
         PermissionKey.NETWORKS_EDIT,
         PermissionKey.COMPLIANCE_EDIT,
         PermissionKey.DEADLINES_EDIT,
+        PermissionKey.DOMAINS_EDIT,
     }
 )
 ADMINISTRATOR_PERMISSIONS = frozenset(

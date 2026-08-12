@@ -1972,6 +1972,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/domains": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_domain_list"];
+        readonly put?: never;
+        readonly post: operations["msp_domain_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/integrations/conflicts": {
         readonly parameters: {
             readonly query?: never;
@@ -4030,6 +4046,22 @@ export interface paths {
         readonly get: operations["document_mentions_organization_search"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_domain_list"];
+        readonly put?: never;
+        readonly post: operations["organization_domain_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -6769,6 +6801,54 @@ export interface components {
         readonly DocumentationReferenceWrite: {
             /** Format: uuid */
             readonly organization_id: string;
+        };
+        readonly Domain: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            /** Format: uuid */
+            readonly registrar_id: string | null;
+            readonly registrar: string | null;
+            /** Format: date */
+            readonly registration_date: string | null;
+            /** Format: date */
+            readonly expiration_date: string | null;
+            readonly renewal_mode: string;
+            /** Format: uuid */
+            readonly owner_id: string | null;
+            readonly owner: string | null;
+            readonly status: string;
+            readonly notes: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly DomainWrite: {
+            readonly name: string;
+            /** Format: uuid */
+            readonly registrar_id?: string | null;
+            /** Format: date */
+            readonly registration_date?: string | null;
+            /** Format: date */
+            readonly expiration_date?: string | null;
+            /**
+             * @description * `manual` - manual
+             *     * `auto` - auto
+             *     * `external` - external
+             * @enum {string}
+             */
+            readonly renewal_mode: "manual" | "auto" | "external";
+            /** Format: uuid */
+            readonly owner_id?: string | null;
+            /**
+             * @description * `active` - active
+             *     * `pending` - pending
+             *     * `expired` - expired
+             *     * `transferred` - transferred
+             * @enum {string}
+             */
+            readonly status: "active" | "pending" | "expired" | "transferred";
+            /** @default  */
+            readonly notes: string;
         };
         readonly EligibleCatalogPublication: {
             /** Format: uuid */
@@ -14716,6 +14796,54 @@ export interface operations {
             };
         };
     };
+    readonly msp_domain_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Domain"][];
+                };
+            };
+        };
+    };
+    readonly msp_domain_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DomainWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DomainWrite"];
+                readonly "multipart/form-data": components["schemas"]["DomainWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_integrations_conflicts_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -19914,6 +20042,58 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["EntityMentionResult"];
+                };
+            };
+        };
+    };
+    readonly organization_domain_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Domain"][];
+                };
+            };
+        };
+    };
+    readonly organization_domain_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DomainWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DomainWrite"];
+                readonly "multipart/form-data": components["schemas"]["DomainWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Domain"];
                 };
             };
         };

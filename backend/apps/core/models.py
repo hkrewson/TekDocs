@@ -5048,3 +5048,61 @@ class ReminderSchedule(TimestampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+
+class DomainRenewalMode(models.TextChoices):
+    MANUAL = "manual", "Manual"
+    AUTO = "auto", "Automatic"
+    EXTERNAL = "external", "Managed externally"
+
+
+class RegisteredDomainStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    PENDING = "pending", "Pending"
+    EXPIRED = "expired", "Expired"
+    TRANSFERRED = "transferred", "Transferred"
+
+
+class RegisteredDomain(TimestampedModel):
+    """Workspace-owned entered registration record; observations remain separate."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="registered_domains")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="registered_domains")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="registered_domains", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="registered_domain")
+    ascii_name = models.CharField(max_length=253)
+    registrar = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="registrar_domains", null=True, blank=True
+    )
+    registration_date = models.DateField(null=True, blank=True)
+    expiration_date = models.DateField(null=True, blank=True)
+    renewal_mode = models.CharField(max_length=16, choices=DomainRenewalMode.choices)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_registered_domains", null=True, blank=True
+    )
+    status = models.CharField(max_length=16, choices=RegisteredDomainStatus.choices)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_registered_domains"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("ascii_name", "id")
+        indexes = [models.Index(fields=("workspace", "status", "expiration_date"), name="core_domain_scope_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("workspace", "ascii_name"),
+                condition=models.Q(archived_at__isnull=True),
+                name="registered_domain_active_name_unique",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.ascii_name

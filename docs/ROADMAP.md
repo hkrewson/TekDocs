@@ -1108,7 +1108,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.5` | **Complete:** Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | **Complete:** Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | **Complete:** Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
-| `0.7.8` | Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
+| `0.7.8` | **Complete:** Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
 | `0.7.9` | Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
 | `0.7.10` | Renewal/expiration schedules, review state, reminder events, notification/calendar integration, and stale or conflicting source handling. |
 | `0.7.11` | Safe RDAP and authoritative-DNS collection through the approved egress service, with observed-vs-entered reconciliation and expiration/change notifications. |
@@ -1183,6 +1183,16 @@ Evidence: `docs/releases/0.7.6.md`.
 - [x] Existing webhook and provider adversarial tests remain green, and Ruff, mypy, security/threat/architecture documentation, ADR 0069, risk disposition, and release evidence agree at `0.7.7`.
 
 Evidence: `docs/releases/0.7.7.md`.
+
+### `0.7.8` acceptance criteria
+
+- [x] Registered domains have stable Entity identities and explicit MSP or organization Workspace ownership; MSP listings are not client aggregates.
+- [x] Names normalize to lowercase IDNA ASCII and active duplicates fail within one Workspace. Entered registration/expiration dates, renewal mode, lifecycle status, notes, optional registrar, and optional currently authorized owner remain explicit operational data.
+- [x] Registrar choices are same-tenant active vendor/partner organizations; responsible owners remain active users with exact-scope domain visibility. Neither relationship grants access.
+- [x] Dedicated `domains.view` and MFA-backed `domains.edit` permissions, strict MSP/organization APIs, and a restrained responsive Domains surface preserve exact context and non-disclosing sibling behavior.
+- [x] PostgreSQL guards stable ownership/actor/entity edges and forces RLS. Migration, permission/IDOR, OpenAPI/client, frontend, architecture/security/threat/risk, ADR 0070, and release evidence agree at `0.7.8`.
+
+Evidence: `docs/releases/0.7.8.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

@@ -204,6 +204,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-compliance-bundle-list-create": ("organization_entity_id",),
         "organization-reminder-list-create": ("organization_entity_id",),
         "organization-reminder-calendar": ("organization_entity_id",),
+        "organization-domain-list-create": ("organization_entity_id",),
         "organization-catalog-product-list-create": ("organization_entity_id",),
         "organization-catalog-product-detail": ("organization_entity_id", "product_entity_id"),
         "organization-catalog-publication-choices": ("organization_entity_id",),

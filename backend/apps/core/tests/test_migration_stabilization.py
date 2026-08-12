@@ -105,6 +105,7 @@ DOCUMENT_RLS_TABLES = {
     "core_complianceriskevent",
     "core_complianceevidencebundle",
     "core_reminderschedule",
+    "core_registereddomain",
 }
 
 
@@ -294,7 +295,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0091", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0093", verbosity=0, interactive=False)
     call_command("migrate", "accounts", "0017", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids

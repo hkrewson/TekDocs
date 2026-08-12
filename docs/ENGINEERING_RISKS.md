@@ -57,6 +57,7 @@ This register turns known limitations into release obligations. A risk remains o
 | `TD-RISK-051` | Risk scores or acceptance can be forged, silently rewritten, or disclosed across clients. | Free-form severity creates inconsistent reporting; mutable decisions erase accountability; unchecked owners/control edges create cross-client attribution; treatment text can be mistaken for formal acceptance. | `0.7.4` bounds likelihood/impact and derives score/band server-side, reauthorizes owners and exact-Workspace assignments, requires matching accepted status/treatment, records accepting actor/time, and appends full-state decisions pinned to exact control revisions. Database guards, forced RLS, non-disclosing APIs, and scoped summaries repeat the boundary. | Initial mitigation ADR 0066 and `0.7.4`; bundle composition `0.7.5`; certification `0.8.0` |
 | `TD-RISK-052` | A compliance export can omit dependencies, cross scope, or be altered after review. | Mutable or noncanonical exports undermine evidence integrity and can leak sibling data. | `0.7.5` resolves only one authorized Workspace, serializes exact revisions/links/windows/outcomes canonically, signs SHA-256 with the deployment Ed25519 key, retains public verification material, and enforces database immutability plus forced RLS. | Initial mitigation ADR 0067 and `0.7.5`; certification `0.8.0` |
 | `TD-RISK-053` | A reminder or calendar feed can disclose hidden client deadlines or become a long-lived bearer secret. | Cross-client aggregation, guessed source IDs, or public feed tokens can reveal client relationships and operational timing after access is revoked. | `0.7.6` keeps schedules in one exact Workspace, revalidates source type and current owner authority, adds dedicated central permissions, forces RLS, and exports only through the authenticated session with private/no-store headers and a 5,000-event bound. Public subscription tokens and notification generation remain disabled until separately designed. | Initial mitigation ADR 0068 and `0.7.6`; notification integration `0.7.10`; certification `0.8.0` |
+| `TD-RISK-054` | Entered domain ownership can cross clients, be confused with discovered truth, or expose renewal timing. | A tenant-wide list or silently overwritten registration date can disclose customers and produce false operational confidence. | `0.7.8` gives each normalized domain an exact Workspace Entity, dedicated permissions, authorized registrar/owner edges, non-aggregating APIs, database guards, and forced RLS. Entered fields remain explicitly separate from future observations. | Initial mitigation ADR 0070 and `0.7.8`; observations `0.7.9`–`0.7.11`; certification `0.8.0` |
 
 ## 0.5.0 network certification disposition
 
@@ -117,6 +118,10 @@ This register turns known limitations into release obligations. A risk remains o
 ## 0.7.7 approved-egress disposition
 
 `TD-RISK-047` remains **mitigated with recurring owner**. One reusable service now owns hostname normalization, every-answer public DNS validation, address pinning, and TLS hostname/SNI preservation for existing webhook and provider callers. Each caller retains explicit no-redirect, timeout, body, content, and origin constraints. Proxy behavior, DAST, and every future collector's adoption remain recurring owners through `0.8.7`.
+
+## 0.7.8 registered-domain disposition
+
+`TD-RISK-054` is **mitigated with recurring owner**. Stable IDNA ASCII identity, exact-Workspace ownership, dedicated policy, authorized relationships, non-aggregating APIs, database guards, and forced RLS protect entered registration records. Discovered truth, reconciliation, and expiry notification remain later boundaries.
 
 ## Release rule
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.6
+  version: 0.7.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -6584,6 +6584,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProviderChoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains:
+    get:
+      operationId: msp_domain_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_domain_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
           description: ''
           headers:
             X-Request-ID:
@@ -13728,6 +13783,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EntityMentionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/domains:
+    get:
+      operationId: organization_domain_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_domain_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DomainWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
           description: ''
           headers:
             X-Request-ID:
@@ -22358,6 +22482,112 @@ components:
           format: uuid
       required:
       - organization_id
+    Domain:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        registrar_id:
+          type: string
+          format: uuid
+          nullable: true
+        registrar:
+          type: string
+          nullable: true
+        registration_date:
+          type: string
+          format: date
+          nullable: true
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        renewal_mode:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        status:
+          type: string
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - expiration_date
+      - id
+      - name
+      - notes
+      - owner
+      - owner_id
+      - registrar
+      - registrar_id
+      - registration_date
+      - renewal_mode
+      - status
+    DomainWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 253
+        registrar_id:
+          type: string
+          format: uuid
+          nullable: true
+        registration_date:
+          type: string
+          format: date
+          nullable: true
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        renewal_mode:
+          enum:
+          - manual
+          - auto
+          - external
+          type: string
+          description: |-
+            * `manual` - manual
+            * `auto` - auto
+            * `external` - external
+          x-spec-enum-id: 889f6eb7666dba12
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          enum:
+          - active
+          - pending
+          - expired
+          - transferred
+          type: string
+          description: |-
+            * `active` - active
+            * `pending` - pending
+            * `expired` - expired
+            * `transferred` - transferred
+          x-spec-enum-id: f8a20e2b1f53ad2c
+        notes:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - name
+      - renewal_mode
+      - status
     EligibleCatalogPublication:
       type: object
       properties:

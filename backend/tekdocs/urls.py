@@ -144,6 +144,7 @@ from apps.core.document_views import (
     OrganizationDocumentTemplateInstantiateView,
     OrganizationMarkdownImportView,
 )
+from apps.core.domain_views import MSPDomainListCreateView, OrganizationDomainListCreateView
 from apps.core.integration_views import (
     GitExportDownloadView,
     GitExportListCreateView,
@@ -717,6 +718,7 @@ urlpatterns = [
         MSPReminderCalendarView.as_view(),
         name="msp-reminder-calendar",
     ),
+    path("api/v1/workspaces/msp/domains", MSPDomainListCreateView.as_view(), name="msp-domain-list-create"),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
         "api/v1/workspaces/msp/networks/racks/<uuid:rack_entity_id>",
@@ -1695,6 +1697,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/reminders/calendar.ics",
         OrganizationReminderCalendarView.as_view(),
         name="organization-reminder-calendar",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains",
+        OrganizationDomainListCreateView.as_view(),
+        name="organization-domain-list-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

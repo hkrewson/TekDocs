@@ -1024,7 +1024,7 @@ Evidence: `docs/releases/0.6.0.md`.
 | `0.6.7` | **Complete:** conflict model and permission-aware reconciliation workflow; database remains canonical. |
 | `0.6.8` | **Complete:** deterministic sanitized Git export for selected non-secret documents/manifests. |
 | `0.6.9` | **Complete:** integration-runtime stabilization, webhook/SSRF abuse suites, upgrade/restore, load, accessibility, and production-runtime evidence. |
-| `0.7.0` | Stabilize and certify the public API and integration framework. |
+| `0.7.0` | **Complete:** stabilize and certify the public API and integration framework. |
 
 ### `0.6.1` acceptance criteria
 
@@ -1085,6 +1085,17 @@ Evidence: `docs/releases/0.6.4.md` through `docs/releases/0.6.8.md`.
 - [x] Stabilization, production-image, Compose, static, migration/schema/client, frontend, documentation, and risk evidence agree at `0.6.9`.
 
 Evidence: `docs/releases/0.6.9.md`.
+
+### `0.7.0` acceptance criteria
+
+- [x] `make test-integration-certification` composes public API/error/pagination/filter contracts, personal and service tokens, signed webhooks, read-only provider connections, durable sync workers, reconciliation, sanitized Git export, exact-Workspace permission/IDOR, forced RLS, migration preservation, and the frontend integration surfaces against PostgreSQL.
+- [x] Credentials remain value-free outside their narrow issue or worker boundary. Provider observations and webhook payloads remain reduced, bounded, and exact-Workspace scoped; reconciliation cannot mutate domain data and Git export cannot initialize, authenticate, commit, or push a remote repository.
+- [x] Adversarial provider/webhook egress, redirect, cursor, content, size, retry, stale-lease, replay, and scale evidence remains blocking, and every OpenAPI operation ID plus the generated TypeScript client is deterministic.
+- [x] Exact `0.6.9` state upgrades to `0.7.0` without changing the encrypted provider credential, completed observation, export artifact, identities, or authorization state. Independent restore and production-target secret-file/image rehearsals remain green.
+- [x] `TD-RISK-044` through `TD-RISK-047` are certified for the implemented one-MSP, read-only integration boundary with recurring compatibility, token-administration, SSRF/DAST, and operator-recovery owners.
+- [x] Version, OpenAPI/generated client, architecture, security/threat/risk documentation, ADR 0062, local/hosted gates, release evidence, and production runtime agree at `0.7.0`; no model, migration, route, provider, permission, or domain family is added.
+
+Evidence: `docs/releases/0.7.0.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

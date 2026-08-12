@@ -3,6 +3,8 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 baseline_ref=${TEKDOCS_INTEGRATION_UPGRADE_FROM_REF:-d3b7c4d}
+baseline_version=${TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION:-0.6.8}
+target_version=${TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION:-0.6.9}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-integration-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -35,8 +37,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
   echo "TEKDOCS_PORT=0"
   echo "MAILPIT_UI_PORT=0"
 } >> "$environment_file"
-[ "$(tr -d '[:space:]' < "$baseline_directory/VERSION")" = "0.6.8" ]
-[ "$(tr -d '[:space:]' < "$repository_root/VERSION")" = "0.6.9" ]
+[ "$(tr -d '[:space:]' < "$baseline_directory/VERSION")" = "$baseline_version" ]
+[ "$(tr -d '[:space:]' < "$repository_root/VERSION")" = "$target_version" ]
 
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
@@ -50,4 +52,4 @@ current_compose exec -T -e TEKDOCS_FIXTURE_MODE=verify -e TEKDOCS_FIXTURE_PROVID
   backend python manage.py shell < "$repository_root/scripts/integration-runtime-fixture.py"
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend python manage.py makemigrations --check --dry-run
-echo "Integration upgrade rehearsal passed: 0.6.8 -> 0.6.9"
+echo "Integration upgrade rehearsal passed: $baseline_version -> $target_version"

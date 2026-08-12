@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.0
+  version: 0.7.1
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5702,6 +5702,210 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks:
+    get:
+      operationId: msp_compliance_framework_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFrameworkResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_compliance_framework_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFramework'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}:
+    get:
+      operationId: msp_compliance_framework_retrieve
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFramework'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/revisions:
+    get:
+      operationId: msp_compliance_catalog_revision_list
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_compliance_catalog_revision_create
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/revisions/{revision_number}:
+    get:
+      operationId: msp_compliance_catalog_revision_retrieve
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: revision_number
+        schema:
+          type: integer
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/contracts:
     get:
       operationId: workspaces_msp_contracts_retrieve_list
@@ -10379,6 +10583,247 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Invitation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks:
+    get:
+      operationId: organization_compliance_framework_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFrameworkResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_compliance_framework_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceFrameworkWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFramework'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}:
+    get:
+      operationId: organization_compliance_framework_retrieve
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceFramework'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/revisions:
+    get:
+      operationId: organization_compliance_catalog_revision_list
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_compliance_catalog_revision_create
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceCatalogWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/revisions/{revision_number}
+  : get:
+      operationId: organization_compliance_catalog_revision_retrieve
+      parameters:
+      - in: path
+        name: framework_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: revision_number
+        schema:
+          type: integer
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCatalogRevision'
           description: ''
           headers:
             X-Request-ID:
@@ -18535,6 +18980,194 @@ components:
       - page
       - page_size
       - results
+    ComplianceCatalogEntry:
+      type: object
+      properties:
+        position:
+          type: integer
+        control:
+          $ref: '#/components/schemas/ComplianceControlRevision'
+      required:
+      - control
+      - position
+    ComplianceCatalogRevision:
+      type: object
+      properties:
+        revision_number:
+          type: integer
+        version_label:
+          type: string
+        description:
+          type: string
+        source_url:
+          type: string
+          format: uri
+        content_digest:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceCatalogEntry'
+      required:
+      - content_digest
+      - created_at
+      - created_by
+      - description
+      - entries
+      - revision_number
+      - source_url
+      - version_label
+    ComplianceCatalogWrite:
+      type: object
+      properties:
+        version_label:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          default: ''
+          maxLength: 20000
+        source_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 500
+        controls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceControlWrite'
+      required:
+      - version_label
+    ComplianceControlRevision:
+      type: object
+      properties:
+        control_id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+        identifier:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        guidance:
+          type: string
+        content_digest:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - content_digest
+      - control_id
+      - created_at
+      - description
+      - guidance
+      - identifier
+      - revision_number
+      - title
+    ComplianceControlWrite:
+      type: object
+      properties:
+        control_id:
+          type: string
+          format: uuid
+          nullable: true
+        identifier:
+          type: string
+          maxLength: 100
+        title:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+          default: ''
+          maxLength: 20000
+        guidance:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - identifier
+      - title
+    ComplianceFramework:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        current_revision:
+          $ref: '#/components/schemas/ComplianceCatalogRevision'
+        revision_count:
+          type: integer
+          readOnly: true
+        can_manage:
+          type: boolean
+          readOnly: true
+      required:
+      - can_manage
+      - current_revision
+      - id
+      - name
+      - revision_count
+    ComplianceFrameworkResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceFramework'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    ComplianceFrameworkWrite:
+      type: object
+      properties:
+        version_label:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          default: ''
+          maxLength: 20000
+        source_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 500
+        controls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceControlWrite'
+        name:
+          type: string
+          maxLength: 240
+      required:
+      - name
+      - version_label
     Conflict:
       type: object
       properties:

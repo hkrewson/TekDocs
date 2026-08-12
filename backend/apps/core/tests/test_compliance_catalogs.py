@@ -1,0 +1,223 @@
+import secrets
+
+import pytest
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError, connection, transaction
+from django.test import Client
+from django.urls import reverse
+
+from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.compliance_catalogs import ControlInput, create_catalog_version, create_framework, frameworks_for_scope
+from apps.core.models import ComplianceCatalogEntry, ComplianceCatalogRevision, InstallationState
+from apps.core.organizations import create_organization
+from apps.core.scoping import DataScope
+
+
+@pytest.fixture
+def installation(db):
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Compliance MSP",
+        owner_email="compliance-owner@example.invalid",
+        owner_display_name="Compliance Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    TOTP.activate(result.owner, generate_totp_secret())
+    return result
+
+
+@pytest.fixture
+def owner_client(installation):
+    browser = Client()
+    browser.force_login(installation.owner)
+    return browser
+
+
+def control(identifier: str, title: str, *, control_id=None, guidance=""):
+    return ControlInput(
+        identifier=identifier,
+        title=title,
+        description="Control description",
+        guidance=guidance,
+        control_id=control_id,
+    )
+
+
+@pytest.mark.django_db
+def test_catalog_versions_pin_exact_control_revisions_and_preserve_history(installation):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="TekDocs Baseline",
+        version_label="2026.1",
+        description="Initial baseline",
+        source_url="https://example.invalid/baseline",
+        controls=[control("TD-1", "Inventory"), control("TD-2", "Recovery")],
+    )
+    framework = frameworks_for_scope(DataScope.tenant(installation.tenant)).get(pk=framework.pk)
+    first = framework.current_revision
+    first_entries = list(first.entries.all())
+    unchanged = first_entries[0].control_revision
+    changing = first_entries[1].control_revision
+
+    second = create_catalog_version(
+        framework=framework,
+        actor_id=installation.owner.id,
+        version_label="2026.2",
+        description="Recovery guidance clarified",
+        source_url="https://example.invalid/baseline",
+        controls=[
+            control("TD-1", "Inventory", control_id=unchanged.control.entity_id),
+            control("TD-2", "Recovery", control_id=changing.control.entity_id, guidance="Test restores quarterly."),
+        ],
+    )
+    second_entries = list(second.entries.select_related("control_revision__control").order_by("position"))
+
+    assert second_entries[0].control_revision_id == unchanged.id
+    assert second_entries[1].control_revision.control_id == changing.control_id
+    assert second_entries[1].control_revision.revision_number == 2
+    first.refresh_from_db()
+    assert first.entries.get(position=1).control_revision_id == changing.id
+    assert first.content_digest != second.content_digest
+    assert ComplianceCatalogRevision.objects.filter(framework=framework).count() == 2
+    with pytest.raises(ValidationError):
+        first.delete()
+    with pytest.raises(ValidationError):
+        first.version_label = "rewritten"
+        first.save()
+
+
+@pytest.mark.django_db
+def test_compliance_api_is_workspace_scoped_and_revisions_are_addressable(owner_client, installation):
+    client = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Scoped Client",
+        legal_name="Scoped Client LLC",
+        website="https://client.example.invalid",
+        classifications=["client"],
+    )
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Sibling Client",
+        legal_name="Sibling Client LLC",
+        website="https://sibling.example.invalid",
+        classifications=["client"],
+    )
+    collection = reverse(
+        "organization-compliance-framework-list-create", kwargs={"organization_entity_id": client.entity_id}
+    )
+    created = owner_client.post(
+        collection,
+        {
+            "name": "Client Security Standard",
+            "version_label": "v1",
+            "description": "Client-owned catalog",
+            "controls": [{"identifier": "CS-1", "title": "Asset inventory"}],
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["current_revision"]["entries"][0]["control"]["identifier"] == "CS-1"
+    assert owner_client.get(collection).json()["count"] == 1
+    assert owner_client.get(reverse("msp-compliance-framework-list-create")).json()["count"] == 0
+    assert (
+        owner_client.get(
+            reverse(
+                "organization-compliance-framework-detail",
+                kwargs={"organization_entity_id": sibling.entity_id, "framework_entity_id": body["id"]},
+            )
+        ).status_code
+        == 404
+    )
+
+    revisions_url = reverse(
+        "organization-compliance-catalog-revision-list-create",
+        kwargs={"organization_entity_id": client.entity_id, "framework_entity_id": body["id"]},
+    )
+    revised = owner_client.post(
+        revisions_url,
+        {
+            "version_label": "v2",
+            "controls": [
+                {
+                    "control_id": body["current_revision"]["entries"][0]["control"]["control_id"],
+                    "identifier": "CS-1",
+                    "title": "Asset inventory",
+                    "guidance": "Review quarterly.",
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert revised.status_code == 201
+    assert revised.json()["revision_number"] == 2
+    assert len(owner_client.get(revisions_url).json()) == 2
+    first = owner_client.get(
+        reverse(
+            "organization-compliance-catalog-revision-detail",
+            kwargs={
+                "organization_entity_id": client.entity_id,
+                "framework_entity_id": body["id"],
+                "revision_number": 1,
+            },
+        )
+    )
+    assert first.status_code == 200
+    assert first.json()["entries"][0]["control"]["guidance"] == ""
+
+
+@pytest.mark.django_db
+def test_catalog_input_is_strict_and_rejects_duplicate_control_identity(owner_client, installation):
+    url = reverse("msp-compliance-framework-list-create")
+    assert (
+        owner_client.post(
+            url,
+            {"name": "Bad", "version_label": "v1", "unexpected": "value"},
+            content_type="application/json",
+        ).status_code
+        == 400
+    )
+    assert (
+        owner_client.post(
+            url,
+            {
+                "name": "Duplicates",
+                "version_label": "v1",
+                "controls": [
+                    {"identifier": "A-1", "title": "First"},
+                    {"identifier": "a-1", "title": "Duplicate"},
+                ],
+            },
+            content_type="application/json",
+        ).status_code
+        == 400
+    )
+    assert ComplianceCatalogRevision.objects.count() == 0
+    assert ComplianceCatalogEntry.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_database_guards_retain_catalog_evidence_and_reject_scope_retargeting(installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Compliance database guards require PostgreSQL")
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="Guarded Baseline",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("G-1", "Guarded control")],
+    )
+    revision = ComplianceCatalogRevision.objects.get(framework=framework)
+    entry = ComplianceCatalogEntry.objects.get(catalog_revision=revision)
+    with pytest.raises(DatabaseError), transaction.atomic():
+        ComplianceCatalogRevision.objects.filter(pk=revision.pk).update(version_label="rewritten")
+    with pytest.raises(DatabaseError), transaction.atomic():
+        ComplianceCatalogEntry.objects.filter(pk=entry.pk).delete()

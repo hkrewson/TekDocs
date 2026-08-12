@@ -148,6 +148,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-integration-connection-rotate": ("connection_id",),
         "msp-integration-conflict-resolve": ("conflict_id",),
         "msp-git-export-download": ("bundle_id",),
+        "msp-compliance-framework-detail": ("framework_entity_id",),
+        "msp-compliance-catalog-revision-list-create": ("framework_entity_id",),
+        "msp-compliance-catalog-revision-detail": ("framework_entity_id", "revision_number"),
         "msp-asset-document-detail": ("asset_entity_id", "publication_entity_id"),
         "msp-asset-document-artifact-download": ("asset_entity_id", "publication_entity_id", "artifact_entity_id"),
         "workspace-organization": ("entity_id",),
@@ -171,6 +174,17 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-integration-conflict-resolve": ("organization_entity_id", "conflict_id"),
         "organization-git-export-list-create": ("organization_entity_id",),
         "organization-git-export-download": ("organization_entity_id", "bundle_id"),
+        "organization-compliance-framework-list-create": ("organization_entity_id",),
+        "organization-compliance-framework-detail": ("organization_entity_id", "framework_entity_id"),
+        "organization-compliance-catalog-revision-list-create": (
+            "organization_entity_id",
+            "framework_entity_id",
+        ),
+        "organization-compliance-catalog-revision-detail": (
+            "organization_entity_id",
+            "framework_entity_id",
+            "revision_number",
+        ),
         "organization-catalog-product-list-create": ("organization_entity_id",),
         "organization-catalog-product-detail": ("organization_entity_id", "product_entity_id"),
         "organization-catalog-publication-choices": ("organization_entity_id",),
@@ -396,7 +410,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         if route_name.startswith("organization-"):
             kwargs["organization_entity_id"] = value
         return kwargs
-    return {name: value for name in route_kwargs.get(route_name, ())}
+    return {name: (1 if name == "revision_number" else value) for name in route_kwargs.get(route_name, ())}
 
 
 def _request(client: Client, method: str, route_name: str):

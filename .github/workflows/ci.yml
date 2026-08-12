@@ -91,6 +91,7 @@ jobs:
           make test-integrations
           make test-integration-stabilization
           make test-integration-certification
+          make test-compliance-catalogs
       - name: Collect logs
         if: always()
         run: docker compose logs --no-color > compose.log

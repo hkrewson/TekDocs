@@ -115,6 +115,20 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-git-export-download", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route(
+        "msp-compliance-framework-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+    ),
+    route("msp-compliance-framework-detail", ("GET",), PermissionKey.COMPLIANCE_VIEW),
+    route(
+        "msp-compliance-catalog-revision-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+    ),
+    route("msp-compliance-catalog-revision-detail", ("GET",), PermissionKey.COMPLIANCE_VIEW),
+    route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
@@ -1194,6 +1208,32 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-git-export-download",
         ("GET",),
         PermissionKey.INTEGRATIONS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-framework-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-framework-detail",
+        ("GET",),
+        PermissionKey.COMPLIANCE_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-catalog-revision-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-catalog-revision-detail",
+        ("GET",),
+        PermissionKey.COMPLIANCE_VIEW,
         organization_scoped=True,
     ),
 )

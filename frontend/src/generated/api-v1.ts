@@ -1700,6 +1700,70 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/compliance/frameworks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_framework_list"];
+        readonly put?: never;
+        readonly post: operations["msp_compliance_framework_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_framework_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/revisions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_catalog_revision_list"];
+        readonly put?: never;
+        readonly post: operations["msp_compliance_catalog_revision_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/frameworks/{framework_entity_id}/revisions/{revision_number}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_catalog_revision_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/contracts": {
         readonly parameters: {
             readonly query?: never;
@@ -3102,6 +3166,70 @@ export interface paths {
         readonly get: operations["workspaces_organizations_client_invitations_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_client_invitations_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_framework_list"];
+        readonly put?: never;
+        readonly post: operations["organization_compliance_framework_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_framework_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/revisions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_catalog_revision_list"];
+        readonly put?: never;
+        readonly post: operations["organization_compliance_catalog_revision_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/frameworks/{framework_entity_id}/revisions/{revision_number}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_catalog_revision_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -5332,6 +5460,83 @@ export interface components {
             readonly count: number;
             readonly has_more: boolean;
             readonly can_manage: boolean;
+        };
+        readonly ComplianceCatalogEntry: {
+            readonly position: number;
+            readonly control: components["schemas"]["ComplianceControlRevision"];
+        };
+        readonly ComplianceCatalogRevision: {
+            readonly revision_number: number;
+            readonly version_label: string;
+            readonly description: string;
+            /** Format: uri */
+            readonly source_url: string;
+            readonly content_digest: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly created_by: string;
+            readonly entries: readonly components["schemas"]["ComplianceCatalogEntry"][];
+        };
+        readonly ComplianceCatalogWrite: {
+            readonly version_label: string;
+            /** @default  */
+            readonly description: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly source_url: string;
+            readonly controls?: readonly components["schemas"]["ComplianceControlWrite"][];
+        };
+        readonly ComplianceControlRevision: {
+            /** Format: uuid */
+            readonly control_id: string;
+            readonly revision_number: number;
+            readonly identifier: string;
+            readonly title: string;
+            readonly description: string;
+            readonly guidance: string;
+            readonly content_digest: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly ComplianceControlWrite: {
+            /** Format: uuid */
+            readonly control_id?: string | null;
+            readonly identifier: string;
+            readonly title: string;
+            /** @default  */
+            readonly description: string;
+            /** @default  */
+            readonly guidance: string;
+        };
+        readonly ComplianceFramework: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly current_revision: components["schemas"]["ComplianceCatalogRevision"];
+            readonly revision_count: number;
+            readonly can_manage: boolean;
+        };
+        readonly ComplianceFrameworkResult: {
+            readonly results: readonly components["schemas"]["ComplianceFramework"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
+        };
+        readonly ComplianceFrameworkWrite: {
+            readonly version_label: string;
+            /** @default  */
+            readonly description: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly source_url: string;
+            readonly controls?: readonly components["schemas"]["ComplianceControlWrite"][];
+            readonly name: string;
         };
         readonly Conflict: {
             /** Format: uuid */
@@ -13203,6 +13408,157 @@ export interface operations {
             };
         };
     };
+    readonly msp_compliance_framework_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFrameworkResult"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_framework_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceFrameworkWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceFrameworkWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceFrameworkWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFramework"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_framework_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFramework"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_catalog_revision_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["ComplianceCatalogRevision"][];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_catalog_revision_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceCatalogWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceCatalogWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceCatalogWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceCatalogRevision"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_catalog_revision_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+                readonly revision_number: number;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceCatalogRevision"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
@@ -16746,6 +17102,165 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Invitation"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_framework_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFrameworkResult"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_framework_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceFrameworkWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceFrameworkWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceFrameworkWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFramework"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_framework_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceFramework"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_catalog_revision_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["ComplianceCatalogRevision"][];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_catalog_revision_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceCatalogWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceCatalogWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceCatalogWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceCatalogRevision"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_catalog_revision_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly framework_entity_id: string;
+                readonly organization_entity_id: string;
+                readonly revision_number: number;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceCatalogRevision"];
                 };
             };
         };

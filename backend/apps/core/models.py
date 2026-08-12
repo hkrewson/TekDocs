@@ -4366,3 +4366,237 @@ class NotificationEmailDelivery(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Notification email deliveries cannot be deleted")
+
+
+class ComplianceFramework(TimestampedModel):
+    """Stable identity for one Workspace-owned compliance framework."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_frameworks")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_frameworks")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="compliance_frameworks",
+        null=True,
+        blank=True,
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="compliance_framework_record")
+    current_revision = models.ForeignKey(
+        "ComplianceCatalogRevision",
+        on_delete=models.PROTECT,
+        related_name="current_for_frameworks",
+        null=True,
+        blank=True,
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "id")
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_compfw_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+
+class ComplianceCatalogRevision(models.Model):
+    """Immutable metadata and ordered-control snapshot for one framework version."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_catalog_revisions")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_catalog_revisions")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="compliance_catalog_revisions",
+        null=True,
+        blank=True,
+    )
+    framework = models.ForeignKey(ComplianceFramework, on_delete=models.PROTECT, related_name="revisions")
+    revision_number = models.PositiveIntegerField()
+    version_label = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    source_url = models.URLField(max_length=500, blank=True)
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_compliance_catalog_revisions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-revision_number", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("framework", "revision_number"),
+                name="compliance_catalog_revision_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(revision_number__gte=1),
+                name="compliance_catalog_revision_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"),
+                name="compliance_catalog_digest_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_compcat_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.framework} revision {self.revision_number}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance catalog revisions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance catalog revisions are retained")
+
+
+class ComplianceControl(models.Model):
+    """Stable addressable identity for a control across catalog revisions."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_controls")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_controls")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="compliance_controls",
+        null=True,
+        blank=True,
+    )
+    framework = models.ForeignKey(ComplianceFramework, on_delete=models.PROTECT, related_name="controls")
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="compliance_control_record")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("created_at", "id")
+        indexes = [models.Index(fields=("workspace", "framework"), name="core_compctl_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+
+class ComplianceControlRevision(models.Model):
+    """Immutable Markdown-capable control content reused by catalog snapshots."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_control_revisions")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_control_revisions")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="compliance_control_revisions",
+        null=True,
+        blank=True,
+    )
+    control = models.ForeignKey(ComplianceControl, on_delete=models.PROTECT, related_name="revisions")
+    revision_number = models.PositiveIntegerField()
+    identifier = models.CharField(max_length=100)
+    title = models.CharField(max_length=240)
+    description = models.TextField(blank=True)
+    guidance = models.TextField(blank=True)
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_compliance_control_revisions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-revision_number", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("control", "revision_number"),
+                name="compliance_control_revision_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(revision_number__gte=1),
+                name="compliance_control_revision_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"),
+                name="compliance_control_digest_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_compctlrev_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.identifier} revision {self.revision_number}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance control revisions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance control revisions are retained")
+
+
+class ComplianceCatalogEntry(models.Model):
+    """One immutable ordered control-revision membership in a catalog snapshot."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_catalog_entries")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_catalog_entries")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="compliance_catalog_entries",
+        null=True,
+        blank=True,
+    )
+    catalog_revision = models.ForeignKey(
+        ComplianceCatalogRevision,
+        on_delete=models.PROTECT,
+        related_name="entries",
+    )
+    control_revision = models.ForeignKey(
+        ComplianceControlRevision,
+        on_delete=models.PROTECT,
+        related_name="catalog_entries",
+    )
+    position = models.PositiveIntegerField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("position", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("catalog_revision", "position"),
+                name="compliance_catalog_entry_position_unique",
+            ),
+            models.UniqueConstraint(
+                fields=("catalog_revision", "control_revision"),
+                name="compliance_catalog_entry_revision_unique",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "catalog_revision"), name="core_compentry_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.catalog_revision}: {self.control_revision}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance catalog entries are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance catalog entries are retained")

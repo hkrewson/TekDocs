@@ -53,6 +53,11 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_integrationlogevent",
     "core_integrationconflict",
     "core_gitexportbundle",
+    "core_complianceframework",
+    "core_compliancecatalogrevision",
+    "core_compliancecontrol",
+    "core_compliancecontrolrevision",
+    "core_compliancecatalogentry",
 )
 
 TENANT_SCOPED_TABLES = (

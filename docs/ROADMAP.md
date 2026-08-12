@@ -1101,7 +1101,7 @@ Evidence: `docs/releases/0.7.0.md`.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.7.1` | Compliance frameworks and versioned control catalogs. |
+| `0.7.1` | **Complete:** Compliance frameworks and versioned control catalogs. |
 | `0.7.2` | Applicability, owners, status, reviews, and scoped control assignments. |
 | `0.7.3` | Evidence links, collection windows, review history, and permission-aware reuse. |
 | `0.7.4` | Risks, treatments, acceptance, deadlines, and reporting. |
@@ -1115,6 +1115,16 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.12` | TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
 | `0.7.13` | Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
 | `0.8.0` | Stabilize and certify compliance evidence and safe monitoring. |
+
+### `0.7.1` acceptance criteria
+
+- [x] Frameworks and controls have stable Entity-backed identities owned by one explicit MSP or organization Workspace; MSP reads are not client aggregates and sibling identifiers return no record.
+- [x] Changed control content creates an immutable revision while unchanged content reuses its exact revision. Every catalog version retains an ordered snapshot of exact control revisions and canonical SHA-256 digests.
+- [x] Strict bounded APIs and a responsive MSP/client Compliance surface support framework creation, full version publication, current catalog reads, and historical snapshot inspection through central MFA-gated compliance policy.
+- [x] PostgreSQL validates Workspace, Entity, framework, control, actor, current-revision, and entry edges; blocks revision/entry rewrite or deletion; rejects duplicate stable controls; and forces exact-Workspace RLS.
+- [x] Permission/IDOR, database-retention, RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0063, and release evidence agree at `0.7.1`. Applicability, evidence, risk, and review domain families are not added.
+
+Evidence: `docs/releases/0.7.1.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

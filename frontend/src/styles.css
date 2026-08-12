@@ -9,6 +9,8 @@
   --sidebar-border: #30332f;
   --canvas: #f2f1ed;
   --surface: #faf9f6;
+  --surface-subtle: #f4f2ec;
+  --surface-hover: #ece9e1;
   --border: #d8d6cf;
   --border-strong: #c5c1b7;
   --text: #23241f;
@@ -845,6 +847,40 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .catalog-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
 .catalog-form-grid label, .catalog-notes, .catalog-spec-fields label, .specification-row label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 600; }
 .catalog-form-grid .wide-field { grid-column: 1 / -1; }
+
+.compliance-layout { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.compliance-index { padding: 12px; }
+.compliance-framework-list, .compliance-control-list, .compliance-control-editor { margin: 12px 0 0; padding: 0; list-style: none; }
+.compliance-framework-list li + li { border-top: 1px solid var(--border); }
+.compliance-framework-list button { width: 100%; padding: 11px 10px; display: grid; gap: 3px; text-align: left; color: var(--text); background: transparent; border: 0; border-radius: 6px; }
+.compliance-framework-list button:hover, .compliance-framework-list button.selected { background: var(--surface-hover); }
+.compliance-framework-list button span { color: var(--muted); font-size: 12px; }
+.compliance-revision-bar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 10px 0; border-block: 1px solid var(--border); }
+.compliance-revision-bar label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.compliance-revision-bar select { min-height: 34px; padding: 5px 8px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 6px; }
+.compliance-revision-bar > span { color: var(--muted); font-size: 12px; }
+.compliance-version-metadata { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; }
+.compliance-version-metadata div { min-width: 0; }
+.compliance-version-metadata dt { color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.compliance-version-metadata dd { margin: 3px 0 0; overflow-wrap: anywhere; font-size: 13px; }
+.compliance-control-list { counter-reset: compliance-control; border-top: 1px solid var(--border); }
+.compliance-control-list > li { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.compliance-control-list > li > div { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.compliance-control-list h3 { margin: 5px 0 7px; font-size: 15px; }
+.compliance-control-list p { margin: 0; white-space: pre-wrap; }
+.compliance-control-list details { margin-top: 10px; }
+.compliance-control-list pre { margin: 8px 0 0; padding: 10px; white-space: pre-wrap; font-family: inherit; background: var(--surface-subtle); border-radius: 6px; }
+.compliance-catalog-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compliance-catalog-fields label, .compliance-framework-name, .compliance-control-editor label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.compliance-catalog-fields .wide-field { grid-column: 1 / -1; }
+.compliance-catalog-fields input, .compliance-catalog-fields textarea, .compliance-framework-name input, .compliance-control-editor input, .compliance-control-editor textarea { width: 100%; min-height: 36px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; font-weight: 400; }
+.compliance-framework-name { max-width: 520px; margin-bottom: 12px; }
+.compliance-controls-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-top: 20px; }
+.compliance-controls-heading h3, .compliance-controls-heading p { margin: 0; }
+.compliance-controls-heading p { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.compliance-control-editor { display: grid; gap: 12px; }
+.compliance-control-editor > li { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
+.compliance-control-title { display: grid; grid-template-columns: minmax(100px, 160px) minmax(0, 1fr) 32px; gap: 10px; align-items: end; }
 .catalog-notes { margin-top: 14px; }
 .catalog-spec-fields, .specification-builder { margin: 16px 0 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--border); }
 .catalog-spec-fields legend, .specification-builder legend { padding: 0 0 9px; font-size: 11px; font-weight: 600; }
@@ -958,6 +994,11 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .catalog-document-form .form-actions { grid-column: auto; }
   .catalog-form-grid { grid-template-columns: 1fr; }
   .catalog-form-grid .wide-field { grid-column: auto; }
+  .compliance-layout, .compliance-catalog-fields { grid-template-columns: 1fr; }
+  .compliance-catalog-fields .wide-field { grid-column: auto; }
+  .compliance-version-metadata { grid-template-columns: 1fr 1fr; }
+  .compliance-control-title { grid-template-columns: 1fr 32px; }
+  .compliance-control-title label:first-child { grid-column: 1 / -1; }
   .specification-row { grid-template-columns: 1fr 1fr; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .catalog-definition-list li, .catalog-model-heading { align-items: flex-start; flex-direction: column; }
 }

@@ -49,6 +49,16 @@ from apps.core.commercial_views import (
     ContractCostDetailView,
     ContractCostListCreateView,
 )
+from apps.core.compliance_catalog_views import (
+    MSPComplianceCatalogRevisionDetailView,
+    MSPComplianceCatalogRevisionListCreateView,
+    MSPComplianceFrameworkDetailView,
+    MSPComplianceFrameworkListCreateView,
+    OrganizationComplianceCatalogRevisionDetailView,
+    OrganizationComplianceCatalogRevisionListCreateView,
+    OrganizationComplianceFrameworkDetailView,
+    OrganizationComplianceFrameworkListCreateView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -611,6 +621,26 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/git-exports/<uuid:bundle_id>/download",
         GitExportDownloadView.as_view(),
         name="msp-git-export-download",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks",
+        MSPComplianceFrameworkListCreateView.as_view(),
+        name="msp-compliance-framework-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>",
+        MSPComplianceFrameworkDetailView.as_view(),
+        name="msp-compliance-framework-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/revisions",
+        MSPComplianceCatalogRevisionListCreateView.as_view(),
+        name="msp-compliance-catalog-revision-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/revisions/<int:revision_number>",
+        MSPComplianceCatalogRevisionDetailView.as_view(),
+        name="msp-compliance-catalog-revision-detail",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1520,6 +1550,26 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/git-exports/<uuid:bundle_id>/download",
         GitExportDownloadView.as_view(),
         name="organization-git-export-download",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks",
+        OrganizationComplianceFrameworkListCreateView.as_view(),
+        name="organization-compliance-framework-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>",
+        OrganizationComplianceFrameworkDetailView.as_view(),
+        name="organization-compliance-framework-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/revisions",
+        OrganizationComplianceCatalogRevisionListCreateView.as_view(),
+        name="organization-compliance-catalog-revision-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/revisions/<int:revision_number>",
+        OrganizationComplianceCatalogRevisionDetailView.as_view(),
+        name="organization-compliance-catalog-revision-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

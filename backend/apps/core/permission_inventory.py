@@ -137,6 +137,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.COMPLIANCE_EDIT,),
     ),
     route("msp-compliance-evidence-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
+    route(
+        "msp-compliance-risk-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+    ),
+    route("msp-compliance-risk-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route("msp-compliance-assignment-evidence-link", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route(
         "msp-document-reference-list-create",
@@ -1273,6 +1280,19 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-compliance-assignment-evidence-link",
+        ("POST",),
+        mutations=(PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-risk-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-risk-review",
         ("POST",),
         mutations=(PermissionKey.COMPLIANCE_EDIT,),
         organization_scoped=True,

@@ -107,6 +107,17 @@ export type ComplianceEvidence = {
 };
 export type ComplianceEvidenceDraft = Pick<ComplianceEvidence, "title" | "kind" | "summary" | "source_url" | "source_entity_id" | "collection_start" | "collection_end">;
 export type ComplianceEvidenceResult = { results: ComplianceEvidence[]; page: number; page_size: number; count: number; has_more: boolean };
+export type ComplianceRisk = {
+  id: string; title: string; description: string; assignment_id: string | null; control: string | null;
+  likelihood: number; impact: number; score: number; reporting_band: "low" | "moderate" | "high" | "critical";
+  status: "open" | "monitoring" | "accepted" | "closed";
+  treatment: "mitigate" | "avoid" | "transfer" | "accept"; treatment_plan: string;
+  owner_id: string | null; owner: string | null; due_date: string | null;
+  accepted_by: string | null; accepted_at: string | null;
+  events: { id: string; control_revision: number | null; likelihood: number; impact: number; status: string; treatment: string; treatment_plan: string; due_date: string | null; decision: string; note: string; recorded_by: string; recorded_at: string }[];
+};
+export type ComplianceRiskDraft = Pick<ComplianceRisk, "title" | "description" | "assignment_id" | "likelihood" | "impact" | "status" | "treatment" | "treatment_plan" | "owner_id" | "due_date"> & { decision: string; note: string };
+export type ComplianceRiskResult = { results: ComplianceRisk[]; page: number; page_size: number; count: number; has_more: boolean; owner_choices: ComplianceOwnerChoice[]; summary: { total: number; by_status: Record<string, number>; by_band: Record<string, number>; overdue: number } };
 
 export interface ComplianceClient {
   list(
@@ -144,6 +155,9 @@ export interface ComplianceClient {
   createEvidence(workspace: WorkspaceContext | null, draft: ComplianceEvidenceDraft): Promise<ComplianceEvidence>;
   reviewEvidence(workspace: WorkspaceContext | null, evidenceId: string, draft: { status: ComplianceEvidence["reviews"][number]["status"]; decision: string; note: string }): Promise<ComplianceEvidence["reviews"][number]>;
   linkEvidence(workspace: WorkspaceContext | null, assignmentId: string, evidenceId: string): Promise<ComplianceEvidence["control_links"][number]>;
+  risks(workspace: WorkspaceContext | null, signal?: AbortSignal): Promise<ComplianceRiskResult>;
+  createRisk(workspace: WorkspaceContext | null, draft: ComplianceRiskDraft): Promise<ComplianceRisk>;
+  reviewRisk(workspace: WorkspaceContext | null, riskId: string, draft: ComplianceRiskDraft): Promise<ComplianceRisk>;
 }
 
 function collectionPath(workspace: WorkspaceContext | null) {
@@ -156,6 +170,12 @@ function evidencePath(workspace: WorkspaceContext | null) {
   return workspace
     ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/evidence`
     : "/api/v1/workspaces/msp/compliance/evidence";
+}
+
+function riskPath(workspace: WorkspaceContext | null) {
+  return workspace
+    ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/risks`
+    : "/api/v1/workspaces/msp/compliance/risks";
 }
 
 function csrfToken() {
@@ -264,4 +284,11 @@ export const browserComplianceClient: ComplianceClient = {
     `${evidencePath(workspace).replace(/\/evidence$/, "")}/assignments/${encodeURIComponent(assignmentId)}/evidence`,
     { evidence_id: evidenceId },
   ),
+  async risks(workspace, signal) {
+    return parse(await fetch(`${riskPath(workspace)}?page=1&page_size=100`, {
+      credentials: "same-origin", headers: { Accept: "application/json" }, signal,
+    }));
+  },
+  createRisk: (workspace, draft) => post(riskPath(workspace), draft),
+  reviewRisk: (workspace, riskId, draft) => post(`${riskPath(workspace)}/${encodeURIComponent(riskId)}/review`, draft),
 };

@@ -1104,7 +1104,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.1` | **Complete:** Compliance frameworks and versioned control catalogs. |
 | `0.7.2` | **Complete:** Applicability, owners, status, reviews, and scoped control assignments. |
 | `0.7.3` | **Complete:** Evidence links, collection windows, review history, and permission-aware reuse. |
-| `0.7.4` | Risks, treatments, acceptance, deadlines, and reporting. |
+| `0.7.4` | **Complete:** Risks, treatments, acceptance, deadlines, and reporting. |
 | `0.7.5` | Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
@@ -1145,6 +1145,16 @@ Evidence: `docs/releases/0.7.2.md`.
 - [x] Permission/IDOR, forced RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0065, and release evidence agree at `0.7.3`. Risk treatment and signed bundles remain later slices.
 
 Evidence: `docs/releases/0.7.3.md`.
+
+### `0.7.4` acceptance criteria
+
+- [x] Risks have stable Entity-backed identities in one explicit MSP or organization Workspace, with bounded Markdown description/treatment, optional exact-scope control assignment, authorized user owner, and deadline.
+- [x] Likelihood and impact use a maintained 1–5 contract; the server derives a 1–25 score and low/moderate/high/critical reporting band. Exact-Workspace summaries report status, band, and overdue counts without client aggregation.
+- [x] Mitigate, avoid, transfer, and accept treatments are explicit. Acceptance requires accepted status, records the authenticated accepting actor and time, and does not erase or imply remediation.
+- [x] Every create/review appends a retained full-state decision, pinned to the related control revision when present. Django and PostgreSQL reject history rewrite, forged actors/owners/assignments, invalid acceptance, and cross-Workspace edges.
+- [x] Strict MSP/organization APIs, the Compliance risk register, permission/IDOR matrix, forced RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0066, and release evidence agree at `0.7.4`. Signed evidence bundles remain later.
+
+Evidence: `docs/releases/0.7.4.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

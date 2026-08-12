@@ -1,4 +1,5 @@
 import secrets
+from datetime import timedelta
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
@@ -6,14 +7,17 @@ from django.core.exceptions import ValidationError
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.compliance_catalogs import ControlInput, create_catalog_version, create_framework, frameworks_for_scope
 from apps.core.compliance_evidence import EvidenceInput, create_evidence, link_evidence, review_evidence
 from apps.core.compliance_operations import AssignmentInput, record_assignment_review
+from apps.core.compliance_risks import RiskInput, create_risk, review_risk, risk_summary
 from apps.core.models import (
     ComplianceCatalogEntry,
     ComplianceCatalogRevision,
+    ComplianceRiskEvent,
     InstallationState,
 )
 from apps.core.organizations import create_organization
@@ -395,3 +399,95 @@ def test_database_guards_retain_catalog_evidence_and_reject_scope_retargeting(in
         ComplianceCatalogRevision.objects.filter(pk=revision.pk).update(version_label="rewritten")
     with pytest.raises(DatabaseError), transaction.atomic():
         ComplianceCatalogEntry.objects.filter(pk=entry.pk).delete()
+
+
+@pytest.mark.django_db
+def test_risks_score_treatment_acceptance_deadlines_and_retained_decisions(installation):
+    workspace = resolve_msp_workspace(installation.owner)
+    risk = create_risk(
+        workspace=workspace,
+        actor_id=installation.owner.id,
+        value=RiskInput(
+            title="Unsupported firewall",
+            description="The perimeter appliance is end of support.",
+            likelihood=4,
+            impact=5,
+            status="open",
+            treatment="mitigate",
+            treatment_plan="Replace the appliance.",
+            due_date=timezone.localdate() - timedelta(days=1),
+            owner_id=installation.owner.id,
+            decision="Added to register",
+        ),
+    )
+    assert risk.score == 20
+    assert risk.reporting_band == "critical"
+    assert risk_summary(workspace.data_scope)["overdue"] == 1
+
+    accepted = review_risk(
+        risk=risk,
+        workspace=workspace,
+        actor_id=installation.owner.id,
+        value=RiskInput(
+            title="Unsupported firewall",
+            description=risk.description,
+            likelihood=2,
+            impact=3,
+            status="accepted",
+            treatment="accept",
+            treatment_plan="Replacement is scheduled next quarter.",
+            due_date=None,
+            owner_id=installation.owner.id,
+            decision="Residual risk accepted",
+        ),
+    )
+    assert accepted.accepted_by_id == installation.owner.id
+    assert accepted.accepted_at is not None
+    assert accepted.events.count() == 2
+    assert risk_summary(workspace.data_scope)["by_status"] == {"accepted": 1}
+    event = accepted.events.first()
+    with pytest.raises(ValidationError):
+        event.delete()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        ComplianceRiskEvent.objects.filter(pk=event.pk).update(decision="Rewritten")
+
+
+@pytest.mark.django_db
+def test_risk_api_reports_exact_workspace_and_requires_explicit_acceptance(owner_client, installation):
+    url = reverse("msp-compliance-risk-list-create")
+    created = owner_client.post(
+        url,
+        {
+            "title": "Recovery gap",
+            "description": "Restore evidence is incomplete.",
+            "likelihood": 3,
+            "impact": 4,
+            "status": "monitoring",
+            "treatment": "mitigate",
+            "treatment_plan": "Complete a restore test.",
+            "owner_id": str(installation.owner.id),
+            "decision": "Track this quarter",
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["score"] == 12
+    assert created.json()["reporting_band"] == "high"
+    listing = owner_client.get(url).json()
+    assert listing["summary"]["total"] == 1
+    assert listing["owner_choices"][0]["id"] == str(installation.owner.id)
+
+    invalid = owner_client.post(
+        reverse("msp-compliance-risk-review", kwargs={"risk_entity_id": created.json()["id"]}),
+        {
+            "title": "Recovery gap",
+            "description": "Restore evidence is incomplete.",
+            "likelihood": 2,
+            "impact": 3,
+            "status": "accepted",
+            "treatment": "mitigate",
+            "decision": "Invalid acceptance",
+        },
+        content_type="application/json",
+    )
+    assert invalid.status_code == 400

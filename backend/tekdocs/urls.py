@@ -71,6 +71,12 @@ from apps.core.compliance_evidence_views import (
     OrganizationComplianceEvidenceListCreateView,
     OrganizationComplianceEvidenceReviewView,
 )
+from apps.core.compliance_risk_views import (
+    MSPComplianceRiskListCreateView,
+    MSPComplianceRiskReviewView,
+    OrganizationComplianceRiskListCreateView,
+    OrganizationComplianceRiskReviewView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -678,6 +684,16 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/assignments/<uuid:assignment_id>/evidence",
         MSPComplianceAssignmentEvidenceLinkView.as_view(),
         name="msp-compliance-assignment-evidence-link",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/risks",
+        MSPComplianceRiskListCreateView.as_view(),
+        name="msp-compliance-risk-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/risks/<uuid:risk_entity_id>/review",
+        MSPComplianceRiskReviewView.as_view(),
+        name="msp-compliance-risk-review",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1632,6 +1648,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/assignments/<uuid:assignment_id>/evidence",
         OrganizationComplianceAssignmentEvidenceLinkView.as_view(),
         name="organization-compliance-assignment-evidence-link",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/risks",
+        OrganizationComplianceRiskListCreateView.as_view(),
+        name="organization-compliance-risk-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/risks/<uuid:risk_entity_id>/review",
+        OrganizationComplianceRiskReviewView.as_view(),
+        name="organization-compliance-risk-review",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

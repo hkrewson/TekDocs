@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.3
+  version: 0.7.4
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -6128,6 +6128,114 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/compliance/risks:
+    get:
+      operationId: msp_compliance_risk_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRiskResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_compliance_risk_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRisk'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/risks/{risk_entity_id}/review:
+    post:
+      operationId: msp_compliance_risk_review
+      parameters:
+      - in: path
+        name: risk_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRisk'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/contracts:
     get:
       operationId: workspaces_msp_contracts_retrieve_list
@@ -11305,6 +11413,133 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceCatalogRevision'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/risks:
+    get:
+      operationId: organization_compliance_risk_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRiskResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_compliance_risk_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRisk'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/risks/{risk_entity_id}/review:
+    post:
+      operationId: organization_compliance_risk_review
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: risk_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceRiskWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceRisk'
           description: ''
           headers:
             X-Request-ID:
@@ -20005,6 +20240,228 @@ components:
       required:
       - display_name
       - id
+    ComplianceRisk:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        assignment_id:
+          type: string
+          format: uuid
+          nullable: true
+        control:
+          type: string
+          nullable: true
+        likelihood:
+          type: integer
+        impact:
+          type: integer
+        score:
+          type: integer
+        reporting_band:
+          type: string
+        status:
+          type: string
+        treatment:
+          type: string
+        treatment_plan:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        accepted_by:
+          type: string
+          nullable: true
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceRiskEvent'
+      required:
+      - accepted_at
+      - accepted_by
+      - assignment_id
+      - control
+      - description
+      - due_date
+      - events
+      - id
+      - impact
+      - likelihood
+      - owner
+      - owner_id
+      - reporting_band
+      - score
+      - status
+      - title
+      - treatment
+      - treatment_plan
+    ComplianceRiskEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        control_revision:
+          type: integer
+          nullable: true
+        likelihood:
+          type: integer
+        impact:
+          type: integer
+        status:
+          type: string
+        treatment:
+          type: string
+        treatment_plan:
+          type: string
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        decision:
+          type: string
+        note:
+          type: string
+        recorded_by:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+      required:
+      - control_revision
+      - decision
+      - due_date
+      - id
+      - impact
+      - likelihood
+      - note
+      - recorded_at
+      - recorded_by
+      - status
+      - treatment
+      - treatment_plan
+    ComplianceRiskResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceRisk'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        owner_choices:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        summary:
+          type: object
+          additionalProperties: {}
+      required:
+      - count
+      - has_more
+      - owner_choices
+      - page
+      - page_size
+      - results
+      - summary
+    ComplianceRiskWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+          default: ''
+          maxLength: 20000
+        likelihood:
+          type: integer
+          maximum: 5
+          minimum: 1
+        impact:
+          type: integer
+          maximum: 5
+          minimum: 1
+        status:
+          enum:
+          - open
+          - monitoring
+          - accepted
+          - closed
+          type: string
+          description: |-
+            * `open` - open
+            * `monitoring` - monitoring
+            * `accepted` - accepted
+            * `closed` - closed
+          x-spec-enum-id: 975a5dfb1b905601
+        treatment:
+          enum:
+          - mitigate
+          - avoid
+          - transfer
+          - accept
+          type: string
+          description: |-
+            * `mitigate` - mitigate
+            * `avoid` - avoid
+            * `transfer` - transfer
+            * `accept` - accept
+          x-spec-enum-id: 3ddd7a934b579e18
+        treatment_plan:
+          type: string
+          default: ''
+          maxLength: 20000
+        assignment_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        decision:
+          type: string
+          maxLength: 120
+        note:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - decision
+      - impact
+      - likelihood
+      - status
+      - title
+      - treatment
     Conflict:
       type: object
       properties:

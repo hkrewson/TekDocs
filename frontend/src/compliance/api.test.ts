@@ -20,6 +20,14 @@ describe('compliance API client', () => {
       status: 'accepted', decision: 'Reviewed', note: '',
     })
     await browserComplianceClient.linkEvidence(workspace, 'assignment/1', 'evidence/1')
+    await browserComplianceClient.risks(workspace)
+    const risk = {
+      title: 'Recovery gap', description: '', assignment_id: null, likelihood: 3, impact: 4,
+      status: 'open', treatment: 'mitigate', treatment_plan: '', owner_id: null, due_date: null,
+      decision: 'Track', note: '',
+    } as const
+    await browserComplianceClient.createRisk(workspace, risk)
+    await browserComplianceClient.reviewRisk(workspace, 'risk/1', risk)
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/compliance/evidence?page=1&page_size=100',
@@ -32,6 +40,10 @@ describe('compliance API client', () => {
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/compliance/assignments/assignment%2F1/evidence',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ evidence_id: 'evidence/1' }) }),
+    )
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/compliance/risks/risk%2F1/review',
+      expect.objectContaining({ method: 'POST' }),
     )
     const write = vi.mocked(fetch).mock.calls.find(([url, options]) =>
       url === '/api/v1/workspaces/organizations/client%2F1/compliance/evidence' && options?.method === 'POST')

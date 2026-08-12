@@ -4825,3 +4825,131 @@ class ComplianceEvidenceReview(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Compliance evidence reviews are retained")
+
+
+class ComplianceRiskStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    MONITORING = "monitoring", "Monitoring"
+    ACCEPTED = "accepted", "Accepted"
+    CLOSED = "closed", "Closed"
+
+
+class ComplianceRiskTreatment(models.TextChoices):
+    MITIGATE = "mitigate", "Mitigate"
+    AVOID = "avoid", "Avoid"
+    TRANSFER = "transfer", "Transfer"
+    ACCEPT = "accept", "Accept"
+
+
+class ComplianceRisk(TimestampedModel):
+    """Current exact-Workspace risk projection; decisions are retained as events."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_risks")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_risks")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_risks", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="compliance_risk")
+    assignment = models.ForeignKey(
+        ComplianceControlAssignment, on_delete=models.PROTECT, related_name="risks", null=True, blank=True
+    )
+    description = models.TextField(blank=True)
+    likelihood = models.PositiveSmallIntegerField()
+    impact = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=16, choices=ComplianceRiskStatus.choices)
+    treatment = models.CharField(max_length=16, choices=ComplianceRiskTreatment.choices)
+    treatment_plan = models.TextField(blank=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_compliance_risks", null=True, blank=True
+    )
+    due_date = models.DateField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="accepted_compliance_risks",
+        null=True,
+        blank=True,
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-updated_at", "entity__display_name", "id")
+        indexes = [models.Index(fields=("workspace", "status", "due_date"), name="core_comprisk_scope_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(likelihood__gte=1, likelihood__lte=5), name="risk_likelihood_1_5"
+            ),
+            models.CheckConstraint(condition=models.Q(impact__gte=1, impact__lte=5), name="risk_impact_1_5"),
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    @property
+    def score(self) -> int:
+        return self.likelihood * self.impact
+
+    @property
+    def reporting_band(self) -> str:
+        if self.score >= 16:
+            return "critical"
+        if self.score >= 10:
+            return "high"
+        if self.score >= 5:
+            return "moderate"
+        return "low"
+
+
+class ComplianceRiskEvent(models.Model):
+    """Append-only risk decision and complete reporting snapshot."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_risk_events")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_risk_events")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_risk_events", null=True, blank=True
+    )
+    risk = models.ForeignKey(ComplianceRisk, on_delete=models.PROTECT, related_name="events")
+    control_revision = models.ForeignKey(
+        ComplianceControlRevision, on_delete=models.PROTECT, related_name="risk_events", null=True, blank=True
+    )
+    likelihood = models.PositiveSmallIntegerField()
+    impact = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=16, choices=ComplianceRiskStatus.choices)
+    treatment = models.CharField(max_length=16, choices=ComplianceRiskTreatment.choices)
+    treatment_plan = models.TextField(blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    decision = models.CharField(max_length=120)
+    note = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="compliance_risk_events"
+    )
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-recorded_at", "id")
+        indexes = [models.Index(fields=("workspace", "recorded_at"), name="core_compriskev_scope_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(likelihood__gte=1, likelihood__lte=5), name="risk_event_likelihood_1_5"
+            ),
+            models.CheckConstraint(condition=models.Q(impact__gte=1, impact__lte=5), name="risk_event_impact_1_5"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.risk} decision at {self.recorded_at}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance risk events are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance risk events are retained")

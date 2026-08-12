@@ -15,6 +15,9 @@ import type {
   ComplianceFramework,
   ComplianceFrameworkDraft,
   ComplianceOwnerChoice,
+  ComplianceRisk,
+  ComplianceRiskDraft,
+  ComplianceRiskResult,
 } from "./api";
 
 const EMPTY_CONTROL: ComplianceControlDraft = {
@@ -45,6 +48,11 @@ const EMPTY_EVIDENCE: ComplianceEvidenceDraft = {
   source_entity_id: null,
   collection_start: null,
   collection_end: null,
+};
+const EMPTY_RISK: ComplianceRiskDraft = {
+  title: "", description: "", assignment_id: null, likelihood: 3, impact: 3,
+  status: "open", treatment: "mitigate", treatment_plan: "", owner_id: null,
+  due_date: null, decision: "", note: "",
 };
 
 function controlsFrom(
@@ -253,6 +261,13 @@ export function Compliance({
   const [existingEvidenceId, setExistingEvidenceId] = useState("");
   const [evidenceAssignmentId, setEvidenceAssignmentId] = useState("");
   const [evidenceDecision, setEvidenceDecision] = useState("");
+  const [risks, setRisks] = useState<ComplianceRisk[]>([]);
+  const [riskSummary, setRiskSummary] = useState<ComplianceRiskResult["summary"]>({
+    total: 0, overdue: 0, by_status: {}, by_band: {},
+  });
+  const [riskFormOpen, setRiskFormOpen] = useState(false);
+  const [editingRiskId, setEditingRiskId] = useState<string | null>(null);
+  const [riskDraft, setRiskDraft] = useState<ComplianceRiskDraft>(EMPTY_RISK);
   const [reviewingControl, setReviewingControl] = useState<string | null>(null);
   const [assignmentDraft, setAssignmentDraft] =
     useState<ComplianceAssignmentDraft>(EMPTY_ASSIGNMENT);
@@ -326,6 +341,18 @@ export function Compliance({
       .catch(() => {
         if (!controller.signal.aborted) setError("Compliance evidence could not be loaded.");
       });
+    return () => controller.abort();
+  }, [client, workspace]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    client.risks(workspace, controller.signal).then((result) => {
+      setRisks(result.results);
+      setRiskSummary(result.summary);
+      if (result.owner_choices.length) setOwnerChoices(result.owner_choices);
+    }).catch(() => {
+      if (!controller.signal.aborted) setError("Compliance risks could not be loaded.");
+    });
     return () => controller.abort();
   }, [client, workspace]);
 
@@ -464,6 +491,36 @@ export function Compliance({
       setEvidenceDecision("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The evidence could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editRisk(risk: ComplianceRisk) {
+    setEditingRiskId(risk.id);
+    setRiskDraft({
+      title: risk.title, description: risk.description, assignment_id: risk.assignment_id,
+      likelihood: risk.likelihood, impact: risk.impact, status: risk.status, treatment: risk.treatment,
+      treatment_plan: risk.treatment_plan, owner_id: risk.owner_id, due_date: risk.due_date,
+      decision: "", note: "",
+    });
+    setRiskFormOpen(true);
+  }
+
+  async function saveRisk() {
+    setSaving(true);
+    setError(null);
+    try {
+      if (editingRiskId) await client.reviewRisk(workspace, editingRiskId, riskDraft);
+      else await client.createRisk(workspace, riskDraft);
+      const result = await client.risks(workspace);
+      setRisks(result.results);
+      setRiskSummary(result.summary);
+      setRiskFormOpen(false);
+      setEditingRiskId(null);
+      setRiskDraft(EMPTY_RISK);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The risk decision could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -911,6 +968,38 @@ export function Compliance({
         {evidence.length === 0 ? <p className="empty-state">No evidence has been collected in this workspace.</p> : (
           <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Evidence</th><th>Source / window</th><th>Controls</th><th>Latest review</th></tr></thead><tbody>{evidence.map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.kind}</small></td><td>{item.source_url ? <a href={item.source_url} target="_blank" rel="noreferrer">Open source</a> : item.source_entity_name ?? "Recorded in TekDocs"}<small>{item.collection_start ?? "Open"} – {item.collection_end ?? "Open"}</small></td><td>{item.control_links.length ? item.control_links.map((link) => `r${link.control_revision}`).join(", ") : "Unlinked"}</td><td>{item.reviews[0] ? <><strong>{item.reviews[0].status}</strong><small>{item.reviews[0].decision}</small></> : "Not reviewed"}</td></tr>)}</tbody></table></div>
         )}
+      </section>
+      <section className="content-section compliance-risks" aria-labelledby="compliance-risks-heading">
+        <div className="section-heading">
+          <div>
+            <h2 id="compliance-risks-heading">Risk register</h2>
+            <p>Workspace risks with consistent scoring, accountable treatment, deadlines, and retained decisions.</p>
+          </div>
+          {canManage && <button type="button" className="secondary-button" onClick={() => { setEditingRiskId(null); setRiskDraft(EMPTY_RISK); setRiskFormOpen(true); }}><Plus size={15} /> Add risk</button>}
+        </div>
+        <div className="compliance-risk-summary" aria-label="Risk reporting summary">
+          <span><strong>{riskSummary.total}</strong> total</span>
+          <span><strong>{riskSummary.by_band.critical ?? 0}</strong> critical</span>
+          <span><strong>{riskSummary.by_band.high ?? 0}</strong> high</span>
+          <span><strong>{riskSummary.overdue}</strong> overdue</span>
+        </div>
+        {riskFormOpen && <div className="compliance-risk-form">
+          <label className="wide-field"><span>Risk title</span><input value={riskDraft.title} maxLength={240} onChange={(event) => setRiskDraft({ ...riskDraft, title: event.target.value })} /></label>
+          <label className="wide-field"><span>Description (Markdown)</span><textarea rows={3} value={riskDraft.description} onChange={(event) => setRiskDraft({ ...riskDraft, description: event.target.value })} /></label>
+          <label><span>Likelihood (1–5)</span><input type="number" min={1} max={5} value={riskDraft.likelihood} onChange={(event) => setRiskDraft({ ...riskDraft, likelihood: Number(event.target.value) })} /></label>
+          <label><span>Impact (1–5)</span><input type="number" min={1} max={5} value={riskDraft.impact} onChange={(event) => setRiskDraft({ ...riskDraft, impact: Number(event.target.value) })} /></label>
+          <label><span>Status</span><select value={riskDraft.status} onChange={(event) => setRiskDraft({ ...riskDraft, status: event.target.value as ComplianceRiskDraft["status"], treatment: event.target.value === "accepted" ? "accept" : riskDraft.treatment === "accept" ? "mitigate" : riskDraft.treatment })}><option value="open">Open</option><option value="monitoring">Monitoring</option><option value="accepted">Accepted</option><option value="closed">Closed</option></select></label>
+          <label><span>Treatment</span><select value={riskDraft.treatment} onChange={(event) => setRiskDraft({ ...riskDraft, treatment: event.target.value as ComplianceRiskDraft["treatment"], status: event.target.value === "accept" ? "accepted" : riskDraft.status === "accepted" ? "open" : riskDraft.status })}><option value="mitigate">Mitigate</option><option value="avoid">Avoid</option><option value="transfer">Transfer</option><option value="accept">Accept</option></select></label>
+          <label><span>Owner</span><select value={riskDraft.owner_id ?? ""} onChange={(event) => setRiskDraft({ ...riskDraft, owner_id: event.target.value || null })}><option value="">Unassigned</option>{ownerChoices.map((owner) => <option key={owner.id} value={owner.id}>{owner.display_name}</option>)}</select></label>
+          <label><span>Deadline</span><input type="date" value={riskDraft.due_date ?? ""} onChange={(event) => setRiskDraft({ ...riskDraft, due_date: event.target.value || null })} /></label>
+          <label><span>Related control</span><select value={riskDraft.assignment_id ?? ""} onChange={(event) => setRiskDraft({ ...riskDraft, assignment_id: event.target.value || null })}><option value="">No direct control</option>{assignments.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignment.control_identifier} — {assignment.control_title}</option>)}</select></label>
+          <label className="wide-field"><span>Treatment plan (Markdown)</span><textarea rows={3} value={riskDraft.treatment_plan} onChange={(event) => setRiskDraft({ ...riskDraft, treatment_plan: event.target.value })} /></label>
+          <label className="wide-field"><span>Decision</span><input maxLength={120} value={riskDraft.decision} onChange={(event) => setRiskDraft({ ...riskDraft, decision: event.target.value })} /></label>
+          <label className="wide-field"><span>Review note</span><textarea rows={2} value={riskDraft.note} onChange={(event) => setRiskDraft({ ...riskDraft, note: event.target.value })} /></label>
+          {riskDraft.status === "accepted" && <p className="form-note wide-field">Saving records you as the accepting actor. Acceptance is a retained decision, not deletion or remediation.</p>}
+          <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>Cancel</button></div>
+        </div>}
+        {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>Review</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
       </section>
     </>
   );

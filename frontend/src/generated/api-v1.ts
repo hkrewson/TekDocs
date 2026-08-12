@@ -1844,6 +1844,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/compliance/risks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_risk_list"];
+        readonly put?: never;
+        readonly post: operations["msp_compliance_risk_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/risks/{risk_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["msp_compliance_risk_review"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/contracts": {
         readonly parameters: {
             readonly query?: never;
@@ -3390,6 +3422,38 @@ export interface paths {
         readonly get: operations["organization_compliance_catalog_revision_retrieve"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/risks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_risk_list"];
+        readonly put?: never;
+        readonly post: operations["organization_compliance_risk_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/risks/{risk_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["organization_compliance_risk_review"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -5852,6 +5916,95 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             readonly display_name: string;
+        };
+        readonly ComplianceRisk: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly description: string;
+            /** Format: uuid */
+            readonly assignment_id: string | null;
+            readonly control: string | null;
+            readonly likelihood: number;
+            readonly impact: number;
+            readonly score: number;
+            readonly reporting_band: string;
+            readonly status: string;
+            readonly treatment: string;
+            readonly treatment_plan: string;
+            /** Format: uuid */
+            readonly owner_id: string | null;
+            readonly owner: string | null;
+            /** Format: date */
+            readonly due_date: string | null;
+            readonly accepted_by: string | null;
+            /** Format: date-time */
+            readonly accepted_at: string | null;
+            readonly events: readonly components["schemas"]["ComplianceRiskEvent"][];
+        };
+        readonly ComplianceRiskEvent: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly control_revision: number | null;
+            readonly likelihood: number;
+            readonly impact: number;
+            readonly status: string;
+            readonly treatment: string;
+            readonly treatment_plan: string;
+            /** Format: date */
+            readonly due_date: string | null;
+            readonly decision: string;
+            readonly note: string;
+            readonly recorded_by: string;
+            /** Format: date-time */
+            readonly recorded_at: string;
+        };
+        readonly ComplianceRiskResult: {
+            readonly results: readonly components["schemas"]["ComplianceRisk"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly owner_choices: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly summary: {
+                readonly [key: string]: unknown;
+            };
+        };
+        readonly ComplianceRiskWrite: {
+            readonly title: string;
+            /** @default  */
+            readonly description: string;
+            readonly likelihood: number;
+            readonly impact: number;
+            /**
+             * @description * `open` - open
+             *     * `monitoring` - monitoring
+             *     * `accepted` - accepted
+             *     * `closed` - closed
+             * @enum {string}
+             */
+            readonly status: "open" | "monitoring" | "accepted" | "closed";
+            /**
+             * @description * `mitigate` - mitigate
+             *     * `avoid` - avoid
+             *     * `transfer` - transfer
+             *     * `accept` - accept
+             * @enum {string}
+             */
+            readonly treatment: "mitigate" | "avoid" | "transfer" | "accept";
+            /** @default  */
+            readonly treatment_plan: string;
+            /** Format: uuid */
+            readonly assignment_id?: string | null;
+            /** Format: uuid */
+            readonly owner_id?: string | null;
+            /** Format: date */
+            readonly due_date?: string | null;
+            readonly decision: string;
+            /** @default  */
+            readonly note: string;
         };
         readonly Conflict: {
             /** Format: uuid */
@@ -14036,6 +14189,86 @@ export interface operations {
             };
         };
     };
+    readonly msp_compliance_risk_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRiskResult"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_risk_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceRiskWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceRiskWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceRiskWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRisk"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_risk_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly risk_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceRiskWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceRiskWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceRiskWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRisk"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
@@ -17908,6 +18141,91 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ComplianceCatalogRevision"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_risk_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRiskResult"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_risk_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceRiskWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceRiskWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceRiskWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRisk"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_risk_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly risk_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceRiskWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceRiskWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceRiskWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceRisk"];
                 };
             };
         };

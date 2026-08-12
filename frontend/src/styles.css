@@ -880,6 +880,13 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .compliance-evidence-form label { display: grid; gap: 5px; }
 .compliance-evidence-form .wide-field { grid-column: 1 / -1; }
 .compliance-evidence td small { display: block; margin-top: 3px; color: var(--muted); }
+.compliance-risks { margin-top: 16px; }
+.compliance-risk-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
+.compliance-risk-form label { display: grid; gap: 5px; }
+.compliance-risk-form .wide-field { grid-column: 1 / -1; }
+.compliance-risk-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.compliance-risk-summary span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); }
+.compliance-risks td small { display: block; margin-top: 3px; color: var(--muted); }
 .compliance-catalog-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .compliance-catalog-fields label, .compliance-framework-name, .compliance-control-editor label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .compliance-catalog-fields .wide-field { grid-column: 1 / -1; }
@@ -1114,6 +1121,8 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .compliance-assignment-form { grid-template-columns: 1fr; }
   .compliance-evidence-form { grid-template-columns: 1fr; }
   .compliance-evidence-form .wide-field { grid-column: auto; }
+  .compliance-risk-form { grid-template-columns: 1fr; }
+  .compliance-risk-form .wide-field { grid-column: auto; }
   .token-create-form, .token-permissions { grid-template-columns: 1fr; }
   .token-create-form fieldset, .token-create-form .settings-actions { grid-column: 1; }
   .token-secret { grid-template-columns: auto minmax(0, 1fr) auto; }

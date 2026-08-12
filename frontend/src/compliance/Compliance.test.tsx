@@ -57,6 +57,13 @@ function client(): ComplianceClient {
       id: 'evidence-link-1', assignment_id: 'assignment-1', control_id: 'control-1', control_revision: 1,
       linked_by: 'Owner', linked_at: '2026-08-12T00:00:00Z',
     }),
+    risks: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, owner_choices: [{ id: 'owner-1', display_name: 'Compliance Owner' }], summary: { total: 0, overdue: 0, by_status: {}, by_band: {} } }),
+    createRisk: vi.fn().mockResolvedValue({
+      id: 'risk-1', title: 'Recovery gap', description: '', assignment_id: null, control: null,
+      likelihood: 4, impact: 4, score: 16, reporting_band: 'critical', status: 'open', treatment: 'mitigate', treatment_plan: '',
+      owner_id: 'owner-1', owner: 'Compliance Owner', due_date: null, accepted_by: null, accepted_at: null, events: [],
+    }),
+    reviewRisk: vi.fn(),
   }
 }
 
@@ -128,5 +135,57 @@ describe('Compliance', () => {
     })))
     expect(api.reviewEvidence).toHaveBeenCalledWith(null, 'evidence-1', expect.objectContaining({ status: 'collected', decision: 'Collected' }))
     expect(api.linkEvidence).toHaveBeenCalledWith(null, 'assignment-1', 'evidence-1')
+  })
+
+  it('records a scored risk treatment decision', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    render(<Compliance workspace={null} client={api} />)
+
+    await screen.findByRole('heading', { name: 'Risk register' })
+    await user.click(screen.getByRole('button', { name: 'Add risk' }))
+    await user.type(screen.getByLabelText('Risk title'), 'Recovery gap')
+    await user.clear(screen.getByLabelText('Likelihood (1–5)'))
+    await user.type(screen.getByLabelText('Likelihood (1–5)'), '4')
+    await user.clear(screen.getByLabelText('Impact (1–5)'))
+    await user.type(screen.getByLabelText('Impact (1–5)'), '4')
+    await user.selectOptions(screen.getByLabelText('Owner'), 'owner-1')
+    await user.type(screen.getByLabelText('Decision'), 'Track and mitigate')
+    await user.click(screen.getAllByRole('button', { name: 'Add risk' })[1])
+
+    await waitFor(() => expect(api.createRisk).toHaveBeenCalledWith(null, expect.objectContaining({
+      title: 'Recovery gap', likelihood: 4, impact: 4, owner_id: 'owner-1', decision: 'Track and mitigate',
+    })))
+  })
+
+  it('records explicit acceptance while retaining the prior risk decision', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    const risk = {
+      id: 'risk-1', title: 'Legacy platform', description: 'Unsupported.', assignment_id: null, control: null,
+      likelihood: 4, impact: 5, score: 20, reporting_band: 'critical' as const, status: 'open' as const,
+      treatment: 'mitigate' as const, treatment_plan: 'Replace.', owner_id: null, owner: null,
+      due_date: '2026-08-01', accepted_by: null, accepted_at: null,
+      events: [{ id: 'event-1', control_revision: null, likelihood: 4, impact: 5, status: 'open', treatment: 'mitigate', treatment_plan: 'Replace.', due_date: '2026-08-01', decision: 'Track', note: '', recorded_by: 'Owner', recorded_at: '2026-08-12T00:00:00Z' }],
+    }
+    vi.mocked(api.risks).mockResolvedValue({
+      results: [risk], page: 1, page_size: 100, count: 1, has_more: false, owner_choices: [],
+      summary: { total: 1, overdue: 1, by_status: { open: 1 }, by_band: { critical: 1, high: 0 } },
+    })
+    vi.mocked(api.reviewRisk).mockResolvedValue({ ...risk, status: 'accepted', treatment: 'accept', accepted_by: 'Owner', accepted_at: '2026-08-12T01:00:00Z' })
+    render(<Compliance workspace={null} client={api} />)
+
+    expect(await screen.findByText('Legacy platform')).toBeInTheDocument()
+    expect(screen.getByText('20 · critical')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Review' }))
+    await user.selectOptions(screen.getByLabelText('Status'), 'accepted')
+    expect(screen.getByLabelText('Treatment')).toHaveValue('accept')
+    expect(screen.getByText(/records you as the accepting actor/i)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Decision'), 'Residual risk accepted')
+    await user.click(screen.getByRole('button', { name: 'Save review' }))
+
+    await waitFor(() => expect(api.reviewRisk).toHaveBeenCalledWith(null, 'risk-1', expect.objectContaining({
+      status: 'accepted', treatment: 'accept', decision: 'Residual risk accepted',
+    })))
   })
 })

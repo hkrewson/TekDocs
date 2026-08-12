@@ -4,7 +4,7 @@ from hashlib import sha256
 import psycopg
 import pytest
 from django.conf import settings
-from django.db import connection, transaction
+from django.db import DatabaseError, connection, transaction
 
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
@@ -20,6 +20,7 @@ from apps.core.models import (
     DocumentPublicationControlEvent,
     Entity,
     Organization,
+    OutboxEvent,
     Tenant,
 )
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
@@ -148,6 +149,53 @@ def test_runtime_role_is_constrained_and_forced_rls_inventory_is_complete():
         assert {row[0] for row in cursor.fetchall()} == set(CONTROL_PLANE_GUARD_TRIGGERS)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cursor.execute("CREATE TABLE runtime_role_escape (id integer)")
+        runtime.rollback()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_outbox_is_tenant_isolated_and_event_payload_is_immutable():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    first = Tenant.objects.create(name="First outbox tenant", slug=f"outbox-first-{uuid.uuid4()}")
+    second = Tenant.objects.create(name="Second outbox tenant", slug=f"outbox-second-{uuid.uuid4()}")
+    first_org = _organization(first, "First outbox client")
+    second_org = _organization(second, "Second outbox client")
+    first_event = OutboxEvent.objects.create(
+        tenant=first,
+        organization=first_org,
+        topic="document_publication.available",
+        subject_id=uuid.uuid4(),
+        idempotency_key="first-event",
+        payload={"audience": "client_visible"},
+    )
+    OutboxEvent.objects.create(
+        tenant=second,
+        organization=second_org,
+        topic="document_publication.available",
+        subject_id=uuid.uuid4(),
+        idempotency_key="second-event",
+        payload={"audience": "client_visible"},
+    )
+    with pytest.raises(DatabaseError, match="payload contract mismatch"), transaction.atomic():
+        OutboxEvent.objects.create(
+            tenant=first,
+            organization=first_org,
+            topic="document_publication.available",
+            subject_id=uuid.uuid4(),
+            idempotency_key="unsafe-event",
+            payload={"audience": "client_visible", "password": "must-not-persist"},
+        )
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, first.id, "msp")
+        cursor.execute("SELECT id FROM core_outboxevent")
+        assert cursor.fetchall() == [(first_event.id,)]
+        with pytest.raises(psycopg.errors.RaiseException, match="payload are immutable"):
+            cursor.execute(
+                "UPDATE core_outboxevent SET payload='{\"audience\": \"msp_internal\"}'::jsonb WHERE id=%s",
+                [first_event.id],
+            )
         runtime.rollback()
 
 

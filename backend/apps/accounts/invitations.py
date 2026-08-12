@@ -16,6 +16,7 @@ from rest_framework.exceptions import APIException, ValidationError
 
 from apps.core.email import send_invitation_email
 from apps.core.models import AuditEvent, Organization, Tenant
+from apps.core.outbox import OutboxTopic, enqueue_outbox_event
 from apps.core.rls import bind_tenant_scope_if_postgresql
 
 from .models import EMPTY_DIGEST, BuiltInRole, Invitation, InvitationState, TenantMembership, User
@@ -152,6 +153,15 @@ def issue_invitation(
                 delivery_attempts=1,
             )
             _audit(invitation=invitation, actor=actor, action="invitation.issued")
+            if invitation.organization is not None:
+                enqueue_outbox_event(
+                    tenant=tenant,
+                    organization=invitation.organization,
+                    topic=OutboxTopic.INVITATION_ISSUED,
+                    subject_id=invitation.id,
+                    idempotency_key=f"invitation-issued:{invitation.id}",
+                    payload={"role": invitation.role},
+                )
     except IntegrityError as exc:
         raise InvitationConflict("An active invitation already exists for this email address.") from exc
     return _deliver(IssuedInvitation(invitation, token), actor)
@@ -241,6 +251,15 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
                 invitation.token_digest = EMPTY_DIGEST
                 invitation.save(update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at"))
                 _audit(invitation=invitation, actor=user, action="invitation.accepted")
+                if invitation.organization is not None:
+                    enqueue_outbox_event(
+                        tenant=invitation.tenant,
+                        organization=invitation.organization,
+                        topic=OutboxTopic.INVITATION_ACCEPTED,
+                        subject_id=invitation.id,
+                        idempotency_key=f"invitation-accepted:{invitation.id}",
+                        payload={"role": invitation.role},
+                    )
                 accepted = AcceptedInvitation(invitation=invitation, user=user)
     except IntegrityError as exc:
         raise InvitationUnavailable() from exc

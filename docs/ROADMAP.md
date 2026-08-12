@@ -926,6 +926,17 @@ Evidence: `docs/releases/0.5.2.md`.
 
 Evidence: `docs/releases/0.5.3.md`.
 
+### `0.5.4` acceptance criteria
+
+- [x] Client invitation issuance/acceptance and client-visible publication approval/withdrawal enqueue allowlisted, value-minimized events in the same database transaction as their domain change.
+- [x] Event identity, topic, subject, scope, payload, and creation time are immutable; a tenant-scoped idempotency key prevents duplicate reinterpretation and PostgreSQL rejects deletion or cross-tenant organization edges.
+- [x] A scheduled Celery dispatcher claims bounded due batches, recovers expired claims, records one append-only consumer receipt, and delivers each event once to that named internal consumer under ordinary successful execution.
+- [x] Failures use bounded exponential backoff, retain only an allowlisted error code, and move to a dead-letter state after five attempts. Exception messages and domain values are not persisted.
+- [x] Outbox and receipt tables use forced tenant RLS. Transaction rollback, replay, stale claim, retry, dead-letter, payload rejection, direct-write immutability, and cross-tenant isolation tests are blocking.
+- [x] `make test-outbox` joins the release gate. Notification inbox projection and user-visible delivery remain explicitly assigned to `0.5.5`.
+
+Evidence: `docs/releases/0.5.4.md`.
+
 ## API and integrations: `0.6.x` → `0.7.0`
 
 | Release | Slice and exit condition |

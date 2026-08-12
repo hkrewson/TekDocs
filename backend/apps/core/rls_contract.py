@@ -56,6 +56,8 @@ TENANT_SCOPED_TABLES = (
     "core_person",
     "core_entitylink",
     "core_auditevent",
+    "core_outboxevent",
+    "core_outboxdeliveryreceipt",
 )
 
 RLS_TABLES = ORGANIZATION_SCOPED_TABLES + TENANT_SCOPED_TABLES

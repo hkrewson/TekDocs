@@ -78,6 +78,8 @@ DOCUMENT_RLS_TABLES = {
     "core_networkcircuit",
     "core_networkcircuithandoff",
     "core_netboxreference",
+    "core_outboxevent",
+    "core_outboxdeliveryreceipt",
 }
 
 
@@ -265,7 +267,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0065", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0067", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

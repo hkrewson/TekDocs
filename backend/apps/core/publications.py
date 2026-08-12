@@ -39,6 +39,7 @@ from .models import (
     PublicationAudience,
     PublicationControlAction,
 )
+from .outbox import OutboxTopic, enqueue_outbox_event
 from .rendering import (
     RenderedAttachment,
     attachment_ids_in_markdown,
@@ -544,6 +545,14 @@ def approve_publication(
         entity_id=locked.entity_id,
         metadata={"source_document_id": str(locked.document.entity_id)},
     )
+    enqueue_outbox_event(
+        tenant=locked.tenant,
+        organization=locked.organization,
+        topic=OutboxTopic.PUBLICATION_AVAILABLE,
+        subject_id=locked.id,
+        idempotency_key=f"publication-available:{locked.id}",
+        payload={"audience": locked.audience},
+    )
     return locked
 
 
@@ -577,6 +586,15 @@ def withdraw_publication(
         entity_id=locked.entity_id,
         metadata={"source_document_id": str(locked.document.entity_id)},
     )
+    if locked.audience == PublicationAudience.CLIENT_VISIBLE:
+        enqueue_outbox_event(
+            tenant=locked.tenant,
+            organization=locked.organization,
+            topic=OutboxTopic.PUBLICATION_WITHDRAWN,
+            subject_id=locked.id,
+            idempotency_key=f"publication-withdrawn:{locked.id}",
+            payload={"audience": locked.audience},
+        )
     return locked
 
 

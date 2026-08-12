@@ -3561,3 +3561,98 @@ class AuditEvent(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Audit events are append-only")
+
+
+class OutboxEventState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    DELIVERED = "delivered", "Delivered"
+    DEAD_LETTER = "dead_letter", "Dead letter"
+
+
+class OutboxEvent(models.Model):
+    """A durable, value-minimized domain event awaiting asynchronous delivery."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="outbox_events")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="outbox_events",
+        null=True,
+        blank=True,
+    )
+    topic = models.CharField(max_length=120)
+    subject_id = models.UUIDField()
+    idempotency_key = models.CharField(max_length=200)
+    payload = models.JSONField(default=dict)
+    state = models.CharField(max_length=20, choices=OutboxEventState.choices, default=OutboxEventState.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="unique_tenant_outbox_key"),
+            models.CheckConstraint(condition=models.Q(attempts__lte=100), name="outbox_attempts_bounded"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state=OutboxEventState.DELIVERED, delivered_at__isnull=False, locked_at__isnull=True)
+                    | models.Q(
+                        state__in=[OutboxEventState.PENDING, OutboxEventState.DEAD_LETTER],
+                        delivered_at__isnull=True,
+                        locked_at__isnull=True,
+                    )
+                    | models.Q(
+                        state=OutboxEventState.PROCESSING,
+                        delivered_at__isnull=True,
+                        locked_at__isnull=False,
+                    )
+                ),
+                name="outbox_state_timestamps_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "state", "available_at", "created_at"]),
+            models.Index(fields=["tenant", "topic", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.topic}:{self.subject_id}"
+
+
+class OutboxDeliveryReceipt(models.Model):
+    """Append-only proof that one named consumer accepted an outbox event."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="outbox_delivery_receipts")
+    event = models.ForeignKey(OutboxEvent, on_delete=models.PROTECT, related_name="delivery_receipts")
+    consumer = models.CharField(max_length=80)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["event", "consumer"], name="unique_outbox_consumer_receipt")
+        ]
+        indexes = [models.Index(fields=["tenant", "processed_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.consumer}:{self.event_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Outbox delivery receipts are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Outbox delivery receipts are append-only")

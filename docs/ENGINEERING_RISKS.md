@@ -114,6 +114,10 @@ This register turns known limitations into release obligations. A risk remains o
 
 `TD-RISK-053` is **mitigated with recurring owner**. Exact-Workspace source validation, dedicated policy grants, database identity guards, forced RLS, stable calendar UIDs, event bounds, and authenticated private delivery protect the implemented schedule boundary. Notification emission and any revocable public subscription design remain owned by later milestones.
 
+## 0.7.7 approved-egress disposition
+
+`TD-RISK-047` remains **mitigated with recurring owner**. One reusable service now owns hostname normalization, every-answer public DNS validation, address pinning, and TLS hostname/SNI preservation for existing webhook and provider callers. Each caller retains explicit no-redirect, timeout, body, content, and origin constraints. Proxy behavior, DAST, and every future collector's adoption remain recurring owners through `0.8.7`.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import json
-import ssl
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import urllib3
 from django.core.exceptions import ValidationError
 from urllib3.exceptions import HTTPError
-from urllib3.util import Timeout
 
+from .approved_egress import pinned_https_pool
 from .webhook_egress import WebhookEgressError, resolve_webhook_target, validate_webhook_url
 
 MAX_INTEGRATION_RESPONSE_BYTES = 1024 * 1024
@@ -40,16 +39,11 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
     request_path = target_parts.path or "/"
     if target_parts.query:
         request_path = f"{request_path}?{target_parts.query}"
-    pool = urllib3.HTTPSConnectionPool(
-        target.address,
-        port=443,
-        timeout=Timeout(connect=3.0, read=10.0),
-        retries=False,
-        maxsize=1,
-        block=True,
-        cert_reqs=ssl.CERT_REQUIRED,
-        assert_hostname=target.hostname,
-        server_hostname=target.hostname,
+    pool = pinned_https_pool(
+        target,
+        connect_timeout=3.0,
+        read_timeout=10.0,
+        pool_factory=urllib3.HTTPSConnectionPool,
     )
     try:
         response = pool.urlopen(

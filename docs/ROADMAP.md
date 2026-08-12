@@ -1107,7 +1107,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.4` | **Complete:** Risks, treatments, acceptance, deadlines, and reporting. |
 | `0.7.5` | **Complete:** Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | **Complete:** Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
-| `0.7.7` | Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
+| `0.7.7` | **Complete:** Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
 | `0.7.8` | Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
 | `0.7.9` | Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
 | `0.7.10` | Renewal/expiration schedules, review state, reminder events, notification/calendar integration, and stale or conflicting source handling. |
@@ -1174,6 +1174,15 @@ Evidence: `docs/releases/0.7.5.md`.
 - [x] PostgreSQL validates immutable source/scope/actor identity, forces exact-Workspace RLS, and migration, permission/IDOR, OpenAPI/client, security, ADR 0068, risk, and release evidence agree at `0.7.6`.
 
 Evidence: `docs/releases/0.7.6.md`.
+
+### `0.7.7` acceptance criteria
+
+- [x] One approved egress module owns public-HTTPS normalization, DNS resolution, every-answer public-address validation, reviewed-address pinning, and TLS hostname/SNI preservation.
+- [x] Webhooks and read-only integration providers consume that service while retaining explicit connect/read timeouts, no redirects, bounded request/response bodies, and value-free errors.
+- [x] IP literals, credentials, nonstandard ports, fragments, private/internal names, unavailable DNS, and any private/reserved DNS answer fail closed before a connection.
+- [x] Existing webhook and provider adversarial tests remain green, and Ruff, mypy, security/threat/architecture documentation, ADR 0069, risk disposition, and release evidence agree at `0.7.7`.
+
+Evidence: `docs/releases/0.7.7.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

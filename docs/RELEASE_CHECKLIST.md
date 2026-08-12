@@ -3,6 +3,7 @@
 ## Required evidence
 
 - Version, roadmap status, migration state, OpenAPI, and release notes agree.
+- The checked-in TypeScript API client matches OpenAPI, public error/pagination/filter contracts pass, and every advertised idempotent operation documents its actual replay boundary.
 - Fresh Docker install and previous supported-version upgrade pass.
 - The representative migration cycle preserves identifiers, authorization state, archive/audit evidence, and the forced-RLS inventory.
 - Reference-dataset latency and query-count budgets pass without bypassing policy or workspace scope.

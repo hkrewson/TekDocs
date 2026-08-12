@@ -57,6 +57,7 @@ jobs:
       - name: Frontend gates
         working-directory: frontend
         run: |
+          npm run api:check
           npm run lint
           npm run typecheck
           npm run test
@@ -84,6 +85,7 @@ jobs:
           make test-inventory-certification
           make test-networks
           make test-portal-notification-certification
+          make test-api-contracts
       - name: Collect logs
         if: always()
         run: docker compose logs --no-color > compose.log

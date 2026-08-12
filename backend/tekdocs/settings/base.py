@@ -212,6 +212,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Self-hosted MSP knowledge and inventory API",
     "VERSION": VERSION,
     "SERVE_INCLUDE_SCHEMA": False,
+    "POSTPROCESSING_HOOKS": ["apps.core.api_contracts.public_api_postprocessing"],
     "SCHEMA_PATH_PREFIX": r"/api/v1",
     "ENUM_NAME_OVERRIDES": {
         "OrganizationKindEnum": "apps.core.models.OrganizationKind",

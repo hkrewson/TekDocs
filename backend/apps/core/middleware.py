@@ -1,10 +1,11 @@
+import re
 import uuid
 from collections.abc import Callable
 from typing import Any
 
 from django.conf import settings
 from django.db import connection, transaction
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from .models import InstallationState, Organization, Tenant
 from .rls import OrganizationRLSMode, bind_local_rls_scope
@@ -12,14 +13,39 @@ from .scoping import DataScope
 
 
 class RequestContextMiddleware:
+    IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,199}$")
+
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         request_id = uuid.uuid4()
         request.request_id = request_id  # type: ignore[attr-defined]
-        response = self.get_response(request)
+        idempotency_key = request.headers.get("Idempotency-Key")
+        response: HttpResponse
+        if idempotency_key is not None and not self.IDEMPOTENCY_KEY.fullmatch(idempotency_key):
+            response = JsonResponse(
+                {
+                    "error": {
+                        "status": 400,
+                        "code": "invalid_idempotency_key",
+                        "message": "The request is invalid.",
+                        "fields": {
+                            "Idempotency-Key": [
+                                "Use 8–200 ASCII letters, numbers, periods, underscores, colons, or hyphens."
+                            ]
+                        },
+                        "request_id": str(request_id),
+                    }
+                },
+                status=400,
+            )
+        else:
+            request.idempotency_key = idempotency_key  # type: ignore[attr-defined]
+            response = self.get_response(request)
         response["X-Request-ID"] = str(request_id)
+        if idempotency_key is not None and response.status_code < 500:
+            response["Idempotency-Key"] = idempotency_key
         return response
 
 

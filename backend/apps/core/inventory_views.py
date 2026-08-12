@@ -326,7 +326,7 @@ class ClientAssetSerializer(serializers.Serializer):
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_mac_addresses(self, asset: ClientAsset) -> list[dict[str, object]]:
         return [
-            {"id": item.entity_id, "address": item.address, "description": item.description}
+            {"id": item.entity_id, "address": item.address.upper(), "description": item.description}
             for item in asset.network_mac_addresses.all()
         ]
 
@@ -335,11 +335,21 @@ class AssetMACAddressWriteSerializer(StrictSerializer):
     address = serializers.CharField(max_length=17, trim_whitespace=True)
     description = serializers.CharField(max_length=4000, allow_blank=True, required=False, default="")
 
+    def validate_address(self, value: str) -> str:
+        compact = value.replace(":", "").replace("-", "")
+        if len(compact) != 12 or any(character not in "0123456789abcdefABCDEF" for character in compact):
+            raise serializers.ValidationError("Enter a valid 48-bit MAC address.")
+        return ":".join(compact[index : index + 2] for index in range(0, 12, 2)).lower()
+
 
 class AssetMACAddressSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
-    address = serializers.CharField()
+    address = serializers.SerializerMethodField()
     description = serializers.CharField()
+
+    @extend_schema_field(serializers.CharField())
+    def get_address(self, record: NetworkMACAddress) -> str:
+        return record.address.upper()
 
 
 class ClientAssetResultSerializer(serializers.Serializer):

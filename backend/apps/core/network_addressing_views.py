@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
-from .collection_pagination import BoundedCollectionQuerySerializer, paginate
+from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageSerializer, paginate
 from .inventory import InventoryError, require_operational_owner
 from .models import NetworkSubnet, NetworkVLAN, NetworkVRF
 from .network_addressing import (
@@ -81,11 +81,8 @@ class SubnetSerializer(serializers.Serializer):
     description = serializers.CharField()
 
 
-class CollectionResultSerializer(serializers.Serializer):
-    page = serializers.IntegerField()
-    page_size = serializers.IntegerField()
-    count = serializers.IntegerField()
-    has_more = serializers.BooleanField()
+class CollectionResultSerializer(OffsetPageSerializer):
+    pass
     can_manage = serializers.BooleanField()
 
 

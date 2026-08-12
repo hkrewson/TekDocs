@@ -7,6 +7,7 @@ mode=${1:-check}
 run_gate() {
   case "$mode" in
     check)
+      npm --prefix "$repository_root/frontend" run api:check
       npm --prefix "$repository_root/frontend" run lint
       npm --prefix "$repository_root/frontend" run typecheck
       npm --prefix "$repository_root/frontend" run test -- --maxWorkers=1 --no-file-parallelism
@@ -36,12 +37,13 @@ echo "Host Node ${node_major:-unavailable} is unsupported; running the frontend 
 docker run --rm \
   -e FRONTEND_GATE_MODE="$mode" \
   -v "$repository_root/frontend:/src:ro" \
+  -v "$repository_root/backend/openapi.yml:/backend/openapi.yml:ro" \
   -w /work \
   node:24-alpine sh -ec '
     tar -C /src --exclude=node_modules --exclude=dist --exclude=coverage --exclude=playwright-report --exclude=test-results -cf - . | tar -C /work -xf -
     npm ci --no-audit --no-fund
     case "$FRONTEND_GATE_MODE" in
-      check) npm run lint && npm run typecheck && npm run test -- --maxWorkers=1 --no-file-parallelism && npm run build ;;
+      check) npm run api:check && npm run lint && npm run typecheck && npm run test -- --maxWorkers=1 --no-file-parallelism && npm run build ;;
       test) npm run test -- --maxWorkers=1 --no-file-parallelism ;;
       audit) npm audit --omit=dev --audit-level=high ;;
       *) exit 2 ;;

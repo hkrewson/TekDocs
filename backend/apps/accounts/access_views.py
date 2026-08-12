@@ -2,6 +2,7 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.api_contracts import IDEMPOTENCY_KEY_PARAMETER
 from apps.core.models import OrganizationAccessMode
 
 from .access_collections import (
@@ -263,6 +264,7 @@ class OrganizationAccessDetailView(APIView):
 
 class OrganizationStaffAssignmentView(APIView):
     @extend_schema(
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         request=OrganizationStaffWriteSerializer,
         responses={
             200: OrganizationAccessSerializer,
@@ -286,6 +288,7 @@ class OrganizationStaffAssignmentView(APIView):
 
 class OrganizationStaffAssignmentDetailView(APIView):
     @extend_schema(
+        parameters=[IDEMPOTENCY_KEY_PARAMETER],
         responses={
             200: OrganizationAccessSerializer,
             403: OpenApiResponse(description="Staff assignment permission and MFA required"),

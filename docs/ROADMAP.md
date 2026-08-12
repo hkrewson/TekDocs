@@ -1015,7 +1015,7 @@ Evidence: `docs/releases/0.6.0.md`.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.6.1` | `/api/v1` conventions, filtering/pagination/error/idempotency contracts, and generated TypeScript client. |
+| `0.6.1` | **Complete:** `/api/v1` conventions, strict declared filtering, bounded pagination, correlated error/idempotency contracts, and generated TypeScript client. |
 | `0.6.2` | Scoped personal/service tokens, rotation/revocation, expiry, and value-safe audit. |
 | `0.6.3` | Signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
 | `0.6.4` | Integration provider contract and envelope-encrypted connection configuration. |
@@ -1025,6 +1025,18 @@ Evidence: `docs/releases/0.6.0.md`.
 | `0.6.8` | Deterministic sanitized Git export for selected non-secret documents/manifests. |
 | `0.6.9` | Integration-runtime stabilization, webhook/SSRF abuse suites, upgrade, and load evidence. |
 | `0.7.0` | Stabilize and certify the public API and integration framework. |
+
+### `0.6.1` acceptance criteria
+
+- [x] `/api/v1/` publishes the active API version and machine-readable offset/seek pagination, strict-filter, error, and idempotency conventions without implying that every mutation is retry-safe.
+- [x] Shared offset pagination is bounded to 100 records, uses `results`, `page`, `page_size`, `count`, and `has_more`, and strict query serializers reject undocumented parameters instead of silently broadening a read.
+- [x] framework-generated failures use one value-minimized `error` envelope with stable status/code/message fields, optional field errors, and a server-generated UUID that matches the `X-Request-ID` response header.
+- [x] `Idempotency-Key` is syntax-bounded and echoed for correlation, but appears in OpenAPI only for naturally convergent staff-assignment operations; durable replay storage for generic jobs remains owned by `0.6.5`.
+- [x] the checked-in `frontend/src/generated/api-v1.ts` is deterministically generated from `backend/openapi.yml`; local and hosted frontend gates fail on drift, and the typed same-origin wrapper retains session, CSRF, and idempotency helpers.
+- [x] `make test-api-contracts`, schema validation, migration drift, frontend lint/type/unit/build, architecture, security/threat/risk documentation, ADR 0059, release notes, and version metadata agree at `0.6.1`; no model or migration is added.
+- [x] `TD-RISK-012` is resolved as the reusable strict/bounded collection convention. `TD-RISK-044` and `TD-RISK-045` remain mitigated with explicit owners through integration certification.
+
+Evidence: `docs/releases/0.6.1.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

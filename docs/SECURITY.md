@@ -4,6 +4,8 @@ TekDocs targets the current OWASP ASVS Level 2 controls appropriate to a self-ho
 
 ## Non-negotiable controls
 
+Public API inputs use explicit serializers and bounded pages; declared filter sets reject unknown parameters so a spelling mistake cannot silently widen a query. Authorization and exact Workspace selection precede filtering, counting, and pagination. Framework errors return stable value-minimized messages with a server correlation UUID rather than exception text, SQL details, identifiers, or secrets. `Idempotency-Key` is a bounded opaque value and is documented only where the operation is naturally convergent; it is not represented as durable replay storage. OpenAPI and the generated TypeScript client are checked artifacts, with remaining operation-ID collision debt tracked as `TD-RISK-044`.
+
 - Same-origin, HTTP-only, secure production session cookies with CSRF middleware enabled.
 - Invite-only registration after a one-time owner bootstrap.
 - The first-owner endpoint requires a high-entropy deployment secret, compares it in constant time, and transactionally locks a migration-created singleton installation record. The status endpoint exposes only whether bootstrap remains required.

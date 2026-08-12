@@ -90,6 +90,14 @@ Portal documents, inbox notifications, and delivery metadata use signed seek cur
 
 SMTP is a second, non-blocking consumer queue attached one-to-one to newly projected inbox rows. It resolves the current account address only in memory, repeats the inbox authorization projection at send time, checks surface-specific preferences, and renders fixed autoescaped templates with a generic subject and application link. Delivery state retains only attempts, timestamps, and an allowlisted error code. Temporary failures back off, synchronous permanent recipient rejection dead-letters, and revoked authority suppresses. Historical inbox rows are deliberately not backfilled. SMTP is inherently at-least-once across a crash after remote acceptance; a deterministic Message-ID supports downstream correlation but cannot guarantee recipient-side deduplication. ADRs 0052 through 0054 define these boundaries.
 
+## Public API contract
+
+`/api/v1` is the compatibility boundary for browser and future external clients. Offset collections use `results`, `page`, `page_size`, `count`, and `has_more`; ordered event histories use bounded signed seek cursors. Declared query serializers reject unknown fields so a misspelled scope/filter cannot silently become a broader read. Authorization and exact Workspace resolution occur before filtering or pagination.
+
+Framework errors use a stable `error` envelope with a non-sensitive message, machine code, optional per-field errors, and the same server UUID returned in `X-Request-ID`. Operation-specific conflict payloads remain explicitly typed in OpenAPI. `Idempotency-Key` is accepted as a bounded opaque correlation value but is advertised only for operations whose domain behavior is already naturally convergent; durable request/result replay belongs to the integration job boundary.
+
+`backend/openapi.yml` is authoritative. `openapi-typescript` produces the immutable checked-in `frontend/src/generated/api-v1.ts`; `openapi-fetch` supplies the typed same-origin transport wrapper. The frontend gate regenerates in check mode, so hand edits or server/client drift fail locally and in CI. Existing generated operation-ID collision warnings are tracked by `TD-RISK-044` and must be removed before `0.7.0` certification.
+
 ## Trust boundaries
 
 - Browser to same-origin Django session and CSRF boundary.

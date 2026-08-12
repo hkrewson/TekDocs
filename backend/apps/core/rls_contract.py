@@ -47,6 +47,12 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_networkcircuit",
     "core_networkcircuithandoff",
     "core_netboxreference",
+    "core_integrationconnection",
+    "core_integrationsyncjob",
+    "core_integrationobservation",
+    "core_integrationlogevent",
+    "core_integrationconflict",
+    "core_gitexportbundle",
 )
 
 TENANT_SCOPED_TABLES = (

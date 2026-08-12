@@ -1018,11 +1018,11 @@ Evidence: `docs/releases/0.6.0.md`.
 | `0.6.1` | **Complete:** `/api/v1` conventions, strict declared filtering, bounded pagination, correlated error/idempotency contracts, and generated TypeScript client. |
 | `0.6.2` | **Complete:** scoped personal/service tokens, rotation/revocation, expiry, and value-safe audit. |
 | `0.6.3` | **Complete:** signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
-| `0.6.4` | Integration provider contract and envelope-encrypted connection configuration. |
-| `0.6.5` | Scheduled sync jobs, cursors, backoff, idempotency, and worker failure recovery. |
-| `0.6.6` | Maintained structured logging plus provider logs/metrics with field allowlists, secret redaction, bounded retention, and `TD-RISK-015`. |
-| `0.6.7` | Conflict model and permission-aware reconciliation workflow; database remains canonical. |
-| `0.6.8` | Deterministic sanitized Git export for selected non-secret documents/manifests. |
+| `0.6.4` | **Complete:** integration provider contract and envelope-encrypted connection configuration. |
+| `0.6.5` | **Complete:** scheduled sync jobs, cursors, backoff, idempotency, and worker failure recovery. |
+| `0.6.6` | **Complete:** provider logs/metrics with field allowlists, secret redaction, and bounded retention; final process-wide structured-log remediation remains `0.8.7`. |
+| `0.6.7` | **Complete:** conflict model and permission-aware reconciliation workflow; database remains canonical. |
+| `0.6.8` | **Complete:** deterministic sanitized Git export for selected non-secret documents/manifests. |
 | `0.6.9` | Integration-runtime stabilization, webhook/SSRF abuse suites, upgrade, and load evidence. |
 | `0.7.0` | Stabilize and certify the public API and integration framework. |
 
@@ -1059,6 +1059,19 @@ Evidence: `docs/releases/0.6.2.md`.
 - [x] `TD-RISK-047` is mitigated with recurring owners. Provider-specific connections, generalized egress reuse, large-scale delivery administration, adversarial DNS/redirect proxy testing, upgrade/load evidence, and integration-wide certification remain assigned to `0.6.4`, `0.6.9`, and `0.7.0`.
 
 Evidence: `docs/releases/0.6.3.md`.
+
+### `0.6.4`–`0.6.8` acceptance criteria
+
+- [x] A provider registry declares direction, credential fields, and capabilities. The first reviewed adapter is read-only NetBox; configuration belongs to an exact MSP or organization Workspace and no connector appears in the ordinary Networks surface.
+- [x] Provider API tokens are accepted only through MFA/recent-session management, envelope-encrypted with tenant/connection/generation associated data, never returned, and rotatable without changing connection identity. Base URLs use the approved pinned-public-HTTPS/no-redirect egress boundary.
+- [x] Scheduled and manual jobs are durable and idempotent per connection/key, use bounded cursors, stale leases, exponential backoff, eight-attempt dead letters, and page continuations. Provider payloads are reduced at the adapter boundary to type, remote ID, and SHA-256 fingerprint observations.
+- [x] Provider operations retain only allowlisted event codes and non-negative numeric metrics for 30 days. Tokens, request/response bodies, exception text, remote labels, cursors, and provider JSON are absent from list responses and logs. Process-wide maintained structured logging remains the later `TD-RISK-015` owner.
+- [x] Differences become exact-Workspace conflicts. Resolution requires central `integrations.manage`; keeping/ignoring changes no domain data, and accepting remote changes only the existing external identity fingerprint. TekDocs records remain canonical and there is no connector write-back.
+- [x] Git export selects exact-Workspace documents/STATIC manifests, resolves canonical Markdown, removes credential and live-attachment links, excludes attachment content/secrets/audit/provider payloads/editor HTML, and rejects STATIC manifests containing credential-reference metadata. Stable-path/sorted/fixed-time ZIP bytes receive a digest; admitted signed manifests retain their evidence metadata unchanged. It does not initialize, push, or authenticate to a remote Git repository.
+- [x] PostgreSQL guards exact Workspace ownership and forces RLS across connection/job/observation/log/conflict/export records. API and UI expose connections, jobs, logs, reconciliation, exports, and webhooks for MSP and organization contexts with private/no-store responses and permission denials.
+- [x] Focused PostgreSQL integration tests, Ruff, mypy, migration drift, OpenAPI/generated-client drift, frontend type/lint/unit/build, Compose runtime, documentation, ADR 0062, and release evidence agree at `0.6.8`. Integration load, adversarial egress, exact-prior upgrade, and final certification remain `0.6.9`–`0.7.0`.
+
+Evidence: `docs/releases/0.6.4.md` through `docs/releases/0.6.8.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

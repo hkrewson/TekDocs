@@ -29,6 +29,7 @@ function base(workspace: WorkspaceContext) {
   return `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/integrations/webhooks`
 }
 
+
 function csrfToken() {
   return document.cookie.split('; ').find((value) => value.startsWith('csrftoken='))?.split('=')[1] ?? ''
 }

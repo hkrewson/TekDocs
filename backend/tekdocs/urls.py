@@ -115,6 +115,18 @@ from apps.core.document_views import (
     OrganizationDocumentTemplateInstantiateView,
     OrganizationMarkdownImportView,
 )
+from apps.core.integration_views import (
+    GitExportDownloadView,
+    GitExportListCreateView,
+    IntegrationConflictListView,
+    IntegrationConflictResolveView,
+    IntegrationConnectionDetailView,
+    IntegrationConnectionListCreateView,
+    IntegrationConnectionRotateView,
+    IntegrationJobListCreateView,
+    IntegrationLogListView,
+    IntegrationProviderCatalogView,
+)
 from apps.core.inventory_views import (
     ClientAssetBulkView,
     ClientAssetCsvApplyView,
@@ -553,6 +565,52 @@ urlpatterns = [
         "api/v1/workspaces/msp/networks/netbox/reconcile-preview",
         NetBoxReconciliationPreviewView.as_view(),
         name="msp-netbox-reconcile-preview",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/providers",
+        IntegrationProviderCatalogView.as_view(),
+        name="msp-integration-provider-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/connections",
+        IntegrationConnectionListCreateView.as_view(),
+        name="msp-integration-connection-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/connections/<uuid:connection_id>",
+        IntegrationConnectionDetailView.as_view(),
+        name="msp-integration-connection-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/connections/<uuid:connection_id>/rotate",
+        IntegrationConnectionRotateView.as_view(),
+        name="msp-integration-connection-rotate",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/jobs",
+        IntegrationJobListCreateView.as_view(),
+        name="msp-integration-job-list-create",
+    ),
+    path("api/v1/workspaces/msp/integrations/logs", IntegrationLogListView.as_view(), name="msp-integration-log-list"),
+    path(
+        "api/v1/workspaces/msp/integrations/conflicts",
+        IntegrationConflictListView.as_view(),
+        name="msp-integration-conflict-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/conflicts/<uuid:conflict_id>/resolve",
+        IntegrationConflictResolveView.as_view(),
+        name="msp-integration-conflict-resolve",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/git-exports",
+        GitExportListCreateView.as_view(),
+        name="msp-git-export-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/git-exports/<uuid:bundle_id>/download",
+        GitExportDownloadView.as_view(),
+        name="msp-git-export-download",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1412,6 +1470,56 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/deliveries/<uuid:delivery_id>/retry",
         OrganizationWebhookDeliveryRetryView.as_view(),
         name="organization-webhook-delivery-retry",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/providers",
+        IntegrationProviderCatalogView.as_view(),
+        name="organization-integration-provider-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections",
+        IntegrationConnectionListCreateView.as_view(),
+        name="organization-integration-connection-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections/<uuid:connection_id>",
+        IntegrationConnectionDetailView.as_view(),
+        name="organization-integration-connection-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections/<uuid:connection_id>/rotate",
+        IntegrationConnectionRotateView.as_view(),
+        name="organization-integration-connection-rotate",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/jobs",
+        IntegrationJobListCreateView.as_view(),
+        name="organization-integration-job-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/logs",
+        IntegrationLogListView.as_view(),
+        name="organization-integration-log-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/conflicts",
+        IntegrationConflictListView.as_view(),
+        name="organization-integration-conflict-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/conflicts/<uuid:conflict_id>/resolve",
+        IntegrationConflictResolveView.as_view(),
+        name="organization-integration-conflict-resolve",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/git-exports",
+        GitExportListCreateView.as_view(),
+        name="organization-git-export-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/git-exports/<uuid:bundle_id>/download",
+        GitExportDownloadView.as_view(),
+        name="organization-git-export-download",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

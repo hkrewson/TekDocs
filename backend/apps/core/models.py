@@ -3831,6 +3831,321 @@ class WebhookInboundReceipt(models.Model):
         raise ValidationError("Inbound webhook receipts are append-only")
 
 
+class IntegrationProvider(models.TextChoices):
+    NETBOX = "netbox", "NetBox"
+
+
+class IntegrationConnection(TimestampedModel):
+    """A provider connection whose credential is readable only through the worker boundary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_connections")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_connections")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_connections", null=True, blank=True
+    )
+    provider = models.CharField(max_length=32, choices=IntegrationProvider.choices)
+    name = models.CharField(max_length=100)
+    base_url = models.URLField(max_length=500)
+    configuration = models.JSONField(default=dict, blank=True)
+    secret_envelope = models.JSONField()
+    secret_generation = models.PositiveIntegerField(default=1)
+    active = models.BooleanField(default=True)
+    sync_interval_minutes = models.PositiveIntegerField(default=60)
+    next_sync_at = models.DateTimeField(default=timezone.now)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_integration_connections"
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(provider__in=IntegrationProvider.values), name="integration_provider_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(secret_generation__gte=1), name="integration_secret_generation_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(sync_interval_minutes__gte=5) & models.Q(sync_interval_minutes__lte=10080),
+                name="integration_sync_interval_bounded",
+            ),
+            models.UniqueConstraint(fields=("workspace", "name"), name="integration_connection_name_unique"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "active"), name="core_intconn_scope_idx"),
+            models.Index(fields=("tenant", "active", "next_sync_at"), name="core_intconn_due_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        if self.workspace_id and (
+            self.workspace.tenant_id != self.tenant_id or self.workspace.organization_id != self.organization_id
+        ):
+            raise ValidationError("Integration connection Workspace ownership does not match")
+        if not isinstance(self.configuration, dict):
+            raise ValidationError("Integration configuration must be an object")
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Integration connections are retained and deactivated, not deleted")
+
+
+class IntegrationJobState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    SUCCEEDED = "succeeded", "Succeeded"
+    DEAD_LETTER = "dead_letter", "Dead letter"
+
+
+class IntegrationSyncJob(models.Model):
+    """Durable, idempotent execution record with bounded retry metadata."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_sync_jobs")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_sync_jobs")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_sync_jobs", null=True, blank=True
+    )
+    connection = models.ForeignKey(IntegrationConnection, on_delete=models.PROTECT, related_name="sync_jobs")
+    idempotency_key = models.CharField(max_length=160)
+    trigger = models.CharField(max_length=20, default="scheduled")
+    state = models.CharField(max_length=20, choices=IntegrationJobState.choices, default=IntegrationJobState.PENDING)
+    cursor_before = models.CharField(max_length=500, blank=True)
+    cursor_after = models.CharField(max_length=500, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    result_counts = models.JSONField(default=dict)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_integration_sync_jobs",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("connection", "idempotency_key"), name="integration_job_idempotent"),
+            models.CheckConstraint(condition=models.Q(attempts__lte=8), name="integration_job_attempts_bounded"),
+            models.CheckConstraint(
+                condition=models.Q(trigger__in=("scheduled", "manual")), name="integration_job_trigger_valid"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "state", "available_at"), name="core_intjob_due_idx"),
+            models.Index(fields=("workspace", "created_at"), name="core_intjob_scope_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Integration job {self.id}"
+
+
+class IntegrationObservation(models.Model):
+    """Value-minimized immutable remote identity observation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_observations")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_observations")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_observations", null=True, blank=True
+    )
+    job = models.ForeignKey(IntegrationSyncJob, on_delete=models.PROTECT, related_name="observations")
+    remote_type = models.CharField(max_length=64)
+    remote_id = models.CharField(max_length=160)
+    fingerprint = models.CharField(max_length=64)
+    observed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("remote_type", "remote_id", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("job", "remote_type", "remote_id"), name="integration_observation_unique"),
+            models.CheckConstraint(
+                condition=models.Q(fingerprint__regex=r"^[0-9a-f]{64}$"), name="integration_observation_digest_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "remote_type", "remote_id"), name="core_intobs_remote_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.remote_type}:{self.remote_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Integration observations are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Integration observations are append-only")
+
+
+class IntegrationLogEvent(models.Model):
+    """Structured allowlisted operational metadata; never provider text or response bodies."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_log_events")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_log_events")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_log_events", null=True, blank=True
+    )
+    connection = models.ForeignKey(IntegrationConnection, on_delete=models.PROTECT, related_name="log_events")
+    job = models.ForeignKey(
+        IntegrationSyncJob, on_delete=models.PROTECT, related_name="log_events", null=True, blank=True
+    )
+    level = models.CharField(max_length=12)
+    code = models.CharField(max_length=64)
+    metrics = models.JSONField(default=dict)
+    occurred_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(level__in=("info", "warning", "error")),
+                name="integration_log_level_valid",
+            )
+        ]
+        indexes = [models.Index(fields=("tenant", "occurred_at"), name="core_intlog_retention_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.level}:{self.code}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Integration log events are append-only")
+        return super().save(*args, **kwargs)
+
+
+class IntegrationConflictStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    KEEP_LOCAL = "keep_local", "Keep local"
+    ACCEPT_REMOTE = "accept_remote", "Accept remote identity"
+    IGNORED = "ignored", "Ignored"
+
+
+class IntegrationConflict(TimestampedModel):
+    """Reviewable difference that cannot mutate a TekDocs domain record implicitly."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_conflicts")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_conflicts")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_conflicts", null=True, blank=True
+    )
+    connection = models.ForeignKey(IntegrationConnection, on_delete=models.PROTECT, related_name="conflicts")
+    observation = models.ForeignKey(
+        IntegrationObservation, on_delete=models.PROTECT, related_name="conflicts", null=True, blank=True
+    )
+    local_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="integration_conflicts", null=True, blank=True
+    )
+    remote_type = models.CharField(max_length=64)
+    remote_id = models.CharField(max_length=160)
+    difference = models.CharField(max_length=32)
+    remote_fingerprint = models.CharField(max_length=64, blank=True)
+    local_fingerprint = models.CharField(max_length=64, blank=True)
+    status = models.CharField(
+        max_length=20, choices=IntegrationConflictStatus.choices, default=IntegrationConflictStatus.OPEN
+    )
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="resolved_integration_conflicts",
+        null=True,
+        blank=True,
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("status", "remote_type", "remote_id", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=IntegrationConflictStatus.values),
+                name="integration_conflict_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(difference__in=("unmatched", "changed")),
+                name="integration_conflict_difference_valid",
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(remote_fingerprint="") | models.Q(remote_fingerprint__regex=r"^[0-9a-f]{64}$"))
+                & (models.Q(local_fingerprint="") | models.Q(local_fingerprint__regex=r"^[0-9a-f]{64}$")),
+                name="integration_conflict_digests_valid",
+            ),
+            models.UniqueConstraint(
+                fields=("connection", "remote_type", "remote_id"),
+                condition=models.Q(status=IntegrationConflictStatus.OPEN),
+                name="integration_open_conflict_unique",
+            )
+        ]
+        indexes = [models.Index(fields=("workspace", "status"), name="core_intconf_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.remote_type}:{self.remote_id}:{self.status}"
+
+
+def git_export_upload_to(instance: "GitExportBundle", _filename: str) -> str:
+    return str(PurePosixPath("git-exports") / str(instance.tenant_id) / str(instance.id))
+
+
+class GitExportBundle(models.Model):
+    """Retained deterministic, sanitized archive suitable for a Git working tree."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="git_export_bundles")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="git_export_bundles")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="git_export_bundles", null=True, blank=True
+    )
+    selection_manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    artifact = models.FileField(upload_to=git_export_upload_to, max_length=500)
+    byte_size = models.PositiveBigIntegerField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="git_export_bundles"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_gitexport_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Git export {self.id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Git export bundles are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Git export bundles are retained")
+
+
 class NotificationSurface(models.TextChoices):
     MSP = "msp", "MSP"
     CLIENT_PORTAL = "client_portal", "Client portal"

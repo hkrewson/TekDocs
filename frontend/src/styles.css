@@ -1055,6 +1055,9 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .content-section > .table-scroll th, .content-section > .table-scroll td { padding: 10px 12px; border-top: 1px solid var(--border); text-align: left; vertical-align: middle; }
 .content-section > .table-scroll th { color: var(--muted); font-weight: 650; }
 .table-actions { display: flex; align-items: center; gap: 6px; }
+.integration-export-choices { display: grid; border-top: 1px solid var(--border); }
+.integration-export-choices label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.integration-export-choices label small { color: var(--muted); text-transform: capitalize; }
 
 @media (max-width: 720px) {
   .token-create-form, .token-permissions { grid-template-columns: 1fr; }

@@ -1,11 +1,18 @@
-from celery import shared_task
+from datetime import timedelta
+from uuid import UUID
 
-from .models import InstallationState
+from celery import shared_task
+from django.utils import timezone
+
+from .integrations import process_sync_job, purge_integration_logs, schedule_due_connections
+from .models import InstallationState, IntegrationJobState, IntegrationSyncJob, Workspace
 from .notification_email import dispatch_due_notification_emails
 from .outbox import dispatch_due_outbox_events
 from .rls import OrganizationRLSMode, rls_scope
 from .scoping import DataScope
 from .webhooks import dispatch_due_webhooks
+
+INTEGRATION_DISPATCH_LEASE = timedelta(minutes=2)
 
 
 @shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
@@ -33,3 +40,76 @@ def dispatch_webhook_deliveries() -> int:
         return 0
     with rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
         return dispatch_due_webhooks(tenant=installation.tenant)
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def schedule_integration_syncs() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with rls_scope(scope, organization_mode=mode):
+            total += schedule_due_connections(tenant=installation.tenant, scope=scope)
+    return total
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def process_integration_sync_job(
+    job_id: str, tenant_id: str, workspace_id: str, organization_id: str | None
+) -> None:
+    scope = DataScope(
+        tenant_id=UUID(tenant_id),
+        workspace_id=UUID(workspace_id),
+        organization_id=UUID(organization_id) if organization_id else None,
+    )
+    mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
+    with rls_scope(scope, organization_mode=mode):
+        process_sync_job(job_id=UUID(job_id))
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def dispatch_integration_syncs() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with rls_scope(scope, organization_mode=mode):
+            now = timezone.now()
+            job_ids = list(
+                IntegrationSyncJob.scoped.for_scope(scope)
+                .filter(state=IntegrationJobState.PENDING, available_at__lte=now)
+                .order_by("available_at", "created_at")
+                .values_list("id", flat=True)[:25]
+            )
+            IntegrationSyncJob.scoped.for_scope(scope).filter(id__in=job_ids).update(
+                available_at=now + INTEGRATION_DISPATCH_LEASE
+            )
+            for job_id in job_ids:
+                process_integration_sync_job.delay(
+                    str(job_id),
+                    str(scope.tenant_id),
+                    str(scope.workspace_id),
+                    str(scope.organization_id) if scope.organization_id else None,
+                )
+                total += 1
+    return total
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def purge_expired_integration_logs() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with rls_scope(scope, organization_mode=mode):
+            total += purge_integration_logs(tenant=installation.tenant)
+    return total

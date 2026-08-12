@@ -284,6 +284,18 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.core.tasks.dispatch_webhook_deliveries",
         "schedule": 30.0,
     },
+    "schedule-integration-syncs": {
+        "task": "apps.core.tasks.schedule_integration_syncs",
+        "schedule": 60.0,
+    },
+    "dispatch-integration-syncs": {
+        "task": "apps.core.tasks.dispatch_integration_syncs",
+        "schedule": 30.0,
+    },
+    "purge-expired-integration-logs": {
+        "task": "apps.core.tasks.purge_expired_integration_logs",
+        "schedule": 86400.0,
+    },
 }
 
 LOGGING = {

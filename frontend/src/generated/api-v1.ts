@@ -1780,6 +1780,166 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/integrations/conflicts": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_conflicts_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/resolve": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_conflicts_resolve_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/connections": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_connections_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_connections_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/connections/{connection_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_msp_integrations_connections_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/connections/{connection_id}/rotate": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_connections_rotate_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/git-exports": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_git_exports_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_git_exports_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/git-exports/{bundle_id}/download": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_git_exports_download_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/jobs": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_jobs_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_jobs_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/logs": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_logs_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/providers": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_providers_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/licenses": {
         readonly parameters: {
             readonly query?: never;
@@ -3540,6 +3700,166 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_conflicts_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/resolve": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_conflicts_resolve_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_connections_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_connections_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_integrations_connections_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}/rotate": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_connections_rotate_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/git-exports": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_git_exports_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_git_exports_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/git-exports/{bundle_id}/download": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_git_exports_download_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/jobs": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_jobs_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_jobs_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/logs": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_logs_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/providers": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_providers_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries": {
         readonly parameters: {
             readonly query?: never;
@@ -5013,6 +5333,70 @@ export interface components {
             readonly has_more: boolean;
             readonly can_manage: boolean;
         };
+        readonly Conflict: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly connection_id: string;
+            readonly connection_name: string;
+            /** Format: uuid */
+            readonly local_entity_id: string | null;
+            readonly remote_type: string;
+            readonly remote_id: string;
+            readonly difference: string;
+            readonly status: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly resolved_at: string | null;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly ConflictPage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["Conflict"][];
+        };
+        readonly ConflictResolution: {
+            /**
+             * @description * `keep_local` - keep_local
+             *     * `accept_remote` - accept_remote
+             *     * `ignored` - ignored
+             * @enum {string}
+             */
+            readonly resolution: "keep_local" | "accept_remote" | "ignored";
+        };
+        readonly Connection: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly provider: string;
+            readonly name: string;
+            readonly base_url: string;
+            readonly credential_configured: boolean;
+            readonly secret_generation: number;
+            readonly active: boolean;
+            readonly sync_interval_minutes: number;
+            /** Format: date-time */
+            readonly next_sync_at: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly ConnectionWrite: {
+            /**
+             * @description * `netbox` - netbox
+             * @enum {string}
+             */
+            readonly provider: "netbox";
+            readonly name: string;
+            /** Format: uri */
+            readonly base_url: string;
+            readonly api_token: string;
+            /** @default 60 */
+            readonly sync_interval_minutes: number;
+        };
         readonly Contract: {
             /** Format: uuid */
             readonly id: string;
@@ -5143,6 +5527,9 @@ export interface components {
              */
             readonly provider: "onepassword";
             readonly reference_url: string;
+        };
+        readonly CredentialRotation: {
+            readonly api_token: string;
         };
         readonly CustomFieldDefinition: {
             /** Format: uuid */
@@ -5746,6 +6133,19 @@ export interface components {
             readonly count: number;
             readonly has_more: boolean;
         };
+        readonly GitExport: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly selection_manifest: unknown;
+            readonly content_digest: string;
+            readonly byte_size: number;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly GitExportWrite: {
+            readonly document_ids?: readonly string[];
+            readonly publication_ids?: readonly string[];
+        };
         readonly Handoff: {
             /** Format: uuid */
             readonly id: string;
@@ -6105,6 +6505,39 @@ export interface components {
             readonly updated_at: string;
             readonly signing_secret: string;
         };
+        readonly Job: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly connection_id: string;
+            readonly connection_name: string;
+            readonly trigger: string;
+            readonly state: string;
+            readonly attempts: number;
+            readonly cursor_present: boolean;
+            readonly last_error_code: string;
+            readonly result_counts: unknown;
+            /** Format: date-time */
+            readonly available_at: string;
+            /** Format: date-time */
+            readonly started_at: string | null;
+            /** Format: date-time */
+            readonly finished_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly JobPage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["Job"][];
+        };
+        readonly JobStart: {
+            /** Format: uuid */
+            readonly connection_id: string;
+        };
         readonly LicenseResult: {
             readonly results: readonly components["schemas"]["SoftwareLicense"][];
             readonly page: number;
@@ -6204,6 +6637,28 @@ export interface components {
             readonly code?: string;
             /** Format: uuid */
             readonly parent_id?: string | null;
+        };
+        readonly Log: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly connection_id: string;
+            readonly connection_name: string;
+            /** Format: uuid */
+            readonly job_id: string | null;
+            readonly level: string;
+            readonly code: string;
+            readonly metrics: unknown;
+            /** Format: date-time */
+            readonly occurred_at: string;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly LogPage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["Log"][];
         };
         readonly MACAddress: {
             /** Format: uuid */
@@ -6738,6 +7193,10 @@ export interface components {
             readonly planned_disconnect_on?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly PatchedConnectionUpdate: {
+            readonly active?: boolean;
+            readonly sync_interval_minutes?: number;
         };
         readonly PatchedContractWrite: {
             readonly name?: string;
@@ -7457,6 +7916,13 @@ export interface components {
             readonly kind: "hardware" | "software";
             /** @default  */
             readonly description: string;
+        };
+        readonly Provider: {
+            readonly key: string;
+            readonly label: string;
+            readonly direction: string;
+            readonly credential_fields: readonly string[];
+            readonly capabilities: readonly string[];
         };
         readonly ProviderChoice: {
             /** Format: uuid */
@@ -12967,6 +13433,334 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_integrations_conflicts_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConflictPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_conflicts_resolve_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly conflict_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ConflictResolution"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ConflictResolution"];
+                readonly "multipart/form-data": components["schemas"]["ConflictResolution"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Conflict"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_connections_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Connection"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_connections_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ConnectionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ConnectionWrite"];
+                readonly "multipart/form-data": components["schemas"]["ConnectionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_connections_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedConnectionUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedConnectionUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedConnectionUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_connections_rotate_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CredentialRotation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CredentialRotation"];
+                readonly "multipart/form-data": components["schemas"]["CredentialRotation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_git_exports_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["GitExport"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_git_exports_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["GitExportWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["GitExportWrite"];
+                readonly "multipart/form-data": components["schemas"]["GitExportWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GitExport"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_git_exports_download_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly bundle_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/zip": string;
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_jobs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["JobPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_jobs_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["JobStart"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["JobStart"];
+                readonly "multipart/form-data": components["schemas"]["JobStart"];
+            };
+        };
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Idempotency key required */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_logs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_providers_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Provider"][];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_licenses_retrieve: {
         readonly parameters: {
             readonly query?: {
@@ -17617,6 +18411,356 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_conflicts_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConflictPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_conflicts_resolve_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly conflict_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ConflictResolution"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ConflictResolution"];
+                readonly "multipart/form-data": components["schemas"]["ConflictResolution"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Conflict"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_connections_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Connection"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_connections_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ConnectionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ConnectionWrite"];
+                readonly "multipart/form-data": components["schemas"]["ConnectionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_connections_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedConnectionUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedConnectionUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedConnectionUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_connections_rotate_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CredentialRotation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CredentialRotation"];
+                readonly "multipart/form-data": components["schemas"]["CredentialRotation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_git_exports_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["GitExport"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_git_exports_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["GitExportWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["GitExportWrite"];
+                readonly "multipart/form-data": components["schemas"]["GitExportWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GitExport"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_git_exports_download_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly bundle_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/zip": string;
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_jobs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["JobPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_jobs_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["JobStart"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["JobStart"];
+                readonly "multipart/form-data": components["schemas"]["JobStart"];
+            };
+        };
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Idempotency key required */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_logs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_providers_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Provider"][];
                 };
             };
         };

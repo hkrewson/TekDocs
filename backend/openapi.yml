@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.6.3
+  version: 0.6.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5995,6 +5995,393 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProviderChoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/conflicts:
+    get:
+      operationId: workspaces_msp_integrations_conflicts_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/resolve:
+    post:
+      operationId: workspaces_msp_integrations_conflicts_resolve_create
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/connections:
+    get:
+      operationId: workspaces_msp_integrations_connections_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_integrations_connections_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/connections/{connection_id}:
+    patch:
+      operationId: workspaces_msp_integrations_connections_partial_update
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/connections/{connection_id}/rotate:
+    post:
+      operationId: workspaces_msp_integrations_connections_rotate_create
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/git-exports:
+    get:
+      operationId: workspaces_msp_integrations_git_exports_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GitExport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_integrations_git_exports_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitExport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/git-exports/{bundle_id}/download:
+    get:
+      operationId: workspaces_msp_integrations_git_exports_download_retrieve
+      parameters:
+      - in: path
+        name: bundle_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/jobs:
+    get:
+      operationId: workspaces_msp_integrations_jobs_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_integrations_jobs_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Idempotency key required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/integrations/logs:
+    get:
+      operationId: workspaces_msp_integrations_logs_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/providers:
+    get:
+      operationId: workspaces_msp_integrations_providers_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
           description: ''
           headers:
             X-Request-ID:
@@ -12434,6 +12821,480 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts:
+    get:
+      operationId: workspaces_organizations_integrations_conflicts_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/resolve:
+    post:
+      operationId: workspaces_organizations_integrations_conflicts_resolve_create
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConflictResolution'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections:
+    get:
+      operationId: workspaces_organizations_integrations_connections_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_integrations_connections_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConnectionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}:
+    patch:
+      operationId: workspaces_organizations_integrations_connections_partial_update
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedConnectionUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}/rotate:
+    post:
+      operationId: workspaces_organizations_integrations_connections_rotate_create
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CredentialRotation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/git-exports:
+    get:
+      operationId: workspaces_organizations_integrations_git_exports_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GitExport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_integrations_git_exports_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GitExportWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitExport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/git-exports/{bundle_id}/download:
+    get:
+      operationId: workspaces_organizations_integrations_git_exports_download_retrieve
+      parameters:
+      - in: path
+        name: bundle_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/jobs:
+    get:
+      operationId: workspaces_organizations_integrations_jobs_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_integrations_jobs_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobStart'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Idempotency key required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/logs:
+    get:
+      operationId: workspaces_organizations_integrations_logs_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/providers:
+    get:
+      operationId: workspaces_organizations_integrations_providers_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries:
     get:
       operationId: workspaces_organizations_integrations_webhooks_deliveries_retrieve
@@ -17674,6 +18535,163 @@ components:
       - page
       - page_size
       - results
+    Conflict:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        connection_id:
+          type: string
+          format: uuid
+        connection_name:
+          type: string
+        local_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        remote_type:
+          type: string
+        remote_id:
+          type: string
+        difference:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - connection_id
+      - connection_name
+      - created_at
+      - difference
+      - id
+      - local_entity_id
+      - remote_id
+      - remote_type
+      - resolved_at
+      - status
+    ConflictPage:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conflict'
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    ConflictResolution:
+      type: object
+      properties:
+        resolution:
+          enum:
+          - keep_local
+          - accept_remote
+          - ignored
+          type: string
+          description: |-
+            * `keep_local` - keep_local
+            * `accept_remote` - accept_remote
+            * `ignored` - ignored
+          x-spec-enum-id: 28548e3e60d5c867
+      required:
+      - resolution
+    Connection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        name:
+          type: string
+        base_url:
+          type: string
+        credential_configured:
+          type: boolean
+          readOnly: true
+        secret_generation:
+          type: integer
+        active:
+          type: boolean
+        sync_interval_minutes:
+          type: integer
+        next_sync_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - active
+      - base_url
+      - created_at
+      - credential_configured
+      - id
+      - name
+      - next_sync_at
+      - provider
+      - secret_generation
+      - sync_interval_minutes
+      - updated_at
+    ConnectionWrite:
+      type: object
+      properties:
+        provider:
+          enum:
+          - netbox
+          type: string
+          description: '* `netbox` - netbox'
+          x-spec-enum-id: 7be5a5ac0532a173
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        base_url:
+          type: string
+          format: uri
+          maxLength: 500
+        api_token:
+          type: string
+          writeOnly: true
+          maxLength: 4096
+          minLength: 8
+        sync_interval_minutes:
+          type: integer
+          maximum: 10080
+          minimum: 5
+          default: 60
+      required:
+      - api_token
+      - base_url
+      - name
+      - provider
     Contract:
       type: object
       properties:
@@ -17973,6 +18991,16 @@ components:
       - provider
       - reference_url
       - title
+    CredentialRotation:
+      type: object
+      properties:
+        api_token:
+          type: string
+          writeOnly: true
+          maxLength: 4096
+          minLength: 8
+      required:
+      - api_token
     CustomFieldDefinition:
       type: object
       properties:
@@ -19417,6 +20445,41 @@ components:
       - page
       - page_size
       - results
+    GitExport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        selection_manifest: {}
+        content_digest:
+          type: string
+        byte_size:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - byte_size
+      - content_digest
+      - created_at
+      - id
+      - selection_manifest
+    GitExportWrite:
+      type: object
+      properties:
+        document_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 250
+        publication_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 250
     Handoff:
       type: object
       properties:
@@ -20275,6 +21338,91 @@ components:
       - topics
       - updated_at
       - url
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        connection_id:
+          type: string
+          format: uuid
+        connection_name:
+          type: string
+        trigger:
+          type: string
+        state:
+          type: string
+        attempts:
+          type: integer
+        cursor_present:
+          type: boolean
+          readOnly: true
+        last_error_code:
+          type: string
+        result_counts: {}
+        available_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - attempts
+      - available_at
+      - connection_id
+      - connection_name
+      - created_at
+      - cursor_present
+      - finished_at
+      - id
+      - last_error_code
+      - result_counts
+      - started_at
+      - state
+      - trigger
+    JobPage:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    JobStart:
+      type: object
+      properties:
+        connection_id:
+          type: string
+          format: uuid
+      required:
+      - connection_id
     LicenseResult:
       type: object
       properties:
@@ -20479,6 +21627,64 @@ components:
       required:
       - kind
       - name
+    Log:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        connection_id:
+          type: string
+          format: uuid
+        connection_name:
+          type: string
+        job_id:
+          type: string
+          format: uuid
+          nullable: true
+        level:
+          type: string
+        code:
+          type: string
+        metrics: {}
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - code
+      - connection_id
+      - connection_name
+      - id
+      - job_id
+      - level
+      - metrics
+      - occurred_at
+    LogPage:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Log'
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     MACAddress:
       type: object
       properties:
@@ -21783,6 +22989,15 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedConnectionUpdate:
+      type: object
+      properties:
+        active:
+          type: boolean
+        sync_interval_minutes:
+          type: integer
+          maximum: 10080
+          minimum: 5
     PatchedContractWrite:
       type: object
       properties:
@@ -23254,6 +24469,29 @@ components:
       required:
       - kind
       - name
+    Provider:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        direction:
+          type: string
+        credential_fields:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+      required:
+      - capabilities
+      - credential_fields
+      - direction
+      - key
+      - label
     ProviderChoice:
       type: object
       properties:

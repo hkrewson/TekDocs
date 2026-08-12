@@ -88,7 +88,7 @@ const Licenses = lazy(async () => ({ default: (await import('./inventory/License
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
-const Webhooks = lazy(async () => ({ default: (await import('./integrations/Webhooks')).Webhooks }))
+const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
 
 type NavigationItem = {
   label: string
@@ -402,7 +402,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
   if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
-  if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Webhooks workspace={state.workspace} client={webhooksClient} /></Suspense>
+  if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -506,7 +506,8 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
             <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />
+            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks', '/integrations'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} networksClient={networksClient} />} />)}

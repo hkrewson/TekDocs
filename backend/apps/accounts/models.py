@@ -19,6 +19,7 @@ class User(AbstractUser):
     username = None  # type: ignore[assignment]
     email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=160)
+    is_service_account = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []  # type: ignore[misc]
@@ -472,3 +473,86 @@ class ScopedRoleAssignment(models.Model):
             )
             if not has_expected_target:
                 raise ValidationError("Scoped role assignment must match the role scope")
+
+
+class APITokenKind(models.TextChoices):
+    PERSONAL = "personal", "Personal"
+    SERVICE = "service", "Service"
+
+
+class APITokenWorkspaceScope(models.TextChoices):
+    MSP = "msp", "MSP Workspace"
+    ORGANIZATION = "organization", "Organization Workspace"
+
+
+class APIToken(models.Model):
+    """Digest-only API credential with one explicit principal and Workspace."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="api_tokens")
+    kind = models.CharField(max_length=16, choices=APITokenKind.choices)
+    name = models.CharField(max_length=100)
+    subject = models.ForeignKey(User, on_delete=models.PROTECT, related_name="api_tokens")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_api_tokens")
+    workspace_scope = models.CharField(max_length=16, choices=APITokenWorkspaceScope.choices)
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="api_tokens",
+        null=True,
+        blank=True,
+    )
+    prefix = models.CharField(max_length=20, unique=True)
+    secret_hash = models.CharField(max_length=256)
+    generation = models.PositiveIntegerField(default=1)
+    expires_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    rotated_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    permissions_locked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(workspace_scope=APITokenWorkspaceScope.MSP, organization__isnull=True)
+                    | models.Q(workspace_scope=APITokenWorkspaceScope.ORGANIZATION, organization__isnull=False)
+                ),
+                name="api_token_workspace_scope_valid",
+            ),
+            models.CheckConstraint(condition=models.Q(expires_at__gt=models.F("created_at")), name="api_token_expires"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "subject", "revoked_at"), name="accounts_token_subject_idx"),
+            models.Index(fields=("tenant", "kind", "revoked_at"), name="accounts_token_kind_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"API token {self.id}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("API tokens are retained and revoked, not deleted")
+
+
+class APITokenPermission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="api_token_permissions")
+    token = models.ForeignKey(APIToken, on_delete=models.PROTECT, related_name="permission_rows")
+    permission = models.CharField(max_length=80)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("permission", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("token", "permission"), name="unique_api_token_permission"),
+        ]
+
+    def __str__(self) -> str:
+        return f"API token permission {self.id}"

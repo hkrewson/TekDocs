@@ -361,7 +361,16 @@ class InstallationMemberContext:
 
     @property
     def permissions(self) -> frozenset[PermissionKey]:
-        return ROLE_BY_VALUE[self.role].permissions
+        permissions = ROLE_BY_VALUE[self.role].permissions
+        token = getattr(self.user, "tekdocs_api_token", None)
+        if token is None:
+            return permissions
+        token_permissions = {
+            PermissionKey(row.permission)
+            for row in token.permission_rows.all()
+            if row.permission in PermissionKey._value2member_map_
+        }
+        return permissions & token_permissions
 
 
 def permission_catalog() -> list[dict[str, object]]:
@@ -450,6 +459,8 @@ def context_has_permission(
 ) -> bool:
     if context.surface == "client_portal":
         return False
+    if not _token_allows(context, permission, organization=organization):
+        return False
     if not _permission_granted(context, permission, organization=organization):
         return False
     return organization is None or _organization_allowed(context, organization)
@@ -490,8 +501,10 @@ def context_has_archived_organization_permission(
     *,
     organization: Organization,
 ) -> bool:
-    return _permission_granted(context, permission, organization=organization) and _archived_organization_allowed(
-        context, organization
+    return (
+        _token_allows(context, permission, organization=organization)
+        and _permission_granted(context, permission, organization=organization)
+        and _archived_organization_allowed(context, organization)
     )
 
 
@@ -520,6 +533,11 @@ def accessible_organizations(
     permission: PermissionKey = PermissionKey.ORGANIZATIONS_VIEW,
 ) -> QuerySet[Organization]:
     organizations = Organization.scoped.for_tenant(context.tenant).filter(entity__archived_at__isnull=True)
+    token = getattr(context.user, "tekdocs_api_token", None)
+    if token is not None:
+        if not _token_allows(context, permission, organization=token.organization):
+            return organizations.none()
+        organizations = organizations.filter(pk=token.organization_id)
     tenant_grant = permission in context.permissions or _custom_permission_exists(context, permission)
     if not tenant_grant:
         if context.membership_id is None:
@@ -585,6 +603,22 @@ def _permission_granted(
     organization: Organization | None = None,
 ) -> bool:
     return permission in context.permissions or _custom_permission_exists(context, permission, organization)
+
+
+def _token_allows(
+    context: InstallationMemberContext,
+    permission: PermissionKey,
+    *,
+    organization: Organization | None,
+) -> bool:
+    token = getattr(context.user, "tekdocs_api_token", None)
+    if token is None:
+        return True
+    if not any(row.permission == permission.value for row in token.permission_rows.all()):
+        return False
+    if token.workspace_scope == "msp":
+        return organization is None
+    return organization is not None and organization.id == token.organization_id
 
 
 def custom_assignable_permission_catalog() -> list[dict[str, object]]:

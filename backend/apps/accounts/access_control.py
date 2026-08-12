@@ -35,7 +35,11 @@ def members_for_context(context: InstallationMemberContext) -> list[MemberProjec
     memberships = TenantMembership.scoped.for_tenant(context.tenant)
     if context.state.owner_id is not None:
         memberships = memberships.exclude(user_id=context.state.owner_id)
-    memberships = memberships.select_related("user").order_by("user__display_name", "user__email", "user_id")
+    memberships = (
+        memberships.filter(user__is_service_account=False)
+        .select_related("user")
+        .order_by("user__display_name", "user__email", "user_id")
+    )
     owner = context.state.owner
     records = []
     if owner is not None:
@@ -84,6 +88,8 @@ def assign_membership_role(
         )
     except TenantMembership.DoesNotExist as exc:
         raise NotFound("The tenant member is not available.") from exc
+    if membership.user.is_service_account:
+        raise NotFound("The tenant member is not available.")
     if membership.role == role:
         return membership
     membership.role = role
@@ -164,7 +170,11 @@ def assign_organization_staff(
     if context.state.owner_id == member_user_id:
         raise ValidationError({"user_id": "The installation owner already has break-glass access."})
     try:
-        membership = TenantMembership.scoped.for_tenant(context.tenant).select_for_update().get(user_id=member_user_id)
+        membership = (
+            TenantMembership.scoped.for_tenant(context.tenant)
+            .select_for_update()
+            .get(user_id=member_user_id, user__is_service_account=False)
+        )
     except TenantMembership.DoesNotExist as exc:
         raise NotFound("The tenant member is not available.") from exc
     assignment, created = OrganizationAccessAssignment.objects.get_or_create(

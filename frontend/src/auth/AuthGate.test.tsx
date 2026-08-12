@@ -34,6 +34,11 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     regenerateRecoveryCodes: vi.fn(),
     disableTotp: vi.fn(),
     reauthenticate: vi.fn(),
+    listApiTokens: vi.fn().mockResolvedValue({ tokens: [], permissions: [] }),
+    issueApiToken: vi.fn(),
+    rotateApiToken: vi.fn(),
+    revokeApiToken: vi.fn(),
+    searchTokenOrganizations: vi.fn().mockResolvedValue([]),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }

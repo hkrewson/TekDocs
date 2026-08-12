@@ -228,6 +228,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/auth/api-tokens": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["auth_api_tokens_retrieve"];
+        readonly put?: never;
+        readonly post: operations["auth_api_tokens_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/auth/api-tokens/{token_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["auth_api_tokens_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/auth/api-tokens/{token_id}/rotate": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["auth_api_tokens_rotate_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/auth/context": {
         readonly parameters: {
             readonly query?: never;
@@ -4296,6 +4344,70 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        readonly APIToken: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `personal` - Personal
+             *     * `service` - Service
+             * @enum {string}
+             */
+            readonly kind: "personal" | "service";
+            readonly name: string;
+            readonly display_prefix: string;
+            /**
+             * @description * `msp` - MSP Workspace
+             *     * `organization` - Organization Workspace
+             * @enum {string}
+             */
+            readonly workspace_scope: "msp" | "organization";
+            readonly organization: {
+                readonly [key: string]: string;
+            } | null;
+            readonly permissions: readonly string[];
+            readonly status: string;
+            readonly generation: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly expires_at: string;
+            /** Format: date-time */
+            readonly last_used_at: string | null;
+            /** Format: date-time */
+            readonly rotated_at: string | null;
+            /** Format: date-time */
+            readonly revoked_at: string | null;
+        };
+        readonly APITokenCatalog: {
+            readonly tokens: readonly components["schemas"]["APIToken"][];
+            readonly permissions: readonly {
+                readonly [key: string]: unknown;
+            }[];
+        };
+        readonly APITokenRotation: {
+            /** @default 90 */
+            readonly expires_in_days: number;
+        };
+        readonly APITokenWrite: {
+            readonly name: string;
+            /**
+             * @description * `personal` - Personal
+             *     * `service` - Service
+             * @enum {string}
+             */
+            readonly kind: "personal" | "service";
+            /**
+             * @description * `msp` - MSP Workspace
+             *     * `organization` - Organization Workspace
+             * @enum {string}
+             */
+            readonly workspace_scope: "msp" | "organization";
+            /** Format: uuid */
+            readonly organization_id?: string | null;
+            readonly permissions: readonly string[];
+            /** @default 90 */
+            readonly expires_in_days: number;
+        };
         readonly AccessCollection: {
             /** Format: uuid */
             readonly id: string;
@@ -5834,6 +5946,41 @@ export interface components {
         readonly InvitationRequest: {
             /** Format: email */
             readonly email: string;
+        };
+        readonly IssuedAPIToken: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `personal` - Personal
+             *     * `service` - Service
+             * @enum {string}
+             */
+            readonly kind: "personal" | "service";
+            readonly name: string;
+            readonly display_prefix: string;
+            /**
+             * @description * `msp` - MSP Workspace
+             *     * `organization` - Organization Workspace
+             * @enum {string}
+             */
+            readonly workspace_scope: "msp" | "organization";
+            readonly organization: {
+                readonly [key: string]: string;
+            } | null;
+            readonly permissions: readonly string[];
+            readonly status: string;
+            readonly generation: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly expires_at: string;
+            /** Format: date-time */
+            readonly last_used_at: string | null;
+            /** Format: date-time */
+            readonly rotated_at: string | null;
+            /** Format: date-time */
+            readonly revoked_at: string | null;
+            readonly token: string;
         };
         readonly LicenseResult: {
             readonly results: readonly components["schemas"]["SoftwareLicense"][];
@@ -8400,6 +8547,128 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    readonly auth_api_tokens_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["APITokenCatalog"];
+                };
+            };
+        };
+    };
+    readonly auth_api_tokens_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["APITokenWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["APITokenWrite"];
+                readonly "multipart/form-data": components["schemas"]["APITokenWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["IssuedAPIToken"];
+                };
+            };
+            /** @description Recent MFA-backed session and scope authority required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly auth_api_tokens_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly token_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["APIToken"];
+                };
+            };
+        };
+    };
+    readonly auth_api_tokens_rotate_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly token_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["APITokenRotation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["APITokenRotation"];
+                readonly "multipart/form-data": components["schemas"]["APITokenRotation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["IssuedAPIToken"];
+                };
+            };
+            /** @description Recent MFA-backed session and token ownership required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };

@@ -50,6 +50,41 @@ export type TotpSetup = {
   totpUrl: string
 }
 
+export type ApiTokenPermission = {
+  key: string
+  label: string
+  category: string
+  requires_mfa: boolean
+  service_eligible: boolean
+}
+export type ApiToken = {
+  id: string
+  kind: 'personal' | 'service'
+  name: string
+  display_prefix: string
+  workspace_scope: 'msp' | 'organization'
+  organization: { id: string; name: string } | null
+  permissions: string[]
+  status: 'active' | 'expired' | 'revoked'
+  generation: number
+  created_at: string
+  expires_at: string
+  last_used_at: string | null
+  rotated_at: string | null
+  revoked_at: string | null
+}
+export type IssuedApiToken = ApiToken & { token: string }
+export type ApiTokenCatalog = { tokens: ApiToken[]; permissions: ApiTokenPermission[] }
+export type ApiTokenInput = {
+  name: string
+  kind: ApiToken['kind']
+  workspace_scope: ApiToken['workspace_scope']
+  organization_id: string | null
+  permissions: string[]
+  expires_in_days: number
+}
+export type TokenOrganization = { id: string; name: string; classifications: string[] }
+
 export type OidcProvider = {
   id: string
   name: string
@@ -74,6 +109,11 @@ export interface AuthClient {
   regenerateRecoveryCodes(): Promise<string[]>
   disableTotp(): Promise<void>
   reauthenticate(password: string): Promise<void>
+  listApiTokens(): Promise<ApiTokenCatalog>
+  issueApiToken(input: ApiTokenInput): Promise<IssuedApiToken>
+  rotateApiToken(id: string, expiresInDays: number): Promise<IssuedApiToken>
+  revokeApiToken(id: string): Promise<ApiToken>
+  searchTokenOrganizations(query: string): Promise<TokenOrganization[]>
   logout(): Promise<void>
 }
 
@@ -419,6 +459,44 @@ export const browserAuthClient: AuthClient = {
   async reauthenticate(password) {
     const response = await mutation('/_allauth/browser/v1/auth/reauthenticate', 'POST', { password })
     if (!response.ok) throw new AuthRequestError('The current password was not accepted.', response.status)
+  },
+
+  async listApiTokens() {
+    const response = await fetch('/api/v1/auth/api-tokens', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new AuthRequestError('API tokens could not be loaded.', response.status)
+    return responseJson<ApiTokenCatalog>(response)
+  },
+
+  async issueApiToken(input) {
+    const response = await mutation('/api/v1/auth/api-tokens', 'POST', input)
+    if (!response.ok) throw new AuthRequestError(response.status === 403 ? 'Enable MFA and confirm your password before issuing a token.' : 'The API token could not be issued.', response.status)
+    return responseJson<IssuedApiToken>(response)
+  },
+
+  async rotateApiToken(id, expiresInDays) {
+    const response = await mutation(`/api/v1/auth/api-tokens/${encodeURIComponent(id)}/rotate`, 'POST', { expires_in_days: expiresInDays })
+    if (!response.ok) throw new AuthRequestError(response.status === 403 ? 'Confirm your password again before rotating this token.' : 'The API token could not be rotated.', response.status)
+    return responseJson<IssuedApiToken>(response)
+  },
+
+  async revokeApiToken(id) {
+    const response = await mutation(`/api/v1/auth/api-tokens/${encodeURIComponent(id)}`, 'DELETE')
+    if (!response.ok) throw new AuthRequestError('The API token could not be revoked.', response.status)
+    return responseJson<ApiToken>(response)
+  },
+
+  async searchTokenOrganizations(query) {
+    const parameters = new URLSearchParams({ q: query, page: '1', page_size: '15' })
+    const response = await fetch(`/api/v1/workspaces/organizations/search?${parameters}`, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new AuthRequestError('Organizations could not be searched.', response.status)
+    const payload = await responseJson<{ results?: TokenOrganization[] }>(response)
+    return payload.results ?? []
   },
 
   async logout() {

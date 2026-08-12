@@ -100,6 +100,8 @@ Framework errors use a stable `error` envelope with a non-sensitive message, mac
 
 ## Trust boundaries
 
+Personal and service API credentials use the same public routes without creating a second authorization system. Middleware validates the one-time-issued bearer value before the RLS transaction starts, attaches its dedicated human/service subject, and lets normal Workspace resolution and central policy run. Policy then intersects the subject's current grants with immutable token permission rows and one exact MSP or organization Workspace. Personal tokens retain their human subject; service tokens use a dedicated active-but-noninteractive read-only tenant member. PostgreSQL protects token ownership, subject classification, Workspace identity, permission immutability, and monotonic lifecycle. ADR 0060 defines the boundary.
+
 - Browser to same-origin Django session and CSRF boundary.
 - MSP users to client-scoped data.
 - Client portal users to explicitly published data.

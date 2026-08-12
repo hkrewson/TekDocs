@@ -26,6 +26,9 @@ def route(
 AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
+    route("api-token-list-create", ("GET", "POST")),
+    route("api-token-rotate", ("POST",)),
+    route("api-token-revoke", ("DELETE",)),
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
     route(
         "msp-credential-reference-list-create",

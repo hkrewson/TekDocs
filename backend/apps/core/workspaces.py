@@ -12,6 +12,7 @@ from apps.accounts.policy import (
     PermissionKey,
     accessible_organizations,
     context_has_permission,
+    require_installation_member,
     require_permission,
 )
 
@@ -196,8 +197,14 @@ def resolve_msp_workspace(user: User) -> ResolvedWorkspace:
 
 
 def resolve_organization_workspace(user: User, *, entity_id: UUID) -> ResolvedWorkspace:
-    member = require_permission(user, PermissionKey.WORKSPACES_VIEW)
-    organization = get_object_or_404(active_organizations_for_member(member), entity_id=entity_id)
+    member = require_installation_member(user)
+    organizations = (
+        accessible_organizations(member, PermissionKey.WORKSPACES_VIEW)
+        .select_related("entity", "tenant")
+        .prefetch_related("classifications")
+    )
+    organization = get_object_or_404(organizations, entity_id=entity_id)
+    require_permission(user, PermissionKey.WORKSPACES_VIEW, organization=organization)
     classifications = tuple(sorted(classification.kind for classification in organization.classifications.all()))
     capabilities = authorized_capabilities(
         member,

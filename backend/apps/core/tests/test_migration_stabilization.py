@@ -236,10 +236,11 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
             "SELECT count(*) FROM pg_trigger WHERE tgname IN "
             "('accounts_tenant_membership_guard', 'accounts_invitation_scope_guard', "
             "'accounts_organization_access_assignment_actor_guard', 'accounts_custom_role_creator_guard', "
-            "'accounts_access_collection_creator_guard')"
+            "'accounts_access_collection_creator_guard', 'accounts_service_account_guard', "
+            "'accounts_api_token_guard', 'accounts_api_token_permission_guard')"
         )
         assert cursor.fetchone() == (0,)
-    call_command("migrate", "accounts", "0016", verbosity=0, interactive=False)
+    call_command("migrate", "accounts", "0017", verbosity=0, interactive=False)
     assert TenantMembership.objects.filter(id=membership.id, tenant=result.tenant, user=member).exists()
     assert ScopedRoleAssignment.objects.filter(id=assignment.id).exists()
     with connection.cursor() as cursor:
@@ -247,9 +248,10 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
             "SELECT count(*) FROM pg_trigger WHERE tgname IN "
             "('accounts_tenant_membership_guard', 'accounts_invitation_scope_guard', "
             "'accounts_organization_access_assignment_actor_guard', 'accounts_custom_role_creator_guard', "
-            "'accounts_access_collection_creator_guard')"
+            "'accounts_access_collection_creator_guard', 'accounts_service_account_guard', "
+            "'accounts_api_token_guard', 'accounts_api_token_permission_guard')"
         )
-        assert cursor.fetchone() == (5,)
+        assert cursor.fetchone() == (8,)
 
     call_command("migrate", "core", "0021", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
@@ -270,7 +272,8 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0074", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0075", verbosity=0, interactive=False)
+    call_command("migrate", "accounts", "0017", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
     assert Organization.objects.filter(tenant=result.tenant).count() == counts["organizations"]

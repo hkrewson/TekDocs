@@ -1016,7 +1016,7 @@ Evidence: `docs/releases/0.6.0.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.6.1` | **Complete:** `/api/v1` conventions, strict declared filtering, bounded pagination, correlated error/idempotency contracts, and generated TypeScript client. |
-| `0.6.2` | Scoped personal/service tokens, rotation/revocation, expiry, and value-safe audit. |
+| `0.6.2` | **Complete:** scoped personal/service tokens, rotation/revocation, expiry, and value-safe audit. |
 | `0.6.3` | Signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
 | `0.6.4` | Integration provider contract and envelope-encrypted connection configuration. |
 | `0.6.5` | Scheduled sync jobs, cursors, backoff, idempotency, and worker failure recovery. |
@@ -1037,6 +1037,17 @@ Evidence: `docs/releases/0.6.0.md`.
 - [x] `TD-RISK-012` is resolved as the reusable strict/bounded collection convention. `TD-RISK-044` and `TD-RISK-045` remain mitigated with explicit owners through integration certification.
 
 Evidence: `docs/releases/0.6.1.md`.
+
+### `0.6.2` acceptance criteria
+
+- [x] Personal and dedicated non-interactive service identities can receive an expiring token for exactly the MSP Workspace or one organization Workspace and an explicit permission subset that never exceeds current central-policy authority.
+- [x] Raw credentials use an allowlisted bearer format, are returned only at issue/rotation, are stored only through Django's maintained password hashers, and are excluded from lists, audits, logs, browser storage, URLs, and generated artifacts.
+- [x] Issuance and rotation require a session, CSRF, enrolled TOTP, and recent allauth reauthentication; service-token administration additionally requires `integrations.manage`, while bearer credentials cannot administer credentials.
+- [x] Rotation invalidates the prior credential, revocation is immediate, expiry is mandatory and bounded, and service subjects cannot sign in, become staff, or receive ordinary roles.
+- [x] Bearer authentication is established before request-wide RLS binding; central policy intersects account, exact Workspace, and token permissions, with MSP/sibling-client/IDOR and direct-write database negatives.
+- [x] Settings provides accessible issue/search/copy-once/rotate/revoke behavior; OpenAPI and its generated TypeScript client, migrations/guards, `make test-api-tokens`, documentation, risks, and version metadata agree at `0.6.2`.
+
+Evidence: `docs/releases/0.6.2.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

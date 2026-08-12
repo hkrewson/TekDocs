@@ -17,6 +17,7 @@ from apps.accounts.access_views import (
     ScopedRoleAssignmentDetailView,
     ScopedRoleAssignmentListCreateView,
 )
+from apps.accounts.api_token_views import APITokenListCreateView, APITokenRevokeView, APITokenRotateView
 from apps.accounts.views import (
     AuthenticatedContextView,
     BootstrapStatusView,
@@ -280,6 +281,9 @@ urlpatterns = [
         name="client-portal-document-artifact-download",
     ),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
+    path("api/v1/auth/api-tokens", APITokenListCreateView.as_view(), name="api-token-list-create"),
+    path("api/v1/auth/api-tokens/<uuid:token_id>/rotate", APITokenRotateView.as_view(), name="api-token-rotate"),
+    path("api/v1/auth/api-tokens/<uuid:token_id>", APITokenRevokeView.as_view(), name="api-token-revoke"),
     path("api/v1/notifications", MSPNotificationListView.as_view(), name="notification-list"),
     path(
         "api/v1/notifications/<uuid:notification_id>",

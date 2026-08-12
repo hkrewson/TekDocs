@@ -84,7 +84,9 @@ class RLSRequestScopeMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        if connection.vendor != "postgresql" or settings.SESSION_COOKIE_NAME not in request.COOKIES:
+        has_session = settings.SESSION_COOKIE_NAME in request.COOKIES
+        has_api_token = getattr(request, "api_token", None) is not None
+        if connection.vendor != "postgresql" or not (has_session or has_api_token):
             return self.get_response(request)
 
         with transaction.atomic():

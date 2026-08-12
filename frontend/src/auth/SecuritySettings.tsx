@@ -4,6 +4,7 @@ import { KeyRound, Laptop, RefreshCw, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
+import { ApiTokenSettings } from './ApiTokenSettings'
 
 function sessionName(userAgent: string): string {
   const browser = userAgent.includes('Edg/') ? 'Edge' : userAgent.includes('Chrome/') ? 'Chrome' : userAgent.includes('Firefox/') ? 'Firefox' : userAgent.includes('Safari/') ? 'Safari' : 'Browser'
@@ -273,6 +274,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
           </ul>
         )}
       </section>
+      {context.surface === 'msp' && <ApiTokenSettings client={client} context={context} />}
     </>
   )
 }

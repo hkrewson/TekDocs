@@ -83,10 +83,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "allauth.usersessions.middleware.UserSessionsMiddleware",
+    "apps.core.middleware.RequestContextMiddleware",
+    "apps.accounts.authentication.APITokenAuthenticationMiddleware",
     "apps.core.middleware.RLSRequestScopeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "apps.core.middleware.RequestContextMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
 ]
 
@@ -197,6 +198,7 @@ USERSESSIONS_TRACK_ACTIVITY = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.accounts.authentication.BearerTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],

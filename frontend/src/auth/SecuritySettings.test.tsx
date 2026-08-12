@@ -38,6 +38,8 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
     revokeSession: vi.fn().mockResolvedValue([current]),
     loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
     updateProfile: vi.fn().mockResolvedValue(context),
+    listApiTokens: vi.fn().mockResolvedValue({ tokens: [], permissions: [] }),
+    searchTokenOrganizations: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as AuthClient
 }
@@ -47,6 +49,34 @@ const settings = (authClient: AuthClient, onProfileUpdated = vi.fn()) => (
 )
 
 describe('security settings', () => {
+  it('issues a scoped personal token and shows its value only until dismissed', async () => {
+    const user = userEvent.setup()
+    const issued = {
+      id: crypto.randomUUID(), kind: 'personal' as const, name: 'Docs export', display_prefix: 'tdp_123456789abc…',
+      workspace_scope: 'msp' as const, organization: null, permissions: ['documents.view'], status: 'active' as const,
+      generation: 1, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      last_used_at: null, rotated_at: null, revoked_at: null, token: 'tdp_123456789abc_once-only-value',
+    }
+    const issueApiToken = vi.fn().mockResolvedValue(issued)
+    const listApiTokens = vi.fn().mockResolvedValue({
+      tokens: [],
+      permissions: [{ key: 'documents.view', label: 'View documents', category: 'Documentation', requires_mfa: false, service_eligible: true }],
+    })
+    render(settings(client({ listApiTokens, issueApiToken })))
+
+    await user.click(await screen.findByRole('button', { name: 'New token' }))
+    await user.type(screen.getByLabelText('Name'), 'Docs export')
+    await user.click(screen.getByRole('checkbox', { name: /View documents/ }))
+    await user.click(screen.getByRole('button', { name: 'Issue token' }))
+
+    expect(await screen.findByText(issued.token)).toBeInTheDocument()
+    expect(issueApiToken).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Docs export', workspace_scope: 'msp', permissions: ['documents.view'], expires_in_days: 90,
+    }))
+    await user.click(screen.getByRole('button', { name: 'Dismiss token' }))
+    expect(screen.queryByText(issued.token)).not.toBeInTheDocument()
+  })
+
   it('lists active sessions and revokes another browser', async () => {
     const user = userEvent.setup()
     const revokeSession = vi.fn().mockResolvedValue([current])

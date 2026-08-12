@@ -72,6 +72,16 @@ TENANT_MODEL_CONTRACTS = tuple(
         "The row composes member, role, and tenant/organization/collection scope.",
     ),
     TenantModelContract(
+        "accounts_apitoken",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "Digest-only credentials establish a bounded principal before domain RLS can be selected.",
+    ),
+    TenantModelContract(
+        "accounts_apitokenpermission",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "Immutable permission rows constrain authenticated token authority before domain access.",
+    ),
+    TenantModelContract(
         "core_installationstate",
         IsolationBoundary.INSTALLATION_SINGLETON,
         "The migration-created singleton anchors bootstrap and tenant discovery.",
@@ -91,4 +101,7 @@ CONTROL_PLANE_GUARD_TRIGGERS = (
     "accounts_organization_access_assignment_actor_guard",
     "accounts_custom_role_creator_guard",
     "accounts_access_collection_creator_guard",
+    "accounts_service_account_guard",
+    "accounts_api_token_guard",
+    "accounts_api_token_permission_guard",
 )

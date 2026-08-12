@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 from rest_framework import serializers
+
+
+class BearerTokenAuthenticationScheme(OpenApiAuthenticationExtension):  # type: ignore[no-untyped-call]
+    target_class = "apps.accounts.authentication.BearerTokenAuthentication"
+    name = "TekDocsBearerToken"
+
+    def get_security_definition(self, auto_schema):  # type: ignore[no-untyped-def]
+        del auto_schema
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "TekDocs API token",
+            "description": "One-time-issued, expiring, Workspace- and permission-scoped TekDocs API token.",
+        }
 
 
 class ApiErrorSerializer(serializers.Serializer):

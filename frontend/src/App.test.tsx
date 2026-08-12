@@ -21,6 +21,7 @@ const authContext: AuthenticatedContext = {
 const authClient = {
   listSessions: vi.fn().mockResolvedValue([]),
   loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
+  listApiTokens: vi.fn().mockResolvedValue({ tokens: [], permissions: [] }),
 } as unknown as AuthClient
 
 const portalContext: AuthenticatedContext = {

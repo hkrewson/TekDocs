@@ -23,7 +23,7 @@ const sameOriginSession: Middleware = {
   },
 }
 
-export function createTekDocsApiClient(baseUrl = '') {
+export function createTekDocsApiClient(baseUrl = window.location.origin) {
   const client = createClient<paths>({ baseUrl, credentials: 'same-origin' })
   client.use(sameOriginSession)
   return client

@@ -1,13 +1,14 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.6.1
+  version: 0.6.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
     get:
       operationId: root_retrieve
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       - {}
       responses:
@@ -29,6 +30,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -61,6 +63,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -94,6 +97,7 @@ paths:
               $ref: '#/components/schemas/AccessCollectionWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -132,6 +136,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAccessCollectionWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -158,6 +163,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -178,6 +184,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -211,6 +218,7 @@ paths:
               $ref: '#/components/schemas/CustomRoleCreate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -249,6 +257,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCustomRoleUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -275,6 +284,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -295,6 +305,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -347,6 +358,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedMemberRoleWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -403,6 +415,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -455,6 +468,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedOrganizationAccessWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -537,6 +551,7 @@ paths:
               $ref: '#/components/schemas/OrganizationStaffWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -625,6 +640,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -669,6 +685,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -702,6 +719,7 @@ paths:
               $ref: '#/components/schemas/ScopedRoleAssignmentWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -729,6 +747,7 @@ paths:
       tags:
       - access-control
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -739,12 +758,153 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/auth/api-tokens:
+    get:
+      operationId: auth_api_tokens_retrieve
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenCatalog'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: auth_api_tokens_create
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APITokenWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/APITokenWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/APITokenWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedAPIToken'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: Recent MFA-backed session and scope authority required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/auth/api-tokens/{token_id}:
+    delete:
+      operationId: auth_api_tokens_destroy
+      parameters:
+      - in: path
+        name: token_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIToken'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/auth/api-tokens/{token_id}/rotate:
+    post:
+      operationId: auth_api_tokens_rotate_create
+      parameters:
+      - in: path
+        name: token_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APITokenRotation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/APITokenRotation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/APITokenRotation'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedAPIToken'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: Recent MFA-backed session and token ownership required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/auth/context:
     get:
       operationId: auth_context_retrieve
       tags:
       - auth
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -800,6 +960,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProfileUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -980,6 +1141,7 @@ paths:
       tags:
       - credential-references
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1011,6 +1173,7 @@ paths:
               $ref: '#/components/schemas/CredentialReferenceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -1049,6 +1212,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1075,6 +1239,7 @@ paths:
       tags:
       - credential-references
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -1098,6 +1263,7 @@ paths:
       tags:
       - credential-references
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '302':
@@ -1114,6 +1280,7 @@ paths:
       tags:
       - custom-field-definitions
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1145,6 +1312,7 @@ paths:
               $ref: '#/components/schemas/CustomFieldDefinitionWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -1183,6 +1351,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1209,6 +1378,7 @@ paths:
       tags:
       - custom-field-definitions
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -1225,6 +1395,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1256,6 +1427,7 @@ paths:
               $ref: '#/components/schemas/DocumentCreate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -1283,6 +1455,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1321,6 +1494,7 @@ paths:
               $ref: '#/components/schemas/DocumentUpdate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1359,6 +1533,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -1403,6 +1578,7 @@ paths:
               $ref: '#/components/schemas/DocumentAttachmentWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -1436,6 +1612,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -1465,6 +1642,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1493,6 +1671,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1533,6 +1712,7 @@ paths:
               $ref: '#/components/schemas/DocumentPlacementWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1589,6 +1769,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1633,6 +1814,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1678,6 +1860,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1723,6 +1906,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1767,6 +1951,7 @@ paths:
               $ref: '#/components/schemas/SharedBlockUpdate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1806,6 +1991,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1844,6 +2030,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -1889,6 +2076,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1934,6 +2122,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationControlWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -1985,6 +2174,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2019,6 +2209,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2053,6 +2244,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2099,6 +2291,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationControlWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2138,6 +2331,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2178,6 +2372,7 @@ paths:
               $ref: '#/components/schemas/DocumentationReferenceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -2211,6 +2406,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -2259,6 +2455,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2292,6 +2489,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2324,6 +2522,7 @@ paths:
               $ref: '#/components/schemas/DocumentTemplateInstantiate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -2365,6 +2564,7 @@ paths:
               $ref: '#/components/schemas/MarkdownImport'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -2412,6 +2612,7 @@ paths:
       tags:
       - documents
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2439,6 +2640,7 @@ paths:
       tags:
       - entities
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2483,6 +2685,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2515,6 +2718,7 @@ paths:
       tags:
       - entities
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -2538,6 +2742,7 @@ paths:
       tags:
       - entities
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2600,6 +2805,7 @@ paths:
               $ref: '#/components/schemas/EntityLinkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -2669,6 +2875,7 @@ paths:
       tags:
       - entities
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -2775,6 +2982,7 @@ paths:
       tags:
       - entities
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2831,6 +3039,7 @@ paths:
       tags:
       - entity-link-types
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2920,6 +3129,7 @@ paths:
       tags:
       - invitations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -2965,6 +3175,7 @@ paths:
               $ref: '#/components/schemas/InvitationRequest'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -3040,6 +3251,7 @@ paths:
       tags:
       - invitations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3115,6 +3327,7 @@ paths:
       tags:
       - invitations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3264,6 +3477,7 @@ paths:
               $ref: '#/components/schemas/MarkdownRenderRequest'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3317,6 +3531,7 @@ paths:
       tags:
       - notification-deliveries
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3356,6 +3571,7 @@ paths:
               $ref: '#/components/schemas/NotificationDeliveryRetry'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3388,6 +3604,7 @@ paths:
       tags:
       - notification-preferences
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3418,6 +3635,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNotificationPreference'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3443,6 +3661,7 @@ paths:
       tags:
       - notifications
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3481,6 +3700,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedInboxNotificationRead'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3513,6 +3733,7 @@ paths:
       tags:
       - organizations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3558,6 +3779,7 @@ paths:
               $ref: '#/components/schemas/OrganizationWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -3609,6 +3831,7 @@ paths:
       tags:
       - organizations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3670,6 +3893,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedOrganizationWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3732,6 +3956,7 @@ paths:
       tags:
       - organizations
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -3798,6 +4023,7 @@ paths:
       tags:
       - people
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3841,6 +4067,7 @@ paths:
               $ref: '#/components/schemas/PersonWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -3880,6 +4107,7 @@ paths:
       tags:
       - people
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3929,6 +4157,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedPersonWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -3967,6 +4196,7 @@ paths:
       tags:
       - people
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -3995,6 +4225,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4032,6 +4263,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4059,6 +4291,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4092,6 +4325,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4125,6 +4359,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4155,6 +4390,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNotificationPreference'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4180,6 +4416,7 @@ paths:
       tags:
       - portal
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4218,6 +4455,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedInboxNotificationRead'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4295,6 +4533,7 @@ paths:
       tags:
       - recycle-bin
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4351,6 +4590,7 @@ paths:
       tags:
       - recycle-bin
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -4408,6 +4648,7 @@ paths:
       tags:
       - sites
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4439,6 +4680,7 @@ paths:
               $ref: '#/components/schemas/SiteWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -4466,6 +4708,7 @@ paths:
       tags:
       - sites
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4515,6 +4758,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSiteWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4541,6 +4785,7 @@ paths:
       tags:
       - sites
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -4576,6 +4821,7 @@ paths:
               $ref: '#/components/schemas/LocationWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -4620,6 +4866,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedLocationWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4652,6 +4899,7 @@ paths:
       tags:
       - sites
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -4668,6 +4916,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4727,6 +4976,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4758,6 +5008,7 @@ paths:
               $ref: '#/components/schemas/ClientAssetWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -4785,6 +5036,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4818,6 +5070,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4857,6 +5110,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4880,6 +5134,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4917,6 +5172,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedHardwareDetailWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4955,6 +5211,7 @@ paths:
             schema:
               $ref: '#/components/schemas/HardwareAssignmentWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -4981,6 +5238,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5008,6 +5266,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5047,6 +5306,7 @@ paths:
               $ref: '#/components/schemas/HardwareDisposalWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5074,6 +5334,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5103,6 +5364,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5143,6 +5405,7 @@ paths:
               $ref: '#/components/schemas/AssetMACAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -5187,6 +5450,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5225,6 +5489,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5257,6 +5522,7 @@ paths:
               $ref: '#/components/schemas/ClientAssetBulkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5289,6 +5555,7 @@ paths:
               $ref: '#/components/schemas/AssetCsvApply'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5309,6 +5576,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5337,6 +5605,7 @@ paths:
               $ref: '#/components/schemas/AssetCsvUpload'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5357,6 +5626,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5378,6 +5648,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5419,6 +5690,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5449,6 +5721,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ContractWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -5476,6 +5749,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5513,6 +5787,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedContractWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5539,6 +5814,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -5573,6 +5849,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CostWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -5617,6 +5894,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCostWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5649,6 +5927,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5669,6 +5948,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5704,6 +5984,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5734,6 +6015,7 @@ paths:
             schema:
               $ref: '#/components/schemas/LicenseWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -5761,6 +6043,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5798,6 +6081,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedLicenseWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5837,6 +6121,7 @@ paths:
               $ref: '#/components/schemas/InstallationLinkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5875,6 +6160,7 @@ paths:
             schema:
               $ref: '#/components/schemas/SeatWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5908,6 +6194,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5928,6 +6215,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5963,6 +6251,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -5994,6 +6283,7 @@ paths:
               $ref: '#/components/schemas/NetworkRecordWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6032,6 +6322,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkRecordWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6052,6 +6343,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6087,6 +6379,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6118,6 +6411,7 @@ paths:
               $ref: '#/components/schemas/CircuitWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6145,6 +6439,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6182,6 +6477,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCircuitWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6209,6 +6505,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6249,6 +6546,7 @@ paths:
               $ref: '#/components/schemas/HandoffWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6293,6 +6591,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedHandoffWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6313,6 +6612,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6348,6 +6648,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6379,6 +6680,7 @@ paths:
               $ref: '#/components/schemas/NetworkDeviceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6406,6 +6708,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6443,6 +6746,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6478,6 +6782,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6509,6 +6814,7 @@ paths:
               $ref: '#/components/schemas/RecordWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6536,6 +6842,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6573,6 +6880,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRecordWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6608,6 +6916,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6639,6 +6948,7 @@ paths:
               $ref: '#/components/schemas/ZoneWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6666,6 +6976,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6703,6 +7014,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedZoneWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6723,6 +7035,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6754,6 +7067,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6785,6 +7099,7 @@ paths:
               $ref: '#/components/schemas/InterfaceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6812,6 +7127,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6849,6 +7165,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedInterfaceWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6884,6 +7201,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6915,6 +7233,7 @@ paths:
               $ref: '#/components/schemas/IPAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -6942,6 +7261,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -6979,6 +7299,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedIPAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7014,6 +7335,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7045,6 +7367,7 @@ paths:
               $ref: '#/components/schemas/MACAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7072,6 +7395,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7109,6 +7433,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedMACAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7129,6 +7454,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7161,6 +7487,7 @@ paths:
               $ref: '#/components/schemas/NetBoxPreviewWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7181,6 +7508,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7214,6 +7542,7 @@ paths:
               $ref: '#/components/schemas/NetBoxReferenceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7241,6 +7570,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -7272,6 +7602,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7303,6 +7634,7 @@ paths:
               $ref: '#/components/schemas/NetworkRackWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7330,6 +7662,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7367,6 +7700,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkRackWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7408,6 +7742,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7443,6 +7778,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7474,6 +7810,7 @@ paths:
               $ref: '#/components/schemas/SubnetWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7501,6 +7838,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7538,6 +7876,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSubnetWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7573,6 +7912,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7604,6 +7944,7 @@ paths:
               $ref: '#/components/schemas/VLANWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7631,6 +7972,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7668,6 +8010,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVLANWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7703,6 +8046,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7734,6 +8078,7 @@ paths:
               $ref: '#/components/schemas/VRFWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7761,6 +8106,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7798,6 +8144,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVRFWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7833,6 +8180,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7864,6 +8212,7 @@ paths:
               $ref: '#/components/schemas/WirelessWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -7891,6 +8240,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7928,6 +8278,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedWirelessWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -7948,6 +8299,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8006,6 +8358,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8057,6 +8410,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8134,6 +8488,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8172,6 +8527,7 @@ paths:
               $ref: '#/components/schemas/ClientAssetWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -8205,6 +8561,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8244,6 +8601,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8289,6 +8647,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8318,6 +8677,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8361,6 +8721,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedHardwareDetailWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8405,6 +8766,7 @@ paths:
             schema:
               $ref: '#/components/schemas/HardwareAssignmentWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8437,6 +8799,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8470,6 +8833,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8515,6 +8879,7 @@ paths:
               $ref: '#/components/schemas/HardwareDisposalWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8548,6 +8913,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8583,6 +8949,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8629,6 +8996,7 @@ paths:
               $ref: '#/components/schemas/AssetMACAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -8679,6 +9047,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8723,6 +9092,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSoftwareInstallationWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8762,6 +9132,7 @@ paths:
               $ref: '#/components/schemas/ClientAssetBulkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8801,6 +9172,7 @@ paths:
               $ref: '#/components/schemas/AssetCsvApply'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8828,6 +9200,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8863,6 +9236,7 @@ paths:
               $ref: '#/components/schemas/AssetCsvUpload'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8890,6 +9264,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8917,6 +9292,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8952,6 +9328,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -8990,6 +9367,7 @@ paths:
               $ref: '#/components/schemas/ProductWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9023,6 +9401,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9066,6 +9445,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9098,6 +9478,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -9127,6 +9508,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9173,6 +9555,7 @@ paths:
               $ref: '#/components/schemas/CatalogProductDocumentWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9212,6 +9595,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -9253,6 +9637,7 @@ paths:
               $ref: '#/components/schemas/ModelWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9303,6 +9688,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedModelRevisionWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9353,6 +9739,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -9376,6 +9763,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9403,6 +9791,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9441,6 +9830,7 @@ paths:
               $ref: '#/components/schemas/DefinitionWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9486,6 +9876,7 @@ paths:
               $ref: '#/components/schemas/DefinitionVersionWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9513,6 +9904,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9553,6 +9945,7 @@ paths:
               $ref: '#/components/schemas/InvitationRequest'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9600,6 +9993,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9637,6 +10031,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ContractWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9670,6 +10065,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9713,6 +10109,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedContractWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9745,6 +10142,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -9785,6 +10183,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CostWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -9835,6 +10234,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCostWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9873,6 +10273,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9900,6 +10301,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9947,6 +10349,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -9985,6 +10388,7 @@ paths:
               $ref: '#/components/schemas/CredentialReferenceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -10029,6 +10433,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCredentialReferenceUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10061,6 +10466,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -10090,6 +10496,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '302':
@@ -10113,6 +10520,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10151,6 +10559,7 @@ paths:
               $ref: '#/components/schemas/CustomFieldDefinitionWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -10195,6 +10604,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCustomFieldVersionWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10227,6 +10637,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -10250,6 +10661,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10288,6 +10700,7 @@ paths:
               $ref: '#/components/schemas/DocumentCreate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -10321,6 +10734,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10365,6 +10779,7 @@ paths:
               $ref: '#/components/schemas/DocumentUpdate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10409,6 +10824,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -10459,6 +10875,7 @@ paths:
               $ref: '#/components/schemas/DocumentAttachmentWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -10498,6 +10915,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -10533,6 +10951,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10567,6 +10986,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10613,6 +11033,7 @@ paths:
               $ref: '#/components/schemas/DocumentPlacementWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10675,6 +11096,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedDocumentPlacementUpdate'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10725,6 +11147,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10776,6 +11199,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10827,6 +11251,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10877,6 +11302,7 @@ paths:
               $ref: '#/components/schemas/SharedBlockUpdate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10922,6 +11348,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -10966,6 +11393,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -11017,6 +11445,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11068,6 +11497,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationControlWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11125,6 +11555,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11165,6 +11596,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11205,6 +11637,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11257,6 +11690,7 @@ paths:
               $ref: '#/components/schemas/DocumentPublicationControlWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11315,6 +11749,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11354,6 +11789,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11393,6 +11829,7 @@ paths:
               $ref: '#/components/schemas/DocumentTemplateInstantiate'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -11441,6 +11878,7 @@ paths:
               $ref: '#/components/schemas/MarkdownImport'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -11494,6 +11932,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11527,6 +11966,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11577,6 +12017,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCustomFieldValueWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11615,6 +12056,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -11644,6 +12086,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11712,6 +12155,7 @@ paths:
               $ref: '#/components/schemas/EntityLinkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -11787,6 +12231,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -11899,6 +12344,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -11976,6 +12422,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12013,6 +12460,7 @@ paths:
             schema:
               $ref: '#/components/schemas/LicenseWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12046,6 +12494,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12089,6 +12538,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedLicenseWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12134,6 +12584,7 @@ paths:
               $ref: '#/components/schemas/InstallationLinkWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12178,6 +12629,7 @@ paths:
             schema:
               $ref: '#/components/schemas/SeatWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12217,6 +12669,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12244,6 +12697,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12285,6 +12739,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12323,6 +12778,7 @@ paths:
               $ref: '#/components/schemas/NetworkRecordWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12367,6 +12823,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkRecordWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12394,6 +12851,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12435,6 +12893,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12473,6 +12932,7 @@ paths:
               $ref: '#/components/schemas/CircuitWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12506,6 +12966,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12549,6 +13010,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCircuitWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12582,6 +13044,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12628,6 +13091,7 @@ paths:
               $ref: '#/components/schemas/HandoffWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12678,6 +13142,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedHandoffWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12705,6 +13170,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12746,6 +13212,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12784,6 +13251,7 @@ paths:
               $ref: '#/components/schemas/NetworkDeviceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12817,6 +13285,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12860,6 +13329,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkDeviceWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12901,6 +13371,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -12939,6 +13410,7 @@ paths:
               $ref: '#/components/schemas/RecordWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -12972,6 +13444,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13015,6 +13488,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRecordWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13056,6 +13530,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13094,6 +13569,7 @@ paths:
               $ref: '#/components/schemas/ZoneWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13127,6 +13603,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13170,6 +13647,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedZoneWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13197,6 +13675,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13234,6 +13713,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13272,6 +13752,7 @@ paths:
               $ref: '#/components/schemas/InterfaceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13305,6 +13786,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13348,6 +13830,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedInterfaceWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13389,6 +13872,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13427,6 +13911,7 @@ paths:
               $ref: '#/components/schemas/IPAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13460,6 +13945,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13503,6 +13989,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedIPAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13544,6 +14031,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13582,6 +14070,7 @@ paths:
               $ref: '#/components/schemas/MACAddressWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13615,6 +14104,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13658,6 +14148,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedMACAddressWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13685,6 +14176,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13724,6 +14216,7 @@ paths:
               $ref: '#/components/schemas/NetBoxPreviewWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13751,6 +14244,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13791,6 +14285,7 @@ paths:
               $ref: '#/components/schemas/NetBoxReferenceWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13824,6 +14319,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -13861,6 +14357,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13899,6 +14396,7 @@ paths:
               $ref: '#/components/schemas/NetworkRackWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -13932,6 +14430,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -13975,6 +14474,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNetworkRackWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14022,6 +14522,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14063,6 +14564,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14101,6 +14603,7 @@ paths:
               $ref: '#/components/schemas/SubnetWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -14134,6 +14637,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14177,6 +14681,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSubnetWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14218,6 +14723,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14256,6 +14762,7 @@ paths:
               $ref: '#/components/schemas/VLANWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -14289,6 +14796,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14332,6 +14840,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVLANWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14373,6 +14882,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14411,6 +14921,7 @@ paths:
               $ref: '#/components/schemas/VRFWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -14444,6 +14955,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14487,6 +14999,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVRFWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14528,6 +15041,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14566,6 +15080,7 @@ paths:
               $ref: '#/components/schemas/WirelessWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -14599,6 +15114,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14642,6 +15158,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedWirelessWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14694,6 +15211,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14744,6 +15262,7 @@ paths:
               $ref: '#/components/schemas/PersonWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -14789,6 +15308,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14844,6 +15364,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedPersonWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -14888,6 +15409,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -14967,6 +15489,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15029,6 +15552,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -15092,6 +15616,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15130,6 +15655,7 @@ paths:
               $ref: '#/components/schemas/SiteWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -15163,6 +15689,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15218,6 +15745,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSiteWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15250,6 +15778,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -15291,6 +15820,7 @@ paths:
               $ref: '#/components/schemas/LocationWrite'
         required: true
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '201':
@@ -15341,6 +15871,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedLocationWrite'
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15379,6 +15910,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '204':
@@ -15402,6 +15934,7 @@ paths:
       tags:
       - workspaces
       security:
+      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -15418,6 +15951,153 @@ paths:
                 format: uuid
 components:
   schemas:
+    APIToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          enum:
+          - personal
+          - service
+          type: string
+          description: |-
+            * `personal` - Personal
+            * `service` - Service
+          x-spec-enum-id: c657ef5a5179a7d4
+        name:
+          type: string
+        display_prefix:
+          type: string
+          readOnly: true
+        workspace_scope:
+          enum:
+          - msp
+          - organization
+          type: string
+          description: |-
+            * `msp` - MSP Workspace
+            * `organization` - Organization Workspace
+          x-spec-enum-id: c8a5ce48c634a2ec
+        organization:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          readOnly: true
+        permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        generation:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        rotated_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - created_at
+      - display_prefix
+      - expires_at
+      - generation
+      - id
+      - kind
+      - last_used_at
+      - name
+      - organization
+      - permissions
+      - revoked_at
+      - rotated_at
+      - status
+      - workspace_scope
+    APITokenCatalog:
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIToken'
+        permissions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - permissions
+      - tokens
+    APITokenRotation:
+      type: object
+      properties:
+        expires_in_days:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 90
+    APITokenWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        kind:
+          enum:
+          - personal
+          - service
+          type: string
+          description: |-
+            * `personal` - Personal
+            * `service` - Service
+          x-spec-enum-id: c657ef5a5179a7d4
+        workspace_scope:
+          enum:
+          - msp
+          - organization
+          type: string
+          description: |-
+            * `msp` - MSP Workspace
+            * `organization` - Organization Workspace
+          x-spec-enum-id: c8a5ce48c634a2ec
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+            maxLength: 80
+          maxItems: 50
+          minItems: 1
+        expires_in_days:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 90
+      required:
+      - kind
+      - name
+      - permissions
+      - workspace_scope
     AccessCollection:
       type: object
       properties:
@@ -19131,6 +19811,87 @@ components:
           maxLength: 254
       required:
       - email
+    IssuedAPIToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          enum:
+          - personal
+          - service
+          type: string
+          description: |-
+            * `personal` - Personal
+            * `service` - Service
+          x-spec-enum-id: c657ef5a5179a7d4
+        name:
+          type: string
+        display_prefix:
+          type: string
+          readOnly: true
+        workspace_scope:
+          enum:
+          - msp
+          - organization
+          type: string
+          description: |-
+            * `msp` - MSP Workspace
+            * `organization` - Organization Workspace
+          x-spec-enum-id: c8a5ce48c634a2ec
+        organization:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          readOnly: true
+        permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        generation:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        rotated_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        token:
+          type: string
+      required:
+      - created_at
+      - display_prefix
+      - expires_at
+      - generation
+      - id
+      - kind
+      - last_used_at
+      - name
+      - organization
+      - permissions
+      - revoked_at
+      - rotated_at
+      - status
+      - token
+      - workspace_scope
     LicenseResult:
       type: object
       properties:
@@ -23543,6 +24304,12 @@ components:
         error:
           $ref: '#/components/schemas/ApiError'
   securitySchemes:
+    TekDocsBearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: TekDocs API token
+      description: One-time-issued, expiring, Workspace- and permission-scoped TekDocs
+        API token.
     cookieAuth:
       type: apiKey
       in: cookie

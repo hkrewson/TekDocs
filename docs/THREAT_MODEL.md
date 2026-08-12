@@ -6,6 +6,8 @@ Client documentation, credential-reference metadata, personal/contact informatio
 
 ## Principal threats and planned controls
 
+API-token threats include bearer theft, plaintext retention, guessed-prefix enumeration, scope confusion between MSP and client Workspaces, permission drift, service-account interactive login, stale credentials, and token use to mint broader tokens. Mitigations are header-only transport over TLS, high-entropy one-time material with password-hash-only storage, generic authentication failures with dummy-hash work, exact Workspace plus central-policy permission intersection, non-interactive read-only service subjects, mandatory bounded expiry, immediate rotation/revocation, session/MFA/recent-reauthentication management, value-free audits, forced RLS, and PostgreSQL authority guards. Client custody and bearer replay until lifecycle termination remain inherent residual risks tracked as `TD-RISK-046`.
+
 | Threat | Initial controls |
 | --- | --- |
 | Missing or orphaned owner identity | Every Entity has a non-null immutable MSP/organization Workspace owner. There is exactly one MSP Workspace per installation tenant and one Workspace per organization; PostgreSQL rejects mismatched tenant/Workspace/organization edges, and ordinary Entity creation without an owner fails. Organization archival retains its identity and owned records, while protected immutable Workspace relationships prohibit physical deletion from orphaning data. `Tenant` remains only the one-MSP installation/future-hosting boundary; hosted multi-MSP control-plane safety is not claimed. |

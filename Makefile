@@ -2,7 +2,7 @@ SHELL := /bin/sh
 
 .PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-certification notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
 
-.PHONY: bootstrap build up down logs check test test-api-contracts test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -38,6 +38,10 @@ test:
 test-api-contracts:
 	docker compose run --rm migrate pytest apps/core/tests/test_api_contracts.py -q
 	./scripts/frontend-gate.sh check
+
+test-api-tokens:
+	docker compose run --rm migrate pytest apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
+	./scripts/frontend-gate.sh test
 
 test-auth-abuse:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q

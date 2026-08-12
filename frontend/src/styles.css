@@ -628,6 +628,28 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .reauth-form { display: grid; grid-template-columns: 24px minmax(220px, 1fr) minmax(200px, .8fr) auto; align-items: end; gap: 12px; padding-top: 17px; border-top: 1px solid var(--border); }
 .reauth-form > svg { align-self: start; margin-top: 2px; color: var(--muted); }
 .settings-state { margin: 0; padding: 16px 2px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+.api-token-settings { margin-top: 18px; }
+.token-secret { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: start; margin: 12px 0; padding: 14px; border: 1px solid #a47d37; border-radius: 7px; background: #fff8e8; }
+.token-secret p { margin: 3px 0 8px; color: var(--muted); font-size: 13px; }
+.token-secret code { display: block; overflow-wrap: anywhere; user-select: all; }
+.token-create-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 12px 0 18px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
+.token-create-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 650; }
+.token-create-form fieldset, .token-create-form .settings-actions { grid-column: 1 / -1; }
+.token-create-form fieldset { min-width: 0; padding: 0; border: 0; }
+.token-create-form legend { margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.token-permissions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; max-height: 260px; overflow: auto; }
+.token-permissions label { display: grid; grid-template-columns: auto 1fr; align-items: start; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.token-permissions input { margin-top: 3px; }
+.token-permissions small, .token-organization-picker small { display: block; margin-top: 2px; color: var(--muted); font-weight: 400; }
+.token-organization-picker { position: relative; }
+.token-organization-picker ul { position: absolute; z-index: 4; width: 100%; margin: 4px 0 0; padding: 5px; list-style: none; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); }
+.token-organization-picker li button { width: 100%; padding: 8px; border: 0; border-radius: 4px; text-align: left; background: transparent; }
+.token-organization-picker li button:hover { background: var(--surface-subtle); }
+.token-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.token-list li { display: flex; justify-content: space-between; gap: 16px; padding: 14px 2px; border-bottom: 1px solid var(--border); }
+.token-list p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.token-status { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.token-status.active { color: #45613c; }
 .session-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
 .session-list li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 16px 2px; border-bottom: 1px solid var(--border); }
 .session-list li:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -1026,6 +1048,11 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .network-relationship-list li > span:nth-child(3) { color: var(--muted); font-size: 11px; }
 
 @media (max-width: 720px) {
+  .token-create-form, .token-permissions { grid-template-columns: 1fr; }
+  .token-create-form fieldset, .token-create-form .settings-actions { grid-column: 1; }
+  .token-secret { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .token-secret > .secondary-button { grid-column: 2; justify-self: start; }
+  .token-list li { align-items: flex-start; flex-direction: column; }
   .network-toolbar { align-items: stretch; }
   .segmented-control { max-width: 100%; overflow-x: auto; }
   .network-toolbar .primary-button { width: 100%; margin-left: 0; }

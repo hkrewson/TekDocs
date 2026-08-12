@@ -87,6 +87,7 @@ jobs:
           make test-portal-notification-certification
           make test-api-contracts
           make test-api-tokens
+          make test-webhooks
       - name: Collect logs
         if: always()
         run: docker compose logs --no-color > compose.log

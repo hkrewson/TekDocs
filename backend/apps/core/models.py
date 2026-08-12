@@ -3669,6 +3669,168 @@ class OutboxDeliveryReceipt(models.Model):
         raise ValidationError("Outbox delivery receipts are append-only")
 
 
+class WebhookDirection(models.TextChoices):
+    OUTBOUND = "outbound", "Outbound"
+    INBOUND = "inbound", "Inbound"
+
+
+class WebhookDeliveryState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    DELIVERED = "delivered", "Delivered"
+    DEAD_LETTER = "dead_letter", "Dead letter"
+
+
+class WebhookEndpoint(models.Model):
+    """Exact-organization webhook configuration discovered before inbound RLS binding."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="webhook_endpoints")
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="webhook_endpoints")
+    direction = models.CharField(max_length=16, choices=WebhookDirection.choices)
+    name = models.CharField(max_length=100)
+    url = models.URLField(max_length=500, blank=True)
+    topics = models.JSONField(default=list)
+    secret_envelope = models.JSONField()
+    secret_prefix = models.CharField(max_length=16)
+    secret_generation = models.PositiveIntegerField(default=1)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_webhook_endpoints",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        indexes = [models.Index(fields=("tenant", "organization", "direction", "active"))]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(direction=WebhookDirection.OUTBOUND, url__gt="")
+                    | models.Q(direction=WebhookDirection.INBOUND, url="")
+                ),
+                name="webhook_direction_url_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(secret_generation__gte=1), name="webhook_secret_generation_valid"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Webhook endpoint {self.id}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Webhook endpoints are retained and deactivated, not deleted")
+
+
+class WebhookOutboundDelivery(models.Model):
+    """Value-minimized delivery lifecycle for one endpoint/event pair."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="webhook_outbound_deliveries")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="webhook_outbound_deliveries",
+    )
+    endpoint = models.ForeignKey(WebhookEndpoint, on_delete=models.PROTECT, related_name="outbound_deliveries")
+    event = models.ForeignKey(OutboxEvent, on_delete=models.PROTECT, related_name="webhook_deliveries")
+    state = models.CharField(
+        max_length=20,
+        choices=WebhookDeliveryState.choices,
+        default=WebhookDeliveryState.PENDING,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("endpoint", "event"), name="unique_webhook_endpoint_event"),
+            models.CheckConstraint(condition=models.Q(attempts__lte=20), name="webhook_attempts_bounded"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state=WebhookDeliveryState.DELIVERED,
+                        delivered_at__isnull=False,
+                        locked_at__isnull=True,
+                    )
+                    | models.Q(
+                        state__in=[WebhookDeliveryState.PENDING, WebhookDeliveryState.DEAD_LETTER],
+                        delivered_at__isnull=True,
+                        locked_at__isnull=True,
+                    )
+                    | models.Q(
+                        state=WebhookDeliveryState.PROCESSING,
+                        delivered_at__isnull=True,
+                        locked_at__isnull=False,
+                    )
+                ),
+                name="webhook_delivery_state_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "state", "available_at", "created_at")),
+            models.Index(fields=("tenant", "organization", "created_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"Webhook delivery {self.id}"
+
+
+class WebhookInboundReceipt(models.Model):
+    """Append-only replay ledger that retains no inbound body or signature."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="webhook_inbound_receipts")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="webhook_inbound_receipts",
+    )
+    endpoint = models.ForeignKey(WebhookEndpoint, on_delete=models.PROTECT, related_name="inbound_receipts")
+    delivery_id = models.CharField(max_length=100)
+    event_type = models.CharField(max_length=120)
+    body_sha256 = models.CharField(max_length=64)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-received_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("endpoint", "delivery_id"), name="unique_inbound_webhook_delivery"),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "received_at"))]
+
+    def __str__(self) -> str:
+        return f"Inbound webhook receipt {self.id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Inbound webhook receipts are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Inbound webhook receipts are append-only")
+
+
 class NotificationSurface(models.TextChoices):
     MSP = "msp", "MSP"
     CLIENT_PORTAL = "client_portal", "Client portal"

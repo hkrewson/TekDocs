@@ -1046,6 +1046,15 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .network-relationship-list { display: grid; gap: 0; margin: 10px 0 0; padding: 0; list-style: none; }
 .network-relationship-list li { display: grid; grid-template-columns: auto minmax(180px, 1fr) auto auto; align-items: center; gap: 9px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .network-relationship-list li > span:nth-child(3) { color: var(--muted); font-size: 11px; }
+.webhook-secret { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(240px, auto) auto auto; align-items: center; gap: 12px; border-left: 3px solid var(--warning); }
+.webhook-secret h2, .webhook-secret p { margin: 0; }
+.webhook-secret p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.webhook-secret code { overflow: hidden; padding: 8px 10px; border: 1px solid var(--border); background: var(--background); text-overflow: ellipsis; white-space: nowrap; }
+.content-section > .table-scroll { overflow-x: auto; }
+.content-section > .table-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.content-section > .table-scroll th, .content-section > .table-scroll td { padding: 10px 12px; border-top: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.content-section > .table-scroll th { color: var(--muted); font-weight: 650; }
+.table-actions { display: flex; align-items: center; gap: 6px; }
 
 @media (max-width: 720px) {
   .token-create-form, .token-permissions { grid-template-columns: 1fr; }
@@ -1061,6 +1070,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .network-relationship-list li { grid-template-columns: auto 1fr auto; }
   .network-relationship-list li > span:nth-child(3) { display: none; }
   .network-record-toolbar { align-items: stretch; flex-direction: column; }
+  .webhook-secret { grid-template-columns: 1fr; }
 }
 .client-portal-shell { min-height: 100vh; background: var(--background); color: var(--text); }
 .client-portal-header { min-height: 64px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; }

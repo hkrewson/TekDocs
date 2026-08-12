@@ -62,8 +62,19 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "tickets",
         "vendors",
         "recycle_bin",
+        "integrations",
     ),
-    "vendor": ("overview", "people", "sites", "custom_fields", "documentation", "files", "products", "recycle_bin"),
+    "vendor": (
+        "overview",
+        "people",
+        "sites",
+        "custom_fields",
+        "documentation",
+        "files",
+        "products",
+        "recycle_bin",
+        "integrations",
+    ),
     "manufacturer": (
         "overview",
         "people",
@@ -73,8 +84,18 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "files",
         "products",
         "recycle_bin",
+        "integrations",
     ),
-    "partner": ("overview", "people", "sites", "custom_fields", "documentation", "files", "recycle_bin"),
+    "partner": (
+        "overview",
+        "people",
+        "sites",
+        "custom_fields",
+        "documentation",
+        "files",
+        "recycle_bin",
+        "integrations",
+    ),
 }
 
 CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {

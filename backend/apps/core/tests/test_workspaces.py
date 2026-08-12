@@ -112,6 +112,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "tickets",
         "vendors",
         "recycle_bin",
+        "integrations",
         "products",
     ]
     assert selected.json()["organization"]["legal_name"] == "Acme Workspace, LLC"
@@ -200,6 +201,7 @@ def test_workspace_search_is_ordered_searchable_and_page_bounded(owner_client, i
                 "files",
                 "products",
                 "recycle_bin",
+                "integrations",
             ],
         }
     ]

@@ -239,6 +239,14 @@ from apps.core.software_inventory_views import (
     SoftwareLicenseSeatView,
 )
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
+from apps.core.webhook_views import (
+    InboundWebhookView,
+    OrganizationWebhookDeliveryListView,
+    OrganizationWebhookDeliveryRetryView,
+    OrganizationWebhookEndpointDetailView,
+    OrganizationWebhookEndpointListCreateView,
+    OrganizationWebhookEndpointRotateView,
+)
 from apps.core.workspace_views import (
     MSPWorkspaceContextView,
     OrganizationWorkspaceContextView,
@@ -246,6 +254,11 @@ from apps.core.workspace_views import (
 )
 
 urlpatterns = [
+    path(
+        "api/v1/webhooks/inbound/<uuid:endpoint_id>",
+        InboundWebhookView.as_view(),
+        name="inbound-webhook",
+    ),
     path("admin/", admin.site.urls),
     path("_allauth/oidc/", include("allauth.socialaccount.providers.openid_connect.urls")),
     path("_allauth/", include("allauth.headless.urls")),
@@ -1374,6 +1387,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin",
         OrganizationRecycleBinListView.as_view(),
         name="organization-recycle-bin",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/endpoints",
+        OrganizationWebhookEndpointListCreateView.as_view(),
+        name="organization-webhook-endpoint-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/endpoints/<uuid:endpoint_id>",
+        OrganizationWebhookEndpointDetailView.as_view(),
+        name="organization-webhook-endpoint-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/endpoints/<uuid:endpoint_id>/rotate",
+        OrganizationWebhookEndpointRotateView.as_view(),
+        name="organization-webhook-endpoint-rotate",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/deliveries",
+        OrganizationWebhookDeliveryListView.as_view(),
+        name="organization-webhook-delivery-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/webhooks/deliveries/<uuid:delivery_id>/retry",
+        OrganizationWebhookDeliveryRetryView.as_view(),
+        name="organization-webhook-delivery-retry",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

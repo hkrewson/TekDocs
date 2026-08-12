@@ -101,9 +101,11 @@ def _retry_delay(attempts: int) -> timedelta:
 
 def _default_handler(event: OutboxEvent) -> None:
     from .notifications import project_inbox_notifications
+    from .webhooks import project_webhook_deliveries
 
     OutboxTopic(event.topic)
     project_inbox_notifications(event)
+    project_webhook_deliveries(event)
 
 
 def _dispatch_one(

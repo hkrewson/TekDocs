@@ -4,7 +4,7 @@ describe('generated API client boundary', () => {
   it('uses generated paths with same-origin JSON and CSRF conventions', async () => {
     document.cookie = 'csrftoken=generated-client-csrf'
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      name: 'TekDocs API', version: '0.6.2', status: 'pre-alpha', api_version: 'v1',
+      name: 'TekDocs API', version: '0.6.3', status: 'pre-alpha', api_version: 'v1',
       schema_url: '/api/v1/schema/', documentation_url: '/api/v1/docs/', conventions: {},
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)

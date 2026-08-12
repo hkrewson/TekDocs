@@ -1017,7 +1017,7 @@ Evidence: `docs/releases/0.6.0.md`.
 | --- | --- |
 | `0.6.1` | **Complete:** `/api/v1` conventions, strict declared filtering, bounded pagination, correlated error/idempotency contracts, and generated TypeScript client. |
 | `0.6.2` | **Complete:** scoped personal/service tokens, rotation/revocation, expiry, and value-safe audit. |
-| `0.6.3` | Signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
+| `0.6.3` | **Complete:** signed outbound/inbound webhooks, replay defense, retries, and delivery inspection. |
 | `0.6.4` | Integration provider contract and envelope-encrypted connection configuration. |
 | `0.6.5` | Scheduled sync jobs, cursors, backoff, idempotency, and worker failure recovery. |
 | `0.6.6` | Maintained structured logging plus provider logs/metrics with field allowlists, secret redaction, bounded retention, and `TD-RISK-015`. |
@@ -1048,6 +1048,17 @@ Evidence: `docs/releases/0.6.1.md`.
 - [x] Settings provides accessible issue/search/copy-once/rotate/revoke behavior; OpenAPI and its generated TypeScript client, migrations/guards, `make test-api-tokens`, documentation, risks, and version metadata agree at `0.6.2`.
 
 Evidence: `docs/releases/0.6.2.md`.
+
+### `0.6.3` acceptance criteria
+
+- [x] Webhook endpoints belong to exactly one organization Workspace, subscribe only to allowlisted transactional-outbox topics, and expose signing material only at creation or rotation. Signing keys are envelope-encrypted with tenant/endpoint/generation associated data and never enter audit metadata, lists, logs, notifications, or delivery inspection.
+- [x] Outbound requests use canonical JSON plus versioned HMAC-SHA256 over delivery ID, timestamp, and exact bytes. HTTPS destinations require public DNS on port 443; all answers must remain public, the connection is pinned to the reviewed address with hostname/SNI verification, redirects are disabled, and time/body bounds apply.
+- [x] Inbound requests are body-bounded, timestamp-windowed, constant-time signature checked, and accepted once through an append-only delivery-ID receipt. This slice permits only a value-free `integration.ping`; provider payload interpretation and domain mutation remain `0.6.4`–`0.6.7` work.
+- [x] Outbound delivery projection is idempotent per endpoint/event, retries temporary failures with bounded exponential backoff, dead-letters permanent/exhausted failures, recovers stale claims, and stores only safe status/error metadata. Audited manual retry requires an active endpoint, reason, MFA-backed recent session, and `integrations.manage`.
+- [x] PostgreSQL guards endpoint ownership/key rotation, event/endpoint scope, monotonic attempt history, delivered/receipt immutability, and forced tenant RLS. The complete route/permission/IDOR matrix, negative cross-organization writes, OpenAPI/generated client, organization Integrations UI, frontend accessibility/component tests, `make test-webhooks`, and version/docs agree at `0.6.3`.
+- [x] `TD-RISK-047` is mitigated with recurring owners. Provider-specific connections, generalized egress reuse, large-scale delivery administration, adversarial DNS/redirect proxy testing, upgrade/load evidence, and integration-wide certification remain assigned to `0.6.4`, `0.6.9`, and `0.7.0`.
+
+Evidence: `docs/releases/0.6.3.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

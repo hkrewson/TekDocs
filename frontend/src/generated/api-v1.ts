@@ -1380,6 +1380,22 @@ export interface paths {
         readonly patch: operations["locations_msp_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/webhooks/inbound/{endpoint_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["webhooks_inbound_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp": {
         readonly parameters: {
             readonly query?: never;
@@ -3518,6 +3534,86 @@ export interface paths {
         readonly get: operations["organization_entities_search"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_webhooks_deliveries_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries/{delivery_id}/retry": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_webhooks_deliveries_retry_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_webhooks_endpoints_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_webhooks_endpoints_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints/{endpoint_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_integrations_webhooks_endpoints_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints/{endpoint_id}/rotate": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_webhooks_endpoints_rotate_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -5830,6 +5926,11 @@ export interface components {
             /** @default  */
             readonly description: string;
         };
+        readonly InboundWebhookResponse: {
+            readonly accepted: boolean;
+            /** Format: uuid */
+            readonly receipt_id: string;
+        };
         readonly InboxNotification: {
             /** Format: uuid */
             readonly id: string;
@@ -5981,6 +6082,28 @@ export interface components {
             /** Format: date-time */
             readonly revoked_at: string | null;
             readonly token: string;
+        };
+        readonly IssuedWebhookEndpoint: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `outbound` - Outbound
+             *     * `inbound` - Inbound
+             * @enum {string}
+             */
+            readonly direction: "outbound" | "inbound";
+            readonly name: string;
+            readonly url: string;
+            readonly inbound_path: string | null;
+            readonly topics: readonly string[];
+            readonly secret_prefix: string;
+            readonly secret_generation: number;
+            readonly active: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly signing_secret: string;
         };
         readonly LicenseResult: {
             readonly results: readonly components["schemas"]["SoftwareLicense"][];
@@ -7129,6 +7252,9 @@ export interface components {
             /** @default  */
             readonly description: string;
         };
+        readonly PatchedWebhookEndpointActive: {
+            readonly active?: boolean;
+        };
         readonly PatchedWirelessWrite: {
             readonly ssid?: string;
             /**
@@ -7783,6 +7909,77 @@ export interface components {
             readonly route_distinguisher: string;
             /** @default  */
             readonly description: string;
+        };
+        readonly WebhookDelivery: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly endpoint_id: string;
+            readonly endpoint_name: string;
+            readonly topic: string;
+            /**
+             * @description * `pending` - Pending
+             *     * `processing` - Processing
+             *     * `delivered` - Delivered
+             *     * `dead_letter` - Dead letter
+             * @enum {string}
+             */
+            readonly state: "pending" | "processing" | "delivered" | "dead_letter";
+            readonly attempts: number;
+            /** Format: date-time */
+            readonly available_at: string;
+            /** Format: date-time */
+            readonly last_attempt_at: string | null;
+            /** Format: date-time */
+            readonly delivered_at: string | null;
+            readonly response_status: number | null;
+            readonly last_error_code: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly WebhookDeliveryResult: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["WebhookDelivery"][];
+        };
+        readonly WebhookEndpoint: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `outbound` - Outbound
+             *     * `inbound` - Inbound
+             * @enum {string}
+             */
+            readonly direction: "outbound" | "inbound";
+            readonly name: string;
+            readonly url: string;
+            readonly inbound_path: string | null;
+            readonly topics: readonly string[];
+            readonly secret_prefix: string;
+            readonly secret_generation: number;
+            readonly active: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly WebhookEndpointWrite: {
+            readonly name: string;
+            /**
+             * @description * `outbound` - Outbound
+             *     * `inbound` - Inbound
+             * @enum {string}
+             */
+            readonly direction: "outbound" | "inbound";
+            /** @default  */
+            readonly url: string;
+            readonly topics: readonly string[];
+        };
+        readonly WebhookRetry: {
+            readonly reason: string;
         };
         readonly Wireless: {
             /** Format: uuid */
@@ -11903,6 +12100,40 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Location"];
+                };
+            };
+        };
+    };
+    readonly webhooks_inbound_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly endpoint_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InboundWebhookResponse"];
+                };
+            };
+            /** @description Invalid or replayed signature */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };
@@ -17386,6 +17617,194 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_deliveries_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                readonly endpoint_id?: string;
+                readonly page?: number;
+                readonly page_size?: number;
+                /**
+                 * @description * `pending` - Pending
+                 *     * `processing` - Processing
+                 *     * `delivered` - Delivered
+                 *     * `dead_letter` - Dead letter
+                 */
+                readonly state?: "pending" | "processing" | "delivered" | "dead_letter";
+                /**
+                 * @description * `client_invitation.issued` - client_invitation.issued
+                 *     * `client_invitation.accepted` - client_invitation.accepted
+                 *     * `document_publication.available` - document_publication.available
+                 *     * `document_publication.withdrawn` - document_publication.withdrawn
+                 */
+                readonly topic?: "client_invitation.issued" | "client_invitation.accepted" | "document_publication.available" | "document_publication.withdrawn";
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WebhookDeliveryResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_deliveries_retry_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly delivery_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["WebhookRetry"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["WebhookRetry"];
+                readonly "multipart/form-data": components["schemas"]["WebhookRetry"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WebhookDelivery"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_endpoints_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["WebhookEndpoint"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_endpoints_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["WebhookEndpointWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["WebhookEndpointWrite"];
+                readonly "multipart/form-data": components["schemas"]["WebhookEndpointWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["IssuedWebhookEndpoint"];
+                };
+            };
+            /** @description Recent MFA session required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_endpoints_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly endpoint_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedWebhookEndpointActive"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedWebhookEndpointActive"];
+                readonly "multipart/form-data": components["schemas"]["PatchedWebhookEndpointActive"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_webhooks_endpoints_rotate_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly endpoint_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["IssuedWebhookEndpoint"];
                 };
             };
         };

@@ -280,6 +280,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.core.tasks.dispatch_notification_emails",
         "schedule": 60.0,
     },
+    "dispatch-webhook-deliveries": {
+        "task": "apps.core.tasks.dispatch_webhook_deliveries",
+        "schedule": 30.0,
+    },
 }
 
 LOGGING = {

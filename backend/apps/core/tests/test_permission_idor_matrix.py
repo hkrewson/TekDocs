@@ -234,6 +234,12 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "circuit_entity_id",
             "handoff_entity_id",
         ),
+        "organization-webhook-endpoint-list-create": ("organization_entity_id",),
+        "organization-webhook-endpoint-detail": ("organization_entity_id", "endpoint_id"),
+        "organization-webhook-endpoint-rotate": ("organization_entity_id", "endpoint_id"),
+        "organization-webhook-delivery-list": ("organization_entity_id",),
+        "organization-webhook-delivery-retry": ("organization_entity_id", "delivery_id"),
+        "inbound-webhook": ("endpoint_id",),
         "organization-client-hardware-detail": ("organization_entity_id", "asset_entity_id"),
         "organization-client-hardware-assignment-choices": (
             "organization_entity_id",

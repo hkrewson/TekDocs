@@ -82,6 +82,11 @@ TENANT_MODEL_CONTRACTS = tuple(
         "Immutable permission rows constrain authenticated token authority before domain access.",
     ),
     TenantModelContract(
+        "core_webhookendpoint",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "A high-entropy endpoint identifier establishes signed inbound tenant scope before domain RLS is selected.",
+    ),
+    TenantModelContract(
         "core_installationstate",
         IsolationBoundary.INSTALLATION_SINGLETON,
         "The migration-created singleton anchors bootstrap and tenant discovery.",
@@ -104,4 +109,5 @@ CONTROL_PLANE_GUARD_TRIGGERS = (
     "accounts_service_account_guard",
     "accounts_api_token_guard",
     "accounts_api_token_permission_guard",
+    "core_webhook_endpoint_guard",
 )

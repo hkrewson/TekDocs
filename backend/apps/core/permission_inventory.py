@@ -1077,6 +1077,37 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.RECYCLE_BIN_RESTORE,),
         organization_scoped=True,
     ),
+    route(
+        "organization-webhook-endpoint-list-create",
+        ("GET", "POST"),
+        PermissionKey.INTEGRATIONS_VIEW,
+        (PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-webhook-endpoint-detail",
+        ("PATCH",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-webhook-endpoint-rotate",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-webhook-delivery-list",
+        ("GET",),
+        PermissionKey.INTEGRATIONS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-webhook-delivery-retry",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
 )
 
 
@@ -1091,5 +1122,6 @@ PUBLIC_API_ROUTE_NAMES = frozenset(
         "bootstrap-owner",
         "auth-providers",
         "invitation-accept",
+        "inbound-webhook",
     }
 )

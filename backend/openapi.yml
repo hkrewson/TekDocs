@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.6.2
+  version: 0.6.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -4910,6 +4910,45 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/webhooks/inbound/{endpoint_id}:
+    post:
+      operationId: webhooks_inbound_create
+      parameters:
+      - in: path
+        name: endpoint_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - webhooks
+      security:
+      - {}
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboundWebhookResponse'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: Invalid or replayed signature
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp:
     get:
       operationId: workspaces_msp_retrieve
@@ -12395,6 +12434,285 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries:
+    get:
+      operationId: workspaces_organizations_integrations_webhooks_deliveries_retrieve
+      parameters:
+      - in: query
+        name: endpoint_id
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: state
+        schema:
+          enum:
+          - pending
+          - processing
+          - delivered
+          - dead_letter
+          type: string
+          x-spec-enum-id: fc355aa83948029d
+          minLength: 1
+        description: |-
+          * `pending` - Pending
+          * `processing` - Processing
+          * `delivered` - Delivered
+          * `dead_letter` - Dead letter
+      - in: query
+        name: topic
+        schema:
+          enum:
+          - client_invitation.issued
+          - client_invitation.accepted
+          - document_publication.available
+          - document_publication.withdrawn
+          type: string
+          x-spec-enum-id: bdb98c0ac8da7113
+          minLength: 1
+        description: |-
+          * `client_invitation.issued` - client_invitation.issued
+          * `client_invitation.accepted` - client_invitation.accepted
+          * `document_publication.available` - document_publication.available
+          * `document_publication.withdrawn` - document_publication.withdrawn
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/deliveries/{delivery_id}/retry:
+    post:
+      operationId: workspaces_organizations_integrations_webhooks_deliveries_retry_create
+      parameters:
+      - in: path
+        name: delivery_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookRetry'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WebhookRetry'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WebhookRetry'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints:
+    get:
+      operationId: workspaces_organizations_integrations_webhooks_endpoints_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_integrations_webhooks_endpoints_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WebhookEndpointWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedWebhookEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: Recent MFA session required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints/{endpoint_id}:
+    patch:
+      operationId: workspaces_organizations_integrations_webhooks_endpoints_partial_update
+      parameters:
+      - in: path
+        name: endpoint_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWebhookEndpointActive'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWebhookEndpointActive'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWebhookEndpointActive'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/webhooks/endpoints/{endpoint_id}/rotate:
+    post:
+      operationId: workspaces_organizations_integrations_webhooks_endpoints_rotate_create
+      parameters:
+      - in: path
+        name: endpoint_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedWebhookEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/licenses:
     get:
       operationId: workspaces_organizations_licenses_retrieve
@@ -19537,6 +19855,17 @@ components:
       required:
       - address
       - subnet_id
+    InboundWebhookResponse:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        receipt_id:
+          type: string
+          format: uuid
+      required:
+      - accepted
+      - receipt_id
     InboxNotification:
       type: object
       properties:
@@ -19892,6 +20221,60 @@ components:
       - status
       - token
       - workspace_scope
+    IssuedWebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        direction:
+          enum:
+          - outbound
+          - inbound
+          type: string
+          description: |-
+            * `outbound` - Outbound
+            * `inbound` - Inbound
+          x-spec-enum-id: 6e53f4662f5f3da3
+        name:
+          type: string
+        url:
+          type: string
+        inbound_path:
+          type: string
+          nullable: true
+          readOnly: true
+        topics:
+          type: array
+          items:
+            type: string
+        secret_prefix:
+          type: string
+        secret_generation:
+          type: integer
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        signing_secret:
+          type: string
+      required:
+      - active
+      - created_at
+      - direction
+      - id
+      - inbound_path
+      - name
+      - secret_generation
+      - secret_prefix
+      - signing_secret
+      - topics
+      - updated_at
+      - url
     LicenseResult:
       type: object
       properties:
@@ -22418,6 +22801,11 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedWebhookEndpointActive:
+      type: object
+      properties:
+        active:
+          type: boolean
     PatchedWirelessWrite:
       type: object
       properties:
@@ -23998,6 +24386,183 @@ components:
           maxLength: 4000
       required:
       - name
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        endpoint_id:
+          type: string
+          format: uuid
+        endpoint_name:
+          type: string
+        topic:
+          type: string
+        state:
+          enum:
+          - pending
+          - processing
+          - delivered
+          - dead_letter
+          type: string
+          description: |-
+            * `pending` - Pending
+            * `processing` - Processing
+            * `delivered` - Delivered
+            * `dead_letter` - Dead letter
+          x-spec-enum-id: fc355aa83948029d
+        attempts:
+          type: integer
+        available_at:
+          type: string
+          format: date-time
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        response_status:
+          type: integer
+          nullable: true
+        last_error_code:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - attempts
+      - available_at
+      - created_at
+      - delivered_at
+      - endpoint_id
+      - endpoint_name
+      - id
+      - last_attempt_at
+      - last_error_code
+      - response_status
+      - state
+      - topic
+    WebhookDeliveryResult:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookDelivery'
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    WebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        direction:
+          enum:
+          - outbound
+          - inbound
+          type: string
+          description: |-
+            * `outbound` - Outbound
+            * `inbound` - Inbound
+          x-spec-enum-id: 6e53f4662f5f3da3
+        name:
+          type: string
+        url:
+          type: string
+        inbound_path:
+          type: string
+          nullable: true
+          readOnly: true
+        topics:
+          type: array
+          items:
+            type: string
+        secret_prefix:
+          type: string
+        secret_generation:
+          type: integer
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - active
+      - created_at
+      - direction
+      - id
+      - inbound_path
+      - name
+      - secret_generation
+      - secret_prefix
+      - topics
+      - updated_at
+      - url
+    WebhookEndpointWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        direction:
+          enum:
+          - outbound
+          - inbound
+          type: string
+          description: |-
+            * `outbound` - Outbound
+            * `inbound` - Inbound
+          x-spec-enum-id: 6e53f4662f5f3da3
+        url:
+          type: string
+          default: ''
+          maxLength: 500
+        topics:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+          maxItems: 20
+          minItems: 1
+      required:
+      - direction
+      - name
+      - topics
+    WebhookRetry:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 200
+          minLength: 5
+      required:
+      - reason
     Wireless:
       type: object
       properties:

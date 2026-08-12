@@ -13,6 +13,7 @@ describe('Domains', () => {
         id: 'domain-1', name: 'example.com', registrar_id: null, registrar: null,
         registration_date: null, expiration_date: '2027-08-12', renewal_mode: 'auto',
         owner_id: null, owner: null, status: 'active', notes: '', created_at: '2026-08-12T00:00:00Z',
+        review_state: 'unreviewed', observed_expiration_date: null, last_reviewed_at: null,
       }),
     }
     const user = userEvent.setup()

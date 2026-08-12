@@ -12,6 +12,9 @@ export type RegisteredDomain = {
   owner: string | null
   status: 'active' | 'pending' | 'expired' | 'transferred'
   notes: string
+  review_state: 'unreviewed' | 'current' | 'stale' | 'conflict'
+  observed_expiration_date: string | null
+  last_reviewed_at: string | null
   created_at: string
 }
 

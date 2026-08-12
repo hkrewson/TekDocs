@@ -7,8 +7,8 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.core.domains import DomainInput, create_domain, normalize_domain_name, review_domain
 from apps.core.domain_hierarchy import HostnameInput, create_hostname, record_dns_observation
+from apps.core.domains import DomainInput, create_domain, normalize_domain_name, review_domain
 from apps.core.models import InstallationState, ReminderSchedule
 from apps.core.organizations import create_organization
 from apps.core.workspaces import resolve_organization_workspace

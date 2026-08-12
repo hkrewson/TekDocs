@@ -1110,7 +1110,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.7` | **Complete:** Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
 | `0.7.8` | **Complete:** Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
 | `0.7.9` | **Complete:** Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
-| `0.7.10` | Renewal/expiration schedules, review state, reminder events, notification/calendar integration, and stale or conflicting source handling. |
+| `0.7.10` | **Complete:** Renewal/expiration schedules, review state, calendar integration, and stale or conflicting source handling. Notification delivery consumes the shared reminder boundary in a later dispatcher slice. |
 | `0.7.11` | Safe RDAP and authoritative-DNS collection through the approved egress service, with observed-vs-entered reconciliation and expiration/change notifications. |
 | `0.7.12` | TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
 | `0.7.13` | Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |

@@ -12,6 +12,8 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 from .models import (
     AuditEvent,
     DomainRenewalMode,
+    DomainReviewEvent,
+    DomainReviewState,
     Entity,
     EntityVisibility,
     Organization,
@@ -136,4 +138,48 @@ def create_domain(*, workspace: ResolvedWorkspace, actor_id: UUID, value: Domain
         entity_id=entity.id,
         metadata={"renewal_mode": domain.renewal_mode, "status": domain.status},
     )
+    if domain.expiration_date:
+        from .reminders import ReminderInput, create_reminder
+
+        create_reminder(
+            workspace=workspace,
+            actor_id=actor_id,
+            value=ReminderInput(
+                source_entity_id=domain.entity_id,
+                domain="domain",
+                kind="registration_expiration",
+                title=f"Renew {domain.ascii_name}",
+                due_on=domain.expiration_date,
+                lead_days=30,
+                owner_id=domain.owner_id,
+            ),
+        )
+    return domain
+
+
+@transaction.atomic
+def review_domain(
+    *, domain: RegisteredDomain, actor_id: UUID, state: str, observed_expiration_date: date | None,
+    source: str, note: str = ""
+) -> RegisteredDomain:
+    if state not in DomainReviewState.values or state == DomainReviewState.UNREVIEWED:
+        raise DomainError("Unknown domain review state.")
+    if not source.strip():
+        raise DomainError("A review source is required.")
+    event = DomainReviewEvent.objects.create(
+        tenant=domain.tenant,
+        workspace=domain.workspace,
+        organization=domain.organization,
+        domain=domain,
+        state=state,
+        entered_expiration_date=domain.expiration_date,
+        observed_expiration_date=observed_expiration_date,
+        source=source.strip(),
+        note=note,
+        reviewed_by_id=actor_id,
+    )
+    domain.review_state = state
+    domain.observed_expiration_date = observed_expiration_date
+    domain.last_reviewed_at = event.reviewed_at
+    domain.save(update_fields=("review_state", "observed_expiration_date", "last_reviewed_at", "updated_at"))
     return domain

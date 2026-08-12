@@ -1109,7 +1109,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.6` | **Complete:** Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | **Complete:** Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
 | `0.7.8` | **Complete:** Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
-| `0.7.9` | Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
+| `0.7.9` | **Complete:** Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
 | `0.7.10` | Renewal/expiration schedules, review state, reminder events, notification/calendar integration, and stale or conflicting source handling. |
 | `0.7.11` | Safe RDAP and authoritative-DNS collection through the approved egress service, with observed-vs-entered reconciliation and expiration/change notifications. |
 | `0.7.12` | TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
@@ -1193,6 +1193,25 @@ Evidence: `docs/releases/0.7.7.md`.
 - [x] PostgreSQL guards stable ownership/actor/entity edges and forces RLS. Migration, permission/IDOR, OpenAPI/client, frontend, architecture/security/threat/risk, ADR 0070, and release evidence agree at `0.7.8`.
 
 Evidence: `docs/releases/0.7.8.md`.
+
+### `0.7.9` acceptance criteria
+
+- [x] Managed hostnames are stable exact-Workspace Entities below one registered-domain apex, with optional ancestry and explicit entered/discovered provenance.
+- [x] Active FQDN duplicates, apex-as-child, foreign parents, non-ancestor parents, and immediate cycles fail closed.
+- [x] DNS observations are normalized, typed, source-attributed, content-digested, append-only records with exact hostname ownership and bounded values.
+- [x] Scoped APIs, central domain permissions, forced RLS, database scope/retention guards, migration/OpenAPI/client, ADR 0071, security/risk, and release evidence agree at `0.7.9`.
+
+Evidence: `docs/releases/0.7.9.md`.
+
+### `0.7.10` acceptance criteria
+
+- [x] Creating a domain with an expiration date atomically creates an exact-source renewal schedule for the selected owner and authenticated calendar feed.
+- [x] Current, stale, and conflicting-source reviews append retained events containing entered and observed expiration dates, source, note, reviewer, and time while projecting current review state.
+- [x] Review APIs use exact-Workspace domain permissions; database guards reject event rewriting, forged actors, and cross-Workspace domain edges under forced RLS.
+- [x] Domain listings expose current review state without silently replacing entered registration data. Notification delivery is deliberately assigned to the later reminder dispatcher rather than emitting directly from a review request.
+- [x] Migration, permission/IDOR, OpenAPI/client, frontend, ADR 0072, security/risk, and release evidence agree at `0.7.10`.
+
+Evidence: `docs/releases/0.7.10.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

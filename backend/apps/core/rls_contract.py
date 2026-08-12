@@ -68,6 +68,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_complianceevidencebundle",
     "core_reminderschedule",
     "core_registereddomain",
+    "core_managedhostname",
+    "core_domaindnsobservation",
+    "core_domainreviewevent",
 )
 
 TENANT_SCOPED_TABLES = (

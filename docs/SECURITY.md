@@ -94,6 +94,10 @@ Shared reminder schedules use dedicated central permissions and exact-Workspace 
 
 Registered-domain inventory is exact-Workspace data under dedicated domain permissions and forced RLS. Domain identity normalizes to IDNA ASCII; entered registrar, dates, renewal mode, owner, status, and notes are not treated as remotely verified truth. MSP routes never aggregate client registrations.
 
+Hostname hierarchy cannot leave its exact registered-domain Workspace, and parent edges must be DNS ancestors. DNS records are bounded append-only observations with explicit source/time/provenance and content digests; they do not overwrite entered ownership or renewal claims.
+
+Domain expiration schedules reuse the dedicated deadline permission and exact-source boundary. Current/stale/conflict reviews are retained events, and observed dates never silently replace entered values. Notification sending is excluded from request transactions and awaits a bounded reminder dispatcher.
+
 Network search/export in `0.4.8` remains an exact-Workspace read boundary. Search returns only stable identity, label, type, and owning section after central `networks.view`; it does not echo the matched field. The versioned CSV is an explicit streamed projection, not model serialization: costs, contract data, asset-only fields, credential references, provider payloads, and NetBox fingerprints are excluded, every cell is spreadsheet-escaped, and private/no-store headers prevent shared-cache retention. MSP routes remain non-aggregating.
 
 The `0.4.9` lightweight boundary requires every newly created network-device record to extend an active exact-Workspace hardware asset. Database guards independently reject missing, reused, non-hardware, archived, or cross-Workspace edges and prevent application-created legacy markers. Direct IP/MAC asset assignment is exact-scope and the asset identifier/name is projected only with independent `assets.view`; `networks.view` alone is not an asset oracle. Pre-existing Interface/VRF-era rows are retained, explicitly labeled, and upgraded only through stable foreign-key chains—never mutable display-name matching.

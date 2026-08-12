@@ -5063,6 +5063,13 @@ class RegisteredDomainStatus(models.TextChoices):
     TRANSFERRED = "transferred", "Transferred"
 
 
+class DomainReviewState(models.TextChoices):
+    UNREVIEWED = "unreviewed", "Unreviewed"
+    CURRENT = "current", "Current"
+    STALE = "stale", "Stale"
+    CONFLICT = "conflict", "Conflicting source"
+
+
 class RegisteredDomain(TimestampedModel):
     """Workspace-owned entered registration record; observations remain separate."""
 
@@ -5085,6 +5092,11 @@ class RegisteredDomain(TimestampedModel):
     )
     status = models.CharField(max_length=16, choices=RegisteredDomainStatus.choices)
     notes = models.TextField(blank=True)
+    review_state = models.CharField(
+        max_length=16, choices=DomainReviewState.choices, default=DomainReviewState.UNREVIEWED
+    )
+    observed_expiration_date = models.DateField(null=True, blank=True)
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_registered_domains"
     )
@@ -5106,3 +5118,119 @@ class RegisteredDomain(TimestampedModel):
 
     def __str__(self) -> str:
         return self.ascii_name
+
+
+class DomainReviewEvent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="domain_review_events")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="domain_review_events")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="domain_review_events", null=True, blank=True
+    )
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="review_events")
+    state = models.CharField(max_length=16, choices=DomainReviewState.choices)
+    entered_expiration_date = models.DateField(null=True, blank=True)
+    observed_expiration_date = models.DateField(null=True, blank=True)
+    source = models.CharField(max_length=120)
+    note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="domain_review_events"
+    )
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-reviewed_at", "id")
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Domain review events are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Domain review events are retained")
+
+
+class HostnameProvenance(models.TextChoices):
+    ENTERED = "entered", "Entered"
+    DISCOVERED = "discovered", "Discovered"
+
+
+class ManagedHostname(TimestampedModel):
+    """A managed hostname below one registered-domain apex."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="managed_hostnames")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="managed_hostnames")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="managed_hostnames", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="managed_hostname")
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="hostnames")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="children", null=True, blank=True)
+    ascii_name = models.CharField(max_length=253)
+    provenance = models.CharField(max_length=16, choices=HostnameProvenance.choices)
+    source = models.CharField(max_length=120, blank=True)
+    observed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_managed_hostnames"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("ascii_name", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("workspace", "ascii_name"),
+                condition=models.Q(archived_at__isnull=True),
+                name="managed_hostname_active_name_unique",
+            )
+        ]
+
+
+class DomainDNSObservation(models.Model):
+    """Append-only normalized DNS answer observed for a managed hostname."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="domain_dns_observations")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="domain_dns_observations")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="domain_dns_observations", null=True, blank=True
+    )
+    hostname = models.ForeignKey(ManagedHostname, on_delete=models.PROTECT, related_name="dns_observations")
+    record_type = models.CharField(max_length=16)
+    value = models.CharField(max_length=1_024)
+    ttl = models.PositiveIntegerField(null=True, blank=True)
+    provenance = models.CharField(max_length=16, choices=HostnameProvenance.choices)
+    source = models.CharField(max_length=120)
+    content_digest = models.CharField(max_length=64)
+    observed_at = models.DateTimeField()
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_domain_dns_observations"
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-observed_at", "id")
+        indexes = [models.Index(fields=("workspace", "hostname", "observed_at"), name="core_domain_dns_obs_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("hostname", "record_type", "content_digest", "observed_at"),
+                name="domain_dns_observation_unique",
+            )
+        ]
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("DNS observations are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("DNS observations are retained")

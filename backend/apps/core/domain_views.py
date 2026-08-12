@@ -7,7 +7,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
-from .domains import DomainError, DomainInput, create_domain, domains_for_scope
+from .domains import DomainError, DomainInput, create_domain, domains_for_scope, review_domain
+from .models import RegisteredDomain
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -42,6 +43,9 @@ class DomainSerializer(serializers.Serializer):
     owner = serializers.CharField(source="owner.display_name", allow_null=True)
     status = serializers.CharField()
     notes = serializers.CharField()
+    review_state = serializers.CharField()
+    observed_expiration_date = serializers.DateField(allow_null=True)
+    last_reviewed_at = serializers.DateTimeField(allow_null=True)
     created_at = serializers.DateTimeField()
 
 
@@ -75,6 +79,33 @@ class DomainListCreateView(APIView):
         return Response(DomainSerializer(domain).data, status=201)
 
 
+class DomainReviewSerializer(StrictSerializer):
+    state = serializers.ChoiceField(choices=("current", "stale", "conflict"))
+    observed_expiration_date = serializers.DateField(required=False, allow_null=True, default=None)
+    source = serializers.CharField(max_length=120)
+    note = serializers.CharField(max_length=20_000, required=False, allow_blank=True, default="")
+
+
+class DomainReviewView(APIView):
+    @extend_schema(request=DomainReviewSerializer, responses={200: DomainSerializer})
+    def post(self, request, domain_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id)
+        require_permission(request.user, PermissionKey.DOMAINS_EDIT, organization=workspace.organization)
+        try:
+            domain = RegisteredDomain.scoped.for_scope(workspace.data_scope).get(
+                entity_id=domain_entity_id, archived_at__isnull=True
+            )
+        except RegisteredDomain.DoesNotExist as exc:
+            raise serializers.ValidationError({"detail": "The selected domain is unavailable."}) from exc
+        serializer = DomainReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            domain = review_domain(domain=domain, actor_id=request.user.pk, **serializer.validated_data)
+        except DomainError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(DomainSerializer(domain).data)
+
+
 @extend_schema_view(
     get=extend_schema(operation_id="msp_domain_list"),
     post=extend_schema(operation_id="msp_domain_create"),
@@ -88,4 +119,12 @@ class MSPDomainListCreateView(DomainListCreateView):
     post=extend_schema(operation_id="organization_domain_create"),
 )
 class OrganizationDomainListCreateView(DomainListCreateView):
+    pass
+
+
+class MSPDomainReviewView(DomainReviewView):
+    pass
+
+
+class OrganizationDomainReviewView(DomainReviewView):
     pass

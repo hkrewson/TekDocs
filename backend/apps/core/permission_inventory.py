@@ -163,6 +163,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOMAINS_VIEW,
         (PermissionKey.DOMAINS_EDIT,),
     ),
+    route("msp-domain-review", ("POST",), mutations=(PermissionKey.DOMAINS_EDIT,)),
+    route("msp-hostname-list-create", ("GET", "POST"), PermissionKey.DOMAINS_VIEW, (PermissionKey.DOMAINS_EDIT,)),
+    route("msp-domain-observation-create", ("POST",), mutations=(PermissionKey.DOMAINS_EDIT,)),
     route("msp-compliance-assignment-evidence-link", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route(
         "msp-document-reference-list-create",
@@ -1343,6 +1346,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.DOMAINS_EDIT,),
         organization_scoped=True,
     ),
+    route("organization-domain-review", ("POST",), mutations=(PermissionKey.DOMAINS_EDIT,), organization_scoped=True),
+    route("organization-hostname-list-create", ("GET", "POST"), PermissionKey.DOMAINS_VIEW, (PermissionKey.DOMAINS_EDIT,), organization_scoped=True),
+    route("organization-domain-observation-create", ("POST",), mutations=(PermissionKey.DOMAINS_EDIT,), organization_scoped=True),
 )
 
 

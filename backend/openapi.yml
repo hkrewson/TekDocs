@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.8
+  version: 0.7.10
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -6639,6 +6639,156 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains/{domain_entity_id}/hostnames:
+    get:
+      operationId: msp_hostname_list
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_hostname_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains/{domain_entity_id}/review:
+    post:
+      operationId: workspaces_msp_domains_review_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/hostnames/{hostname_entity_id}/observations:
+    post:
+      operationId: workspaces_msp_hostnames_observations_create
+      parameters:
+      - in: path
+        name: hostname_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
           headers:
             X-Request-ID:
@@ -13859,6 +14009,133 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/hostnames:
+    get:
+      operationId: workspaces_organizations_domains_hostnames_list
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_domains_hostnames_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HostnameWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/review:
+    post:
+      operationId: workspaces_organizations_domains_review_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DomainReview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/entities/{entity_id}/custom-fields:
     get:
       operationId: entity_custom_fields_organization_list
@@ -14307,6 +14584,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/hostnames/{hostname_entity_id}/observations:
+    post:
+      operationId: workspaces_organizations_hostnames_observations_create
+      parameters:
+      - in: path
+        name: hostname_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ObservationWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts:
     get:
       operationId: workspaces_organizations_integrations_conflicts_retrieve
@@ -22518,6 +22842,16 @@ components:
           type: string
         notes:
           type: string
+        review_state:
+          type: string
+        observed_expiration_date:
+          type: string
+          format: date
+          nullable: true
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -22525,15 +22859,46 @@ components:
       - created_at
       - expiration_date
       - id
+      - last_reviewed_at
       - name
       - notes
+      - observed_expiration_date
       - owner
       - owner_id
       - registrar
       - registrar_id
       - registration_date
       - renewal_mode
+      - review_state
       - status
+    DomainReview:
+      type: object
+      properties:
+        state:
+          enum:
+          - current
+          - stale
+          - conflict
+          type: string
+          description: |-
+            * `current` - current
+            * `stale` - stale
+            * `conflict` - conflict
+          x-spec-enum-id: 5fb029803e1e75eb
+        observed_expiration_date:
+          type: string
+          format: date
+          nullable: true
+        source:
+          type: string
+          maxLength: 120
+        note:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - source
+      - state
     DomainWrite:
       type: object
       properties:
@@ -23315,6 +23680,54 @@ components:
       - warranty_provider
       - warranty_reference
       - warranty_starts_on
+    Hostname:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        provenance:
+          type: string
+        source:
+          type: string
+      required:
+      - id
+      - name
+      - parent_id
+      - provenance
+      - source
+    HostnameWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 253
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        provenance:
+          enum:
+          - entered
+          - discovered
+          type: string
+          description: |-
+            * `entered` - entered
+            * `discovered` - discovered
+          x-spec-enum-id: 4dfe549a3de0f796
+        source:
+          type: string
+          default: ''
+          maxLength: 120
+      required:
+      - name
+      - provenance
     IPAddress:
       type: object
       properties:
@@ -25241,6 +25654,59 @@ components:
       - kind
       - organization_id
       - publication_id
+    ObservationWrite:
+      type: object
+      properties:
+        record_type:
+          enum:
+          - A
+          - AAAA
+          - CNAME
+          - MX
+          - NS
+          - TXT
+          - CAA
+          - SRV
+          type: string
+          description: |-
+            * `A` - A
+            * `AAAA` - AAAA
+            * `CNAME` - CNAME
+            * `MX` - MX
+            * `NS` - NS
+            * `TXT` - TXT
+            * `CAA` - CAA
+            * `SRV` - SRV
+          x-spec-enum-id: 7b9a9981b39869fc
+        value:
+          type: string
+          maxLength: 1024
+        ttl:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        provenance:
+          enum:
+          - entered
+          - discovered
+          type: string
+          description: |-
+            * `entered` - entered
+            * `discovered` - discovered
+          x-spec-enum-id: 4dfe549a3de0f796
+        source:
+          type: string
+          maxLength: 120
+        observed_at:
+          type: string
+          format: date-time
+      required:
+      - observed_at
+      - provenance
+      - record_type
+      - source
+      - value
     OidcProvider:
       type: object
       properties:

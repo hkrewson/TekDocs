@@ -123,6 +123,14 @@ This register turns known limitations into release obligations. A risk remains o
 
 `TD-RISK-054` is **mitigated with recurring owner**. Stable IDNA ASCII identity, exact-Workspace ownership, dedicated policy, authorized relationships, non-aggregating APIs, database guards, and forced RLS protect entered registration records. Discovered truth, reconciliation, and expiry notification remain later boundaries.
 
+## 0.7.9 domain-hierarchy disposition
+
+`TD-RISK-054` remains **mitigated with recurring owner**. Exact-domain hierarchy, active-name uniqueness, explicit provenance, append-only digested observations, database scope/retention guards, and forced RLS protect the manual observation boundary. Automated collection and reconciliation remain `0.7.11`.
+
+## 0.7.10 domain-renewal disposition
+
+`TD-RISK-053` and `TD-RISK-054` remain **mitigated with recurring owners**. Domain expiration creates an exact-source schedule, review events retain entered/observed differences, and the authenticated calendar consumes the shared scoped projection. Direct request-path notification is prohibited; the later reminder dispatcher owns outbox integration.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

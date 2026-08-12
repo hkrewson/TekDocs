@@ -31,7 +31,7 @@ def test_public_api_root_describes_versioned_conventions(client):
     assert response.status_code == 200
     assert response.json() == {
         "name": "TekDocs API",
-        "version": "0.6.3",
+        "version": "0.6.9",
         "status": "pre-alpha",
         "api_version": "v1",
         "schema_url": "/api/v1/schema/",
@@ -91,3 +91,20 @@ def test_openapi_exposes_error_request_id_and_declared_idempotency_contract():
     assert operation["responses"]["400"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ApiErrorEnvelope"
     }
+
+
+@pytest.mark.django_db
+def test_openapi_operation_ids_are_unique_and_use_stable_list_detail_names():
+    schema = SchemaGenerator().get_schema(request=None, public=True)
+    operation_ids = [
+        operation["operationId"]
+        for path_item in schema["paths"].values()
+        for method, operation in path_item.items()
+        if method in {"get", "post", "put", "patch", "delete"}
+    ]
+
+    assert len(operation_ids) == len(set(operation_ids))
+    assert "workspaces_msp_assets_retrieve_list" in operation_ids
+    assert "workspaces_msp_assets_retrieve_detail" in operation_ids
+    assert "workspaces_organizations_networks_vlans_retrieve_list" in operation_ids
+    assert "workspaces_organizations_networks_vlans_retrieve_detail" in operation_ids

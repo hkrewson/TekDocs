@@ -41,6 +41,14 @@ ALLOWED_LOG_CODES = frozenset(
 )
 
 
+def _validate_provider_secret(value: str) -> bytes:
+    encoded = value.encode()
+    contains_control_character = any(ord(character) < 32 or ord(character) == 127 for character in value)
+    if len(encoded) < 8 or len(encoded) > 4096 or contains_control_character:
+        raise ValidationError({"api_token": "Enter a valid provider API token without control characters."})
+    return encoded
+
+
 def resolve_integration_workspace(
     user: Any, *, organization_entity_id: UUID | None, permission: PermissionKey
 ) -> ResolvedWorkspace:
@@ -88,8 +96,7 @@ def create_connection(
     normalized_name = " ".join(name.split())
     if not normalized_name or any(ord(character) < 32 for character in normalized_name):
         raise ValidationError({"name": "Enter a visible connection name without control characters."})
-    if len(api_token.encode()) < 8 or len(api_token.encode()) > 4096:
-        raise ValidationError({"api_token": "Enter a valid provider API token."})
+    encoded_token = _validate_provider_secret(api_token)
     connection_id = uuid4()
     connection = IntegrationConnection(
         id=connection_id,
@@ -101,7 +108,7 @@ def create_connection(
         base_url=validate_integration_base_url(base_url),
         configuration={},
         secret_envelope=encrypt_integration_secret(
-            secret=api_token.encode(), tenant_id=resolved.member.tenant.id, connection_id=connection_id, generation=1
+            secret=encoded_token, tenant_id=resolved.member.tenant.id, connection_id=connection_id, generation=1
         ),
         sync_interval_minutes=sync_interval_minutes,
         created_by=request.user,
@@ -157,11 +164,10 @@ def rotate_connection_secret(
         connection = connections_for_workspace(resolved).select_for_update().get(pk=connection_id)
     except IntegrationConnection.DoesNotExist as exc:
         raise NotFound("The integration connection is unavailable.") from exc
-    if len(api_token.encode()) < 8 or len(api_token.encode()) > 4096:
-        raise ValidationError({"api_token": "Enter a valid provider API token."})
+    encoded_token = _validate_provider_secret(api_token)
     connection.secret_generation += 1
     connection.secret_envelope = encrypt_integration_secret(
-        secret=api_token.encode(),
+        secret=encoded_token,
         tenant_id=connection.tenant_id,
         connection_id=connection.id,
         generation=connection.secret_generation,
@@ -302,41 +308,43 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
         ).decode()
         selected = adapter or PROVIDERS[job.connection.provider]
         page = selected.fetch_page(job.connection, secret=secret, cursor=job.cursor_before)
-        records = [
-            IntegrationObservation(
-                tenant=job.tenant,
-                workspace=job.workspace,
-                organization=job.organization,
-                job=job,
-                remote_type=item.remote_type,
-                remote_id=item.remote_id,
-                fingerprint=item.fingerprint,
-            )
-            for item in page.observations
-        ]
-        IntegrationObservation.objects.bulk_create(records)
-        created = list(IntegrationObservation.objects.filter(job=job))
-        _conflicts_for_observations(job, created)
-        job.cursor_after = page.next_cursor
-        job.state = IntegrationJobState.SUCCEEDED
-        job.locked_at = None
-        job.finished_at = now
-        job.result_counts = {"observations": len(created)}
-        job.save(update_fields=("cursor_after", "state", "locked_at", "finished_at", "result_counts"))
-        _safe_log(job=job, level="info", code="sync_page_succeeded", metrics={"observations": len(created)})
-        if page.next_cursor:
-            enqueue_sync(
-                connection=job.connection,
-                trigger=job.trigger,
-                requested_by_id=job.requested_by_id,
-                idempotency_key=f"continuation:{job.id}",
-                cursor=page.next_cursor,
-                now=now,
-            )
-        else:
-            job.connection.next_sync_at = now + timedelta(minutes=job.connection.sync_interval_minutes)
-            job.connection.save(update_fields=("next_sync_at", "updated_at"))
-            _safe_log(job=job, level="info", code="sync_completed", metrics={"observations": len(created)})
+        # A handled finalization failure must roll back the whole provider page before scheduling a retry.
+        with transaction.atomic():
+            records = [
+                IntegrationObservation(
+                    tenant=job.tenant,
+                    workspace=job.workspace,
+                    organization=job.organization,
+                    job=job,
+                    remote_type=item.remote_type,
+                    remote_id=item.remote_id,
+                    fingerprint=item.fingerprint,
+                )
+                for item in page.observations
+            ]
+            IntegrationObservation.objects.bulk_create(records)
+            created = list(IntegrationObservation.objects.filter(job=job))
+            _conflicts_for_observations(job, created)
+            job.cursor_after = page.next_cursor
+            job.state = IntegrationJobState.SUCCEEDED
+            job.locked_at = None
+            job.finished_at = now
+            job.result_counts = {"observations": len(created)}
+            job.save(update_fields=("cursor_after", "state", "locked_at", "finished_at", "result_counts"))
+            _safe_log(job=job, level="info", code="sync_page_succeeded", metrics={"observations": len(created)})
+            if page.next_cursor:
+                enqueue_sync(
+                    connection=job.connection,
+                    trigger=job.trigger,
+                    requested_by_id=job.requested_by_id,
+                    idempotency_key=f"continuation:{job.id}",
+                    cursor=page.next_cursor,
+                    now=now,
+                )
+            else:
+                job.connection.next_sync_at = now + timedelta(minutes=job.connection.sync_interval_minutes)
+                job.connection.save(update_fields=("next_sync_at", "updated_at"))
+                _safe_log(job=job, level="info", code="sync_completed", metrics={"observations": len(created)})
         return job
     except Exception as exc:
         code = (

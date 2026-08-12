@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.6.8
+  version: 0.6.9
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -4996,7 +4996,7 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/assets:
     get:
-      operationId: workspaces_msp_assets_retrieve
+      operationId: workspaces_msp_assets_retrieve_list
       parameters:
       - in: query
         name: page
@@ -5064,7 +5064,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/assets/{asset_entity_id}:
     get:
-      operationId: workspaces_msp_assets_retrieve_2
+      operationId: workspaces_msp_assets_retrieve_detail
       parameters:
       - in: path
         name: asset_entity_id
@@ -5704,7 +5704,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/contracts:
     get:
-      operationId: workspaces_msp_contracts_retrieve
+      operationId: workspaces_msp_contracts_retrieve_list
       parameters:
       - in: query
         name: page
@@ -5777,7 +5777,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/contracts/{contract_entity_id}:
     get:
-      operationId: workspaces_msp_contracts_retrieve_2
+      operationId: workspaces_msp_contracts_retrieve_detail
       parameters:
       - in: path
         name: contract_entity_id
@@ -6391,7 +6391,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/licenses:
     get:
-      operationId: workspaces_msp_licenses_retrieve
+      operationId: workspaces_msp_licenses_retrieve_list
       parameters:
       - in: query
         name: page
@@ -6458,7 +6458,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/licenses/{license_entity_id}:
     get:
-      operationId: workspaces_msp_licenses_retrieve_2
+      operationId: workspaces_msp_licenses_retrieve_detail
       parameters:
       - in: path
         name: license_entity_id
@@ -6786,7 +6786,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/circuits:
     get:
-      operationId: workspaces_msp_networks_circuits_retrieve
+      operationId: workspaces_msp_networks_circuits_retrieve_list
       parameters:
       - in: query
         name: page
@@ -6854,7 +6854,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/circuits/{circuit_entity_id}:
     get:
-      operationId: workspaces_msp_networks_circuits_retrieve_2
+      operationId: workspaces_msp_networks_circuits_retrieve_detail
       parameters:
       - in: path
         name: circuit_entity_id
@@ -7055,7 +7055,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/devices:
     get:
-      operationId: workspaces_msp_networks_devices_retrieve
+      operationId: workspaces_msp_networks_devices_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7123,7 +7123,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/devices/{device_entity_id}:
     get:
-      operationId: workspaces_msp_networks_devices_retrieve_2
+      operationId: workspaces_msp_networks_devices_retrieve_detail
       parameters:
       - in: path
         name: device_entity_id
@@ -7189,7 +7189,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/dns-records:
     get:
-      operationId: workspaces_msp_networks_dns_records_retrieve
+      operationId: workspaces_msp_networks_dns_records_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7257,7 +7257,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/dns-records/{record_entity_id}:
     get:
-      operationId: workspaces_msp_networks_dns_records_retrieve_2
+      operationId: workspaces_msp_networks_dns_records_retrieve_detail
       parameters:
       - in: path
         name: record_entity_id
@@ -7323,7 +7323,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/dns-zones:
     get:
-      operationId: workspaces_msp_networks_dns_zones_retrieve
+      operationId: workspaces_msp_networks_dns_zones_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7391,7 +7391,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/dns-zones/{zone_entity_id}:
     get:
-      operationId: workspaces_msp_networks_dns_zones_retrieve_2
+      operationId: workspaces_msp_networks_dns_zones_retrieve_detail
       parameters:
       - in: path
         name: zone_entity_id
@@ -7474,7 +7474,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/interfaces:
     get:
-      operationId: workspaces_msp_networks_interfaces_retrieve
+      operationId: workspaces_msp_networks_interfaces_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7542,7 +7542,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/interfaces/{interface_entity_id}:
     get:
-      operationId: workspaces_msp_networks_interfaces_retrieve_2
+      operationId: workspaces_msp_networks_interfaces_retrieve_detail
       parameters:
       - in: path
         name: interface_entity_id
@@ -7608,7 +7608,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/ip-addresses:
     get:
-      operationId: workspaces_msp_networks_ip_addresses_retrieve
+      operationId: workspaces_msp_networks_ip_addresses_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7676,7 +7676,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/ip-addresses/{ip_address_entity_id}:
     get:
-      operationId: workspaces_msp_networks_ip_addresses_retrieve_2
+      operationId: workspaces_msp_networks_ip_addresses_retrieve_detail
       parameters:
       - in: path
         name: ip_address_entity_id
@@ -7742,7 +7742,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/mac-addresses:
     get:
-      operationId: workspaces_msp_networks_mac_addresses_retrieve
+      operationId: workspaces_msp_networks_mac_addresses_retrieve_list
       parameters:
       - in: query
         name: page
@@ -7810,7 +7810,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/mac-addresses/{mac_address_entity_id}:
     get:
-      operationId: workspaces_msp_networks_mac_addresses_retrieve_2
+      operationId: workspaces_msp_networks_mac_addresses_retrieve_detail
       parameters:
       - in: path
         name: mac_address_entity_id
@@ -8009,7 +8009,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/racks:
     get:
-      operationId: workspaces_msp_networks_racks_retrieve
+      operationId: workspaces_msp_networks_racks_retrieve_list
       parameters:
       - in: query
         name: page
@@ -8077,7 +8077,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/racks/{rack_entity_id}:
     get:
-      operationId: workspaces_msp_networks_racks_retrieve_2
+      operationId: workspaces_msp_networks_racks_retrieve_detail
       parameters:
       - in: path
         name: rack_entity_id
@@ -8185,7 +8185,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/subnets:
     get:
-      operationId: workspaces_msp_networks_subnets_retrieve
+      operationId: workspaces_msp_networks_subnets_retrieve_list
       parameters:
       - in: query
         name: page
@@ -8253,7 +8253,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/subnets/{subnet_entity_id}:
     get:
-      operationId: workspaces_msp_networks_subnets_retrieve_2
+      operationId: workspaces_msp_networks_subnets_retrieve_detail
       parameters:
       - in: path
         name: subnet_entity_id
@@ -8319,7 +8319,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/vlans:
     get:
-      operationId: workspaces_msp_networks_vlans_retrieve
+      operationId: workspaces_msp_networks_vlans_retrieve_list
       parameters:
       - in: query
         name: page
@@ -8387,7 +8387,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/vlans/{vlan_entity_id}:
     get:
-      operationId: workspaces_msp_networks_vlans_retrieve_2
+      operationId: workspaces_msp_networks_vlans_retrieve_detail
       parameters:
       - in: path
         name: vlan_entity_id
@@ -8453,7 +8453,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/vrfs:
     get:
-      operationId: workspaces_msp_networks_vrfs_retrieve
+      operationId: workspaces_msp_networks_vrfs_retrieve_list
       parameters:
       - in: query
         name: page
@@ -8521,7 +8521,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/vrfs/{vrf_entity_id}:
     get:
-      operationId: workspaces_msp_networks_vrfs_retrieve_2
+      operationId: workspaces_msp_networks_vrfs_retrieve_detail
       parameters:
       - in: path
         name: vrf_entity_id
@@ -8587,7 +8587,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/wireless:
     get:
-      operationId: workspaces_msp_networks_wireless_retrieve
+      operationId: workspaces_msp_networks_wireless_retrieve_list
       parameters:
       - in: query
         name: page
@@ -8655,7 +8655,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/networks/wireless/{wireless_entity_id}:
     get:
-      operationId: workspaces_msp_networks_wireless_retrieve_2
+      operationId: workspaces_msp_networks_wireless_retrieve_detail
       parameters:
       - in: path
         name: wireless_entity_id
@@ -8889,7 +8889,7 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/assets:
     get:
-      operationId: workspaces_organizations_assets_retrieve
+      operationId: workspaces_organizations_assets_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -8970,7 +8970,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}:
     get:
-      operationId: workspaces_organizations_assets_retrieve_2
+      operationId: workspaces_organizations_assets_retrieve_detail
       parameters:
       - in: path
         name: asset_entity_id
@@ -10388,7 +10388,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/contracts:
     get:
-      operationId: workspaces_organizations_contracts_retrieve
+      operationId: workspaces_organizations_contracts_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -10474,7 +10474,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/contracts/{contract_entity_id}:
     get:
-      operationId: workspaces_organizations_contracts_retrieve_2
+      operationId: workspaces_organizations_contracts_retrieve_detail
       parameters:
       - in: path
         name: contract_entity_id
@@ -13576,7 +13576,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/licenses:
     get:
-      operationId: workspaces_organizations_licenses_retrieve
+      operationId: workspaces_organizations_licenses_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -13656,7 +13656,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/licenses/{license_entity_id}:
     get:
-      operationId: workspaces_organizations_licenses_retrieve_2
+      operationId: workspaces_organizations_licenses_retrieve_detail
       parameters:
       - in: path
         name: license_entity_id
@@ -14047,7 +14047,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits:
     get:
-      operationId: workspaces_organizations_networks_circuits_retrieve
+      operationId: workspaces_organizations_networks_circuits_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -14128,7 +14128,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/{circuit_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_circuits_retrieve_2
+      operationId: workspaces_organizations_networks_circuits_retrieve_detail
       parameters:
       - in: path
         name: circuit_entity_id
@@ -14366,7 +14366,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/devices:
     get:
-      operationId: workspaces_organizations_networks_devices_retrieve
+      operationId: workspaces_organizations_networks_devices_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -14447,7 +14447,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/devices/{device_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_devices_retrieve_2
+      operationId: workspaces_organizations_networks_devices_retrieve_detail
       parameters:
       - in: path
         name: device_entity_id
@@ -14525,7 +14525,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-records:
     get:
-      operationId: workspaces_organizations_networks_dns_records_retrieve
+      operationId: workspaces_organizations_networks_dns_records_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -14606,7 +14606,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-records/{record_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_dns_records_retrieve_2
+      operationId: workspaces_organizations_networks_dns_records_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -14684,7 +14684,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-zones:
     get:
-      operationId: workspaces_organizations_networks_dns_zones_retrieve
+      operationId: workspaces_organizations_networks_dns_zones_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -14765,7 +14765,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-zones/{zone_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_dns_zones_retrieve_2
+      operationId: workspaces_organizations_networks_dns_zones_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -14867,7 +14867,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/interfaces:
     get:
-      operationId: workspaces_organizations_networks_interfaces_retrieve
+      operationId: workspaces_organizations_networks_interfaces_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -14948,7 +14948,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/interfaces/{interface_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_interfaces_retrieve_2
+      operationId: workspaces_organizations_networks_interfaces_retrieve_detail
       parameters:
       - in: path
         name: interface_entity_id
@@ -15026,7 +15026,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/ip-addresses:
     get:
-      operationId: workspaces_organizations_networks_ip_addresses_retrieve
+      operationId: workspaces_organizations_networks_ip_addresses_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -15107,7 +15107,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/ip-addresses/{ip_address_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_ip_addresses_retrieve_2
+      operationId: workspaces_organizations_networks_ip_addresses_retrieve_detail
       parameters:
       - in: path
         name: ip_address_entity_id
@@ -15185,7 +15185,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/mac-addresses:
     get:
-      operationId: workspaces_organizations_networks_mac_addresses_retrieve
+      operationId: workspaces_organizations_networks_mac_addresses_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -15266,7 +15266,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/mac-addresses/{mac_address_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_mac_addresses_retrieve_2
+      operationId: workspaces_organizations_networks_mac_addresses_retrieve_detail
       parameters:
       - in: path
         name: mac_address_entity_id
@@ -15511,7 +15511,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks:
     get:
-      operationId: workspaces_organizations_networks_racks_retrieve
+      operationId: workspaces_organizations_networks_racks_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -15592,7 +15592,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/racks/{rack_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_racks_retrieve_2
+      operationId: workspaces_organizations_networks_racks_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -15718,7 +15718,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/subnets:
     get:
-      operationId: workspaces_organizations_networks_subnets_retrieve
+      operationId: workspaces_organizations_networks_subnets_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -15799,7 +15799,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/subnets/{subnet_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_subnets_retrieve_2
+      operationId: workspaces_organizations_networks_subnets_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -15877,7 +15877,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/vlans:
     get:
-      operationId: workspaces_organizations_networks_vlans_retrieve
+      operationId: workspaces_organizations_networks_vlans_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -15958,7 +15958,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/vlans/{vlan_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_vlans_retrieve_2
+      operationId: workspaces_organizations_networks_vlans_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -16036,7 +16036,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/vrfs:
     get:
-      operationId: workspaces_organizations_networks_vrfs_retrieve
+      operationId: workspaces_organizations_networks_vrfs_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -16117,7 +16117,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/vrfs/{vrf_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_vrfs_retrieve_2
+      operationId: workspaces_organizations_networks_vrfs_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id
@@ -16195,7 +16195,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/wireless:
     get:
-      operationId: workspaces_organizations_networks_wireless_retrieve
+      operationId: workspaces_organizations_networks_wireless_retrieve_list
       parameters:
       - in: path
         name: organization_entity_id
@@ -16276,7 +16276,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/wireless/{wireless_entity_id}:
     get:
-      operationId: workspaces_organizations_networks_wireless_retrieve_2
+      operationId: workspaces_organizations_networks_wireless_retrieve_detail
       parameters:
       - in: path
         name: organization_entity_id

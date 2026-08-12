@@ -98,7 +98,7 @@ SMTP is a second, non-blocking consumer queue attached one-to-one to newly proje
 
 Framework errors use a stable `error` envelope with a non-sensitive message, machine code, optional per-field errors, and the same server UUID returned in `X-Request-ID`. Operation-specific conflict payloads remain explicitly typed in OpenAPI. `Idempotency-Key` is accepted as a bounded opaque correlation value but is advertised only for operations whose domain behavior is already naturally convergent; durable request/result replay belongs to the integration job boundary.
 
-`backend/openapi.yml` is authoritative. `openapi-typescript` produces the immutable checked-in `frontend/src/generated/api-v1.ts`; `openapi-fetch` supplies the typed same-origin transport wrapper. The frontend gate regenerates in check mode, so hand edits or server/client drift fail locally and in CI. Existing generated operation-ID collision warnings are tracked by `TD-RISK-044` and must be removed before `0.7.0` certification.
+`backend/openapi.yml` is authoritative. `openapi-typescript` produces the immutable checked-in `frontend/src/generated/api-v1.ts`; `openapi-fetch` supplies the typed same-origin transport wrapper. The frontend gate regenerates in check mode, so hand edits or server/client drift fail locally and in CI. The narrow TekDocs schema policy derives deterministic `_list` and `_detail` identifiers for otherwise ambiguous scoped routes; uniqueness and generated-client drift are blocking API compatibility checks.
 
 ## Trust boundaries
 

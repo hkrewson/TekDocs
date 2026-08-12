@@ -1419,7 +1419,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_assets_retrieve"];
+        readonly get: operations["workspaces_msp_assets_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_assets_create"];
         readonly delete?: never;
@@ -1435,7 +1435,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_assets_retrieve_2"];
+        readonly get: operations["workspaces_msp_assets_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -1707,7 +1707,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_contracts_retrieve"];
+        readonly get: operations["workspaces_msp_contracts_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_contracts_create"];
         readonly delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_contracts_retrieve_2"];
+        readonly get: operations["workspaces_msp_contracts_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["workspaces_msp_contracts_destroy"];
@@ -1947,7 +1947,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_licenses_retrieve"];
+        readonly get: operations["workspaces_msp_licenses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_licenses_create"];
         readonly delete?: never;
@@ -1963,7 +1963,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_licenses_retrieve_2"];
+        readonly get: operations["workspaces_msp_licenses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2091,7 +2091,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_circuits_retrieve"];
+        readonly get: operations["workspaces_msp_networks_circuits_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_circuits_create"];
         readonly delete?: never;
@@ -2107,7 +2107,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_circuits_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_circuits_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2171,7 +2171,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_devices_retrieve"];
+        readonly get: operations["workspaces_msp_networks_devices_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_devices_create"];
         readonly delete?: never;
@@ -2187,7 +2187,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_devices_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_devices_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2203,7 +2203,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_dns_records_retrieve"];
+        readonly get: operations["workspaces_msp_networks_dns_records_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_dns_records_create"];
         readonly delete?: never;
@@ -2219,7 +2219,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_dns_records_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_dns_records_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2235,7 +2235,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_dns_zones_retrieve"];
+        readonly get: operations["workspaces_msp_networks_dns_zones_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_dns_zones_create"];
         readonly delete?: never;
@@ -2251,7 +2251,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_dns_zones_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_dns_zones_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2283,7 +2283,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_interfaces_retrieve"];
+        readonly get: operations["workspaces_msp_networks_interfaces_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_interfaces_create"];
         readonly delete?: never;
@@ -2299,7 +2299,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_interfaces_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_interfaces_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2315,7 +2315,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_ip_addresses_retrieve"];
+        readonly get: operations["workspaces_msp_networks_ip_addresses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_ip_addresses_create"];
         readonly delete?: never;
@@ -2331,7 +2331,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_ip_addresses_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_ip_addresses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2347,7 +2347,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_mac_addresses_retrieve"];
+        readonly get: operations["workspaces_msp_networks_mac_addresses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_mac_addresses_create"];
         readonly delete?: never;
@@ -2363,7 +2363,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_mac_addresses_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_mac_addresses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2443,7 +2443,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_racks_retrieve"];
+        readonly get: operations["workspaces_msp_networks_racks_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_racks_create"];
         readonly delete?: never;
@@ -2459,7 +2459,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_racks_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_racks_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2491,7 +2491,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_subnets_retrieve"];
+        readonly get: operations["workspaces_msp_networks_subnets_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_subnets_create"];
         readonly delete?: never;
@@ -2507,7 +2507,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_subnets_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_subnets_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2523,7 +2523,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_vlans_retrieve"];
+        readonly get: operations["workspaces_msp_networks_vlans_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_vlans_create"];
         readonly delete?: never;
@@ -2539,7 +2539,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_vlans_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_vlans_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2555,7 +2555,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_vrfs_retrieve"];
+        readonly get: operations["workspaces_msp_networks_vrfs_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_vrfs_create"];
         readonly delete?: never;
@@ -2571,7 +2571,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_vrfs_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_vrfs_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2587,7 +2587,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_wireless_retrieve"];
+        readonly get: operations["workspaces_msp_networks_wireless_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_wireless_create"];
         readonly delete?: never;
@@ -2603,7 +2603,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_networks_wireless_retrieve_2"];
+        readonly get: operations["workspaces_msp_networks_wireless_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2667,7 +2667,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_assets_retrieve"];
+        readonly get: operations["workspaces_organizations_assets_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_assets_create"];
         readonly delete?: never;
@@ -2683,7 +2683,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_assets_retrieve_2"];
+        readonly get: operations["workspaces_organizations_assets_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -3115,7 +3115,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_contracts_retrieve"];
+        readonly get: operations["workspaces_organizations_contracts_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_contracts_create"];
         readonly delete?: never;
@@ -3131,7 +3131,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_contracts_retrieve_2"];
+        readonly get: operations["workspaces_organizations_contracts_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["workspaces_organizations_contracts_destroy"];
@@ -3947,7 +3947,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_licenses_retrieve"];
+        readonly get: operations["workspaces_organizations_licenses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_licenses_create"];
         readonly delete?: never;
@@ -3963,7 +3963,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_licenses_retrieve_2"];
+        readonly get: operations["workspaces_organizations_licenses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4091,7 +4091,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_circuits_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_circuits_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_circuits_create"];
         readonly delete?: never;
@@ -4107,7 +4107,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_circuits_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_circuits_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4171,7 +4171,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_devices_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_devices_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_devices_create"];
         readonly delete?: never;
@@ -4187,7 +4187,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_devices_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_devices_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4203,7 +4203,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_dns_records_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_dns_records_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_dns_records_create"];
         readonly delete?: never;
@@ -4219,7 +4219,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_dns_records_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_dns_records_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4235,7 +4235,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_dns_zones_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_dns_zones_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_dns_zones_create"];
         readonly delete?: never;
@@ -4251,7 +4251,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_dns_zones_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_dns_zones_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4283,7 +4283,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_interfaces_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_interfaces_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_interfaces_create"];
         readonly delete?: never;
@@ -4299,7 +4299,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_interfaces_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_interfaces_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4315,7 +4315,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_ip_addresses_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_ip_addresses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_ip_addresses_create"];
         readonly delete?: never;
@@ -4331,7 +4331,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_ip_addresses_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_ip_addresses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4347,7 +4347,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_mac_addresses_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_mac_addresses_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_mac_addresses_create"];
         readonly delete?: never;
@@ -4363,7 +4363,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_mac_addresses_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_mac_addresses_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4443,7 +4443,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_racks_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_racks_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_racks_create"];
         readonly delete?: never;
@@ -4459,7 +4459,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_racks_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_racks_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4491,7 +4491,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_subnets_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_subnets_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_subnets_create"];
         readonly delete?: never;
@@ -4507,7 +4507,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_subnets_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_subnets_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4523,7 +4523,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_vlans_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_vlans_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_vlans_create"];
         readonly delete?: never;
@@ -4539,7 +4539,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_vlans_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_vlans_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4555,7 +4555,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_vrfs_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_vrfs_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_vrfs_create"];
         readonly delete?: never;
@@ -4571,7 +4571,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_vrfs_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_vrfs_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4587,7 +4587,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_wireless_retrieve"];
+        readonly get: operations["workspaces_organizations_networks_wireless_retrieve_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_wireless_create"];
         readonly delete?: never;
@@ -4603,7 +4603,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_networks_wireless_retrieve_2"];
+        readonly get: operations["workspaces_organizations_networks_wireless_retrieve_detail"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -12647,7 +12647,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_assets_retrieve: {
+    readonly workspaces_msp_assets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -12698,7 +12698,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_assets_retrieve_2: {
+    readonly workspaces_msp_assets_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -13203,7 +13203,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_contracts_retrieve: {
+    readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -13255,7 +13255,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_contracts_retrieve_2: {
+    readonly workspaces_msp_contracts_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -13761,7 +13761,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_licenses_retrieve: {
+    readonly workspaces_msp_licenses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -13812,7 +13812,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_licenses_retrieve_2: {
+    readonly workspaces_msp_licenses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14068,7 +14068,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_circuits_retrieve: {
+    readonly workspaces_msp_networks_circuits_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14119,7 +14119,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_circuits_retrieve_2: {
+    readonly workspaces_msp_networks_circuits_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14274,7 +14274,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_devices_retrieve: {
+    readonly workspaces_msp_networks_devices_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14325,7 +14325,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_devices_retrieve_2: {
+    readonly workspaces_msp_networks_devices_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14377,7 +14377,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_dns_records_retrieve: {
+    readonly workspaces_msp_networks_dns_records_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14428,7 +14428,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_dns_records_retrieve_2: {
+    readonly workspaces_msp_networks_dns_records_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14480,7 +14480,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_dns_zones_retrieve: {
+    readonly workspaces_msp_networks_dns_zones_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14531,7 +14531,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_dns_zones_retrieve_2: {
+    readonly workspaces_msp_networks_dns_zones_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14603,7 +14603,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_interfaces_retrieve: {
+    readonly workspaces_msp_networks_interfaces_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14654,7 +14654,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_interfaces_retrieve_2: {
+    readonly workspaces_msp_networks_interfaces_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14706,7 +14706,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_ip_addresses_retrieve: {
+    readonly workspaces_msp_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14757,7 +14757,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_ip_addresses_retrieve_2: {
+    readonly workspaces_msp_networks_ip_addresses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -14809,7 +14809,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_mac_addresses_retrieve: {
+    readonly workspaces_msp_networks_mac_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -14860,7 +14860,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_mac_addresses_retrieve_2: {
+    readonly workspaces_msp_networks_mac_addresses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15030,7 +15030,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_racks_retrieve: {
+    readonly workspaces_msp_networks_racks_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15081,7 +15081,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_racks_retrieve_2: {
+    readonly workspaces_msp_networks_racks_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15158,7 +15158,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_subnets_retrieve: {
+    readonly workspaces_msp_networks_subnets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15209,7 +15209,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_subnets_retrieve_2: {
+    readonly workspaces_msp_networks_subnets_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15261,7 +15261,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_vlans_retrieve: {
+    readonly workspaces_msp_networks_vlans_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15312,7 +15312,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_vlans_retrieve_2: {
+    readonly workspaces_msp_networks_vlans_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15364,7 +15364,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_vrfs_retrieve: {
+    readonly workspaces_msp_networks_vrfs_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15415,7 +15415,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_vrfs_retrieve_2: {
+    readonly workspaces_msp_networks_vrfs_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15467,7 +15467,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_wireless_retrieve: {
+    readonly workspaces_msp_networks_wireless_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15518,7 +15518,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_networks_wireless_retrieve_2: {
+    readonly workspaces_msp_networks_wireless_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -15701,7 +15701,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_assets_retrieve: {
+    readonly workspaces_organizations_assets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -15756,7 +15756,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_assets_retrieve_2: {
+    readonly workspaces_organizations_assets_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -16750,7 +16750,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_contracts_retrieve: {
+    readonly workspaces_organizations_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -16806,7 +16806,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_contracts_retrieve_2: {
+    readonly workspaces_organizations_contracts_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -18953,7 +18953,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_licenses_retrieve: {
+    readonly workspaces_organizations_licenses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19008,7 +19008,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_licenses_retrieve_2: {
+    readonly workspaces_organizations_licenses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19278,7 +19278,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_circuits_retrieve: {
+    readonly workspaces_organizations_networks_circuits_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19333,7 +19333,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_circuits_retrieve_2: {
+    readonly workspaces_organizations_networks_circuits_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19495,7 +19495,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_devices_retrieve: {
+    readonly workspaces_organizations_networks_devices_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19550,7 +19550,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_devices_retrieve_2: {
+    readonly workspaces_organizations_networks_devices_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19604,7 +19604,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_dns_records_retrieve: {
+    readonly workspaces_organizations_networks_dns_records_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19659,7 +19659,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_dns_records_retrieve_2: {
+    readonly workspaces_organizations_networks_dns_records_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19713,7 +19713,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_dns_zones_retrieve: {
+    readonly workspaces_organizations_networks_dns_zones_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19768,7 +19768,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_dns_zones_retrieve_2: {
+    readonly workspaces_organizations_networks_dns_zones_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19844,7 +19844,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_interfaces_retrieve: {
+    readonly workspaces_organizations_networks_interfaces_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -19899,7 +19899,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_interfaces_retrieve_2: {
+    readonly workspaces_organizations_networks_interfaces_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -19953,7 +19953,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_ip_addresses_retrieve: {
+    readonly workspaces_organizations_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20008,7 +20008,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_ip_addresses_retrieve_2: {
+    readonly workspaces_organizations_networks_ip_addresses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20062,7 +20062,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_mac_addresses_retrieve: {
+    readonly workspaces_organizations_networks_mac_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20117,7 +20117,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_mac_addresses_retrieve_2: {
+    readonly workspaces_organizations_networks_mac_addresses_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20298,7 +20298,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_racks_retrieve: {
+    readonly workspaces_organizations_networks_racks_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20353,7 +20353,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_racks_retrieve_2: {
+    readonly workspaces_organizations_networks_racks_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20434,7 +20434,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_subnets_retrieve: {
+    readonly workspaces_organizations_networks_subnets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20489,7 +20489,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_subnets_retrieve_2: {
+    readonly workspaces_organizations_networks_subnets_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20543,7 +20543,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_vlans_retrieve: {
+    readonly workspaces_organizations_networks_vlans_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20598,7 +20598,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_vlans_retrieve_2: {
+    readonly workspaces_organizations_networks_vlans_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20652,7 +20652,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_vrfs_retrieve: {
+    readonly workspaces_organizations_networks_vrfs_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20707,7 +20707,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_vrfs_retrieve_2: {
+    readonly workspaces_organizations_networks_vrfs_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -20761,7 +20761,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_wireless_retrieve: {
+    readonly workspaces_organizations_networks_wireless_retrieve_list: {
         readonly parameters: {
             readonly query?: {
                 readonly page?: number;
@@ -20816,7 +20816,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_networks_wireless_retrieve_2: {
+    readonly workspaces_organizations_networks_wireless_retrieve_detail: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;

@@ -2,7 +2,7 @@ SHELL := /bin/sh
 
 .PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-certification notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
 
-.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal
+.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-backup-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -50,6 +50,10 @@ test-webhooks:
 test-integrations:
 	docker compose run --rm migrate pytest apps/core/tests/test_integrations.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
+
+test-integration-stabilization:
+	docker compose run --rm migrate pytest apps/core/tests/test_integration_stabilization.py apps/core/tests/test_integrations.py apps/core/tests/test_webhooks.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_api_contracts.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	./scripts/frontend-gate.sh check
 
 test-auth-abuse:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest apps/accounts/tests -q
@@ -183,7 +187,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
 
-release-gate: check test test-api-tokens test-webhooks test-integrations test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-certification test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-network-certification test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal
+release-gate: check test test-api-tokens test-webhooks test-integrations test-integration-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-certification test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-network-certification test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-upgrade-rehearsal integration-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh
@@ -235,6 +239,12 @@ network-backup-rehearsal:
 
 network-upgrade-rehearsal:
 	./scripts/rehearse-network-upgrade.sh
+
+integration-upgrade-rehearsal:
+	./scripts/rehearse-integration-upgrade.sh
+
+integration-backup-rehearsal:
+	./scripts/rehearse-integration-backup.sh
 
 schema:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py spectacular --validate > backend/openapi.yml

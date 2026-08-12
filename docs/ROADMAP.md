@@ -1023,7 +1023,7 @@ Evidence: `docs/releases/0.6.0.md`.
 | `0.6.6` | **Complete:** provider logs/metrics with field allowlists, secret redaction, and bounded retention; final process-wide structured-log remediation remains `0.8.7`. |
 | `0.6.7` | **Complete:** conflict model and permission-aware reconciliation workflow; database remains canonical. |
 | `0.6.8` | **Complete:** deterministic sanitized Git export for selected non-secret documents/manifests. |
-| `0.6.9` | Integration-runtime stabilization, webhook/SSRF abuse suites, upgrade, and load evidence. |
+| `0.6.9` | **Complete:** integration-runtime stabilization, webhook/SSRF abuse suites, upgrade/restore, load, accessibility, and production-runtime evidence. |
 | `0.7.0` | Stabilize and certify the public API and integration framework. |
 
 ### `0.6.1` acceptance criteria
@@ -1072,6 +1072,19 @@ Evidence: `docs/releases/0.6.3.md`.
 - [x] Focused PostgreSQL integration tests, Ruff, mypy, migration drift, OpenAPI/generated-client drift, frontend type/lint/unit/build, Compose runtime, documentation, ADR 0062, and release evidence agree at `0.6.8`. Integration load, adversarial egress, exact-prior upgrade, and final certification remain `0.6.9`–`0.7.0`.
 
 Evidence: `docs/releases/0.6.4.md` through `docs/releases/0.6.8.md`.
+
+### `0.6.9` acceptance criteria
+
+- [x] Provider egress rejects cross-origin/credentialed/non-HTTPS cursors, redirects, wrong content types, invalid JSON shapes, oversized bodies, unavailable DNS, and any DNS answer that is not globally routable. TLS connects to the reviewed address while retaining hostname/SNI verification; redirects remain disabled and time/size limits remain explicit.
+- [x] Provider tokens reject control characters before encryption and never enter response, audit, job, conflict, log, export, or browser surfaces.
+- [x] Failed provider-page finalization rolls back observations/conflicts before retry. Stale leases recover, completed jobs do not replay, idempotency remains exact-connection scoped, retries dead-letter at the maintained ceiling, and dispatcher payloads contain only exact Workspace identities.
+- [x] A 250-job exact-client history remains bounded to 50 rows, excludes a sibling client's equally sized history, stays within the maintained query ceiling, and meets the local 500 ms reference target.
+- [x] Every OpenAPI operation ID is unique and stable without generator-order suffixes. Schema/client drift and existing API conventions remain blocking.
+- [x] The integration UI retains keyboard-operable native controls, explicit labels, loading/empty/error states, responsive tables, and the established TekDocs design system.
+- [x] Exact `0.6.8` state upgrades to `0.6.9`; independent PostgreSQL/media restore preserves the encrypted connection, observation, export, and identities while deployment keys remain separate.
+- [x] Stabilization, production-image, Compose, static, migration/schema/client, frontend, documentation, and risk evidence agree at `0.6.9`.
+
+Evidence: `docs/releases/0.6.9.md`.
 
 ## Compliance and monitoring: `0.7.x` → `0.8.0`
 

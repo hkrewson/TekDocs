@@ -7,6 +7,8 @@ const states = ['', 'pending', 'processing', 'delivered', 'suppressed', 'dead_le
 export function NotificationDeliveryAdmin({ client }: { client: NotificationDeliveryAdminClient }) {
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([])
   const [filter, setFilter] = useState('')
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [retrying, setRetrying] = useState<string | null>(null)
   const [reason, setReason] = useState('')
@@ -15,10 +17,24 @@ export function NotificationDeliveryAdmin({ client }: { client: NotificationDeli
   useEffect(() => {
     let active = true
     client.listDeliveries(filter || undefined).then((result) => {
-      if (active) { setDeliveries(result); setPhase('ready') }
+      if (active) { setDeliveries(result.results); setNextCursor(result.next_cursor); setPhase('ready') }
     }).catch(() => { if (active) setPhase('error') })
     return () => { active = false }
   }, [client, filter])
+
+  async function loadOlder() {
+    if (!nextCursor) return
+    setLoadingMore(true)
+    try {
+      const result = await client.listDeliveries(filter || undefined, nextCursor)
+      setDeliveries((current) => [...current, ...result.results.filter((item) => !current.some((existing) => existing.id === item.id))])
+      setNextCursor(result.next_cursor)
+    } catch {
+      setMessage('Older delivery metadata could not be loaded.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   async function retry(delivery: NotificationDelivery) {
     setMessage(null)
@@ -43,6 +59,7 @@ export function NotificationDeliveryAdmin({ client }: { client: NotificationDeli
       {phase === 'error' && <p role="alert">Delivery metadata could not be loaded.</p>}
       {phase === 'ready' && deliveries.length === 0 && <p>No deliveries match this state.</p>}
       {phase === 'ready' && deliveries.length > 0 && <div className="table-scroll"><table><thead><tr><th>Recipient</th><th>Organization</th><th>Event</th><th>State</th><th>Attempts</th><th>Available</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td>{delivery.recipient}</td><td>{delivery.organization}</td><td>{delivery.event_topic}</td><td>{delivery.state.replace('_', ' ')}</td><td>{delivery.attempts}</td><td><time dateTime={delivery.available_at}>{new Date(delivery.available_at).toLocaleString()}</time></td><td>{delivery.state === 'dead_letter' && (retrying === delivery.id ? <form className="delivery-retry" onSubmit={(event) => { event.preventDefault(); void retry(delivery) }}><label><span className="sr-only">Retry reason</span><input autoFocus required minLength={3} maxLength={240} placeholder="Reason for retry" value={reason} onChange={(event) => setReason(event.target.value)} /></label><button type="submit">Retry</button><button type="button" onClick={() => { setRetrying(null); setReason('') }}>Cancel</button></form> : <button type="button" onClick={() => setRetrying(delivery.id)}>Retry</button>)}</td></tr>)}</tbody></table></div>}
+      {phase === 'ready' && nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadOlder() }}>{loadingMore ? 'Loading…' : 'Load older deliveries'}</button></div>}
     </section>
   </>
 }

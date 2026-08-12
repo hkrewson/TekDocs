@@ -15,7 +15,7 @@ const delivery = {
 describe('NotificationDeliveryAdmin', () => {
   it('lists metadata without content and requires a reason to retry dead letters', async () => {
     const retryDelivery = vi.fn().mockResolvedValue({ ...delivery, state: 'pending', attempts: 0, retry_generation: 1 })
-    const client = { listDeliveries: vi.fn().mockResolvedValue([delivery]), retryDelivery } satisfies NotificationDeliveryAdminClient
+    const client = { listDeliveries: vi.fn().mockResolvedValue({ results: [delivery], has_more: false, next_cursor: null }), retryDelivery } satisfies NotificationDeliveryAdminClient
     const user = userEvent.setup()
     render(<NotificationDeliveryAdmin client={client} />)
 
@@ -26,5 +26,26 @@ describe('NotificationDeliveryAdmin', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(retryDelivery).toHaveBeenCalledWith('delivery-1', 'SMTP service recovered')
     expect(await screen.findByText('Delivery returned to the queue.')).toBeInTheDocument()
+  })
+
+  it('appends an older delivery page without losing the visible history', async () => {
+    const older = { ...delivery, id: 'delivery-2', recipient: 'Older Reader', state: 'delivered' as const }
+    const listDeliveries = vi.fn()
+      .mockResolvedValueOnce({ results: [delivery], has_more: true, next_cursor: 'older-page' })
+      .mockResolvedValueOnce({ results: [older], has_more: false, next_cursor: null })
+    const client = {
+      listDeliveries,
+      retryDelivery: vi.fn(),
+    } satisfies NotificationDeliveryAdminClient
+    const user = userEvent.setup()
+    render(<NotificationDeliveryAdmin client={client} />)
+
+    expect(await screen.findByText('Client Reader')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Load older deliveries' }))
+
+    expect(await screen.findByText('Older Reader')).toBeInTheDocument()
+    expect(screen.getByText('Client Reader')).toBeInTheDocument()
+    expect(listDeliveries).toHaveBeenNthCalledWith(2, undefined, 'older-page')
+    expect(screen.queryByRole('button', { name: 'Load older deliveries' })).not.toBeInTheDocument()
   })
 })

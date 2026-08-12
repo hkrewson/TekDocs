@@ -1,10 +1,15 @@
+from datetime import datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.core import signing
+from django.core.signing import BadSignature
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.utils.dateparse import parse_datetime
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -28,8 +33,11 @@ from .models import (
 )
 from .notification_email import preference_for
 from .notifications import (
+    INBOX_PAGE_SIZE,
+    INBOX_SCAN_LIMIT,
     NotificationProjection,
     authorize_notification,
+    authorize_notifications,
     notification_candidates,
     set_notification_read,
 )
@@ -57,6 +65,7 @@ class InboxNotificationResultSerializer(serializers.Serializer):
     results = InboxNotificationSerializer(many=True)
     unread_count = serializers.IntegerField(min_value=0)
     has_more = serializers.BooleanField()
+    next_cursor = serializers.CharField(allow_null=True)
 
 
 class InboxNotificationReadSerializer(serializers.Serializer):
@@ -140,20 +149,74 @@ class NotificationSurfaceMixin:
         return context
 
 
+def _decode_notification_cursor(
+    value: str | None,
+    *,
+    context: InstallationMemberContext,
+) -> tuple[datetime, UUID] | None:
+    if value is None:
+        return None
+    if len(value) > 1024:
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."})
+    try:
+        payload = signing.loads(value, salt="tekdocs.notification-history.v1", max_age=60 * 60 * 24 * 30)
+        if not isinstance(payload, dict) or payload.get("scope") != [
+            str(context.tenant.id),
+            str(context.user.id),
+            context.surface,
+        ]:
+            raise BadSignature
+        created_at = parse_datetime(str(payload["created_at"]))
+        notification_id = UUID(str(payload["id"]))
+        if created_at is None or not timezone.is_aware(created_at):
+            raise BadSignature
+    except (BadSignature, KeyError, TypeError, ValueError):
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."}) from None
+    return created_at, notification_id
+
+
+def _notification_cursor(
+    notification: InboxNotification,
+    *,
+    context: InstallationMemberContext,
+) -> str:
+    return signing.dumps(
+        {
+            "scope": [str(context.tenant.id), str(context.user.id), context.surface],
+            "created_at": notification.created_at.isoformat(),
+            "id": str(notification.id),
+        },
+        salt="tekdocs.notification-history.v1",
+        compress=True,
+    )
+
+
 class NotificationListView(NotificationSurfaceMixin, APIView):
     def get(self, request: Request) -> Response:
         context = self.context(request)
-        projections = [
-            projection
-            for notification in notification_candidates(context)
-            if (projection := authorize_notification(notification, context)) is not None
-        ]
+        before = _decode_notification_cursor(request.query_params.get("cursor"), context=context)
+        candidates = notification_candidates(context, before=before)
+        scanned = candidates[:INBOX_SCAN_LIMIT]
+        projections = authorize_notifications(scanned, context)
+        page = projections[:INBOX_PAGE_SIZE]
+        if len(projections) > INBOX_PAGE_SIZE:
+            cursor_record = page[-1].notification
+            has_more = True
+        elif len(candidates) > INBOX_SCAN_LIMIT and scanned:
+            cursor_record = scanned[-1]
+            has_more = True
+        else:
+            cursor_record = None
+            has_more = False
         response = Response(
             InboxNotificationResultSerializer(
                 {
-                    "results": [_serialized_projection(item) for item in projections[:50]],
+                    "results": [_serialized_projection(item) for item in page],
                     "unread_count": sum(item.notification.read_at is None for item in projections),
-                    "has_more": len(projections) > 50,
+                    "has_more": has_more,
+                    "next_cursor": (
+                        _notification_cursor(cursor_record, context=context) if cursor_record is not None else None
+                    ),
                 }
             ).data
         )
@@ -207,7 +270,11 @@ class NotificationPreferenceView(NotificationSurfaceMixin, APIView):
 class MSPNotificationListView(NotificationListView):
     surface = NotificationSurface.MSP
 
-    @extend_schema(operation_id="msp_notifications_list", responses={200: InboxNotificationResultSerializer})
+    @extend_schema(
+        operation_id="msp_notifications_list",
+        parameters=[OpenApiParameter("cursor", str, required=False)],
+        responses={200: InboxNotificationResultSerializer},
+    )
     def get(self, request):  # type: ignore[no-untyped-def]
         return super().get(request)
 
@@ -227,7 +294,11 @@ class MSPNotificationReadView(NotificationReadView):
 class ClientPortalNotificationListView(NotificationListView):
     surface = NotificationSurface.CLIENT_PORTAL
 
-    @extend_schema(operation_id="client_portal_notifications_list", responses={200: InboxNotificationResultSerializer})
+    @extend_schema(
+        operation_id="client_portal_notifications_list",
+        parameters=[OpenApiParameter("cursor", str, required=False)],
+        responses={200: InboxNotificationResultSerializer},
+    )
     def get(self, request):  # type: ignore[no-untyped-def]
         return super().get(request)
 
@@ -298,6 +369,12 @@ class NotificationDeliverySerializer(serializers.Serializer):
     last_error_code = serializers.CharField()
 
 
+class NotificationDeliveryResultSerializer(serializers.Serializer):
+    results = NotificationDeliverySerializer(many=True)
+    has_more = serializers.BooleanField()
+    next_cursor = serializers.CharField(allow_null=True)
+
+
 class NotificationDeliveryRetrySerializer(serializers.Serializer):
     reason = serializers.CharField(min_length=3, max_length=240, trim_whitespace=True)
 
@@ -320,15 +397,62 @@ def _delivery_payload(delivery: NotificationEmailDelivery) -> dict[str, object]:
     }
 
 
+def _decode_delivery_cursor(
+    value: str | None,
+    *,
+    context: InstallationMemberContext,
+    state: str | None,
+) -> tuple[datetime, UUID] | None:
+    if value is None:
+        return None
+    if len(value) > 1024:
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."})
+    try:
+        payload = signing.loads(value, salt="tekdocs.notification-deliveries.v1", max_age=60 * 60 * 24 * 30)
+        if not isinstance(payload, dict) or payload.get("scope") != [
+            str(context.tenant.id),
+            str(context.user.id),
+            state,
+        ]:
+            raise BadSignature
+        created_at = parse_datetime(str(payload["created_at"]))
+        delivery_id = UUID(str(payload["id"]))
+        if created_at is None or not timezone.is_aware(created_at):
+            raise BadSignature
+    except (BadSignature, KeyError, TypeError, ValueError):
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."}) from None
+    return created_at, delivery_id
+
+
+def _delivery_cursor(
+    delivery: NotificationEmailDelivery,
+    *,
+    context: InstallationMemberContext,
+    state: str | None,
+) -> str:
+    return signing.dumps(
+        {
+            "scope": [str(context.tenant.id), str(context.user.id), state],
+            "created_at": delivery.created_at.isoformat(),
+            "id": str(delivery.id),
+        },
+        salt="tekdocs.notification-deliveries.v1",
+        compress=True,
+    )
+
+
 class NotificationDeliveryAdminListView(APIView):
     @extend_schema(
-        operation_id="notification_deliveries_list", responses={200: NotificationDeliverySerializer(many=True)}
+        operation_id="notification_deliveries_list",
+        parameters=[OpenApiParameter("state", str, required=False), OpenApiParameter("cursor", str, required=False)],
+        responses={200: NotificationDeliveryResultSerializer},
     )
     def get(self, request: Request) -> Response:
         context = require_permission(request.user, PermissionKey.NOTIFICATIONS_MANAGE)
-        state = request.query_params.get("state")
+        state = request.query_params.get("state") or None
         if state and state not in NotificationEmailState.values:
             raise serializers.ValidationError({"state": "Select a valid delivery state."})
+        before = _decode_delivery_cursor(request.query_params.get("cursor"), context=context, state=state)
         deliveries = (
             NotificationEmailDelivery.scoped.for_tenant(context.tenant)
             .select_related("notification__event", "organization__entity", "recipient")
@@ -336,8 +460,22 @@ class NotificationDeliveryAdminListView(APIView):
         )
         if state:
             deliveries = deliveries.filter(state=state)
+        if before is not None:
+            created_at, delivery_id = before
+            deliveries = deliveries.filter(Q(created_at__lt=created_at) | Q(created_at=created_at, id__lt=delivery_id))
+        page = list(deliveries[:101])
+        has_more = len(page) > 100
+        page = page[:100]
         response = Response(
-            NotificationDeliverySerializer([_delivery_payload(item) for item in deliveries[:100]], many=True).data
+            NotificationDeliveryResultSerializer(
+                {
+                    "results": [_delivery_payload(item) for item in page],
+                    "has_more": has_more,
+                    "next_cursor": (
+                        _delivery_cursor(page[-1], context=context, state=state) if has_more and page else None
+                    ),
+                }
+            ).data
         )
         response["Cache-Control"] = "private, no-store"
         return response

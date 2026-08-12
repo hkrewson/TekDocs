@@ -20,6 +20,7 @@ export type NotificationResult = {
   results: InboxNotification[]
   unread_count: number
   has_more: boolean
+  next_cursor: string | null
 }
 
 export type NotificationPreferences = {
@@ -40,13 +41,19 @@ export type NotificationDelivery = {
   last_attempt_at: string | null; delivered_at: string | null; last_error_code: string
 }
 
+export type NotificationDeliveryResult = {
+  results: NotificationDelivery[]
+  has_more: boolean
+  next_cursor: string | null
+}
+
 export interface NotificationDeliveryAdminClient {
-  listDeliveries(state?: string): Promise<NotificationDelivery[]>
+  listDeliveries(state?: string, cursor?: string): Promise<NotificationDeliveryResult>
   retryDelivery(id: string, reason: string): Promise<NotificationDelivery>
 }
 
 export interface NotificationsClient {
-  list(): Promise<NotificationResult>
+  list(cursor?: string): Promise<NotificationResult>
   setRead(id: string, read: boolean): Promise<InboxNotification>
   getPreferences(): Promise<NotificationPreferences>
   updatePreferences(preferences: NotificationPreferences): Promise<NotificationPreferences>
@@ -61,8 +68,9 @@ export function createBrowserNotificationsClient(portal = false): NotificationsC
   const base = portal ? '/api/v1/portal/notifications' : '/api/v1/notifications'
   const preferencesPath = portal ? '/api/v1/portal/notification-preferences' : '/api/v1/notification-preferences'
   return {
-    async list() {
-      return decode(await fetch(base, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+    async list(cursor) {
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+      return decode(await fetch(`${base}${query}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
     },
     async setRead(id, read) {
       const token = browserCsrfToken()
@@ -91,9 +99,12 @@ export function createBrowserNotificationsClient(portal = false): NotificationsC
 }
 
 export const browserNotificationDeliveryAdminClient: NotificationDeliveryAdminClient = {
-  async listDeliveries(state) {
-    const query = state ? `?state=${encodeURIComponent(state)}` : ''
-    return decode(await fetch(`/api/v1/notification-deliveries${query}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  async listDeliveries(state, cursor) {
+    const query = new URLSearchParams()
+    if (state) query.set('state', state)
+    if (cursor) query.set('cursor', cursor)
+    const suffix = query.size ? `?${query.toString()}` : ''
+    return decode(await fetch(`/api/v1/notification-deliveries${suffix}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   async retryDelivery(id, reason) {
     const token = browserCsrfToken()

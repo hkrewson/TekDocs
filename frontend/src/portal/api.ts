@@ -23,14 +23,22 @@ export type PortalDocument = {
 
 export type PortalDocumentDetail = PortalDocument & { sanitized_html: string }
 
+export type PortalDocumentResult = {
+  results: PortalDocument[]
+  count: number
+  has_more: boolean
+  next_cursor: string | null
+}
+
 async function decode<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(response.status === 403 ? 'Portal access was denied.' : 'Published documentation could not be loaded.')
   return response.json() as Promise<T>
 }
 
 export const portalClient = {
-  async listDocuments(): Promise<{ results: PortalDocument[]; count: number }> {
-    return decode(await fetch('/api/v1/portal/documents', { credentials: 'same-origin' }))
+  async listDocuments(cursor?: string): Promise<PortalDocumentResult> {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+    return decode(await fetch(`/api/v1/portal/documents${query}`, { credentials: 'same-origin' }))
   },
   async getDocument(id: string): Promise<PortalDocumentDetail> {
     return decode(await fetch(`/api/v1/portal/documents/${id}`, { credentials: 'same-origin' }))

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import BuiltInRole, Invitation, TenantMembership, User
@@ -23,11 +25,12 @@ from .models import (
     PublicationControlAction,
 )
 from .outbox import OutboxDeliveryFailure, OutboxTopic
-from .portal_views import _reference_projection_safe
+from .portal_views import _reference_projection_safe, _safe_portal_publications
 from .rls import OrganizationRLSMode, bind_local_rls_scope
 from .scoping import DataScope
 
-INBOX_SCAN_LIMIT = 200
+INBOX_PAGE_SIZE = 50
+INBOX_SCAN_LIMIT = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,13 +277,178 @@ def authorize_notification(
     )
 
 
-def notification_candidates(context: InstallationMemberContext) -> list[InboxNotification]:
-    return list(
+def authorize_notifications(
+    notifications: list[InboxNotification],
+    context: InstallationMemberContext,
+) -> list[NotificationProjection]:
+    """Authorize a bounded history without issuing subject queries for every row."""
+
+    eligible = [
+        notification
+        for notification in notifications
+        if notification.tenant_id == context.tenant.id
+        and notification.recipient_id == context.user.id
+        and notification.surface == context.surface
+    ]
+    projections: dict[UUID, NotificationProjection] = {}
+    by_organization: dict[UUID, list[InboxNotification]] = {}
+    for notification in eligible:
+        by_organization.setdefault(notification.organization_id, []).append(notification)
+
+    for organization_notifications in by_organization.values():
+        organization = organization_notifications[0].organization
+        if context.surface == NotificationSurface.CLIENT_PORTAL and (
+            context.organization is None or context.organization.id != organization.id
+        ):
+            continue
+        bind_local_rls_scope(
+            DataScope.organization(context.tenant, organization),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+        )
+        invitation_notifications = [
+            item
+            for item in organization_notifications
+            if OutboxTopic(item.event.topic) in {OutboxTopic.INVITATION_ISSUED, OutboxTopic.INVITATION_ACCEPTED}
+        ]
+        publication_notifications = [
+            item
+            for item in organization_notifications
+            if OutboxTopic(item.event.topic)
+            not in {OutboxTopic.INVITATION_ISSUED, OutboxTopic.INVITATION_ACCEPTED}
+        ]
+
+        invitation_ids = {item.event.subject_id for item in invitation_notifications}
+        invitations = {
+            invitation.id: invitation
+            for invitation in Invitation.scoped.for_tenant(context.tenant).filter(
+                id__in=invitation_ids,
+                organization=organization,
+            )
+        }
+        can_view_invitations = (
+            bool(invitation_notifications)
+            and context.surface == NotificationSurface.MSP
+            and context_has_permission(
+                context,
+                PermissionKey.INVITATIONS_VIEW,
+                organization=organization,
+            )
+        )
+        for notification in invitation_notifications:
+            invitation = invitations.get(notification.event.subject_id)
+            if invitation is None:
+                continue
+            topic = OutboxTopic(notification.event.topic)
+            if context.surface == NotificationSurface.CLIENT_PORTAL:
+                if topic != OutboxTopic.INVITATION_ACCEPTED or invitation.accepted_by_id != context.user.id:
+                    continue
+                projections[notification.id] = NotificationProjection(
+                    notification,
+                    "Portal access ready",
+                    "Your client portal invitation was accepted.",
+                    NotificationTarget(kind="portal_documents"),
+                )
+            elif can_view_invitations:
+                role = "client administrator" if invitation.role == BuiltInRole.CLIENT_ADMINISTRATOR else "client user"
+                action = "accepted" if topic == OutboxTopic.INVITATION_ACCEPTED else "issued"
+                projections[notification.id] = NotificationProjection(
+                    notification,
+                    f"Client invitation {action}",
+                    f"A {role} invitation for {organization.entity.display_name} was {action}.",
+                    NotificationTarget(kind="organization_overview", organization_id=organization.entity_id),
+                )
+
+        publication_ids = {item.event.subject_id for item in publication_notifications}
+        publication_records = list(
+            DocumentPublication.objects.filter(
+                tenant=context.tenant,
+                organization=organization,
+                id__in=publication_ids,
+            ).select_related("entity", "document", "organization__entity")
+        )
+        publications = {publication.id: publication for publication in publication_records}
+        available_client_ids: set[UUID] = set()
+        if context.surface == NotificationSurface.CLIENT_PORTAL and publication_records:
+            actions_by_publication: dict[UUID, set[str]] = {}
+            for publication_id, action in DocumentPublicationControlEvent.objects.filter(
+                publication_id__in=publication_ids
+            ).values_list("publication_id", "action"):
+                actions_by_publication.setdefault(publication_id, set()).add(action)
+            superseded_ids = set(
+                DocumentPublicationControlEvent.objects.filter(
+                    publication__supersedes_id__in=publication_ids,
+                    action=PublicationControlAction.APPROVED,
+                ).values_list("publication__supersedes_id", flat=True)
+            )
+            safe_ids = {publication.id for publication in _safe_portal_publications(publication_records)}
+            available_client_ids = {
+                publication.id
+                for publication in publication_records
+                if PublicationControlAction.APPROVED in actions_by_publication.get(publication.id, set())
+                and PublicationControlAction.WITHDRAWN not in actions_by_publication.get(publication.id, set())
+                and publication.id not in superseded_ids
+                and publication.id in safe_ids
+            }
+        can_view_documents = (
+            bool(publication_notifications)
+            and context.surface == NotificationSurface.MSP
+            and context_has_permission(
+                context,
+                PermissionKey.DOCUMENTS_VIEW,
+                organization=organization,
+            )
+        )
+        for notification in publication_notifications:
+            publication = publications.get(notification.event.subject_id)
+            if publication is None:
+                continue
+            topic = OutboxTopic(notification.event.topic)
+            if context.surface == NotificationSurface.CLIENT_PORTAL:
+                if topic == OutboxTopic.PUBLICATION_WITHDRAWN:
+                    projections[notification.id] = NotificationProjection(
+                        notification,
+                        "Documentation access changed",
+                        "A previously available publication was withdrawn.",
+                        None,
+                    )
+                elif publication.id in available_client_ids:
+                    projections[notification.id] = NotificationProjection(
+                        notification,
+                        "Documentation published",
+                        f"{publication.title} is now available.",
+                        NotificationTarget(kind="portal_document", publication_id=publication.entity_id),
+                    )
+            elif can_view_documents:
+                action = "withdrawn" if topic == OutboxTopic.PUBLICATION_WITHDRAWN else "published"
+                projections[notification.id] = NotificationProjection(
+                    notification,
+                    f"Documentation {action}",
+                    f"{publication.title} was {action} for {organization.entity.display_name}.",
+                    NotificationTarget(
+                        kind="organization_documentation",
+                        organization_id=organization.entity_id,
+                    ),
+                )
+    return [projections[item.id] for item in eligible if item.id in projections]
+
+
+def notification_candidates(
+    context: InstallationMemberContext,
+    *,
+    before: tuple[datetime, UUID] | None = None,
+) -> list[InboxNotification]:
+    queryset = (
         InboxNotification.scoped.for_tenant(context.tenant)
         .filter(recipient=context.user, surface=context.surface)
         .select_related("event", "organization")
-        .order_by("-created_at", "-id")[:INBOX_SCAN_LIMIT]
+        .order_by("-created_at", "-id")
     )
+    if before is not None:
+        created_at, notification_id = before
+        queryset = queryset.filter(
+            Q(created_at__lt=created_at) | Q(created_at=created_at, id__lt=notification_id)
+        )
+    return list(queryset[: INBOX_SCAN_LIMIT + 1])
 
 
 def set_notification_read(notification: InboxNotification, *, read: bool) -> None:

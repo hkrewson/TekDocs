@@ -21,6 +21,8 @@ export function NotificationInbox({ client, onOpen }: {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<InboxNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'inbox' | 'preferences'>('inbox')
@@ -29,18 +31,26 @@ export function NotificationInbox({ client, onOpen }: {
   const [savingPreferences, setSavingPreferences] = useState(false)
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
 
-  async function load() {
-    setPhase('loading')
+  async function load(cursor?: string) {
+    if (cursor) setLoadingMore(true)
+    else setPhase('loading')
     setError(null)
     try {
-      const result = await client.list()
-      setNotifications(result.results)
-      setUnreadCount(result.unread_count)
+      const result = await client.list(cursor)
+      setNotifications((current) => cursor
+        ? [...current, ...result.results.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : result.results)
+      if (!cursor) setUnreadCount(result.unread_count)
+      setNextCursor(result.next_cursor ?? null)
       setPhase('ready')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Notifications could not be loaded.')
       setPhase('error')
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -72,7 +82,12 @@ export function NotificationInbox({ client, onOpen }: {
   useEffect(() => {
     if (!open) return
     const close = (event: MouseEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false) }
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', escape)
     return () => {
@@ -80,6 +95,10 @@ export function NotificationInbox({ client, onOpen }: {
       document.removeEventListener('keydown', escape)
     }
   }, [open])
+
+  useEffect(() => {
+    if (open) headingRef.current?.focus()
+  }, [open, view])
 
   function toggleOpen() {
     const next = !open
@@ -110,12 +129,12 @@ export function NotificationInbox({ client, onOpen }: {
 
   return (
     <div className="notification-menu" ref={ref}>
-      <button className="notification-trigger" type="button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={open} onClick={toggleOpen}>
+      <button ref={triggerRef} className="notification-trigger" type="button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-controls="notification-popover" aria-expanded={open} onClick={toggleOpen}>
         <Bell size={19} aria-hidden="true" />
         {unreadCount > 0 && <span className="notification-count" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
-      {open && <section className="notification-popover" aria-label="Notifications">
-        <header><h2>{view === 'inbox' ? 'Notifications' : 'Email preferences'}</h2>{view === 'inbox' && phase === 'ready' && <span>{unreadCount} unread</span>}</header>
+      {open && <section id="notification-popover" className="notification-popover" role="dialog" aria-labelledby="notification-popover-heading" aria-busy={phase === 'loading' || loadingMore}>
+        <header><h2 id="notification-popover-heading" ref={headingRef} tabIndex={-1}>{view === 'inbox' ? 'Notifications' : 'Email preferences'}</h2>{view === 'inbox' && phase === 'ready' && <span>{unreadCount} unread</span>}</header>
         {view === 'inbox' && <>
           <div className="notification-toolbar"><button type="button" onClick={() => { void loadPreferences() }}>Email preferences</button></div>
           {phase === 'loading' && <p className="notification-state" role="status">Loading notifications…</p>}
@@ -131,6 +150,7 @@ export function NotificationInbox({ client, onOpen }: {
             {notification.read ? <Mail size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
           </button>
           </li>)}</ul>}
+          {phase === 'ready' && nextCursor && <div className="notification-history-action"><button type="button" disabled={loadingMore} onClick={() => { void load(nextCursor) }}>{loadingMore ? 'Loading…' : 'Load older notifications'}</button></div>}
         </>}
         {view === 'preferences' && <>
           <div className="notification-toolbar"><button type="button" onClick={() => setView('inbox')}>Back to notifications</button></div>

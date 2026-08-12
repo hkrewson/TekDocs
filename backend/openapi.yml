@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.7
+  version: 0.5.9
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2187,6 +2187,15 @@ paths:
   /api/v1/notification-deliveries:
     get:
       operationId: notification_deliveries_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      - in: query
+        name: state
+        schema:
+          type: string
       tags:
       - notification-deliveries
       security:
@@ -2196,9 +2205,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/NotificationDelivery'
+                $ref: '#/components/schemas/NotificationDeliveryResult'
           description: ''
   /api/v1/notification-deliveries/{delivery_id}/retry:
     post:
@@ -2276,6 +2283,11 @@ paths:
   /api/v1/notifications:
     get:
       operationId: msp_notifications_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
       tags:
       - notifications
       security:
@@ -2612,6 +2624,11 @@ paths:
   /api/v1/portal/documents:
     get:
       operationId: client_portal_documents_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
       tags:
       - portal
       security:
@@ -2715,6 +2732,11 @@ paths:
   /api/v1/portal/notifications:
     get:
       operationId: client_portal_notifications_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
       tags:
       - portal
       security:
@@ -14501,8 +14523,12 @@ components:
           minimum: 0
         has_more:
           type: boolean
+        next_cursor:
+          type: string
+          nullable: true
       required:
       - has_more
+      - next_cursor
       - results
       - unread_count
     InstallationLinkWrite:
@@ -15700,6 +15726,22 @@ components:
       - retry_generation
       - state
       - surface
+    NotificationDeliveryResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationDelivery'
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - has_more
+      - next_cursor
+      - results
     NotificationDeliveryRetry:
       type: object
       properties:
@@ -16891,6 +16933,7 @@ components:
           type: string
         lifecycle_state:
           type: string
+          readOnly: true
         retention:
           $ref: '#/components/schemas/RetentionEnum'
         retention_review_on:
@@ -16959,6 +17002,7 @@ components:
           type: string
         lifecycle_state:
           type: string
+          readOnly: true
         retention:
           $ref: '#/components/schemas/RetentionEnum'
         retention_review_on:
@@ -17005,8 +17049,15 @@ components:
             $ref: '#/components/schemas/PortalDocument'
         count:
           type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
       required:
       - count
+      - has_more
+      - next_cursor
       - results
     ProductWrite:
       type: object

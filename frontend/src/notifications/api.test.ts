@@ -8,7 +8,7 @@ describe('notifications API', () => {
   it('uses isolated portal routes and CSRF-protects state changes', async () => {
     document.cookie = 'csrftoken=notification-csrf; path=/'
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [], unread_count: 0, has_more: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [], unread_count: 0, has_more: false, next_cursor: null }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         id: 'notification-1', topic: 'document_publication.available', title: 'Published', message: 'Available', read: true,
         created_at: '2026-08-12T01:00:00Z', target: null,

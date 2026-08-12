@@ -19,7 +19,7 @@ describe('NotificationInbox', () => {
   it('loads on demand, exposes unread state, and marks an activated item read', async () => {
     const setRead = vi.fn().mockResolvedValue({ ...notification, read: true })
     const client = {
-      list: vi.fn().mockResolvedValue({ results: [notification], unread_count: 1, has_more: false }),
+      list: vi.fn().mockResolvedValue({ results: [notification], unread_count: 1, has_more: false, next_cursor: null }),
       setRead,
       getPreferences: vi.fn(),
       updatePreferences: vi.fn(),
@@ -42,7 +42,7 @@ describe('NotificationInbox', () => {
     const client = {
       list: vi.fn()
         .mockRejectedValueOnce(new Error('Notifications could not be loaded.'))
-        .mockResolvedValueOnce({ results: [], unread_count: 0, has_more: false }),
+        .mockResolvedValueOnce({ results: [], unread_count: 0, has_more: false, next_cursor: null }),
       setRead: vi.fn(),
       getPreferences: vi.fn(),
       updatePreferences: vi.fn(),
@@ -60,7 +60,7 @@ describe('NotificationInbox', () => {
     const preferences = { email_enabled: true, invitation_events: true, publication_events: true, delivery_mode: 'immediate' as const, timezone: 'UTC', quiet_start: null, quiet_end: null, daily_digest_hour: 8 }
     const updatePreferences = vi.fn().mockResolvedValue({ ...preferences, publication_events: false })
     const client = {
-      list: vi.fn().mockResolvedValue({ results: [], unread_count: 0, has_more: false }),
+      list: vi.fn().mockResolvedValue({ results: [], unread_count: 0, has_more: false, next_cursor: null }),
       setRead: vi.fn(),
       getPreferences: vi.fn().mockResolvedValue(preferences),
       updatePreferences,
@@ -85,5 +85,23 @@ describe('NotificationInbox', () => {
       daily_digest_hour: 8,
     })
     expect(await screen.findByText('Email preferences saved.')).toBeInTheDocument()
+  })
+
+  it('loads older history through the opaque cursor and returns focus after Escape', async () => {
+    const older = { ...notification, id: 'notification-older', title: 'Older notice', read: true }
+    const list = vi.fn()
+      .mockResolvedValueOnce({ results: [notification], unread_count: 1, has_more: true, next_cursor: 'signed-cursor' })
+      .mockResolvedValueOnce({ results: [older], unread_count: 0, has_more: false, next_cursor: null })
+    const client = { list, setRead: vi.fn(), getPreferences: vi.fn(), updatePreferences: vi.fn() } satisfies NotificationsClient
+    const user = userEvent.setup()
+    render(<NotificationInbox client={client} onOpen={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Notifications' })
+    await user.click(trigger)
+    await user.click(await screen.findByRole('button', { name: 'Load older notifications' }))
+    expect(list).toHaveBeenLastCalledWith('signed-cursor')
+    expect(await screen.findByText('Older notice')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveFocus()
   })
 })

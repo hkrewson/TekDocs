@@ -495,7 +495,7 @@ class PortalDocumentSerializer(serializers.Serializer):
     title = serializers.CharField()
     category = serializers.ChoiceField(choices=DocumentCategory.choices)
     reason = serializers.CharField()
-    lifecycle_state = serializers.CharField()
+    lifecycle_state = serializers.SerializerMethodField()
     retention = serializers.ChoiceField(choices=PublicationRetention.choices)
     retention_review_on = serializers.DateField(allow_null=True)
     published_at = serializers.DateTimeField()
@@ -510,6 +510,11 @@ class PortalDocumentSerializer(serializers.Serializer):
     def get_visibility(self, _obj: DocumentPublication) -> str:
         return "client_visible"
 
+    def get_lifecycle_state(self, obj: DocumentPublication) -> str:
+        if obj.retention_review_on is not None and obj.retention_review_on <= timezone.localdate():
+            return "review_due"
+        return "published"
+
 
 class PortalDocumentDetailSerializer(PortalDocumentSerializer):
     sanitized_html = serializers.CharField(allow_blank=True)
@@ -518,6 +523,8 @@ class PortalDocumentDetailSerializer(PortalDocumentSerializer):
 class PortalDocumentResultSerializer(serializers.Serializer):
     results = PortalDocumentSerializer(many=True)
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    next_cursor = serializers.CharField(allow_null=True)
 
 
 class DocumentPublicationResultSerializer(serializers.Serializer):

@@ -887,8 +887,9 @@ Evidence: `docs/releases/0.5.0.md`.
 | `0.5.5` | In-app notification inbox and permission-filtered event payloads. |
 | `0.5.6` | SMTP delivery, secure templates, immediate preferences, retry/failure handling, and mail-outage recovery. |
 | `0.5.7` | Notification batching, digests, quiet-time behavior, and delivery administration. |
-| `0.5.8` | Document review/expiry reminders and calendar-feed seam. |
+| `0.5.8` | Skipped without release; reminder/calendar work moved to `0.5.10` when `0.5.9` stabilization was started first. |
 | `0.5.9` | Portal/notification stabilization, accessibility, long-history/load behavior, and consolidated upgrade evidence. |
+| `0.5.10` | Document review/expiry reminders and calendar-feed seam. |
 | `0.6.0` | Stabilize and certify controlled client access and notifications. |
 
 ### `0.5.1` acceptance criteria
@@ -971,6 +972,19 @@ Evidence: `docs/releases/0.5.6.md`.
 - [x] Preference, batching, DST/overnight scheduling, outage, retry, API, permission, PostgreSQL-transition, frontend accessibility, migration, OpenAPI, and production-image gates agree.
 
 Evidence: `docs/releases/0.5.7.md`.
+
+### `0.5.9` acceptance criteria
+
+- [x] Portal documents and MSP/client notification inboxes use stable seek pagination instead of fixed terminal windows. Pages are bounded to 50 results, authorization scans are bounded to 100 candidates, and opaque cursors expire after 30 days and are signed to the exact tenant, account, surface, and ordering boundary.
+- [x] Delivery administration uses a separate 100-row seek page whose cursor is additionally bound to the active state filter. Tampered, expired, cross-user, cross-surface, and filter-replayed cursors fail closed without becoming identifier or history oracles.
+- [x] Notification history authorization batches source, distribution, reference-safety, and permission decisions per organization rather than issuing subject queries per row. Every returned item remains re-authorized; revoked, sibling-client, unsafe-reference, and wrong-surface records remain absent.
+- [x] Portal and notification interfaces append older pages without replacing current results, expose busy/error/empty states, avoid duplicate rows, associate the notification trigger with its dialog, move focus into that dialog, and return focus to the trigger on Escape.
+- [x] A PostgreSQL fixture with 125 portal publications and 250 notifications proves stable non-overlapping pages, fixed whole-request query ceilings, private/no-store responses, and p95 below 500 ms on the documented local reference environment.
+- [x] The complete portal/publication/outbox/inbox/SMTP-preference boundary remains covered by the permission/IDOR and forced-RLS matrices. No new domain model, notification topic, secret field, or reminder/calendar behavior is introduced in this stabilization slice.
+- [x] An exact `0.5.7` production-shaped upgrade and an independent PostgreSQL/media backup-and-restore preserve portal membership, signed publication/control state, retained PDF bytes, outbox receipt, inbox read state, SMTP queue identity, and digest/quiet-time preferences.
+- [x] Version, OpenAPI, backend/frontend checks, accessibility tests, Compose runtime, production-image rehearsal, architecture/security/risk documentation, ADR 0056, and release evidence agree at `0.5.9`.
+
+Evidence: `docs/releases/0.5.9.md`.
 
 ## API and integrations: `0.6.x` → `0.7.0`
 

@@ -37,6 +37,30 @@ export type NetworkChoices = {
   hardware_assets: Array<{ id: string; name: string }>
 }
 
+export type NetworkRecord = {
+  id: string
+  name: string
+  location_id: string | null
+  location_name: string | null
+  site_name: string | null
+  description: string
+  vlan: number | null
+  cidr: string
+  gateway: string
+  use_full_range: boolean
+  range_start: string
+  range_end: string
+  primary_dns: string | null
+  secondary_dns: string | null
+  notes: string
+}
+export type NetworkRecordWrite = Pick<NetworkRecord, 'name' | 'description' | 'cidr' | 'use_full_range' | 'primary_dns' | 'secondary_dns' | 'notes'> & {
+  location_id: string | null
+  vlan: number | null
+  range_start: string | null
+  range_end: string | null
+}
+
 export type NetworkVRF = { id: string; name: string; route_distinguisher: string; description: string }
 export type NetworkVLAN = { id: string; name: string; vlan_id: number; description: string }
 export type NetworkSubnet = { id: string; name: string; cidr: string; address_family: 4 | 6; vrf_id: string | null; vrf_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; description: string }
@@ -84,6 +108,9 @@ type ListResult<T> = { results: T[]; page: number; page_size: number; count: num
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export interface NetworksClient {
+  listNetworks(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkRecord>>
+  createNetwork(workspace: WorkspaceContext, values: NetworkRecordWrite): Promise<NetworkRecord>
+  updateNetwork(workspace: WorkspaceContext, id: string, values: NetworkRecordWrite): Promise<NetworkRecord>
   listRacks(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkRack>>
   createRack(workspace: WorkspaceContext, values: RackWrite): Promise<NetworkRack>
   updateRack(workspace: WorkspaceContext, rackId: string, values: RackWrite): Promise<NetworkRack>
@@ -177,6 +204,11 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async listNetworks(workspace, signal) {
+    return json(await fetch(`${basePath(workspace)}?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  createNetwork: (workspace, values) => write(basePath(workspace), 'POST', values),
+  updateNetwork: (workspace, id, values) => write(`${basePath(workspace)}/${encodeURIComponent(id)}`, 'PATCH', values),
   async listRacks(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/racks?page=1&page_size=100`, { credentials: 'same-origin', signal }))
   },

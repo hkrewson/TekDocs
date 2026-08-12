@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.9
+  version: 0.5.10
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -3409,6 +3409,99 @@ paths:
                 items:
                   $ref: '#/components/schemas/HardwareLifecycleEvent'
           description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/mac-addresses:
+    get:
+      operationId: workspaces_msp_assets_mac_addresses_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+    post:
+      operationId: workspaces_msp_assets_mac_addresses_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/mac-addresses/{mac_address_entity_id}:
+    patch:
+      operationId: workspaces_msp_assets_mac_addresses_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
   /api/v1/workspaces/msp/assets/{asset_entity_id}/software:
     patch:
       operationId: workspaces_msp_assets_software_partial_update
@@ -4005,6 +4098,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChoiceResult'
+          description: ''
+  /api/v1/workspaces/msp/networks:
+    get:
+      operationId: workspaces_msp_networks_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecordResult'
+          description: ''
+    post:
+      operationId: workspaces_msp_networks_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
+          description: ''
+  /api/v1/workspaces/msp/networks/{network_entity_id}:
+    patch:
+      operationId: workspaces_msp_networks_partial_update
+      parameters:
+      - in: path
+        name: network_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
           description: ''
   /api/v1/workspaces/msp/networks/choices:
     get:
@@ -6022,6 +6201,117 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/HardwareLifecycleEvent'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/mac-addresses:
+    get:
+      operationId: workspaces_organizations_assets_mac_addresses_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+    post:
+      operationId: workspaces_organizations_assets_mac_addresses_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetMACAddressWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/mac-addresses/{mac_address_entity_id}:
+    patch:
+      operationId: workspaces_organizations_assets_mac_addresses_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: mac_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetMACAddressWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetMACAddress'
           description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/software:
     patch:
@@ -8865,6 +9155,111 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChoiceResult'
           description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks:
+    get:
+      operationId: workspaces_organizations_networks_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecordResult'
+          description: ''
+    post:
+      operationId: workspaces_organizations_networks_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetworkRecordWrite'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
+          description: ''
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/{network_entity_id}:
+    patch:
+      operationId: workspaces_organizations_networks_partial_update
+      parameters:
+      - in: path
+        name: network_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNetworkRecordWrite'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
+          description: ''
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/choices:
     get:
       operationId: workspaces_organizations_networks_choices_retrieve
@@ -11631,6 +12026,32 @@ components:
       - source_document_id
       - title
       - verification
+    AssetMACAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        description:
+          type: string
+      required:
+      - address
+      - description
+      - id
+    AssetMACAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 17
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - address
     AssetPublicationArtifact:
       type: object
       properties:
@@ -12457,6 +12878,12 @@ components:
           allOf:
           - $ref: '#/components/schemas/HardwareProfile'
           nullable: true
+        mac_addresses:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         software_installation:
           allOf:
           - $ref: '#/components/schemas/SoftwareInstallationSummary'
@@ -12470,6 +12897,7 @@ components:
       - hardware
       - id
       - kind
+      - mac_addresses
       - model_id
       - model_name
       - model_number
@@ -15635,6 +16063,135 @@ components:
         * `planned` - planned
         * `active` - active
         * `retired` - retired
+    NetworkRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location_name:
+          type: string
+          nullable: true
+        site_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+        vlan:
+          type: integer
+          nullable: true
+        cidr:
+          type: string
+        gateway:
+          type: string
+        use_full_range:
+          type: boolean
+        range_start:
+          type: string
+        range_end:
+          type: string
+        primary_dns:
+          type: string
+          nullable: true
+        secondary_dns:
+          type: string
+          nullable: true
+        notes:
+          type: string
+      required:
+      - cidr
+      - description
+      - gateway
+      - id
+      - location_id
+      - location_name
+      - name
+      - notes
+      - primary_dns
+      - range_end
+      - range_start
+      - secondary_dns
+      - site_name
+      - use_full_range
+      - vlan
+    NetworkRecordResult:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkRecord'
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    NetworkRecordWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+        vlan:
+          type: integer
+          maximum: 4094
+          minimum: 1
+          nullable: true
+        cidr:
+          type: string
+          maxLength: 49
+        use_full_range:
+          type: boolean
+          default: true
+        range_start:
+          type: string
+          nullable: true
+          maxLength: 45
+        range_end:
+          type: string
+          nullable: true
+          maxLength: 45
+        primary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        secondary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        notes:
+          type: string
+          default: ''
+          maxLength: 8000
+      required:
+      - cidr
+      - name
     NetworkSearchItem:
       type: object
       properties:
@@ -16003,6 +16560,16 @@ components:
           items:
             type: string
             format: uuid
+    PatchedAssetMACAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 17
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
     PatchedCircuitWrite:
       type: object
       properties:
@@ -16466,6 +17033,51 @@ components:
           allOf:
           - $ref: '#/components/schemas/NetworkRackWriteStatusEnum'
           default: active
+    PatchedNetworkRecordWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+        vlan:
+          type: integer
+          maximum: 4094
+          minimum: 1
+          nullable: true
+        cidr:
+          type: string
+          maxLength: 49
+        use_full_range:
+          type: boolean
+          default: true
+        range_start:
+          type: string
+          nullable: true
+          maxLength: 45
+        range_end:
+          type: string
+          nullable: true
+          maxLength: 45
+        primary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        secondary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        notes:
+          type: string
+          default: ''
+          maxLength: 8000
     PatchedNotificationPreference:
       type: object
       properties:

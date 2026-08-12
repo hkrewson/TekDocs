@@ -15,6 +15,8 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import Entity, EntityVisibility, InstallationState, NetworkSubnet, Tenant, workspace_for_owner
 from apps.core.network_addressing import NetworkAddressingError, canonical_network, create_subnet, networks_overlap
 from apps.core.organizations import create_organization
+from apps.core.scoping import DataScope
+from apps.core.sites import create_location, create_site
 
 
 @pytest.fixture
@@ -160,6 +162,90 @@ def test_default_namespace_overlap_and_canonical_validation(owner_client, instal
     assert noncanonical.status_code == 400
     assert "10.20.1.0/24" in noncanonical.content.decode()
     assert NetworkSubnet.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_simple_network_record_calculates_gateway_range_and_isolates_workspace(owner_client, installation):
+    organization = _organization(installation, "Simple Network")
+    sibling = _organization(installation, "Other Network")
+    site = create_site(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Main office",
+        code="MAIN",
+        address_line_1="",
+        address_line_2="",
+        city="",
+        region="",
+        postal_code="",
+        country_code="US",
+        timezone="America/Chicago",
+        phone="",
+    )
+    location = create_location(
+        scope=DataScope.owner(installation.tenant, organization),
+        site=site,
+        actor_id=installation.owner.id,
+        name="Server room",
+        kind="room",
+        code="SR",
+        parent_id=None,
+    )
+    response = _post(
+        owner_client,
+        "organization-networks",
+        organization,
+        {
+            "name": "Office LAN",
+            "location_id": str(location.entity_id),
+            "description": "Primary office network",
+            "vlan": 20,
+            "cidr": "192.0.2.0/24",
+            "use_full_range": True,
+            "primary_dns": "9.9.9.9",
+            "secondary_dns": "1.1.1.1",
+            "notes": "Managed by the firewall.",
+        },
+    )
+    assert response.status_code == 201, response.content
+    assert response.json()["gateway"] == "192.0.2.1"
+    assert response.json()["range_start"] == "192.0.2.1"
+    assert response.json()["range_end"] == "192.0.2.254"
+    assert response.json()["location_name"] == "Server room"
+    assert response.json()["site_name"] == "Main office"
+    assert response.json()["vlan"] == 20
+
+    sibling_list = owner_client.get(
+        reverse("organization-networks", kwargs={"organization_entity_id": sibling.entity_id})
+    )
+    assert sibling_list.status_code == 200
+    assert sibling_list.json()["count"] == 0
+
+
+@pytest.mark.django_db
+def test_simple_network_rejects_manual_range_outside_cidr(owner_client, installation):
+    organization = _organization(installation, "Range Guard")
+    response = _post(
+        owner_client,
+        "organization-networks",
+        organization,
+        {
+            "name": "Invalid range",
+            "location_id": None,
+            "description": "",
+            "vlan": None,
+            "cidr": "10.20.30.0/24",
+            "use_full_range": False,
+            "range_start": "10.20.31.10",
+            "range_end": "10.20.31.20",
+            "primary_dns": "",
+            "secondary_dns": "",
+            "notes": "",
+        },
+    )
+    assert response.status_code == 400
+    assert "inside the network CIDR" in response.content.decode()
 
 
 @given(st.ip_addresses(v=4), st.integers(min_value=0, max_value=32))

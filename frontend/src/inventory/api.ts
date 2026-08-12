@@ -31,9 +31,11 @@ export type ClientAsset = {
   provenance_checksum: string
   documents: AssetDocument[]
   hardware: HardwareProfile | null
+  mac_addresses: AssetMACAddress[]
   software_installation: SoftwareInstallation | null
   created_at: string
 }
+export type AssetMACAddress = { id: string; address: string; description: string }
 export type HardwareProfile = {
   serial_number: string
   asset_tag: string
@@ -97,6 +99,8 @@ export interface InventoryClient {
   assignHardware(workspace: WorkspaceContext, assetId: string, values: { person_id?: string | null; site_id?: string | null; location_id?: string | null }): Promise<HardwareProfile>
   unassignHardware(workspace: WorkspaceContext, assetId: string): Promise<HardwareProfile>
   disposeHardware(workspace: WorkspaceContext, assetId: string, values: { disposed_on: string; method: string; reason: string }): Promise<HardwareProfile>
+  createAssetMACAddress(workspace: WorkspaceContext, assetId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
+  updateAssetMACAddress(workspace: WorkspaceContext, assetId: string, macId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
   updateSoftwareInstallation(workspace: WorkspaceContext, assetId: string, values: Partial<SoftwareInstallation>): Promise<SoftwareInstallation>
   listLicenses(workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<{ results: SoftwareLicense[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }>
   createLicense(workspace: WorkspaceContext, values: object): Promise<SoftwareLicense>
@@ -175,6 +179,8 @@ export const browserInventoryClient: InventoryClient = {
   assignHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'POST', values),
   unassignHardware: (workspace, assetId) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/assignment`, 'DELETE'),
   disposeHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/dispose`, 'POST', values),
+  createAssetMACAddress: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses`, 'POST', values),
+  updateAssetMACAddress: (workspace, assetId, macId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses/${encodeURIComponent(macId)}`, 'PATCH', values),
   updateSoftwareInstallation: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/software`, 'PATCH', values),
   listLicenses: (workspace, page, signal) => get(`${basePath(workspace)}/licenses?page=${page}&page_size=50`, signal),
   createLicense: (workspace, values) => mutate(`${basePath(workspace)}/licenses`, 'POST', values),

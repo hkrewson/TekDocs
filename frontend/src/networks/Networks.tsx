@@ -1,101 +1,178 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
-import { Cable, Download, Pencil, Plus, Search } from 'lucide-react'
+import { MapPin, Pencil, Plus } from 'lucide-react'
+
 import type { RelationshipsClient } from '../relationships/api'
 import type { WorkspaceContext } from '../workspaces/api'
-import { NetworkRelationships } from './NetworkRelationships'
-import { NetworkAddressing } from './NetworkAddressing'
-import { NetworkEndpoints } from './NetworkEndpoints'
-import { NetworkServices } from './NetworkServices'
-import { NetworkCircuits } from './NetworkCircuits'
-import { NetworkNetBox } from './NetworkNetBox'
-import { NetworkSearch } from './NetworkSearch'
 import { browserNetworksClient } from './api'
-import type { DeviceListResult, DeviceWrite, NetworkChoices, NetworkDevice, NetworkRack, NetworkSearchItem, NetworksClient, RackWrite } from './api'
+import type { NetworkChoices, NetworkRecord, NetworkRecordWrite, NetworksClient } from './api'
 
-const blankRack: RackWrite = { name: '', site_id: '', location_id: null, unit_count: 42, status: 'active' }
-const blankDevice: DeviceWrite = { name: '', role: 'switch', status: 'active', hardware_asset_id: '', site_id: null, location_id: null, rack_id: null, rack_unit: null, rack_units: 1 }
-const roleLabel = (value: NetworkDevice['role']) => value.split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ')
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'The network request failed.'
+type Props = {
+  workspace: WorkspaceContext
+  client?: NetworksClient
+  relationshipsClient: RelationshipsClient
+}
 
-export function Networks({ workspace, client = browserNetworksClient, relationshipsClient }: { workspace: WorkspaceContext; client?: NetworksClient; relationshipsClient: RelationshipsClient }) {
-  const [racks, setRacks] = useState<NetworkRack[] | null>(null)
-  const [deviceResult, setDeviceResult] = useState<DeviceListResult | null>(null)
+const emptyForm: NetworkRecordWrite = {
+  name: '',
+  location_id: null,
+  description: '',
+  vlan: null,
+  cidr: '',
+  use_full_range: true,
+  range_start: null,
+  range_end: null,
+  primary_dns: null,
+  secondary_dns: null,
+  notes: '',
+}
+
+export function Networks({ workspace, client = browserNetworksClient, relationshipsClient }: Props) {
+  void relationshipsClient
+  const [records, setRecords] = useState<NetworkRecord[] | null>(null)
   const [choices, setChoices] = useState<NetworkChoices | null>(null)
-  const [view, setView] = useState<'all' | 'devices' | 'racks' | 'ip-addresses' | 'mac-addresses' | 'subnets' | 'vlans' | 'circuits' | 'wireless' | 'dns' | 'netbox'>('devices')
+  const [canManage, setCanManage] = useState(false)
   const [query, setQuery] = useState('')
-  const [rackForm, setRackForm] = useState<RackWrite | null>(null)
-  const [rackEditing, setRackEditing] = useState<string | null>(null)
-  const [deviceForm, setDeviceForm] = useState<DeviceWrite | null>(null)
-  const [deviceEditing, setDeviceEditing] = useState<string | null>(null)
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
+  const [form, setForm] = useState<NetworkRecordWrite | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) { setRacks(null); setDeviceResult(null); setChoices(null); setError(null) }
-    })
-    Promise.all([client.listRacks(workspace, controller.signal), client.listDevices(workspace, controller.signal), client.choices(workspace, controller.signal)])
-      .then(([rackResult, devices, loadedChoices]) => { setRacks(rackResult.results); setDeviceResult(devices); setChoices(loadedChoices) })
-      .catch((caught: unknown) => { if (!controller.signal.aborted) setError(errorMessage(caught)) })
+    Promise.all([client.listNetworks(workspace, controller.signal), client.choices(workspace, controller.signal)])
+      .then(([result, nextChoices]) => {
+        setRecords(result.results)
+        setCanManage(result.can_manage)
+        setChoices(nextChoices)
+        setError('')
+      })
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Networks could not be loaded.')
+      })
     return () => controller.abort()
   }, [client, workspace])
 
-  const filteredRacks = useMemo(() => (racks ?? []).filter((item) => `${item.name} ${item.site_name} ${item.location_name ?? ''}`.toLowerCase().includes(query.toLowerCase())), [query, racks])
-  const filteredDevices = useMemo(() => (deviceResult?.results ?? []).filter((item) => `${item.name} ${item.role} ${item.site_name ?? ''} ${item.rack_name ?? ''}`.toLowerCase().includes(query.toLowerCase())), [deviceResult, query])
-  const selected = deviceResult?.results.find((item) => item.id === selectedDevice) ?? null
-  const locationsForSite = (siteId: string | null) => choices?.locations.filter((item) => item.site_id === siteId) ?? []
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return records ?? []
+    return (records ?? []).filter((record) => [
+      record.name,
+      record.description,
+      record.location_name,
+      record.site_name,
+      record.cidr,
+      record.vlan?.toString(),
+      record.primary_dns,
+      record.secondary_dns,
+    ].some((value) => value?.toLowerCase().includes(normalized)))
+  }, [query, records])
 
-  async function saveRack(event: FormEvent) {
-    event.preventDefault(); if (!rackForm) return
-    setBusy(true); setError(null)
-    try {
-      const saved = rackEditing ? await client.updateRack(workspace, rackEditing, rackForm) : await client.createRack(workspace, rackForm)
-      setRacks((items) => rackEditing ? (items ?? []).map((item) => item.id === saved.id ? saved : item) : [...(items ?? []), saved])
-      setChoices((items) => items ? { ...items, racks: [...items.racks.filter((item) => item.id !== saved.id), { id: saved.id, name: saved.name, site_id: saved.site_id }] } : items)
-      setRackForm(null); setRackEditing(null)
-    } catch (caught) { setError(errorMessage(caught)) } finally { setBusy(false) }
+  function beginEdit(record: NetworkRecord) {
+    setEditingId(record.id)
+    setError('')
+    setForm({
+      name: record.name,
+      location_id: record.location_id,
+      description: record.description,
+      vlan: record.vlan,
+      cidr: record.cidr,
+      use_full_range: record.use_full_range,
+      range_start: record.use_full_range ? null : record.range_start,
+      range_end: record.use_full_range ? null : record.range_end,
+      primary_dns: record.primary_dns,
+      secondary_dns: record.secondary_dns,
+      notes: record.notes,
+    })
   }
 
-  async function saveDevice(event: FormEvent) {
-    event.preventDefault(); if (!deviceForm) return
-    setBusy(true); setError(null)
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    if (!form) return
+    setBusy(true)
+    setError('')
     try {
-      const saved = deviceEditing ? await client.updateDevice(workspace, deviceEditing, deviceForm) : await client.createDevice(workspace, deviceForm)
-      setDeviceResult((items) => items ? { ...items, results: deviceEditing ? items.results.map((item) => item.id === saved.id ? saved : item) : [...items.results, saved], count: deviceEditing ? items.count : items.count + 1 } : items)
-      setDeviceForm(null); setDeviceEditing(null); setSelectedDevice(saved.id)
-      const rackResult = await client.listRacks(workspace); setRacks(rackResult.results)
-    } catch (caught) { setError(errorMessage(caught)) } finally { setBusy(false) }
-  }
-
-  function editRack(item: NetworkRack) { setRackEditing(item.id); setRackForm({ name: item.name, site_id: item.site_id, location_id: item.location_id, unit_count: item.unit_count, status: item.status }) }
-  function editDevice(item: NetworkDevice) { setDeviceEditing(item.id); setDeviceForm({ name: item.name, role: item.role, status: item.status, hardware_asset_id: item.hardware_asset_id ?? '', site_id: item.site_id, location_id: item.location_id, rack_id: item.rack_id, rack_unit: item.rack_unit, rack_units: item.rack_units }) }
-  function openSearchResult(item: NetworkSearchItem) {
-    setView(item.section)
-    setQuery(item.name)
-    if (item.record_type === 'network_device') setSelectedDevice(item.id)
+      const values = form.use_full_range ? { ...form, range_start: null, range_end: null } : form
+      const saved = editingId
+        ? await client.updateNetwork(workspace, editingId, values)
+        : await client.createNetwork(workspace, values)
+      setRecords((current) => editingId
+        ? (current ?? []).map((record) => record.id === saved.id ? saved : record)
+        : [...(current ?? []), saved])
+      setForm(null)
+      setEditingId(null)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The network could not be saved.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return <>
-    <header className="page-header"><div><h1>Networks</h1><p>Physical inventory, routing, and endpoint assignments for {workspace.name}.</p></div></header>
-    <section className="content-section network-inventory">
-      <div className="network-toolbar"><div className="segmented-control" aria-label="Network record type">{(['all', 'devices', 'racks', 'ip-addresses', 'mac-addresses', 'subnets', 'vlans', 'circuits', 'wireless', 'dns', 'netbox'] as const).map((item) => <button key={item} type="button" aria-pressed={view === item} onClick={() => setView(item)}>{item === 'all' ? 'All records' : item === 'dns' ? 'DNS' : item === 'netbox' ? 'NetBox' : item === 'ip-addresses' ? 'IP addresses' : item === 'mac-addresses' ? 'MAC addresses' : item[0].toUpperCase() + item.slice(1)}</button>)}</div><label className="network-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search network inventory</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search this workspace" /></label><a className="secondary-button" href={client.networkExportUrl(workspace)}><Download size={15} aria-hidden="true" />Export CSV</a>{deviceResult?.can_manage && (view === 'devices' || view === 'racks') && <button className="primary-button" type="button" onClick={() => view === 'racks' ? (setRackEditing(null), setRackForm({ ...blankRack })) : (setDeviceEditing(null), setDeviceForm({ ...blankDevice }))}><Plus size={15} />Add {view === 'racks' ? 'rack' : 'asset-backed device'}</button>}</div>
-      {error && <div className="form-error" role="alert">{error}</div>}
+    <header className="page-header">
+      <div>
+        <h1>Networks</h1>
+        <p>Address ranges and essential network settings for {workspace.name}.</p>
+      </div>
+      {canManage && <button className="primary-button" type="button" onClick={() => { setEditingId(null); setForm({ ...emptyForm }); setError('') }}>
+        <Plus size={16} aria-hidden="true" />New network
+      </button>}
+    </header>
 
-      {rackForm && choices && <form className="network-form" onSubmit={(event) => void saveRack(event)}><h2>{rackEditing ? 'Edit rack' : 'Add rack'}</h2><div className="field-grid"><label><span>Name</span><input required value={rackForm.name} onChange={(event) => setRackForm({ ...rackForm, name: event.target.value })} /></label><label><span>Site</span><select required value={rackForm.site_id} onChange={(event) => setRackForm({ ...rackForm, site_id: event.target.value, location_id: null })}><option value="">Choose a site…</option>{choices.sites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>Location</span><select value={rackForm.location_id ?? ''} onChange={(event) => setRackForm({ ...rackForm, location_id: event.target.value || null })}><option value="">No structured location</option>{locationsForSite(rackForm.site_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>Rack units</span><input type="number" min="1" max="100" value={rackForm.unit_count} onChange={(event) => setRackForm({ ...rackForm, unit_count: Number(event.target.value) })} /></label><label><span>Status</span><select value={rackForm.status} onChange={(event) => setRackForm({ ...rackForm, status: event.target.value as RackWrite['status'] })}><option value="planned">Planned</option><option value="active">Active</option><option value="retired">Retired</option></select></label></div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save rack'}</button><button className="secondary-button" type="button" onClick={() => setRackForm(null)}>Cancel</button></div></form>}
+    <section className="content-section network-records" aria-labelledby="network-list-heading">
+      <div className="network-record-toolbar">
+        <div>
+          <h2 id="network-list-heading">Network records</h2>
+          <p>One record describes the location, VLAN, address space, gateway, range, and DNS.</p>
+        </div>
+        <label className="network-search">
+          <span className="sr-only">Search networks</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search networks" />
+        </label>
+      </div>
 
-      {deviceForm && choices && <form className="network-form" onSubmit={(event) => void saveDevice(event)}><h2>{deviceEditing ? 'Edit device' : 'Add asset-backed device'}</h2><div className="field-grid"><label><span>Name</span><input required value={deviceForm.name} onChange={(event) => setDeviceForm({ ...deviceForm, name: event.target.value })} /></label><label><span>Hardware asset</span><select required value={deviceForm.hardware_asset_id} onChange={(event) => setDeviceForm({ ...deviceForm, hardware_asset_id: event.target.value })}><option value="">Choose a hardware asset…</option>{choices.hardware_assets.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>Role</span><select value={deviceForm.role} onChange={(event) => setDeviceForm({ ...deviceForm, role: event.target.value as DeviceWrite['role'] })}>{(['router', 'switch', 'firewall', 'wireless_controller', 'access_point', 'load_balancer', 'other'] as const).map((value) => <option key={value} value={value}>{roleLabel(value)}</option>)}</select></label><label><span>Status</span><select value={deviceForm.status} onChange={(event) => setDeviceForm({ ...deviceForm, status: event.target.value as DeviceWrite['status'] })}><option value="planned">Planned</option><option value="active">Active</option><option value="offline">Offline</option><option value="retired">Retired</option></select></label><label><span>Rack</span><select value={deviceForm.rack_id ?? ''} onChange={(event) => { const rack = racks?.find((item) => item.id === event.target.value); setDeviceForm({ ...deviceForm, rack_id: event.target.value || null, site_id: rack?.site_id ?? deviceForm.site_id, location_id: rack?.location_id ?? deviceForm.location_id, rack_unit: event.target.value ? (deviceForm.rack_unit ?? 1) : null, rack_units: event.target.value ? deviceForm.rack_units : 1 }) }}><option value="">No rack placement</option>{choices.racks.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{deviceForm.rack_id ? <><label><span>Starting unit</span><input type="number" min="1" max="100" required value={deviceForm.rack_unit ?? 1} onChange={(event) => setDeviceForm({ ...deviceForm, rack_unit: Number(event.target.value) })} /></label><label><span>Height (U)</span><input type="number" min="1" max="100" required value={deviceForm.rack_units} onChange={(event) => setDeviceForm({ ...deviceForm, rack_units: Number(event.target.value) })} /></label></> : <><label><span>Site</span><select value={deviceForm.site_id ?? ''} onChange={(event) => setDeviceForm({ ...deviceForm, site_id: event.target.value || null, location_id: null })}><option value="">Unplaced</option>{choices.sites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>Location</span><select value={deviceForm.location_id ?? ''} disabled={!deviceForm.site_id} onChange={(event) => setDeviceForm({ ...deviceForm, location_id: event.target.value || null })}><option value="">No structured location</option>{locationsForSite(deviceForm.site_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></>}</div><div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save device'}</button><button className="secondary-button" type="button" onClick={() => setDeviceForm(null)}>Cancel</button></div></form>}
-
-      {view === 'all' && <NetworkSearch key={`${workspace.kind}:${workspace.id}:${query}`} workspace={workspace} client={client} query={query} onOpen={openSearchResult} />}
-      {(view === 'subnets' || view === 'vlans') && <NetworkAddressing workspace={workspace} client={client} kind={view} query={query} />}
-      {(view === 'ip-addresses' || view === 'mac-addresses') && <NetworkEndpoints workspace={workspace} client={client} kind={view} query={query} hardwareAssets={choices?.hardware_assets ?? []} />}
-      {(view === 'wireless' || view === 'dns') && <NetworkServices workspace={workspace} client={client} kind={view} query={query} />}
-      {view === 'circuits' && <NetworkCircuits workspace={workspace} client={client} query={query} />}
-      {view === 'netbox' && <NetworkNetBox workspace={workspace} client={client} query={query} />}
-      {view === 'all' || view === 'subnets' || view === 'vlans' || view === 'ip-addresses' || view === 'mac-addresses' || view === 'circuits' || view === 'wireless' || view === 'dns' || view === 'netbox' ? null : racks === null || deviceResult === null ? <p role="status">Loading network inventory…</p> : view === 'racks' ? <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Name</th><th>Site / location</th><th>Capacity</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{filteredRacks.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.site_name}{item.location_name ? ` · ${item.location_name}` : ''}</td><td>{item.unit_count}U · {item.device_count} devices</td><td>{item.status}</td><td>{deviceResult.can_manage && <button className="row-action" type="button" onClick={() => editRack(item)}><Pencil size={14} />Edit</button>}</td></tr>)}</tbody></table>{filteredRacks.length === 0 && <p className="empty-state">No racks match this workspace and search.</p>}</div> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Name</th><th>Role</th><th>Physical placement</th><th>Asset</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{filteredDevices.map((item) => <tr key={item.id} className={selectedDevice === item.id ? 'selected' : undefined}><td><button className="network-record-link" type="button" onClick={() => setSelectedDevice(item.id)}>{item.name}</button></td><td>{roleLabel(item.role)}</td><td>{item.rack_name ? `${item.rack_name} · U${item.rack_unit}${item.rack_units > 1 ? `–${(item.rack_unit ?? 0) + item.rack_units - 1}` : ''}` : item.location_name ?? item.site_name ?? 'Unplaced'}</td><td>{item.hardware_asset_name ?? 'Legacy unbacked record'}</td><td>{item.status}</td><td>{deviceResult.can_manage && <button className="row-action" type="button" onClick={() => editDevice(item)}><Pencil size={14} />Edit</button>}</td></tr>)}</tbody></table>{filteredDevices.length === 0 && <p className="empty-state">No network devices match this workspace and search.</p>}</div>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {records === null && !error && <p role="status">Loading networks…</p>}
+      {records !== null && filtered.length === 0 && <p className="empty-state">{query ? 'No networks match this search.' : 'No networks have been added to this workspace.'}</p>}
+      {records !== null && filtered.length > 0 && <div className="network-table-wrap">
+        <table className="network-table">
+          <thead><tr><th>Name</th><th>Location</th><th>VLAN</th><th>CIDR</th><th>Assignable range</th><th>Gateway</th><th>DNS</th><th><span className="sr-only">Actions</span></th></tr></thead>
+          <tbody>{filtered.map((record) => <tr key={record.id}>
+            <td><strong>{record.name}</strong>{record.description && <small>{record.description}</small>}</td>
+            <td>{record.location_name ? <span className="network-location"><MapPin size={14} aria-hidden="true" />{record.site_name ? `${record.site_name} · ` : ''}{record.location_name}</span> : 'Not assigned'}</td>
+            <td>{record.vlan ?? '—'}</td>
+            <td><code>{record.cidr}</code></td>
+            <td><code>{record.range_start}–{record.range_end}</code></td>
+            <td><code>{record.gateway}</code></td>
+            <td>{[record.primary_dns, record.secondary_dns].filter(Boolean).join(', ') || '—'}</td>
+            <td>{canManage && <button className="row-action" type="button" onClick={() => beginEdit(record)}><Pencil size={14} aria-hidden="true" />Edit</button>}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
     </section>
-    {selected && deviceResult?.can_view_relationships && <section className="content-section network-device-detail"><div className="section-heading"><div><h2><Cable size={18} aria-hidden="true" />{selected.name}</h2><p>{roleLabel(selected.role)} · {selected.rack_name ?? selected.location_name ?? selected.site_name ?? 'Unplaced'}</p></div></div><NetworkRelationships key={selected.id} workspace={workspace} deviceId={selected.id} deviceName={selected.name} canCreate={deviceResult.can_create_relationships} canArchive={deviceResult.can_archive_relationships} client={relationshipsClient} /></section>}
+
+    {form && <section className="content-section network-editor" aria-labelledby="network-editor-heading">
+      <div className="section-heading"><div><h2 id="network-editor-heading">{editingId ? 'Edit network' : 'New network'}</h2><p>The gateway and usable full range are calculated from the CIDR.</p></div></div>
+      <form className="network-form" onSubmit={(event) => void save(event)}>
+        <div className="field-grid">
+          <label><span>Name</span><input required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Office LAN" /></label>
+          <label><span>Location</span><select value={form.location_id ?? ''} onChange={(event) => setForm({ ...form, location_id: event.target.value || null })}><option value="">Not assigned</option>{choices?.locations.map((location) => {
+            const site = choices.sites.find((item) => item.id === location.site_id)
+            return <option key={location.id} value={location.id}>{site ? `${site.name} · ` : ''}{location.name}</option>
+          })}</select></label>
+          <label><span>VLAN</span><input type="number" min="1" max="4094" value={form.vlan ?? ''} onChange={(event) => setForm({ ...form, vlan: event.target.value ? Number(event.target.value) : null })} placeholder="20" /></label>
+          <label><span>Network (CIDR)</span><input required value={form.cidr} onChange={(event) => setForm({ ...form, cidr: event.target.value })} placeholder="192.168.1.0/24" /><small>Gateway is calculated as the first usable address.</small></label>
+          <label><span>Primary DNS</span><input value={form.primary_dns ?? ''} onChange={(event) => setForm({ ...form, primary_dns: event.target.value || null })} placeholder="9.9.9.9" /></label>
+          <label><span>Secondary DNS</span><input value={form.secondary_dns ?? ''} onChange={(event) => setForm({ ...form, secondary_dns: event.target.value || null })} placeholder="1.1.1.1" /></label>
+        </div>
+        <label className="network-range-toggle"><input type="checkbox" checked={form.use_full_range} onChange={(event) => setForm({ ...form, use_full_range: event.target.checked })} /><span>Use the full usable address range</span></label>
+        {!form.use_full_range && <div className="field-grid network-range-fields">
+          <label><span>Assignable range start</span><input required value={form.range_start ?? ''} onChange={(event) => setForm({ ...form, range_start: event.target.value || null })} placeholder="192.168.1.100" /></label>
+          <label><span>Assignable range end</span><input required value={form.range_end ?? ''} onChange={(event) => setForm({ ...form, range_end: event.target.value || null })} placeholder="192.168.1.200" /></label>
+        </div>}
+        <label><span>Description</span><input maxLength={4000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Guest Wi-Fi, voice, office LAN…" /></label>
+        <label><span>Notes</span><textarea rows={5} maxLength={8000} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+        <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save network'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError('') }}>Cancel</button></div>
+      </form>
+    </section>}
   </>
 }

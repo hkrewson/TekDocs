@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
@@ -46,8 +48,10 @@ from .models import (
     HardwareAcquisitionMethod,
     HardwareDisposalMethod,
     HardwareLifecycleState,
+    NetworkMACAddress,
     Organization,
 )
+from .network_endpoints import NetworkEndpointError, create_mac_address, update_mac_address
 from .publications import PublicationConflict, read_publication_artifact, verify_publication
 from .software_inventory import SoftwareInventoryError
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
@@ -315,8 +319,27 @@ class ClientAssetSerializer(serializers.Serializer):
     provenance_checksum = serializers.CharField()
     documents = AssetDocumentSummarySerializer(source="document_provenance", many=True)
     hardware = HardwareProfileSerializer(allow_null=True)
+    mac_addresses = serializers.SerializerMethodField()
     software_installation = SoftwareInstallationSummarySerializer(allow_null=True)
     created_at = serializers.DateTimeField()
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_mac_addresses(self, asset: ClientAsset) -> list[dict[str, object]]:
+        return [
+            {"id": item.entity_id, "address": item.address, "description": item.description}
+            for item in asset.network_mac_addresses.all()
+        ]
+
+
+class AssetMACAddressWriteSerializer(StrictSerializer):
+    address = serializers.CharField(max_length=17, trim_whitespace=True)
+    description = serializers.CharField(max_length=4000, allow_blank=True, required=False, default="")
+
+
+class AssetMACAddressSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    address = serializers.CharField()
+    description = serializers.CharField()
 
 
 class ClientAssetResultSerializer(serializers.Serializer):
@@ -496,6 +519,59 @@ class ClientAssetDetailView(APIView):
     def get(self, request, organization_entity_id, asset_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         return Response(ClientAssetSerializer(_asset(workspace, asset_entity_id)).data)
+
+
+class ClientAssetMACAddressListCreateView(APIView):
+    @extend_schema(responses={200: AssetMACAddressSerializer(many=True)})
+    def get(self, request, organization_entity_id=None, asset_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        asset = _asset(workspace, asset_entity_id)
+        if asset.product.kind != "hardware":
+            raise serializers.ValidationError({"detail": "MAC addresses are available only for physical assets."})
+        return Response(AssetMACAddressSerializer(asset.network_mac_addresses.all(), many=True).data)
+
+    @extend_schema(request=AssetMACAddressWriteSerializer, responses={201: AssetMACAddressSerializer})
+    def post(self, request, organization_entity_id=None, asset_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        asset = _asset(workspace, asset_entity_id)
+        if asset.product.kind != "hardware":
+            raise serializers.ValidationError({"detail": "MAC addresses are available only for physical assets."})
+        serializer = AssetMACAddressWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = create_mac_address(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=request.user.pk,
+                interface_entity_id=None,
+                hardware_asset_entity_id=asset.entity_id,
+                **serializer.validated_data,
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(AssetMACAddressSerializer(record).data, status=201)
+
+
+class ClientAssetMACAddressDetailView(APIView):
+    @extend_schema(request=AssetMACAddressWriteSerializer, responses={200: AssetMACAddressSerializer})
+    def patch(self, request, organization_entity_id=None, asset_entity_id=None, mac_address_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        asset = _asset(workspace, asset_entity_id)
+        try:
+            record = asset.network_mac_addresses.select_related("entity").get(entity_id=mac_address_entity_id)
+        except NetworkMACAddress.DoesNotExist as exc:
+            raise PermissionDenied("The selected MAC address is unavailable for this asset.") from exc
+        serializer = AssetMACAddressWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = update_mac_address(
+                record=record,
+                actor_id=request.user.pk,
+                values={**serializer.validated_data, "hardware_asset_entity_id": asset.entity_id},
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(AssetMACAddressSerializer(updated).data)
 
 
 class ClientHardwareDetailView(APIView):

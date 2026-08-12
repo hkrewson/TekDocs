@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -115,7 +116,11 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
 
 
 def _page(
-    queryset: QuerySet[Any], request: Any, workspace: ResolvedWorkspace, serializer: type[serializers.Serializer]
+    queryset: QuerySet[Any],
+    request: Any,
+    workspace: ResolvedWorkspace,
+    serializer: type[serializers.Serializer],
+    transform: Callable[[Any], object] | None = None,
 ) -> Response:
     query = BoundedCollectionQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
@@ -123,7 +128,7 @@ def _page(
     return Response(
         serializer(
             {
-                "results": page.records,
+                "results": [transform(item) for item in page.records] if transform else page.records,
                 "page": page.page,
                 "page_size": page.page_size,
                 "count": page.count,

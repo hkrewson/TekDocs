@@ -174,6 +174,43 @@ def test_interface_ip_mac_crud_and_workspace_isolation(owner_client, installatio
 
 
 @pytest.mark.django_db
+def test_mac_address_is_authored_and_returned_as_a_hardware_asset_field(owner_client, installation):
+    organization = _organization(installation, "Asset MAC")
+    sibling = _organization(installation, "Sibling asset MAC")
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name="Lobby AP")
+    route = reverse(
+        "organization-asset-mac-addresses",
+        kwargs={"organization_entity_id": organization.entity_id, "asset_entity_id": asset.entity_id},
+    )
+    response = owner_client.post(
+        route,
+        {"address": "02-00-00-00-00-0a", "description": "Wi-Fi radio"},
+        content_type="application/json",
+    )
+    assert response.status_code == 201, response.content
+    assert response.json()["address"] == "02:00:00:00:00:0A"
+
+    detail = owner_client.get(
+        reverse(
+            "organization-client-asset-detail",
+            kwargs={"organization_entity_id": organization.entity_id, "asset_entity_id": asset.entity_id},
+        )
+    )
+    assert detail.status_code == 200
+    assert detail.json()["mac_addresses"] == [
+        {"id": response.json()["id"], "address": "02:00:00:00:00:0A", "description": "Wi-Fi radio"}
+    ]
+
+    hidden = owner_client.get(
+        reverse(
+            "organization-asset-mac-addresses",
+            kwargs={"organization_entity_id": sibling.entity_id, "asset_entity_id": asset.entity_id},
+        )
+    )
+    assert hidden.status_code == 404
+
+
+@pytest.mark.django_db
 def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installation):
     organization = _organization(installation, "Routing")
     default_subnet = _subnet(installation, organization)

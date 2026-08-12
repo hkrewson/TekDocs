@@ -887,9 +887,10 @@ Evidence: `docs/releases/0.5.0.md`.
 | `0.5.5` | In-app notification inbox and permission-filtered event payloads. |
 | `0.5.6` | SMTP delivery, secure templates, immediate preferences, retry/failure handling, and mail-outage recovery. |
 | `0.5.7` | Notification batching, digests, quiet-time behavior, and delivery administration. |
-| `0.5.8` | Skipped without release; reminder/calendar work moved to `0.5.10` when `0.5.9` stabilization was started first. |
+| `0.5.8` | Skipped without release; reminder/calendar work moved to `0.5.11` after stabilization and the network-boundary correction. |
 | `0.5.9` | Portal/notification stabilization, accessibility, long-history/load behavior, and consolidated upgrade evidence. |
-| `0.5.10` | Document review/expiry reminders and calendar-feed seam. |
+| `0.5.10` | Correct the network boundary to one simple Network record; move MACs to physical assets and NetBox to the future integration surface. |
+| `0.5.11` | Document review/expiry reminders and calendar-feed seam. |
 | `0.6.0` | Stabilize and certify controlled client access and notifications. |
 
 ### `0.5.1` acceptance criteria
@@ -985,6 +986,18 @@ Evidence: `docs/releases/0.5.7.md`.
 - [x] Version, OpenAPI, backend/frontend checks, accessibility tests, Compose runtime, production-image rehearsal, architecture/security/risk documentation, ADR 0056, and release evidence agree at `0.5.9`.
 
 Evidence: `docs/releases/0.5.9.md`.
+
+### `0.5.10` acceptance criteria
+
+- [x] The ordinary Networks surface exposes one addressable Network object with name, structured location, description, optional VLAN number, canonical CIDR, calculated gateway, full or bounded assignable range, primary/secondary DNS, and notes.
+- [x] Users do not author individual IP rows, Interfaces, VRFs, separate VLAN/Subnet objects, devices, racks, circuits, wireless, DNS zones, or NetBox mappings from the Networks page. Existing rows and compatibility APIs remain intact; this slice performs no destructive migration.
+- [x] The gateway and full usable range derive deterministically from the CIDR. Manual ranges must be complete, ordered, same-family, inside the CIDR, and outside reserved IPv4 network/broadcast addresses; overlap and exact-Workspace rules remain enforced.
+- [x] MAC addresses are repeatable hardware-asset fields, authored with `assets.edit`, returned with the asset projection, canonicalized centrally, and rejected for software or sibling-Workspace assets.
+- [x] Racks and network appliances follow the product rule that every physical object is an Asset. Separate rack/device creation is removed from ordinary navigation; retained legacy placement rows are preserved until an explicit reviewed migration exists.
+- [x] NetBox identity is absent from ordinary Networks navigation. A future connector must own its configuration and reconciliation under the integration framework rather than presenting an empty manual linking section.
+- [x] Model/migration/OpenAPI, application and PostgreSQL guards, exact-Workspace/IDOR negatives, frontend component/accessibility behavior, production frontend/backend builds, and ADR 0057 agree.
+
+Evidence: `docs/releases/0.5.10.md`.
 
 ## API and integrations: `0.6.x` → `0.7.0`
 

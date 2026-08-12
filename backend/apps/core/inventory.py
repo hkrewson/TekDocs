@@ -27,6 +27,7 @@ from .models import (
     HardwareLifecycleEventType,
     HardwareLifecycleState,
     Location,
+    NetworkMACAddress,
     Organization,
     PersonAssociation,
     PublicationAudience,
@@ -110,6 +111,10 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
         )
         .prefetch_related(
             _document_prefetch(),
+            Prefetch(
+                "network_mac_addresses",
+                queryset=NetworkMACAddress.objects.select_related("entity").order_by("address", "entity_id"),
+            ),
             "lifecycle_events__person__person__entity",
             "lifecycle_events__site__entity",
             "lifecycle_events__location__entity",

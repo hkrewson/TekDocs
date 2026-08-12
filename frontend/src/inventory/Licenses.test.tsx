@@ -14,7 +14,7 @@ const license: SoftwareLicense = {
 
 function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryClient {
   return {
-    listAssets: vi.fn(), listModelChoices: vi.fn(), createAsset: vi.fn(), bulkAssets: vi.fn(), updateHardware: vi.fn(), listHardwareLifecycle: vi.fn(), assignmentChoices: vi.fn(), assignHardware: vi.fn(), unassignHardware: vi.fn(), disposeHardware: vi.fn(), updateSoftwareInstallation: vi.fn(),
+    listAssets: vi.fn(), listModelChoices: vi.fn(), createAsset: vi.fn(), bulkAssets: vi.fn(), updateHardware: vi.fn(), listHardwareLifecycle: vi.fn(), assignmentChoices: vi.fn(), assignHardware: vi.fn(), unassignHardware: vi.fn(), disposeHardware: vi.fn(), createAssetMACAddress: vi.fn(), updateAssetMACAddress: vi.fn(), updateSoftwareInstallation: vi.fn(),
     listLicenses: vi.fn().mockResolvedValue({ results: [license], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true }),
     createLicense: vi.fn().mockResolvedValue(license), updateLicense: vi.fn().mockResolvedValue(license),
     softwareChoices: vi.fn().mockResolvedValue({ installations: [{ id: 'installation-1', asset_id: 'asset-1', asset_name: 'Reception Mac', product_id: 'product-1', product_name: 'Secure Agent', model_name: 'Business', status: 'installed', installed_version: '7.4', installed_on: '2026-08-01', last_verified_on: null, site_id: null, site_name: null }], people: [{ id: 'person-1', name: 'Morgan Ellis' }] }),

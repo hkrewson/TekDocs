@@ -2067,7 +2067,7 @@ class NetworkVLAN(TimestampedModel):
 
 
 class NetworkSubnet(TimestampedModel):
-    """A canonical IP prefix in the default table or one explicit VRF."""
+    """A user-facing network record retained on the original subnet table for compatibility."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="network_subnets")
@@ -2079,7 +2079,15 @@ class NetworkSubnet(TimestampedModel):
     address_family = models.PositiveSmallIntegerField()
     vrf = models.ForeignKey(NetworkVRF, on_delete=models.PROTECT, related_name="subnets", null=True, blank=True)
     vlan = models.ForeignKey(NetworkVLAN, on_delete=models.PROTECT, related_name="subnets", null=True, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name="networks", null=True, blank=True)
+    vlan_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    use_full_range = models.BooleanField(default=True)
+    assignable_start = models.GenericIPAddressField(null=True, blank=True)
+    assignable_end = models.GenericIPAddressField(null=True, blank=True)
+    primary_dns = models.GenericIPAddressField(null=True, blank=True)
+    secondary_dns = models.GenericIPAddressField(null=True, blank=True)
     description = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -2088,6 +2096,17 @@ class NetworkSubnet(TimestampedModel):
         ordering = ("address_family", "cidr", "entity_id")
         constraints = [
             models.CheckConstraint(condition=models.Q(address_family__in=(4, 6)), name="network_subnet_family_valid"),
+            models.CheckConstraint(
+                condition=models.Q(vlan_number__isnull=True) | models.Q(vlan_number__gte=1, vlan_number__lte=4094),
+                name="network_record_vlan_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(use_full_range=True, assignable_start__isnull=True, assignable_end__isnull=True)
+                    | models.Q(use_full_range=False, assignable_start__isnull=False, assignable_end__isnull=False)
+                ),
+                name="network_record_range_mode_valid",
+            ),
         ]
         indexes = [
             models.Index(fields=("tenant", "organization", "vrf"), name="core_netsubnet_scope_idx"),
@@ -2105,6 +2124,7 @@ class NetworkSubnet(TimestampedModel):
         for related, label in (
             (self.vrf if self.vrf_id else None, "VRF"),
             (self.vlan if self.vlan_id else None, "VLAN"),
+            (self.location if self.location_id else None, "location"),
         ):
             if related is not None and (
                 related.tenant_id != self.tenant_id or related.organization_id != self.organization_id

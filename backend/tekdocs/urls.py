@@ -124,6 +124,8 @@ from apps.core.inventory_views import (
     ClientAssetDocumentArtifactDownloadView,
     ClientAssetDocumentDetailView,
     ClientAssetListCreateView,
+    ClientAssetMACAddressDetailView,
+    ClientAssetMACAddressListCreateView,
     ClientAssetModelChoiceListView,
     ClientHardwareAssignmentChoicesView,
     ClientHardwareAssignmentView,
@@ -168,6 +170,7 @@ from apps.core.network_inventory_views import (
     NetworkRackDetailView,
     NetworkRackListCreateView,
 )
+from apps.core.network_record_views import NetworkRecordDetailView, NetworkRecordListCreateView
 from apps.core.network_service_views import (
     DNSRecordDetailView,
     DNSRecordListCreateView,
@@ -506,6 +509,12 @@ urlpatterns = [
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
     path("api/v1/workspaces/msp/networks/choices", NetworkChoiceListView.as_view(), name="msp-network-choices"),
+    path("api/v1/workspaces/msp/networks", NetworkRecordListCreateView.as_view(), name="msp-networks"),
+    path(
+        "api/v1/workspaces/msp/networks/<uuid:network_entity_id>",
+        NetworkRecordDetailView.as_view(),
+        name="msp-network-detail",
+    ),
     path("api/v1/workspaces/msp/networks/search", NetworkSearchView.as_view(), name="msp-network-search"),
     path("api/v1/workspaces/msp/networks/export", NetworkCsvExportView.as_view(), name="msp-network-export"),
     path(
@@ -760,6 +769,16 @@ urlpatterns = [
         name="organization-network-subnets",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks",
+        NetworkRecordListCreateView.as_view(),
+        name="organization-networks",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/<uuid:network_entity_id>",
+        NetworkRecordDetailView.as_view(),
+        name="organization-network-detail",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/subnets/<uuid:subnet_entity_id>",
         SubnetDetailView.as_view(),
         name="organization-network-subnet-detail",
@@ -963,6 +982,16 @@ urlpatterns = [
         name="msp-asset-detail",
     ),
     path(
+        "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/mac-addresses",
+        ClientAssetMACAddressListCreateView.as_view(),
+        name="msp-asset-mac-addresses",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/mac-addresses/<uuid:mac_address_entity_id>",
+        ClientAssetMACAddressDetailView.as_view(),
+        name="msp-asset-mac-address-detail",
+    ),
+    path(
         "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/hardware",
         ClientHardwareDetailView.as_view(),
         {"organization_entity_id": None},
@@ -1121,6 +1150,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>",
         ClientAssetDetailView.as_view(),
         name="organization-client-asset-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/mac-addresses",
+        ClientAssetMACAddressListCreateView.as_view(),
+        name="organization-asset-mac-addresses",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/mac-addresses/<uuid:mac_address_entity_id>",
+        ClientAssetMACAddressDetailView.as_view(),
+        name="organization-asset-mac-address-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware",

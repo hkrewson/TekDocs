@@ -17,7 +17,7 @@ const asset: ClientAsset = {
     warranty_provider: 'Northwind', warranty_starts_on: '2026-08-01', warranty_ends_on: '2029-08-01', warranty_reference: '',
     assignment: { person_id: null, person_name: null, site_id: null, site_name: null, location_id: null, location_name: null, assigned_at: null },
     disposed_on: null, disposal_method: '', disposal_reason: '',
-  }, software_installation: null, created_at: '2026-08-10T12:00:00Z',
+  }, mac_addresses: [], software_installation: null, created_at: '2026-08-10T12:00:00Z',
 }
 const softwareAsset: ClientAsset = {
   ...asset,
@@ -47,6 +47,8 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     assignHardware: vi.fn().mockResolvedValue(asset.hardware),
     unassignHardware: vi.fn().mockResolvedValue(asset.hardware),
     disposeHardware: vi.fn().mockResolvedValue(asset.hardware),
+    createAssetMACAddress: vi.fn(),
+    updateAssetMACAddress: vi.fn(),
     updateSoftwareInstallation: vi.fn(),
     listLicenses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true }),
     createLicense: vi.fn(),
@@ -78,6 +80,23 @@ describe('Assets', () => {
     expect(await screen.findByText('created')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Installation guide/ }))
     expect(await screen.findByText('Approved')).toBeInTheDocument()
+  })
+
+  it('records MAC addresses on the physical asset instead of the Networks page', async () => {
+    const created = { id: 'mac-1', address: '02:00:00:00:00:01', description: 'Ethernet' }
+    const createAssetMACAddress = vi.fn().mockResolvedValue(created)
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ createAssetMACAddress })} />)
+    expect(await screen.findByRole('heading', { name: 'MAC addresses' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add address' }))
+    await user.type(screen.getByLabelText('MAC address'), created.address)
+    await user.type(screen.getByLabelText('Description'), created.description)
+    await user.click(screen.getByRole('button', { name: 'Save address' }))
+    await waitFor(() => expect(createAssetMACAddress).toHaveBeenCalledWith(workspace, 'asset-1', {
+      address: created.address,
+      description: created.description,
+    }))
+    expect(await screen.findByText(created.address)).toBeInTheDocument()
   })
 
   it('requires a reviewed dry run before applying an asset CSV', async () => {

@@ -9,6 +9,9 @@ describe('network inventory API client', () => {
 
   it('uses exact client workspace routes and CSRF-protected writes', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
+    await browserNetworksClient.listNetworks(workspace)
+    await browserNetworksClient.createNetwork(workspace, {} as never)
+    await browserNetworksClient.updateNetwork(workspace, 'network/1', {} as never)
     await browserNetworksClient.listRacks(workspace)
     await browserNetworksClient.listDevices(workspace)
     await browserNetworksClient.listSubnets(workspace)
@@ -32,6 +35,9 @@ describe('network inventory API client', () => {
     await browserNetworksClient.updateCircuitHandoff(workspace, 'circuit/1', 'handoff/1', {} as never)
     await browserNetworksClient.createRack(workspace, { name: 'Core rack', site_id: 'site-1', location_id: null, unit_count: 42, status: 'active' })
 
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks?page=1&page_size=100', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/network%2F1', expect.objectContaining({ method: 'PATCH' }))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/subnets?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/interfaces?page=1&page_size=100', expect.any(Object))
@@ -56,11 +62,13 @@ describe('network inventory API client', () => {
 
   it('keeps MSP network inventory on non-aggregating MSP routes', async () => {
     const workspace = { kind: 'msp', id: 'msp-1' } as never
+    await browserNetworksClient.listNetworks(workspace)
     await browserNetworksClient.listRacks(workspace)
     await browserNetworksClient.choices(workspace)
     await browserNetworksClient.listVRFs(workspace)
     await browserNetworksClient.listNetBoxReferences(workspace)
     await browserNetworksClient.searchNetwork(workspace, '')
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/racks?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/choices', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/vrfs?page=1&page_size=100', expect.any(Object))

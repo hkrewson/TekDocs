@@ -4,276 +4,82 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RelationshipsClient } from '../relationships/api'
 import type { WorkspaceContext } from '../workspaces/api'
 import { Networks } from './Networks'
-import type { NetworksClient } from './api'
+import type { NetworkRecord, NetworksClient } from './api'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: 'client-1', name: 'Acme Dental', classifications: ['client'], capabilities: [], organization: null,
 }
-const rack = { id: 'rack-1', name: 'Core rack', site_id: 'site-1', site_name: 'Headquarters', location_id: null, location_name: null, unit_count: 42, status: 'active' as const, device_count: 1 }
-const device = { id: 'device-1', name: 'Core switch', role: 'switch' as const, status: 'active' as const, hardware_asset_id: 'asset-1', hardware_asset_name: 'EdgeSwitch 24', site_id: 'site-1', site_name: 'Headquarters', location_id: null, location_name: null, rack_id: 'rack-1', rack_name: 'Core rack', rack_unit: 20, rack_units: 2 }
+const network: NetworkRecord = {
+  id: 'network-1', name: 'Office LAN', location_id: 'location-1', location_name: 'Server room', site_name: 'Headquarters',
+  description: 'Primary office network', vlan: 20, cidr: '192.0.2.0/24', gateway: '192.0.2.1', use_full_range: true,
+  range_start: '192.0.2.1', range_end: '192.0.2.254', primary_dns: '9.9.9.9', secondary_dns: '1.1.1.1', notes: '',
+}
 
 function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient {
   return {
-    listRacks: vi.fn().mockResolvedValue({ results: [rack], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
-    listDevices: vi.fn().mockResolvedValue({ results: [device], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true, can_view_relationships: true, can_create_relationships: true, can_archive_relationships: true }),
-    choices: vi.fn().mockResolvedValue({ sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [], racks: [{ id: 'rack-1', name: 'Core rack', site_id: 'site-1' }], hardware_assets: [{ id: 'asset-1', name: 'EdgeSwitch 24' }] }),
-    createRack: vi.fn().mockResolvedValue(rack), updateRack: vi.fn().mockResolvedValue(rack),
-    createDevice: vi.fn().mockResolvedValue(device), updateDevice: vi.fn().mockResolvedValue(device),
-    listVRFs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createVRF: vi.fn(), updateVRF: vi.fn(),
-    listVLANs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createVLAN: vi.fn(), updateVLAN: vi.fn(),
-    listSubnets: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createSubnet: vi.fn(), updateSubnet: vi.fn(),
-    listInterfaces: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createInterface: vi.fn(), updateInterface: vi.fn(),
-    listIPAddresses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createIPAddress: vi.fn(), updateIPAddress: vi.fn(),
-    listMACAddresses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createMACAddress: vi.fn(), updateMACAddress: vi.fn(),
-    listWireless: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createWireless: vi.fn(), updateWireless: vi.fn(),
-    listDNSZones: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createDNSZone: vi.fn(), updateDNSZone: vi.fn(),
-    listDNSRecords: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true }),
-    createDNSRecord: vi.fn(), updateDNSRecord: vi.fn(),
-    listCircuits: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: true, can_view_contracts: true }),
-    circuitChoices: vi.fn().mockResolvedValue({ providers: [{ id: 'provider-1', name: 'Example Carrier' }], contracts: [{ id: 'contract-1', name: 'Internet agreement', provider_id: 'provider-1' }], sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [], devices: [{ id: 'device-1', name: 'Core switch' }], interfaces: [{ id: 'interface-1', name: 'WAN1', device_id: 'device-1' }], can_view_contracts: true }),
-    createCircuit: vi.fn(), updateCircuit: vi.fn(), createCircuitHandoff: vi.fn(), updateCircuitHandoff: vi.fn(),
-    listNetBoxReferences: vi.fn().mockResolvedValue([]),
-    netBoxChoices: vi.fn().mockResolvedValue({ results: [], can_manage: true }),
-    setNetBoxReference: vi.fn(), removeNetBoxReference: vi.fn(), previewNetBoxReconciliation: vi.fn(),
-    searchNetwork: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
-    networkExportUrl: vi.fn().mockReturnValue('/api/v1/workspaces/organizations/client-1/networks/export'),
+    listNetworks: vi.fn().mockResolvedValue({ results: [network], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
+    createNetwork: vi.fn().mockResolvedValue(network), updateNetwork: vi.fn().mockResolvedValue(network),
+    choices: vi.fn().mockResolvedValue({ sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [{ id: 'location-1', name: 'Server room', site_id: 'site-1' }], racks: [], hardware_assets: [] }),
     ...overrides,
-  }
+  } as unknown as NetworksClient
 }
 
 const relationshipsClient = {
-  list: vi.fn().mockResolvedValue([]), search: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 15, count: 0, has_more: false }),
-  create: vi.fn(), archive: vi.fn(), linkTypes: vi.fn().mockResolvedValue([]),
+  list: vi.fn(), search: vi.fn(), create: vi.fn(), archive: vi.fn(), linkTypes: vi.fn(),
 } as RelationshipsClient
 
 describe('Networks', () => {
-  it('searches all network records and opens the matching section', async () => {
-    const searchNetwork = vi.fn().mockResolvedValue({
-      results: [{ id: 'subnet-1', name: 'Guest network', record_type: 'network_subnet', type_label: 'Subnet', section: 'subnets' }],
-      page: 1, page_size: 50, count: 1, has_more: false,
-    })
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ searchNetwork })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    expect(screen.getByRole('link', { name: 'Export CSV' })).toHaveAttribute('href', '/api/v1/workspaces/organizations/client-1/networks/export')
-    await user.click(screen.getByRole('button', { name: 'All records' }))
-    await user.type(screen.getByRole('searchbox', { name: 'Search network inventory' }), 'Guest')
-    expect(await screen.findByText('Guest network')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Open section' }))
-    expect(screen.getByRole('button', { name: 'Subnets' })).toHaveAttribute('aria-pressed', 'true')
-  })
-
-  it('links a lightweight record to a stable NetBox identity', async () => {
-    const reference = { id: 'reference-1', entity_id: 'rack-1', entity_name: 'Core rack', entity_type: 'network_rack', object_type: 'dcim.rack' as const, object_id: 41, observed_fingerprint: '', last_observed_at: null }
-    const listNetBoxReferences = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([reference])
-    const netBoxChoices = vi.fn().mockResolvedValue({ results: [{ id: 'rack-1', name: 'Core rack', entity_type: 'network_rack', object_type: 'dcim.rack', linked: false }], can_manage: true })
-    const setNetBoxReference = vi.fn().mockResolvedValue(reference)
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ listNetBoxReferences, netBoxChoices, setNetBoxReference })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'NetBox' }))
-    expect(await screen.findByText('No NetBox identities match this workspace and search.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Link record' }))
-    await user.selectOptions(screen.getByLabelText('TekDocs record'), 'rack-1')
-    await user.type(screen.getByLabelText('NetBox numeric ID'), '41')
-    await user.click(screen.getByRole('button', { name: 'Link identity' }))
-    await waitFor(() => expect(setNetBoxReference).toHaveBeenCalledWith(workspace, { entity_id: 'rack-1', object_type: 'dcim.rack', object_id: 41 }))
-    expect(await screen.findByRole('cell', { name: '41' })).toBeInTheDocument()
-  })
-
-  it('creates a canonical subnet from the workspace addressing surface', async () => {
-    const createSubnet = vi.fn().mockResolvedValue({ id: 'subnet-1', name: 'Guest', cidr: '192.0.2.0/24', address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' })
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createSubnet })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'Subnets' }))
-    await screen.findByText('No subnets match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add subnet' }))
-    await user.type(screen.getByLabelText('Name'), 'Guest')
-    await user.type(screen.getByLabelText(/^CIDR/), '192.0.2.0/24')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(createSubnet).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'Guest', cidr: '192.0.2.0/24', vrf_id: null })))
-    expect(await screen.findByText('IPv4')).toBeInTheDocument()
-  })
-
-  it('shows workspace-scoped device placement and logical relationship surface', async () => {
-    const user = userEvent.setup()
+  it('shows one simple network list without NetBox-style object tabs', async () => {
     render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
-    expect(await screen.findByRole('button', { name: 'Core switch' })).toBeInTheDocument()
-    expect(screen.getByText('Core rack · U20–21')).toBeInTheDocument()
-    expect(screen.getByText('EdgeSwitch 24')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Core switch' }))
-    expect(await screen.findByRole('heading', { name: /Core switch/ })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Logical relationships' })).toBeInTheDocument()
+    expect(await screen.findByText('Office LAN')).toBeInTheDocument()
+    expect(screen.getByText('Headquarters · Server room')).toBeInTheDocument()
+    expect(screen.getByText('192.0.2.0/24')).toBeInTheDocument()
+    expect(screen.getByText('192.0.2.1–192.0.2.254')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'NetBox' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Racks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'IP addresses' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'MAC addresses' })).not.toBeInTheDocument()
   })
 
-  it('keeps the ordinary surface focused on asset-backed addressing', async () => {
-    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    expect(screen.getByRole('button', { name: 'IP addresses' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'MAC addresses' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Interfaces' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'VRFs' })).not.toBeInTheDocument()
-  })
-
-  it('creates assigned IP and MAC records from canonical values', async () => {
-    const subnet = { id: 'subnet-1', name: 'LAN', cidr: '192.0.2.0/24', address_family: 4 as const, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null, description: '' }
-    const createIPAddress = vi.fn().mockResolvedValue({ id: 'ip-1', address: '192.0.2.10', address_family: 4, subnet_id: subnet.id, subnet_cidr: subnet.cidr, vrf_id: null, vrf_name: null, hardware_asset_id: 'asset-1', hardware_asset_name: 'EdgeSwitch 24', interface_id: null, interface_name: null, device_name: device.name, status: 'active', dns_name: '', description: '' })
-    const createMACAddress = vi.fn().mockResolvedValue({ id: 'mac-1', address: '02:00:00:00:00:01', hardware_asset_id: 'asset-1', hardware_asset_name: 'EdgeSwitch 24', interface_id: null, interface_name: null, device_name: device.name, description: '' })
-    const client = networkClient({
-      listSubnets: vi.fn().mockResolvedValue({ results: [subnet], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
-      createIPAddress,
-      createMACAddress,
-    })
+  it('creates one network and lets the server calculate gateway and range', async () => {
+    const createNetwork = vi.fn().mockResolvedValue({ ...network, id: 'network-2', name: 'Guest Wi-Fi', vlan: 30, cidr: '198.51.100.0/24' })
     const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={client} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-
-    await user.click(screen.getByRole('button', { name: 'IP addresses' }))
-    await screen.findByText('No IP address records match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add IP address' }))
-    await user.type(screen.getByLabelText('IP address'), '192.0.2.10')
-    await user.selectOptions(screen.getByLabelText('Subnet'), 'subnet-1')
-    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
-    await user.click(screen.getByRole('button', { name: 'Save IP address' }))
-    await waitFor(() => expect(createIPAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '192.0.2.10', subnet_id: 'subnet-1', hardware_asset_id: 'asset-1' })))
-
-    await user.click(screen.getByRole('button', { name: 'MAC addresses' }))
-    await screen.findByText('No MAC address records match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add MAC address' }))
-    await user.type(screen.getByLabelText('MAC address'), '02:00:00:00:00:01')
-    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
-    await user.click(screen.getByRole('button', { name: 'Save MAC address' }))
-    await waitFor(() => expect(createMACAddress).toHaveBeenCalledWith(workspace, expect.objectContaining({ address: '02:00:00:00:00:01', hardware_asset_id: 'asset-1' })))
-  })
-
-  it('creates wireless inventory without accepting a credential value', async () => {
-    const created = { id: 'wifi-1', ssid: 'Acme Staff', purpose: 'corporate' as const, security: 'wpa3_enterprise' as const, status: 'active' as const, hidden: false, client_isolation: true, site_id: null, site_name: null, vlan_id: null, vlan_name: null, vlan_number: null, subnet_id: null, subnet_cidr: null, description: '' }
-    const createWireless = vi.fn().mockResolvedValue(created)
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createWireless })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'Wireless' }))
-    await screen.findByText('No wireless networks match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add wireless network' }))
-    expect(screen.getByText(/never a Wi-Fi password/i)).toBeInTheDocument()
-    await user.type(screen.getByLabelText('SSID'), 'Acme Staff')
-    await user.click(screen.getByLabelText('Client isolation'))
-    await user.click(screen.getByRole('button', { name: 'Save wireless network' }))
-    await waitFor(() => expect(createWireless).toHaveBeenCalledWith(workspace, expect.objectContaining({ ssid: 'Acme Staff', client_isolation: true })))
-    expect(createWireless.mock.calls[0]?.[1]).not.toHaveProperty('password')
-  })
-
-  it('creates a permission-scoped DNS zone and record', async () => {
-    const zone = { id: 'zone-1', name: 'example.invalid', description: '', record_count: 0 }
-    const createDNSZone = vi.fn().mockResolvedValue(zone)
-    const createDNSRecord = vi.fn().mockResolvedValue({ id: 'record-1', zone_id: zone.id, zone_name: zone.name, owner_name: 'app.example.invalid', record_type: 'A', value: '192.0.2.10', ttl: 300, priority: null, weight: null, port: null, ip_address_id: null, description: '' })
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createDNSZone, createDNSRecord })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'DNS' }))
-    await screen.findByText('No DNS zones match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add zone' }))
-    await user.type(screen.getByLabelText('Canonical zone name'), 'example.invalid')
-    await user.click(screen.getByRole('button', { name: 'Save zone' }))
-    await waitFor(() => expect(createDNSZone).toHaveBeenCalled())
-    await user.click(screen.getByRole('button', { name: 'Add record' }))
-    await user.type(screen.getByLabelText('Owner name'), 'app.example.invalid')
-    await user.type(screen.getByLabelText('Value'), '192.0.2.10')
-    await user.clear(screen.getByLabelText('TTL')); await user.type(screen.getByLabelText('TTL'), '300')
-    await user.click(screen.getByRole('button', { name: 'Save DNS record' }))
-    await waitFor(() => expect(createDNSRecord).toHaveBeenCalledWith(workspace, expect.objectContaining({ zone_id: 'zone-1', owner_name: 'app.example.invalid', record_type: 'A', value: '192.0.2.10' })))
-  })
-
-  it('creates a provider circuit and records an exact device handoff', async () => {
-    const circuit = { id: 'circuit-1', name: 'Headquarters DIA', provider_id: 'provider-1', provider_name: 'Example Carrier', contract: { id: 'contract-1', name: 'Internet agreement', status: 'active', renews_on: '2027-09-01', ends_on: '2027-09-30', auto_renew: true, renewal_notice_days: 30 }, service_identifier: 'CKT-1000', kind: 'internet' as const, status: 'active' as const, bandwidth_down_mbps: '1000.000', bandwidth_up_mbps: '1000.000', installed_on: null, service_starts_on: null, review_on: '2027-07-01', planned_disconnect_on: null, description: '', handoffs: [], lifecycle_events: [{ kind: 'review' as const, date: '2027-07-01', label: 'Review circuit', state: 'upcoming' as const }] }
-    const handoff = { id: 'handoff-1', name: 'Carrier demarc', side: 'a' as const, media: 'fiber' as const, connector: 'LC', provider_reference: '', site_id: 'site-1', site_name: 'Headquarters', location_id: null, location_name: null, device_id: 'device-1', device_name: 'Core switch', interface_id: null, interface_name: null, description: '' }
-    const createCircuit = vi.fn().mockResolvedValue(circuit)
-    const createCircuitHandoff = vi.fn().mockResolvedValue(handoff)
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createCircuit, createCircuitHandoff })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'Circuits' }))
-    await screen.findByText('No circuits match this workspace and search.')
-    await user.click(screen.getByRole('button', { name: 'Add circuit' }))
-    await user.type(screen.getByLabelText('Name'), 'Headquarters DIA')
-    await user.selectOptions(screen.getByLabelText('Provider'), 'provider-1')
-    await user.selectOptions(screen.getByLabelText('Contract'), 'contract-1')
-    await user.type(screen.getByLabelText('Service identifier'), 'CKT-1000')
-    await user.click(screen.getByRole('button', { name: 'Save circuit' }))
-    await waitFor(() => expect(createCircuit).toHaveBeenCalledWith(workspace, expect.objectContaining({ provider_id: 'provider-1', contract_id: 'contract-1', service_identifier: 'CKT-1000' })))
-    await user.click(screen.getByRole('button', { name: 'Add handoff' }))
-    await user.type(screen.getByLabelText('Name'), 'Carrier demarc')
-    await user.type(screen.getByLabelText('Connector'), 'LC')
-    await user.selectOptions(screen.getByLabelText('Site'), 'site-1')
-    await user.selectOptions(screen.getByLabelText('Device'), 'device-1')
-    await user.click(screen.getByRole('button', { name: 'Save handoff' }))
-    await waitFor(() => expect(createCircuitHandoff).toHaveBeenCalledWith(workspace, 'circuit-1', expect.objectContaining({ interface_id: null, device_id: 'device-1' })))
-    expect(screen.queryByLabelText('Interface')).not.toBeInTheDocument()
-    expect(await screen.findByText(/A side · fiber · LC · Core switch/)).toBeInTheDocument()
-  })
-
-  it('creates a rack from the restrained physical-placement form', async () => {
-    const createRack = vi.fn().mockResolvedValue({ ...rack, id: 'rack-2', name: 'Distribution rack' })
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createRack })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-    await user.click(screen.getByRole('button', { name: 'Racks' }))
-    await user.click(screen.getByRole('button', { name: 'Add rack' }))
-    await user.type(screen.getByLabelText('Name'), 'Distribution rack')
-    await user.selectOptions(screen.getByLabelText('Site'), 'site-1')
-    await user.click(screen.getByRole('button', { name: 'Save rack' }))
-    await waitFor(() => expect(createRack).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'Distribution rack', site_id: 'site-1', unit_count: 42 })))
-  })
-
-  it('creates and edits physical device placement', async () => {
-    const createDevice = vi.fn().mockResolvedValue({ ...device, id: 'device-2', name: 'Edge firewall' })
-    const updateDevice = vi.fn().mockResolvedValue({ ...device, name: 'Core switch revised' })
-    const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createDevice, updateDevice })} relationshipsClient={relationshipsClient} />)
-    await screen.findByRole('button', { name: 'Core switch' })
-
-    await user.click(screen.getByRole('button', { name: 'Add asset-backed device' }))
-    await user.type(screen.getByLabelText('Name'), 'Edge firewall')
-    await user.selectOptions(screen.getByLabelText('Hardware asset'), 'asset-1')
-    await user.selectOptions(screen.getByLabelText('Role'), 'firewall')
-    await user.selectOptions(screen.getByLabelText('Rack'), 'rack-1')
-    await user.clear(screen.getByLabelText('Starting unit'))
-    await user.type(screen.getByLabelText('Starting unit'), '10')
-    await user.click(screen.getByRole('button', { name: 'Save device' }))
-    await waitFor(() => expect(createDevice).toHaveBeenCalledWith(workspace, expect.objectContaining({
-      name: 'Edge firewall', role: 'firewall', hardware_asset_id: 'asset-1', rack_id: 'rack-1', rack_unit: 10,
+    render(<Networks workspace={workspace} client={networkClient({ createNetwork })} relationshipsClient={relationshipsClient} />)
+    await screen.findByText('Office LAN')
+    await user.click(screen.getByRole('button', { name: 'New network' }))
+    await user.type(screen.getByLabelText('Name'), 'Guest Wi-Fi')
+    await user.selectOptions(screen.getByLabelText('Location'), 'location-1')
+    await user.type(screen.getByLabelText('VLAN'), '30')
+    await user.type(screen.getByLabelText(/^Network \(CIDR\)/), '198.51.100.0/24')
+    await user.type(screen.getByLabelText('Primary DNS'), '9.9.9.9')
+    expect(screen.queryByLabelText('Gateway')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save network' }))
+    await waitFor(() => expect(createNetwork).toHaveBeenCalledWith(workspace, expect.objectContaining({
+      name: 'Guest Wi-Fi', location_id: 'location-1', vlan: 30, cidr: '198.51.100.0/24', use_full_range: true,
+      range_start: null, range_end: null,
     })))
-
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0])
-    await user.clear(screen.getByLabelText('Name'))
-    await user.type(screen.getByLabelText('Name'), 'Core switch revised')
-    await user.click(screen.getByRole('button', { name: 'Save device' }))
-    await waitFor(() => expect(updateDevice).toHaveBeenCalledWith(
-      workspace,
-      'device-1',
-      expect.objectContaining({ name: 'Core switch revised' }),
-    ))
   })
 
-  it('shows bounded empty and request-failure states', async () => {
-    const empty = networkClient({
-      listRacks: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: false }),
-      listDevices: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false, can_manage: false, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
-    })
-    const { rerender } = render(<Networks workspace={workspace} client={empty} relationshipsClient={relationshipsClient} />)
-    expect(await screen.findByText('No network devices match this workspace and search.')).toBeInTheDocument()
+  it('reveals a bounded manual assignable range only when requested', async () => {
+    const user = userEvent.setup()
+    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
+    await screen.findByText('Office LAN')
+    await user.click(screen.getByRole('button', { name: 'New network' }))
+    expect(screen.queryByLabelText('Assignable range start')).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText('Use the full usable address range'))
+    expect(screen.getByLabelText('Assignable range start')).toBeRequired()
+    expect(screen.getByLabelText('Assignable range end')).toBeRequired()
+  })
 
-    const failed = networkClient({ listRacks: vi.fn().mockRejectedValue(new Error('Network inventory unavailable.')) })
+  it('searches only the simple network records and reports request failures', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
+    await screen.findByText('Office LAN')
+    await user.type(screen.getByLabelText('Search networks'), 'missing')
+    expect(screen.getByText('No networks match this search.')).toBeInTheDocument()
+
+    const failed = networkClient({ listNetworks: vi.fn().mockRejectedValue(new Error('Networks unavailable.')) })
     rerender(<Networks workspace={{ ...workspace, id: 'client-2' }} client={failed} relationshipsClient={relationshipsClient} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Network inventory unavailable.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Networks unavailable.')
   })
 })

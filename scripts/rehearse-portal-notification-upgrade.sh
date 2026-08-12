@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_PORTAL_NOTIFICATION_UPGRADE_FROM_REF:-f5e1de0}
+baseline_ref=${TEKDOCS_PORTAL_NOTIFICATION_UPGRADE_FROM_REF:-f15b6a7}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-portal-notification-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -39,8 +39,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-[ "$baseline_version" = "0.5.7" ] || { echo "Portal/notification upgrade expected baseline 0.5.7, found $baseline_version" >&2; exit 1; }
-[ "$current_version" = "0.5.9" ] || { echo "Portal/notification upgrade expected current version 0.5.9, found $current_version" >&2; exit 1; }
+[ "$baseline_version" = "0.5.9" ] || { echo "Portal/notification upgrade expected baseline 0.5.9, found $baseline_version" >&2; exit 1; }
+[ "$current_version" = "0.6.0" ] || { echo "Portal/notification upgrade expected current version 0.6.0, found $current_version" >&2; exit 1; }
 
 echo "Creating consolidated portal and notification evidence in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend

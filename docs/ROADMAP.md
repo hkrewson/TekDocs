@@ -890,8 +890,8 @@ Evidence: `docs/releases/0.5.0.md`.
 | `0.5.8` | Skipped without release; reminder/calendar work moved to `0.5.11` after stabilization and the network-boundary correction. |
 | `0.5.9` | Portal/notification stabilization, accessibility, long-history/load behavior, and consolidated upgrade evidence. |
 | `0.5.10` | Correct the network boundary to one simple Network record; move MACs to physical assets and NetBox to the future integration surface. |
-| `0.5.11` | Document review/expiry reminders and calendar-feed seam. |
-| `0.6.0` | Stabilize and certify controlled client access and notifications. |
+| `0.5.11` | Skipped without release when the line advanced to `0.6.0`; reminder/calendar work remains owned by the shared scheduling milestone at `0.7.6`. |
+| `0.6.0` | Formal certification of controlled client access, publication, portal, outbox, and notification subsystems. |
 
 ### `0.5.1` acceptance criteria
 
@@ -998,6 +998,18 @@ Evidence: `docs/releases/0.5.9.md`.
 - [x] Model/migration/OpenAPI, application and PostgreSQL guards, exact-Workspace/IDOR negatives, frontend component/accessibility behavior, production frontend/backend builds, and ADR 0057 agree.
 
 Evidence: `docs/releases/0.5.10.md`.
+
+### `0.6.0` acceptance criteria
+
+- [x] `make test-portal-notification-certification` composes client identity and invitation acceptance, publication and approval controls, fail-closed portal projection, transactional outbox, permission-filtered inbox, SMTP delivery, preferences, batching/digests/quiet hours, delivery administration, signed history cursors, full permission/IDOR, forced RLS, and migration preservation against PostgreSQL.
+- [x] The non-mocked production-shaped browser journey crosses React, the proxy, Django, Celery, and PostgreSQL for a client-visible STATIC snapshot that remains unavailable while pending, approval by a different MFA-enabled authorized staff member, exact-client invitation acceptance, the portal-only document and notification surfaces, preference mutation, and withdrawal without retained-evidence loss.
+- [x] Client sessions remain unable to construct or enter MSP navigation and ordinary Workspace/domain APIs. MSP sessions remain unable to consume portal routes; membership-derived exact-client scope, audience/reference safety, current lifecycle, and current recipient authorization remain mandatory at every read.
+- [x] The exact `0.5.9` portal/notification fixture upgrades through the intervening non-destructive `0.5.10` network correction to `0.6.0` without changing publication/control identities, signed PDF evidence, client membership, outbox receipt, inbox read state, SMTP queue identity, or digest/quiet-time preferences.
+- [x] Independent PostgreSQL and retained-media restore re-verifies the same signed publication and notification state. The rehearsal remains recovery evidence, not the supported encrypted backup/key-loss tooling assigned to `0.8.1` and `0.9.3`.
+- [x] `TD-RISK-003`, `TD-RISK-039`, `TD-RISK-040`, `TD-RISK-041`, and `TD-RISK-042` are certified for the implemented one-MSP installation boundary with recurring owners. SMTP's remote-acceptance crash window, asynchronous bounce ingestion, anonymous portals, client co-authoring, and hosted multi-MSP control-plane behavior are not claimed.
+- [x] Version, OpenAPI, architecture, security/threat/risk documentation, ADR 0058, release checklist, local/hosted gate definitions, production images, and release evidence agree at `0.6.0`; no model, migration, route, notification topic, or secret field is added.
+
+Evidence: `docs/releases/0.6.0.md`.
 
 ## API and integrations: `0.6.x` → `0.7.0`
 

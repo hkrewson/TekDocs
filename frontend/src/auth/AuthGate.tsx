@@ -436,6 +436,7 @@ export function AuthGate({ client, initialContext, children }: {
 
   const acceptInvitation = async (details: InvitationAcceptance) => {
     const authenticated = await client.acceptInvitation(details)
+    window.history.replaceState({}, '', '/')
     setState({ phase: 'authenticated', context: authenticated })
   }
 

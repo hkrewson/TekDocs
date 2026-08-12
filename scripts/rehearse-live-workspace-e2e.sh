@@ -53,9 +53,9 @@ docker run --rm \
 live_compose run --rm -v "${project_name}_media_data:/app/media:ro" migrate python manage.py shell -c '
 from django.test import Client
 from django.urls import reverse
-from apps.accounts.models import OrganizationAccessAssignment, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, DNSRecord, DNSZone, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentationListingReference, EntityLink, Location, NetBoxReference, NetworkCircuit, NetworkCircuitHandoff, NetworkDevice, NetworkIPAddress, NetworkMACAddress, NetworkSubnet, Organization, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -102,32 +102,21 @@ assert envelope == {
     "version": 1,
     "value": "Priority",
 }
-network_device = NetworkDevice.objects.get(entity__display_name="Live Core Switch")
 network_asset = ClientAsset.objects.get(entity__display_name="Live core switch")
-network_subnet = NetworkSubnet.objects.get(entity__display_name="Live management LAN")
-network_ip = NetworkIPAddress.objects.get(address="192.0.2.10")
+network_record = NetworkSubnet.objects.get(entity__display_name="Live management LAN")
 network_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:10")
-wireless = WirelessNetwork.objects.get(ssid="Live Staff")
-dns_zone = DNSZone.objects.get(name="live.example.invalid")
-dns_record = DNSRecord.objects.get(owner_name="switch.live.example.invalid", record_type="A")
-assert network_device.organization == organization
-assert network_device.hardware_asset == network_asset
-assert network_device.legacy_unbacked is False
-assert network_subnet.organization == organization
-assert network_ip.subnet == network_subnet
-assert network_ip.interface_id is None
-assert network_ip.hardware_asset == network_asset
-assert network_ip.dns_name == "switch.live.example.invalid"
+assert network_record.organization == organization
+assert network_record.location == location.parent
+assert network_record.cidr == "192.0.2.0/24"
+assert network_record.vlan_number == 20
+assert network_record.use_full_range is True
+assert network_record.assignable_start is None
+assert network_record.assignable_end is None
+assert str(network_record.primary_dns) == "9.9.9.9"
+assert str(network_record.secondary_dns) == "1.1.1.1"
 assert network_mac.interface_id is None
 assert network_mac.hardware_asset == network_asset
-assert wireless.organization == organization
-assert wireless.site == site
-assert wireless.subnet == network_subnet
-assert wireless.client_isolation is True
-assert dns_zone.organization == organization
-assert dns_record.zone == dns_zone
-assert dns_record.value == "192.0.2.10"
-assert dns_record.ip_address == network_ip
+assert network_mac.description == "Ethernet"
 vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
 link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
 assert link.archived_at is None
@@ -239,40 +228,15 @@ cost = ContractCost.objects.get(contract=contract, archived_at__isnull=True)
 assert str(cost.amount) == "875.50"
 assert cost.currency == "USD"
 assert cost.reference == "LIVE-PRIVATE-RATE"
-circuit = NetworkCircuit.objects.select_related("entity", "provider", "contract").get(
-    entity__display_name="Live headquarters DIA"
-)
-handoff = NetworkCircuitHandoff.objects.select_related("entity", "site", "device", "interface").get(circuit=circuit)
-assert circuit.organization == organization
-assert circuit.provider == vendor
-assert circuit.contract == contract
-assert circuit.service_identifier == "LIVE-DIA-1000"
-assert str(circuit.bandwidth_down_mbps) == "1000.000"
-assert circuit.review_on.isoformat() == "2027-06-15"
-assert handoff.organization == organization
-assert handoff.site == site
-assert handoff.device == network_device
-assert handoff.interface_id is None
-assert handoff.provider_reference == "LIVE-DEMARC-1"
-netbox_reference = NetBoxReference.objects.select_related("entity", "workspace").get(
-    entity__display_name="Live Core Rack", archived_at__isnull=True
-)
-assert netbox_reference.organization == organization
-assert netbox_reference.workspace == organization.ownership_workspace
-assert netbox_reference.object_type == "dcim.rack"
-assert netbox_reference.object_id == 4107
-assert netbox_reference.observed_fingerprint == ""
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block
-assert client_block.current_revision.markdown.endswith(
-    "[Live Main Campus](tekdocs://entity/" + str(organization.sites.get(entity__display_name="Live Main Campus").entity_id) + ")"
-)
-assert list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True)) == [
-    "# Acme onboarding\n\nClient-owned canonical Markdown.",
-    "# Acme onboarding\n\nRevision two is retained.",
-    client_block.current_revision.markdown,
-]
+client_revisions = list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True))
+assert len(client_revisions) == 4
+assert client_revisions[0] == "# Acme onboarding\n\nClient-owned canonical Markdown."
+assert client_revisions[1] == "# Acme onboarding\n\nRevision two is retained."
+assert "tekdocs://entity/" in client_revisions[2]
+assert "tekdocs://entity/" not in client_revisions[3]
 template = Document.objects.get(entity__display_name="Live incident template")
 template_copy = Document.objects.get(entity__display_name="New from Live incident template")
 assert template.organization == organization
@@ -320,8 +284,29 @@ publication = DocumentPublication.objects.get(document=client_document)
 assert publication.reason == "Live publication regression"
 assert publication.audience == "client_visible"
 assert publication.retention == "permanent"
-assert publication.lifecycle_state == "current"
+assert publication.lifecycle_state == "withdrawn"
 assert verify_publication(publication)["valid"] is True
+assert list(
+    DocumentPublicationControlEvent.objects.filter(publication=publication)
+    .order_by("occurred_at", "id")
+    .values_list("action", flat=True)
+) == ["submitted", "approved", "withdrawn"]
+portal_membership = TenantMembership.objects.select_related("user", "organization").get(
+    user__display_name="Live Client Reader"
+)
+assert portal_membership.role == BuiltInRole.CLIENT_USER
+assert portal_membership.organization == organization
+assert InboxNotification.objects.filter(
+    recipient=portal_membership.user,
+    surface="client_portal",
+    organization=organization,
+).count() >= 2
+preference = NotificationPreference.objects.get(user=portal_membership.user, surface="client_portal")
+assert preference.delivery_mode == "daily"
+assert preference.quiet_start.isoformat(timespec="minutes") == "22:00"
+assert preference.quiet_end.isoformat(timespec="minutes") == "07:00"
+assert OutboxEvent.objects.filter(organization=organization, state="delivered").count() >= 3
+assert OutboxDeliveryReceipt.objects.filter(event__organization=organization).count() >= 3
 pdf_artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind="pdf")
 assert read_publication_artifact(pdf_artifact).startswith(b"%PDF-")
 assert publication.manifest["artifacts"][0]["checksum"] == pdf_artifact.checksum

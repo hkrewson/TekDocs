@@ -11,6 +11,7 @@
 - A documentation certification release runs `make test-documentation-certification` plus its prior-alpha upgrade and database/media restore rehearsals.
 - An inventory certification release runs `make test-inventory-certification` plus its prior-stabilization upgrade and database/media restore rehearsals.
 - A network certification release runs `make test-network-certification` plus its prior-stabilization upgrade and database/media restore rehearsals.
+- A controlled-client-access certification release runs `make test-portal-notification-certification`, the real publisher/approver/client browser journey, its exact-prior upgrade, and database/media restore rehearsals.
 - Dependency, license, Gitleaks, CodeQL, Trivy, and DAST findings have no unresolved Critical or untriaged High issues.
 - Backup and restore include the database and artifacts; wrapping and publication keys are recovered separately.
 - Container digests, CycloneDX SBOMs, provenance attestations, signed tag, and release notes are ready.

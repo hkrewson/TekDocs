@@ -32,6 +32,7 @@ make test-certification
 make test-documentation-certification
 make test-inventory-certification
 make test-network-stabilization
+make test-portal-notification-certification
 ```
 
 For release evidence, also run:
@@ -43,9 +44,11 @@ make documentation-upgrade-rehearsal
 make documentation-backup-rehearsal
 make network-upgrade-rehearsal
 make network-backup-rehearsal
+make portal-notification-upgrade-rehearsal
+make portal-notification-backup-rehearsal
 ```
 
-The general upgrade rehearsal begins from the maintained `0.1.3` schema fixture, applies current migrations through the one-shot migration owner, verifies preserved sentinel data, and starts the application under the separate runtime role. The documentation rehearsal separately begins at `0.2.8` with immutable revision history, a managed attachment, a signed STATIC publication, and retained PDF bytes. The network rehearsal begins at `0.4.7`, retains representative network records and NetBox identity, applies the current production images, then verifies exact Workspace ownership plus search/export. Its independent backup rehearsal captures PostgreSQL and media, restores both into clean volumes, and verifies the same data. Docker-backed evidence is mandatory; a SQLite or host-only pass cannot certify migrations or RLS.
+The general upgrade rehearsal begins from the maintained `0.1.3` schema fixture, applies current migrations through the one-shot migration owner, verifies preserved sentinel data, and starts the application under the separate runtime role. The documentation rehearsal separately begins at `0.2.8` with immutable revision history, a managed attachment, a signed STATIC publication, and retained PDF bytes. The network rehearsal begins at `0.4.7`, retains representative network records and NetBox identity, applies the current production images, then verifies exact Workspace ownership plus search/export. The controlled-client-access rehearsal begins at exact `0.5.9` and preserves client membership, publication/control identity, signed PDF evidence, outbox receipt, inbox state, SMTP queue identity, and digest/quiet-time preferences through the current release. Independent backup rehearsals capture PostgreSQL and media, restore both into clean volumes, and verify the same data. Docker-backed evidence is mandatory; a SQLite or host-only pass cannot certify migrations or RLS.
 
 ## Failure handling
 

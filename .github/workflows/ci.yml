@@ -83,6 +83,7 @@ jobs:
           make test-documentation-certification
           make test-inventory-certification
           make test-networks
+          make test-portal-notification-certification
       - name: Collect logs
         if: always()
         run: docker compose logs --no-color > compose.log

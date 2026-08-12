@@ -4,25 +4,63 @@ import * as OTPAuth from 'otpauth'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-async function invitationTokenFromMailpit(page: Page) {
+async function invitationTokenFromMailpit(page: Page, recipient: string) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const messagesResponse = await page.request.get('http://mailpit:8025/api/v1/messages')
     expect(messagesResponse.ok()).toBe(true)
     const messages = await messagesResponse.json() as { messages?: Array<{ ID?: string }> }
-    const messageId = messages.messages?.[0]?.ID
-    if (messageId) {
+    for (const message of messages.messages ?? []) {
+      const messageId = message.ID
+      if (!messageId) continue
       const messageResponse = await page.request.get(`http://mailpit:8025/api/v1/message/${messageId}`)
       expect(messageResponse.ok()).toBe(true)
-      const match = JSON.stringify(await messageResponse.json()).match(/#token=([A-Za-z0-9_-]+)/)
+      const serialized = JSON.stringify(await messageResponse.json())
+      if (!serialized.includes(recipient)) continue
+      const match = serialized.match(/#token=([A-Za-z0-9_-]+)/)
       if (match) return match[1]
     }
     await page.waitForTimeout(250)
   }
-  throw new Error('The staff invitation did not arrive in Mailpit.')
+  throw new Error(`The invitation for ${recipient} did not arrive in Mailpit.`)
+}
+
+async function enrollTotp(page: Page, password: string) {
+  await page.goto('/settings')
+  await page.getByRole('button', { name: 'Set up authenticator' }).click()
+  const currentPassword = page.getByLabel('Current password')
+  const setupAddressDisclosure = page.getByText('Show setup address')
+  await Promise.race([currentPassword.waitFor(), setupAddressDisclosure.waitFor()])
+  if (await currentPassword.isVisible()) {
+    await currentPassword.fill(password)
+    await page.getByRole('button', { name: 'Confirm change' }).click()
+  }
+  await setupAddressDisclosure.click()
+  const setupAddress = await page.locator('.mfa-manual-setup details code').textContent()
+  if (!setupAddress) throw new Error('Authenticator setup address was unavailable.')
+  const totp = OTPAuth.URI.parse(setupAddress)
+  if (!(totp instanceof OTPAuth.TOTP)) throw new Error('Authenticator setup did not return a TOTP address.')
+  const enterCurrentCode = async () => {
+    const secondsIntoWindow = Math.floor(Date.now() / 1000) % totp.period
+    if (secondsIntoWindow >= totp.period - 5) {
+      await page.waitForTimeout((totp.period - secondsIntoWindow + 1) * 1000)
+    }
+    await page.getByLabel('Authentication code').fill(totp.generate())
+    await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
+  }
+  await enterCurrentCode()
+  const savedCodes = page.getByRole('button', { name: 'I saved these codes' })
+  await Promise.race([savedCodes.waitFor(), currentPassword.waitFor()])
+  if (await currentPassword.isVisible()) {
+    await currentPassword.fill(password)
+    await page.getByRole('button', { name: 'Confirm change' }).click()
+    await enterCurrentCode()
+  }
+  await savedCodes.click()
 }
 
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(300_000)
+  page.setDefaultTimeout(15_000)
   const deploymentToken = process.env.TEKDOCS_E2E_BOOTSTRAP_TOKEN
   if (!deploymentToken) throw new Error('The isolated live test requires TEKDOCS_E2E_BOOTSTRAP_TOKEN.')
 
@@ -48,27 +86,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   }
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 
-  await page.goto('/settings')
-  await page.getByRole('button', { name: 'Set up authenticator' }).click()
-  const currentPassword = page.getByLabel('Current password')
-  const setupAddressDisclosure = page.getByText('Show setup address')
-  await Promise.race([currentPassword.waitFor(), setupAddressDisclosure.waitFor()])
-  if (await currentPassword.isVisible()) {
-    await currentPassword.fill(password)
-    await page.getByRole('button', { name: 'Confirm change' }).click()
-  }
-  await setupAddressDisclosure.click()
-  const setupAddress = await page.locator('.mfa-manual-setup details code').textContent()
-  if (!setupAddress) throw new Error('Authenticator setup address was unavailable.')
-  const totp = OTPAuth.URI.parse(setupAddress)
-  if (!(totp instanceof OTPAuth.TOTP)) throw new Error('Authenticator setup did not return a TOTP address.')
-  const secondsIntoWindow = Math.floor(Date.now() / 1000) % totp.period
-  if (secondsIntoWindow >= totp.period - 5) {
-    await page.waitForTimeout((totp.period - secondsIntoWindow + 1) * 1000)
-  }
-  await page.getByLabel('Authentication code').fill(totp.generate())
-  await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
-  await page.getByRole('button', { name: 'I saved these codes' }).click()
+  await enrollTotp(page, password)
 
   await page.goto('/organizations')
   await page.getByRole('button', { name: 'New organization' }).click()
@@ -92,10 +110,11 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
     headers: { 'X-CSRFToken': csrfCookie.value },
   })
   expect(invitationResponse.status()).toBe(201)
-  const invitationToken = await invitationTokenFromMailpit(page)
+  const invitationToken = await invitationTokenFromMailpit(page, staffEmail)
 
   const staffContext = await browser.newContext()
   const staffPage = await staffContext.newPage()
+  staffPage.setDefaultTimeout(15_000)
   const staffPassword = `${randomBytes(24).toString('base64url')}Bb8!`
   await staffPage.goto(`/auth/invitations/accept#token=${invitationToken}`)
   await staffPage.getByLabel('Your name').fill('Live Assigned Technician')
@@ -117,6 +136,14 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('alertdialog')).toContainText('The owner retains break-glass access')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText("Live Acme Client's access mode was updated")
+
+  const technicianRow = page.getByRole('table', { name: 'MSP members' }).getByRole('row').filter({ hasText: 'Live Assigned Technician' })
+  await technicianRow.getByRole('combobox', { name: 'Role for Live Assigned Technician' }).selectOption('administrator')
+  await technicianRow.getByRole('button', { name: 'Review change' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('Change Live Assigned Technician from Read-only to Administrator')
+  await page.getByRole('button', { name: 'Confirm change' }).click()
+  await expect(page.getByRole('status')).toContainText("Live Assigned Technician's role was updated")
+  await enrollTotp(staffPage, staffPassword)
 
   const assignedWorkspace = await staffPage.request.get(`/api/v1/workspaces/organizations/${clientId}`)
   expect(assignedWorkspace.status()).toBe(200)
@@ -142,6 +169,8 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('checkbox', { name: 'Vendor' }).check()
   await page.getByRole('button', { name: 'Save organization' }).click()
   await expect(page.getByRole('status')).toHaveText('Organization added.')
+  const vendorHref = await page.getByRole('link', { name: 'Live Northwind Vendor' }).getAttribute('href')
+  if (!vendorHref) throw new Error('The created vendor did not expose its workspace route.')
   await page.getByRole('link', { name: 'Live Acme Client' }).click()
   await page.getByRole('button', { name: 'Add relationship' }).click()
   await page.getByLabel('Relationship type').selectOption('supplied_by')
@@ -217,8 +246,16 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Audience').selectOption('client_visible')
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Publish immutable version' }).click()
+  await expect(page.getByRole('status')).toHaveText('STATIC snapshot submitted. A different authorized user must approve client portal availability.')
   await expect(page.getByText('Signature verified', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Close publication' }).click()
+  await staffPage.goto(vendorHref.replace(/\/overview$/, '/documentation'))
+  await staffPage.locator('.static-publication-list').getByRole('button', { name: /Live EdgeSwitch installation guide/ }).click()
+  await staffPage.getByRole('button', { name: 'Approve publication' }).click()
+  await staffPage.getByLabel('Decision reason').fill('Independent supplier-document approval')
+  staffPage.once('dialog', (dialog) => dialog.accept())
+  await staffPage.getByRole('button', { name: 'Record approval' }).click()
+  await expect(staffPage.getByRole('status')).toHaveText('Publication approved for its intended audience.')
   await page.getByRole('link', { name: 'Products' }).click()
   await page.getByRole('button', { name: 'Add publication' }).click()
   await page.getByLabel('STATIC publication').selectOption({ label: 'Live EdgeSwitch installation guide' })
@@ -306,75 +343,23 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   await page.getByRole('link', { name: 'Networks' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/networks$/)
-  await page.getByRole('button', { name: 'Racks' }).click()
-  await page.getByRole('button', { name: 'Add rack' }).click()
-  await page.getByLabel('Name').fill('Live Core Rack')
-  await page.getByLabel('Site').selectOption({ label: 'Live Main Campus' })
-  await page.getByLabel('Location').selectOption({ label: 'Building A' })
-  await page.getByLabel('Rack units').fill('42')
-  await page.getByRole('button', { name: 'Save rack' }).click()
-  await expect(page.getByRole('cell', { name: 'Live Core Rack', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Devices' }).click()
-  await page.getByRole('button', { name: 'Add asset-backed device' }).click()
-  await page.getByLabel('Name').fill('Live Core Switch')
-  await page.getByLabel('Hardware asset').selectOption({ label: 'Live core switch' })
-  await page.getByLabel('Role').selectOption('switch')
-  await page.getByLabel('Rack').selectOption({ label: 'Live Core Rack' })
-  await page.getByLabel('Starting unit').fill('20')
-  await page.getByLabel('Height (U)').fill('2')
-  await page.getByRole('button', { name: 'Save device' }).click()
-  await expect(page.getByRole('button', { name: 'Live Core Switch' })).toBeVisible()
-  await expect(page.getByRole('cell', { name: /Live Core Rack · U20–21/ })).toBeVisible()
-  await page.reload()
-  await expect(page.getByRole('button', { name: 'Live Core Switch' })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Subnets' }).click()
-  await page.getByRole('button', { name: 'Add subnet' }).click()
+  await page.getByRole('button', { name: 'New network' }).click()
   await page.getByLabel('Name').fill('Live management LAN')
-  await page.getByLabel(/^CIDR/).fill('192.0.2.0/24')
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByRole('cell', { name: '192.0.2.0/24', exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'IP addresses' }).click()
-  await page.getByRole('button', { name: 'Add IP address' }).click()
-  await page.getByLabel('IP address').fill('192.0.2.10')
-  await page.getByLabel('Subnet').selectOption({ label: '192.0.2.0/24 · Live management LAN' })
-  await page.getByLabel('Hardware asset').selectOption({ label: 'Live core switch' })
-  await page.getByLabel('DNS name').fill('switch.live.example.invalid')
-  await page.getByRole('button', { name: 'Save IP address' }).click()
-  await expect(page.getByRole('cell', { name: '192.0.2.10', exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'MAC addresses' }).click()
-  await page.getByRole('button', { name: 'Add MAC address' }).click()
-  await page.getByLabel('MAC address').fill('02:00:00:00:00:10')
-  await page.getByLabel('Hardware asset').selectOption({ label: 'Live core switch' })
-  await page.getByRole('button', { name: 'Save MAC address' }).click()
-  await expect(page.getByRole('cell', { name: '02:00:00:00:00:10', exact: true })).toBeVisible()
+  await page.getByLabel('Location').selectOption({ label: 'Live Main Campus · Building A' })
+  await page.getByLabel('VLAN').fill('20')
+  await page.getByLabel(/^Network \(CIDR\)/).fill('192.0.2.0/24')
+  await page.getByLabel('Primary DNS').fill('9.9.9.9')
+  await page.getByLabel('Secondary DNS').fill('1.1.1.1')
+  await page.getByLabel('Description').fill('Core management network')
+  await page.getByRole('button', { name: 'Save network' }).click()
+  const networkRow = page.getByRole('row').filter({ hasText: 'Live management LAN' })
+  await expect(networkRow).toContainText('192.0.2.0/24')
+  await expect(networkRow).toContainText('192.0.2.1–192.0.2.254')
+  await expect(networkRow).toContainText('192.0.2.1')
+  await expect(networkRow).toContainText('9.9.9.9, 1.1.1.1')
   await page.reload()
-  await page.getByRole('button', { name: 'IP addresses' }).click()
-  await expect(page.getByRole('cell', { name: '192.0.2.10', exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Wireless' }).click()
-  await page.getByRole('button', { name: 'Add wireless network' }).click()
-  await page.getByRole('textbox', { name: 'SSID', exact: true }).fill('Live Staff')
-  await page.getByLabel('Site').selectOption({ label: 'Live Main Campus' })
-  await page.getByLabel('Subnet').selectOption({ label: '192.0.2.0/24' })
-  await page.getByLabel('Client isolation').check()
-  await page.getByRole('button', { name: 'Save wireless network' }).click()
-  await expect(page.getByRole('cell', { name: 'Live Staff', exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'DNS' }).click()
-  await page.getByRole('button', { name: 'Add zone' }).click()
-  await page.getByLabel('Canonical zone name').fill('live.example.invalid')
-  await page.getByRole('button', { name: 'Save zone' }).click()
-  await page.getByRole('button', { name: 'Add record' }).click()
-  await page.getByLabel('Owner name').fill('switch.live.example.invalid')
-  await page.getByLabel('Linked IP inventory').selectOption({ label: '192.0.2.10' })
-  await page.getByRole('button', { name: 'Save DNS record' }).click()
-  await expect(page.getByRole('row').filter({ hasText: 'switch.live.example.invalid' })).toContainText('192.0.2.10')
-  await page.reload()
-  await page.getByRole('button', { name: 'DNS' }).click()
-  await expect(page.getByText('192.0.2.10', { exact: true })).toBeVisible()
+  await page.getByLabel('Search networks').fill('management')
+  await expect(page.getByRole('row').filter({ hasText: 'Live management LAN' })).toBeVisible()
 
   await page.getByRole('link', { name: 'People' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/people$/)
@@ -419,6 +404,12 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Location').selectOption({ label: 'Office 214' })
   await page.getByRole('button', { name: 'Save assignment' }).click()
   await expect(page.getByRole('definition').filter({ hasText: 'Live Morgan Ellis · Office 214 · Live Main Campus' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add address' }).click()
+  const macAddresses = page.getByRole('region', { name: 'MAC addresses' })
+  await macAddresses.getByRole('textbox', { name: 'MAC address' }).fill('02:00:00:00:00:10')
+  await macAddresses.getByLabel('Description').fill('Ethernet')
+  await macAddresses.getByRole('button', { name: 'Save address' }).click()
+  await expect(page.getByText('02:00:00:00:00:10', { exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: 'Licenses' }).click()
   await page.getByRole('button', { name: 'New license' }).click()
@@ -461,51 +452,6 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Reference').fill('LIVE-PRIVATE-RATE')
   await page.getByRole('dialog').getByRole('button', { name: 'Add cost' }).click()
   await expect(page.getByText(/USD 875.50/)).toBeVisible()
-
-  await page.getByRole('link', { name: 'Networks' }).click()
-  await page.getByRole('button', { name: 'Circuits' }).click()
-  await page.getByRole('button', { name: 'Add circuit' }).click()
-  const circuitForm = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Add circuit' }) })
-  await circuitForm.getByLabel('Name').fill('Live headquarters DIA')
-  await circuitForm.getByLabel('Provider').selectOption({ label: 'Live Northwind Vendor' })
-  await circuitForm.getByLabel('Contract').selectOption({ label: 'Live managed services agreement' })
-  await circuitForm.getByLabel('Service identifier').fill('LIVE-DIA-1000')
-  await circuitForm.getByLabel('Download Mbps').fill('1000')
-  await circuitForm.getByLabel('Upload Mbps').fill('1000')
-  await circuitForm.getByLabel('Service starts').fill('2026-08-10')
-  await circuitForm.getByLabel('Review on').fill('2027-06-15')
-  await circuitForm.getByRole('button', { name: 'Save circuit' }).click()
-  await expect(page.getByRole('button', { name: 'Live headquarters DIA', exact: true })).toBeVisible()
-  await expect(page.getByText('Live managed services agreement', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Add handoff' }).click()
-  const handoffForm = page.locator('form').filter({ has: page.getByRole('heading', { name: /Add handoff to Live headquarters DIA/ }) })
-  await handoffForm.getByLabel('Name').fill('Live carrier demarc')
-  await handoffForm.getByLabel('Connector').fill('LC')
-  await handoffForm.getByLabel('Provider handoff reference').fill('LIVE-DEMARC-1')
-  await handoffForm.getByLabel('Site').selectOption({ label: 'Live Main Campus' })
-  await handoffForm.getByLabel('Device').selectOption({ label: 'Live Core Switch' })
-  await handoffForm.getByRole('button', { name: 'Save handoff' }).click()
-  await expect(page.getByText('Live carrier demarc', { exact: true })).toBeVisible()
-  await page.reload()
-  await page.getByRole('button', { name: 'Circuits' }).click()
-  await expect(page.getByText('2027-06-15 · Review circuit', { exact: true })).toBeVisible()
-  await expect(page.getByText(/A side · fiber · LC · Live Core Switch/)).toBeVisible()
-  await page.getByRole('button', { name: 'NetBox' }).click()
-  await expect(page.getByText('No NetBox identities match this workspace and search.')).toBeVisible()
-  await page.getByRole('button', { name: 'Link record' }).click()
-  await page.getByLabel('TekDocs record').selectOption({ label: 'Live Core Rack · Rack' })
-  await page.getByLabel('NetBox numeric ID').fill('4107')
-  await page.getByRole('button', { name: 'Link identity' }).click()
-  await expect(page.getByRole('table', { name: 'NetBox object identities for this workspace' }).getByRole('cell', { name: '4107' })).toBeVisible()
-  await page.getByRole('button', { name: 'All records' }).click()
-  await page.getByRole('searchbox', { name: 'Search network inventory' }).fill('192.0.2.10')
-  await expect(page.getByRole('cell', { name: '192.0.2.10', exact: true })).toBeVisible()
-  const exportHref = await page.getByRole('link', { name: 'Export CSV' }).getAttribute('href')
-  expect(exportHref).toMatch(/\/api\/v1\/workspaces\/organizations\/[0-9a-f-]+\/networks\/export$/)
-  const exportResponse = await page.request.get(exportHref ?? '')
-  expect(exportResponse.ok()).toBe(true)
-  expect(exportResponse.headers()['content-type']).toContain('text/csv')
-  expect(await exportResponse.text()).toContain('tekdocs.networks.v1')
 
   await page.getByRole('link', { name: 'Documentation' }).click()
   await page.getByRole('button', { name: 'New document' }).click()
@@ -639,18 +585,89 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.locator('.resolved-markdown pre')).toContainText('MSP-owned block revision two.')
   await expect(page.locator('.resolved-markdown pre')).not.toContainText('revision three')
 
+  // Entity mentions are deliberately permission-aware. The site created earlier is
+  // MSP-private by default, so remove that exercised mention before producing the
+  // client-visible publication that the independent approver will authorize.
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  const clientDraft = page.getByRole('textbox', { name: 'Markdown source' })
+  await clientDraft.fill((await clientDraft.inputValue()).replace(/\n?\[[^\]]+\]\(tekdocs:\/\/entity\/[0-9a-f-]{36}\)\n?/gi, '\n'))
+  await page.getByRole('button', { name: 'Save document' }).click()
+  await expect(page.getByRole('status')).toHaveText('Document saved as revision 4.')
+
   await page.getByRole('button', { name: 'Publish STATIC' }).click()
   await page.getByLabel('Publication reason').fill('Live publication regression')
   await page.getByLabel('Audience').selectOption('client_visible')
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Publish immutable version' }).click()
-  await expect(page.getByRole('status')).toHaveText('Immutable STATIC publication and retained artifacts created.')
+  await expect(page.getByRole('status')).toHaveText('STATIC snapshot submitted. A different authorized user must approve client portal availability.')
   await expect(page.getByRole('heading', { name: 'Live Acme onboarding' })).toBeVisible()
   await expect(page.getByText('Signature verified', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible()
   await expect(page.locator('.publication-integrity code').first()).toContainText(/^SHA-256 [0-9a-f]{64}$/)
   await page.getByRole('button', { name: 'Close publication' }).click()
   await expect(page.getByRole('button', { name: /Live Acme onboarding.*1 STATIC/ })).toBeVisible()
+
+  const portalEmail = `live-client-${suffix}@example.invalid`
+  const currentCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+  if (!currentCsrf) throw new Error('The owner session lost its CSRF cookie before client invitation.')
+  const clientInvitation = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/client-invitations`, {
+    data: { email: portalEmail },
+    headers: { 'X-CSRFToken': currentCsrf.value },
+  })
+  expect(clientInvitation.status()).toBe(201)
+  const portalInvitationToken = await invitationTokenFromMailpit(page, portalEmail)
+  const portalContext = await browser.newContext()
+  const portalPage = await portalContext.newPage()
+  portalPage.setDefaultTimeout(15_000)
+  const portalPassword = `${randomBytes(24).toString('base64url')}Cc9!`
+  await portalPage.goto(`/auth/invitations/accept#token=${portalInvitationToken}`)
+  await portalPage.getByLabel('Your name').fill('Live Client Reader')
+  await portalPage.getByLabel('Password', { exact: true }).fill(portalPassword)
+  await portalPage.getByLabel('Confirm password').fill(portalPassword)
+  await portalPage.getByRole('button', { name: 'Activate account' }).click()
+  await expect(portalPage.getByRole('heading', { name: 'Published documentation' })).toBeVisible()
+  await expect(portalPage.getByText('No documentation has been published to your organization.')).toBeVisible()
+  await expect(portalPage.getByRole('link', { name: 'Organizations' })).not.toBeVisible()
+
+  await staffPage.goto(`/workspaces/organizations/${clientId}/documentation`)
+  await staffPage.locator('.static-publication-list').getByRole('button', { name: /Live Acme onboarding/ }).click()
+  await staffPage.getByRole('button', { name: 'Approve publication' }).click()
+  await staffPage.getByLabel('Decision reason').fill('Independent live-stack approval')
+  staffPage.once('dialog', (dialog) => dialog.accept())
+  await staffPage.getByRole('button', { name: 'Record approval' }).click()
+  await expect(staffPage.getByRole('status')).toHaveText('Publication approved for its intended audience.')
+
+  await portalPage.reload()
+  await expect(portalPage.getByRole('button', { name: /Live Acme onboarding/ })).toBeVisible()
+  await portalPage.getByRole('button', { name: /Live Acme onboarding/ }).click()
+  await expect(portalPage.getByRole('heading', { name: 'Live Acme onboarding' })).toBeVisible()
+  await expect(portalPage.getByText('Client visible', { exact: true })).toBeVisible()
+  await expect(portalPage.getByRole('link', { name: 'live-acme-onboarding-static.pdf' })).toBeVisible()
+
+  await expect.poll(async () => {
+    const response = await portalPage.request.get('/api/v1/portal/notifications')
+    if (!response.ok()) return []
+    return ((await response.json()) as { results: Array<{ title: string }> }).results.map((item) => item.title)
+  }, { timeout: 75_000 }).toEqual(expect.arrayContaining(['Portal access ready', 'Documentation published']))
+  await portalPage.getByRole('button', { name: /Notifications/ }).click()
+  await expect(portalPage.getByRole('dialog', { name: 'Notifications' })).toContainText('Documentation published')
+  await portalPage.getByRole('button', { name: 'Email preferences' }).click()
+  await portalPage.getByLabel('Delivery schedule').selectOption('daily')
+  await portalPage.getByLabel('Use quiet hours').check()
+  await portalPage.getByRole('button', { name: 'Save preferences' }).click()
+  await expect(portalPage.getByRole('status')).toHaveText('Email preferences saved.')
+
+  await page.goto(`/workspaces/organizations/${clientId}/documentation`)
+  await page.locator('.static-publication-list').getByRole('button', { name: /Live Acme onboarding/ }).click()
+  await page.getByRole('button', { name: 'Withdraw publication' }).click()
+  await page.getByLabel('Decision reason').fill('Live withdrawal regression')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Record withdrawal' }).click()
+  await expect(page.getByRole('status')).toHaveText('Publication withdrawn from audience availability; retained evidence remains accessible to authorized MSP staff.')
+  await expect(page.getByRole('region', { name: 'Publication history' }).getByText('withdrawn', { exact: true })).toBeVisible()
+  await portalPage.reload()
+  await expect(portalPage.getByText('No documentation has been published to your organization.')).toBeVisible()
+  await expect(portalPage.getByText('Live Acme onboarding')).not.toBeVisible()
 
   const privateLink = 'https://start.1password.com/open/i?a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com'
   await page.goto(`/workspaces/organizations/${clientId}/credentials`)
@@ -667,5 +684,6 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   expect(handoffResponse.status()).toBe(302)
   expect(handoffResponse.headers().location).toBe(privateLink)
   await expect(page.locator('body')).not.toContainText(privateLink)
+  await portalContext.close()
   await staffContext.close()
 })

@@ -204,6 +204,7 @@ describe('authentication boundary', () => {
 
     await screen.findByRole('heading', { name: 'Overview' })
     expect(acceptInvitation).toHaveBeenCalledWith({ token, displayName: 'Invited Technician', password })
+    expect(window.location.pathname).toBe('/overview')
     expect(screen.queryByDisplayValue(token)).not.toBeInTheDocument()
     expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
   })

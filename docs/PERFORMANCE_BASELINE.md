@@ -43,6 +43,7 @@ Run the blocking cross-cutting suite with:
 make test-stabilization
 make test-documentation-certification
 make test-inventory-certification
+make test-portal-notification-certification
 ```
 
 Run the performance fixture alone when profiling:

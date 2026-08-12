@@ -80,6 +80,10 @@ This register turns known limitations into release obligations. A risk remains o
 
 `TD-RISK-031` through `TD-RISK-038` remain protected by their existing database and isolation controls, while `TD-RISK-043` is **mitigated with recurring owner**. The ordinary UI no longer promotes legacy granular authoring, but the retained compatibility API is still real product debt. It must not be removed or widened without explicit migration, export, permission, and recovery review.
 
+## 0.6.0 controlled-client-access certification disposition
+
+`TD-RISK-003`, `TD-RISK-039`, `TD-RISK-040`, `TD-RISK-041`, and `TD-RISK-042` are **certified for the implemented one-MSP installation boundary with recurring owners**. The named PostgreSQL composition, real publisher/approver/client browser journey, exact-`0.5.9` upgrade, independent PostgreSQL/media restore, and production-image checks are now one release contract. This does not close SMTP's remote-acceptance crash window, provider bounce ingestion, supported encrypted/key-loss recovery, hosted workflow evidence, anonymous access, client co-authoring, or hosted multi-MSP isolation.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

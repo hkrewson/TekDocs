@@ -44,6 +44,19 @@ function client(): ComplianceClient {
       applicability: 'applicable', implementation_status: 'implemented', owner_id: null, owner: null,
       review_due_date: null, reviews: [{ id: 'review-1', decision: 'Verified', note: '', reviewed_by: 'Owner', reviewed_at: '2026-08-12T00:00:00Z' }],
     }),
+    evidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 100, count: 0, has_more: false }),
+    createEvidence: vi.fn().mockResolvedValue({
+      id: 'evidence-1', title: 'Access review', kind: 'note', summary: '', source_url: '', source_entity_id: null,
+      source_entity_name: null, collection_start: null, collection_end: null, created_by: 'Owner', created_at: '2026-08-12T00:00:00Z',
+      reviews: [], control_links: [],
+    }),
+    reviewEvidence: vi.fn().mockResolvedValue({
+      id: 'evidence-review-1', status: 'collected', decision: 'Collected', note: '', reviewed_by: 'Owner', reviewed_at: '2026-08-12T00:00:00Z',
+    }),
+    linkEvidence: vi.fn().mockResolvedValue({
+      id: 'evidence-link-1', assignment_id: 'assignment-1', control_id: 'control-1', control_revision: 1,
+      linked_by: 'Owner', linked_at: '2026-08-12T00:00:00Z',
+    }),
   }
 }
 
@@ -84,5 +97,36 @@ describe('Compliance', () => {
       applicability: 'applicable', implementation_status: 'implemented', owner_id: 'owner-1', decision: 'Verified',
     })))
     expect(await screen.findByText(/applicable · implemented/i)).toBeInTheDocument()
+  })
+
+  it('collects evidence and links it to an exact control assignment', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    vi.mocked(api.assignments).mockResolvedValue({
+      results: [{
+        id: 'assignment-1', framework_id: 'framework-1', control_id: 'control-1', control_identifier: 'AC-1',
+        control_title: 'Asset inventory', control_revision: 1, applicability: 'applicable', implementation_status: 'implemented',
+        owner_id: null, owner: null, review_due_date: null, reviews: [],
+      }], owner_choices: [],
+    })
+    render(<Compliance workspace={null} client={api} />)
+
+    await screen.findByRole('heading', { name: 'Security Baseline' })
+    await user.click(screen.getByRole('button', { name: 'Add or link evidence' }))
+    await user.type(screen.getByLabelText('Title'), 'Access review')
+    await user.selectOptions(screen.getByLabelText('Kind'), 'url')
+    await user.type(screen.getByLabelText('Source URL'), 'https://example.test/access-review')
+    await user.type(screen.getByLabelText('Collection start'), '2026-07-01')
+    await user.type(screen.getByLabelText('Collection end'), '2026-07-31')
+    await user.selectOptions(screen.getByLabelText('Link to control'), 'assignment-1')
+    await user.type(screen.getByLabelText('Collection decision'), 'Collected')
+    await user.click(screen.getByRole('button', { name: 'Save evidence' }))
+
+    await waitFor(() => expect(api.createEvidence).toHaveBeenCalledWith(null, expect.objectContaining({
+      title: 'Access review', kind: 'url', source_url: 'https://example.test/access-review',
+      collection_start: '2026-07-01', collection_end: '2026-07-31',
+    })))
+    expect(api.reviewEvidence).toHaveBeenCalledWith(null, 'evidence-1', expect.objectContaining({ status: 'collected', decision: 'Collected' }))
+    expect(api.linkEvidence).toHaveBeenCalledWith(null, 'assignment-1', 'evidence-1')
   })
 })

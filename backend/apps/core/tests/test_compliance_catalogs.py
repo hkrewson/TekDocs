@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.compliance_catalogs import ControlInput, create_catalog_version, create_framework, frameworks_for_scope
+from apps.core.compliance_evidence import EvidenceInput, create_evidence, link_evidence, review_evidence
 from apps.core.compliance_operations import AssignmentInput, record_assignment_review
 from apps.core.models import (
     ComplianceCatalogEntry,
@@ -17,6 +18,7 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.scoping import DataScope
+from apps.core.workspaces import resolve_msp_workspace
 
 
 @pytest.fixture
@@ -287,6 +289,90 @@ def test_assignment_api_is_exact_workspace_scoped(owner_client, installation):
         content_type="application/json",
     )
     assert denied.status_code == 400
+
+
+@pytest.mark.django_db
+def test_evidence_is_reused_with_exact_revision_links_and_retained_reviews(installation):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="Evidence baseline",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("E-1", "First"), control("E-2", "Second")],
+    )
+    assignments = [
+        record_assignment_review(
+            framework=framework,
+            control_entity_id=item.entity_id,
+            actor_id=installation.owner.id,
+            value=AssignmentInput(
+                applicability="applicable",
+                implementation_status="implemented",
+                decision="In scope",
+            ),
+        )
+        for item in framework.controls.all()
+    ]
+    evidence = create_evidence(
+        workspace=resolve_msp_workspace(installation.owner),
+        actor_id=installation.owner.id,
+        value=EvidenceInput(title="Quarterly access review", kind="note", summary="Reviewed **quarterly**."),
+    )
+    review = review_evidence(
+        evidence=evidence,
+        actor_id=installation.owner.id,
+        status="accepted",
+        decision="Current",
+    )
+    links = [link_evidence(assignment=item, evidence=evidence, actor_id=installation.owner.id) for item in assignments]
+    assert {item.control_revision_id for item in links} == {item.control_revision_id for item in assignments}
+    assert evidence.control_links.count() == 2
+    with pytest.raises(DatabaseError), transaction.atomic():
+        evidence.reviews.filter(pk=review.pk).update(decision="Rewritten")
+
+
+@pytest.mark.django_db
+def test_evidence_api_creates_reviews_and_links_in_the_msp_workspace(owner_client, installation):
+    framework = create_framework(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        name="Evidence API",
+        version_label="v1",
+        description="",
+        source_url="",
+        controls=[control("EA-1", "API evidence")],
+    )
+    assignment = record_assignment_review(
+        framework=framework,
+        control_entity_id=framework.controls.get().entity_id,
+        actor_id=installation.owner.id,
+        value=AssignmentInput(applicability="applicable", implementation_status="implemented", decision="Implemented"),
+    )
+    created = owner_client.post(
+        reverse("msp-compliance-evidence-list-create"),
+        {"title": "Configuration export", "kind": "url", "source_url": "https://example.invalid/evidence"},
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    evidence_id = created.json()["id"]
+    reviewed = owner_client.post(
+        reverse("msp-compliance-evidence-review", kwargs={"evidence_entity_id": evidence_id}),
+        {"status": "accepted", "decision": "Verified"},
+        content_type="application/json",
+    )
+    assert reviewed.status_code == 201
+    linked = owner_client.post(
+        reverse("msp-compliance-assignment-evidence-link", kwargs={"assignment_id": assignment.pk}),
+        {"evidence_id": evidence_id},
+        content_type="application/json",
+    )
+    assert linked.status_code == 201
+    listing = owner_client.get(reverse("msp-compliance-evidence-list-create"))
+    assert listing.json()["results"][0]["control_links"][0]["control_id"] == str(assignment.control.entity_id)
 
 
 @pytest.mark.django_db(transaction=True)

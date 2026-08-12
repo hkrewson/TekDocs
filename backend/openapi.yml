@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.2
+  version: 0.7.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5702,6 +5702,154 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/compliance/assignments/{assignment_id}/evidence:
+    post:
+      operationId: msp_compliance_assignment_evidence_link
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceControlLink'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/evidence:
+    get:
+      operationId: msp_compliance_evidence_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_compliance_evidence_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidence'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/evidence/{evidence_entity_id}/review:
+    post:
+      operationId: msp_compliance_evidence_review
+      parameters:
+      - in: path
+        name: evidence_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceReview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/compliance/frameworks:
     get:
       operationId: msp_compliance_framework_list
@@ -10657,6 +10805,179 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Invitation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/assignments/{assignment_id}/evidence:
+    post:
+      operationId: organization_compliance_assignment_evidence_link
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceLinkWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceControlLink'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/evidence:
+    get:
+      operationId: organization_compliance_evidence_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_compliance_evidence_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidence'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/evidence/{evidence_entity_id}/review:
+    post:
+      operationId: organization_compliance_evidence_review
+      parameters:
+      - in: path
+        name: evidence_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ComplianceEvidenceReviewWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidenceReview'
           description: ''
           headers:
             X-Request-ID:
@@ -19398,6 +19719,209 @@ components:
           maxLength: 20000
       required:
       - identifier
+      - title
+    ComplianceEvidence:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          type: string
+        summary:
+          type: string
+        source_url:
+          type: string
+          format: uri
+        source_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_entity_name:
+          type: string
+          nullable: true
+        collection_start:
+          type: string
+          format: date
+          nullable: true
+        collection_end:
+          type: string
+          format: date
+          nullable: true
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceEvidenceReview'
+        control_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceEvidenceControlLink'
+      required:
+      - collection_end
+      - collection_start
+      - control_links
+      - created_at
+      - created_by
+      - id
+      - kind
+      - reviews
+      - source_entity_id
+      - source_entity_name
+      - source_url
+      - summary
+      - title
+    ComplianceEvidenceControlLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assignment_id:
+          type: string
+          format: uuid
+        control_id:
+          type: string
+          format: uuid
+        control_revision:
+          type: integer
+        linked_by:
+          type: string
+        linked_at:
+          type: string
+          format: date-time
+      required:
+      - assignment_id
+      - control_id
+      - control_revision
+      - id
+      - linked_at
+      - linked_by
+    ComplianceEvidenceLinkWrite:
+      type: object
+      properties:
+        evidence_id:
+          type: string
+          format: uuid
+      required:
+      - evidence_id
+    ComplianceEvidenceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceEvidence'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    ComplianceEvidenceReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        decision:
+          type: string
+        note:
+          type: string
+        reviewed_by:
+          type: string
+        reviewed_at:
+          type: string
+          format: date-time
+      required:
+      - decision
+      - id
+      - note
+      - reviewed_at
+      - reviewed_by
+      - status
+    ComplianceEvidenceReviewWrite:
+      type: object
+      properties:
+        status:
+          enum:
+          - collected
+          - accepted
+          - rejected
+          - expired
+          type: string
+          description: |-
+            * `collected` - collected
+            * `accepted` - accepted
+            * `rejected` - rejected
+            * `expired` - expired
+          x-spec-enum-id: 9baae0f68d7f5b44
+        decision:
+          type: string
+          maxLength: 120
+        note:
+          type: string
+          default: ''
+          maxLength: 20000
+      required:
+      - decision
+      - status
+    ComplianceEvidenceWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        kind:
+          enum:
+          - note
+          - url
+          - entity
+          type: string
+          description: |-
+            * `note` - note
+            * `url` - url
+            * `entity` - entity
+          x-spec-enum-id: 3745a1b6a01ce8bc
+        summary:
+          type: string
+          default: ''
+          maxLength: 20000
+        source_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 500
+        source_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        collection_start:
+          type: string
+          format: date
+          nullable: true
+        collection_end:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - kind
       - title
     ComplianceFramework:
       type: object

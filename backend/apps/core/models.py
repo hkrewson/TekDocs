@@ -4097,7 +4097,7 @@ class IntegrationConflict(TimestampedModel):
                 fields=("connection", "remote_type", "remote_id"),
                 condition=models.Q(status=IntegrationConflictStatus.OPEN),
                 name="integration_open_conflict_unique",
-            )
+            ),
         ]
         indexes = [models.Index(fields=("workspace", "status"), name="core_intconf_scope_idx")]
 
@@ -4652,9 +4652,7 @@ class ComplianceControlAssignment(TimestampedModel):
 
     class Meta:
         ordering = ("framework_id", "control_id")
-        constraints = [
-            models.UniqueConstraint(fields=("workspace", "control"), name="compliance_assignment_unique")
-        ]
+        constraints = [models.UniqueConstraint(fields=("workspace", "control"), name="compliance_assignment_unique")]
         indexes = [models.Index(fields=("workspace", "implementation_status"), name="core_compassign_scope_idx")]
 
     def __str__(self) -> str:
@@ -4670,9 +4668,7 @@ class ComplianceAssignmentReview(models.Model):
     organization = models.ForeignKey(
         Organization, on_delete=models.PROTECT, related_name="compliance_assignment_reviews", null=True, blank=True
     )
-    assignment = models.ForeignKey(
-        ComplianceControlAssignment, on_delete=models.PROTECT, related_name="reviews"
-    )
+    assignment = models.ForeignKey(ComplianceControlAssignment, on_delete=models.PROTECT, related_name="reviews")
     control_revision = models.ForeignKey(
         ComplianceControlRevision, on_delete=models.PROTECT, related_name="assignment_reviews"
     )
@@ -4702,3 +4698,130 @@ class ComplianceAssignmentReview(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Compliance assignment reviews are retained")
+
+
+class ComplianceEvidenceKind(models.TextChoices):
+    NOTE = "note", "Recorded note"
+    URL = "url", "External URL"
+    ENTITY = "entity", "TekDocs entity"
+
+
+class ComplianceEvidenceStatus(models.TextChoices):
+    COLLECTED = "collected", "Collected"
+    ACCEPTED = "accepted", "Accepted"
+    REJECTED = "rejected", "Rejected"
+    EXPIRED = "expired", "Expired"
+
+
+class ComplianceEvidence(TimestampedModel):
+    """Reusable exact-Workspace evidence identity with a bounded collection window."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_evidence")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_evidence")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_evidence", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="compliance_evidence")
+    kind = models.CharField(max_length=16, choices=ComplianceEvidenceKind.choices)
+    source_url = models.URLField(max_length=500, blank=True)
+    source_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="compliance_evidence_sources", null=True, blank=True
+    )
+    summary = models.TextField(blank=True)
+    collection_start = models.DateField(null=True, blank=True)
+    collection_end = models.DateField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_compliance_evidence"
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "id")
+        indexes = [models.Index(fields=("workspace", "kind"), name="core_compevidence_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+
+class ComplianceEvidenceLink(models.Model):
+    """Retained control-assignment edge to reusable evidence and an exact control revision."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_evidence_links")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_evidence_links")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_evidence_links", null=True, blank=True
+    )
+    assignment = models.ForeignKey(ComplianceControlAssignment, on_delete=models.PROTECT, related_name="evidence_links")
+    evidence = models.ForeignKey(ComplianceEvidence, on_delete=models.PROTECT, related_name="control_links")
+    control_revision = models.ForeignKey(
+        ComplianceControlRevision, on_delete=models.PROTECT, related_name="evidence_links"
+    )
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="linked_compliance_evidence"
+    )
+    linked_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("linked_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("assignment", "evidence", "control_revision"),
+                name="compliance_evidence_link_unique",
+            )
+        ]
+        indexes = [models.Index(fields=("workspace", "linked_at"), name="core_compevlink_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.evidence} linked to {self.assignment}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance evidence links are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance evidence links are retained")
+
+
+class ComplianceEvidenceReview(models.Model):
+    """Append-only evidence review decision history."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_evidence_reviews")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_evidence_reviews")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_evidence_reviews", null=True, blank=True
+    )
+    evidence = models.ForeignKey(ComplianceEvidence, on_delete=models.PROTECT, related_name="reviews")
+    status = models.CharField(max_length=16, choices=ComplianceEvidenceStatus.choices)
+    decision = models.CharField(max_length=120)
+    note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="compliance_evidence_reviews"
+    )
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-reviewed_at", "id")
+        indexes = [models.Index(fields=("workspace", "reviewed_at"), name="core_compevreview_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.status} review of {self.evidence}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance evidence reviews are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance evidence reviews are retained")

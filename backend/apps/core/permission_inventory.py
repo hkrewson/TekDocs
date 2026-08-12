@@ -131,6 +131,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-compliance-assignment-list", ("GET",), PermissionKey.COMPLIANCE_VIEW),
     route("msp-compliance-assignment-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
     route(
+        "msp-compliance-evidence-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+    ),
+    route("msp-compliance-evidence-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
+    route("msp-compliance-assignment-evidence-link", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,)),
+    route(
         "msp-document-reference-list-create",
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
@@ -1239,11 +1247,34 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
-        "organization-compliance-assignment-list", ("GET",), PermissionKey.COMPLIANCE_VIEW,
+        "organization-compliance-assignment-list",
+        ("GET",),
+        PermissionKey.COMPLIANCE_VIEW,
         organization_scoped=True,
     ),
     route(
-        "organization-compliance-assignment-review", ("POST",), mutations=(PermissionKey.COMPLIANCE_EDIT,),
+        "organization-compliance-assignment-review",
+        ("POST",),
+        mutations=(PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-evidence-list-create",
+        ("GET", "POST"),
+        PermissionKey.COMPLIANCE_VIEW,
+        (PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-evidence-review",
+        ("POST",),
+        mutations=(PermissionKey.COMPLIANCE_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-compliance-assignment-evidence-link",
+        ("POST",),
+        mutations=(PermissionKey.COMPLIANCE_EDIT,),
         organization_scoped=True,
     ),
 )

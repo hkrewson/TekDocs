@@ -10,6 +10,8 @@ import type {
   ComplianceAssignmentDraft,
   ComplianceClient,
   ComplianceControlDraft,
+  ComplianceEvidence,
+  ComplianceEvidenceDraft,
   ComplianceFramework,
   ComplianceFrameworkDraft,
   ComplianceOwnerChoice,
@@ -34,6 +36,15 @@ const EMPTY_ASSIGNMENT: ComplianceAssignmentDraft = {
   review_due_date: null,
   decision: "",
   note: "",
+};
+const EMPTY_EVIDENCE: ComplianceEvidenceDraft = {
+  title: "",
+  kind: "note",
+  summary: "",
+  source_url: "",
+  source_entity_id: null,
+  collection_start: null,
+  collection_end: null,
 };
 
 function controlsFrom(
@@ -236,6 +247,12 @@ export function Compliance({
   const [revisions, setRevisions] = useState<ComplianceCatalogRevision[]>([]);
   const [assignments, setAssignments] = useState<ComplianceAssignment[]>([]);
   const [ownerChoices, setOwnerChoices] = useState<ComplianceOwnerChoice[]>([]);
+  const [evidence, setEvidence] = useState<ComplianceEvidence[]>([]);
+  const [evidenceFormOpen, setEvidenceFormOpen] = useState(false);
+  const [evidenceDraft, setEvidenceDraft] = useState<ComplianceEvidenceDraft>(EMPTY_EVIDENCE);
+  const [existingEvidenceId, setExistingEvidenceId] = useState("");
+  const [evidenceAssignmentId, setEvidenceAssignmentId] = useState("");
+  const [evidenceDecision, setEvidenceDecision] = useState("");
   const [reviewingControl, setReviewingControl] = useState<string | null>(null);
   const [assignmentDraft, setAssignmentDraft] =
     useState<ComplianceAssignmentDraft>(EMPTY_ASSIGNMENT);
@@ -300,6 +317,17 @@ export function Compliance({
       });
     return () => controller.abort();
   }, [client, selectedId, workspace]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    client
+      .evidence(workspace, controller.signal)
+      .then((result) => setEvidence(result.results))
+      .catch(() => {
+        if (!controller.signal.aborted) setError("Compliance evidence could not be loaded.");
+      });
+    return () => controller.abort();
+  }, [client, workspace]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -405,6 +433,37 @@ export function Compliance({
           ? caught.message
           : "The control review could not be saved.",
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEvidence() {
+    setSaving(true);
+    setError(null);
+    try {
+      let evidenceId = existingEvidenceId;
+      if (!evidenceId) {
+        const created = await client.createEvidence(workspace, evidenceDraft);
+        evidenceId = created.id;
+        await client.reviewEvidence(workspace, evidenceId, {
+          status: "collected",
+          decision: evidenceDecision,
+          note: "",
+        });
+      }
+      if (evidenceAssignmentId) {
+        await client.linkEvidence(workspace, evidenceAssignmentId, evidenceId);
+      }
+      const refreshed = await client.evidence(workspace);
+      setEvidence(refreshed.results);
+      setEvidenceFormOpen(false);
+      setEvidenceDraft(EMPTY_EVIDENCE);
+      setExistingEvidenceId("");
+      setEvidenceAssignmentId("");
+      setEvidenceDecision("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The evidence could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -806,6 +865,53 @@ export function Compliance({
           )}
         </section>
       </div>
+      <section className="content-section compliance-evidence" aria-labelledby="compliance-evidence-heading">
+        <div className="section-heading">
+          <div>
+            <h2 id="compliance-evidence-heading">Evidence</h2>
+            <p>Reusable workspace evidence with collection windows, exact control links, and retained reviews.</p>
+          </div>
+          {canManage && (
+            <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(true)}>
+              <Plus size={15} /> Add or link evidence
+            </button>
+          )}
+        </div>
+        {evidenceFormOpen && (
+          <div className="compliance-evidence-form">
+            <label>
+              <span>Reuse existing evidence</span>
+              <select value={existingEvidenceId} onChange={(event) => setExistingEvidenceId(event.target.value)}>
+                <option value="">Create new evidence</option>
+                {evidence.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Link to control</span>
+              <select value={evidenceAssignmentId} onChange={(event) => setEvidenceAssignmentId(event.target.value)}>
+                <option value="">Keep unlinked</option>
+                {assignments.map((item) => <option key={item.id} value={item.id}>{item.control_identifier} — {item.control_title}</option>)}
+              </select>
+            </label>
+            {!existingEvidenceId && <>
+              <label><span>Title</span><input value={evidenceDraft.title} maxLength={240} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, title: event.target.value })} /></label>
+              <label><span>Kind</span><select value={evidenceDraft.kind} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, kind: event.target.value as ComplianceEvidenceDraft["kind"], source_url: "", source_entity_id: null })}><option value="note">Recorded note</option><option value="url">External URL</option></select></label>
+              {evidenceDraft.kind === "url" && <label className="wide-field"><span>Source URL</span><input type="url" value={evidenceDraft.source_url} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, source_url: event.target.value })} /></label>}
+              <label><span>Collection start</span><input type="date" value={evidenceDraft.collection_start ?? ""} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, collection_start: event.target.value || null })} /></label>
+              <label><span>Collection end</span><input type="date" value={evidenceDraft.collection_end ?? ""} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, collection_end: event.target.value || null })} /></label>
+              <label className="wide-field"><span>Summary (Markdown)</span><textarea rows={3} value={evidenceDraft.summary} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, summary: event.target.value })} /></label>
+              <label className="wide-field"><span>Collection decision</span><input maxLength={120} value={evidenceDecision} onChange={(event) => setEvidenceDecision(event.target.value)} /></label>
+            </>}
+            <div className="form-actions wide-field">
+              <button type="button" className="primary-button" disabled={saving || (!existingEvidenceId && (!evidenceDraft.title || !evidenceDecision))} onClick={() => { void saveEvidence(); }}>{existingEvidenceId ? "Link evidence" : "Save evidence"}</button>
+              <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {evidence.length === 0 ? <p className="empty-state">No evidence has been collected in this workspace.</p> : (
+          <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Evidence</th><th>Source / window</th><th>Controls</th><th>Latest review</th></tr></thead><tbody>{evidence.map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.kind}</small></td><td>{item.source_url ? <a href={item.source_url} target="_blank" rel="noreferrer">Open source</a> : item.source_entity_name ?? "Recorded in TekDocs"}<small>{item.collection_start ?? "Open"} – {item.collection_end ?? "Open"}</small></td><td>{item.control_links.length ? item.control_links.map((link) => `r${link.control_revision}`).join(", ") : "Unlinked"}</td><td>{item.reviews[0] ? <><strong>{item.reviews[0].status}</strong><small>{item.reviews[0].decision}</small></> : "Not reviewed"}</td></tr>)}</tbody></table></div>
+        )}
+      </section>
     </>
   );
 }

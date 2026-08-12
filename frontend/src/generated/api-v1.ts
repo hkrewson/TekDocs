@@ -1700,6 +1700,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/compliance/assignments/{assignment_id}/evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["msp_compliance_assignment_evidence_link"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_evidence_list"];
+        readonly put?: never;
+        readonly post: operations["msp_compliance_evidence_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/evidence/{evidence_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["msp_compliance_evidence_review"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/compliance/frameworks": {
         readonly parameters: {
             readonly query?: never;
@@ -3198,6 +3246,54 @@ export interface paths {
         readonly get: operations["workspaces_organizations_client_invitations_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_client_invitations_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/assignments/{assignment_id}/evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["organization_compliance_assignment_evidence_link"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_evidence_list"];
+        readonly put?: never;
+        readonly post: operations["organization_compliance_evidence_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/evidence/{evidence_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["organization_compliance_evidence_review"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -5633,6 +5729,96 @@ export interface components {
             readonly description: string;
             /** @default  */
             readonly guidance: string;
+        };
+        readonly ComplianceEvidence: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly kind: string;
+            readonly summary: string;
+            /** Format: uri */
+            readonly source_url: string;
+            /** Format: uuid */
+            readonly source_entity_id: string | null;
+            readonly source_entity_name: string | null;
+            /** Format: date */
+            readonly collection_start: string | null;
+            /** Format: date */
+            readonly collection_end: string | null;
+            readonly created_by: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly reviews: readonly components["schemas"]["ComplianceEvidenceReview"][];
+            readonly control_links: readonly components["schemas"]["ComplianceEvidenceControlLink"][];
+        };
+        readonly ComplianceEvidenceControlLink: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly assignment_id: string;
+            /** Format: uuid */
+            readonly control_id: string;
+            readonly control_revision: number;
+            readonly linked_by: string;
+            /** Format: date-time */
+            readonly linked_at: string;
+        };
+        readonly ComplianceEvidenceLinkWrite: {
+            /** Format: uuid */
+            readonly evidence_id: string;
+        };
+        readonly ComplianceEvidenceResult: {
+            readonly results: readonly components["schemas"]["ComplianceEvidence"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+        };
+        readonly ComplianceEvidenceReview: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly status: string;
+            readonly decision: string;
+            readonly note: string;
+            readonly reviewed_by: string;
+            /** Format: date-time */
+            readonly reviewed_at: string;
+        };
+        readonly ComplianceEvidenceReviewWrite: {
+            /**
+             * @description * `collected` - collected
+             *     * `accepted` - accepted
+             *     * `rejected` - rejected
+             *     * `expired` - expired
+             * @enum {string}
+             */
+            readonly status: "collected" | "accepted" | "rejected" | "expired";
+            readonly decision: string;
+            /** @default  */
+            readonly note: string;
+        };
+        readonly ComplianceEvidenceWrite: {
+            readonly title: string;
+            /**
+             * @description * `note` - note
+             *     * `url` - url
+             *     * `entity` - entity
+             * @enum {string}
+             */
+            readonly kind: "note" | "url" | "entity";
+            /** @default  */
+            readonly summary: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly source_url: string;
+            /** Format: uuid */
+            readonly source_entity_id?: string | null;
+            /** Format: date */
+            readonly collection_start?: string | null;
+            /** Format: date */
+            readonly collection_end?: string | null;
         };
         readonly ComplianceFramework: {
             /** Format: uuid */
@@ -13537,6 +13723,115 @@ export interface operations {
             };
         };
     };
+    readonly msp_compliance_assignment_evidence_link: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly assignment_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceLinkWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceLinkWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceLinkWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceControlLink"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_evidence_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceResult"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_evidence_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidence"];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_evidence_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceReviewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceReviewWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceReviewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceReview"];
+                };
+            };
+        };
+    };
     readonly msp_compliance_framework_list: {
         readonly parameters: {
             readonly query?: {
@@ -17284,6 +17579,121 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Invitation"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_assignment_evidence_link: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly assignment_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceLinkWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceLinkWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceLinkWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceControlLink"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_evidence_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceResult"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_evidence_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidence"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_evidence_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ComplianceEvidenceReviewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ComplianceEvidenceReviewWrite"];
+                readonly "multipart/form-data": components["schemas"]["ComplianceEvidenceReviewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ComplianceEvidenceReview"];
                 };
             };
         };

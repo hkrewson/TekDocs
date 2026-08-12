@@ -63,6 +63,14 @@ from apps.core.compliance_catalog_views import (
     OrganizationComplianceFrameworkDetailView,
     OrganizationComplianceFrameworkListCreateView,
 )
+from apps.core.compliance_evidence_views import (
+    MSPComplianceAssignmentEvidenceLinkView,
+    MSPComplianceEvidenceListCreateView,
+    MSPComplianceEvidenceReviewView,
+    OrganizationComplianceAssignmentEvidenceLinkView,
+    OrganizationComplianceEvidenceListCreateView,
+    OrganizationComplianceEvidenceReviewView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -655,6 +663,21 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/frameworks/<uuid:framework_entity_id>/controls/<uuid:control_entity_id>/review",
         MSPComplianceAssignmentReviewView.as_view(),
         name="msp-compliance-assignment-review",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/evidence",
+        MSPComplianceEvidenceListCreateView.as_view(),
+        name="msp-compliance-evidence-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/evidence/<uuid:evidence_entity_id>/review",
+        MSPComplianceEvidenceReviewView.as_view(),
+        name="msp-compliance-evidence-review",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/assignments/<uuid:assignment_id>/evidence",
+        MSPComplianceAssignmentEvidenceLinkView.as_view(),
+        name="msp-compliance-assignment-evidence-link",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1594,6 +1617,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks/<uuid:framework_entity_id>/controls/<uuid:control_entity_id>/review",
         OrganizationComplianceAssignmentReviewView.as_view(),
         name="organization-compliance-assignment-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/evidence",
+        OrganizationComplianceEvidenceListCreateView.as_view(),
+        name="organization-compliance-evidence-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/evidence/<uuid:evidence_entity_id>/review",
+        OrganizationComplianceEvidenceReviewView.as_view(),
+        name="organization-compliance-evidence-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/assignments/<uuid:assignment_id>/evidence",
+        OrganizationComplianceAssignmentEvidenceLinkView.as_view(),
+        name="organization-compliance-assignment-evidence-link",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

@@ -1103,7 +1103,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | --- | --- |
 | `0.7.1` | **Complete:** Compliance frameworks and versioned control catalogs. |
 | `0.7.2` | **Complete:** Applicability, owners, status, reviews, and scoped control assignments. |
-| `0.7.3` | Evidence links, collection windows, review history, and permission-aware reuse. |
+| `0.7.3` | **Complete:** Evidence links, collection windows, review history, and permission-aware reuse. |
 | `0.7.4` | Risks, treatments, acceptance, deadlines, and reporting. |
 | `0.7.5` | Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
@@ -1135,6 +1135,16 @@ Evidence: `docs/releases/0.7.1.md`.
 - [x] Schema migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0064, and release evidence agree at `0.7.2`. Evidence, risks, and signed bundles remain later slices.
 
 Evidence: `docs/releases/0.7.2.md`.
+
+### `0.7.3` acceptance criteria
+
+- [x] Evidence is a reusable, Entity-backed object owned by one explicit MSP or organization Workspace, with a bounded note, URL, or exact-Workspace Entity source and an optional valid collection window.
+- [x] One evidence object can support multiple assignments without copying content. Every retained link pins the exact assignment and control revision; the same evidence can be linked again after a control advances without rewriting the older edge.
+- [x] Evidence decisions append immutable review history. Django and PostgreSQL reject link/review retargeting or deletion, forged actors and source entities, invalid windows, and cross-Workspace relationships.
+- [x] Strict MSP/organization APIs and the Compliance surface create, review, list, and reuse evidence only after central exact-Workspace authorization; sibling identifiers remain non-disclosing.
+- [x] Permission/IDOR, forced RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0065, and release evidence agree at `0.7.3`. Risk treatment and signed bundles remain later slices.
+
+Evidence: `docs/releases/0.7.3.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

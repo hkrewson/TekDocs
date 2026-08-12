@@ -90,6 +90,23 @@ export type ComplianceAssignmentResult = {
   results: ComplianceAssignment[];
   owner_choices: ComplianceOwnerChoice[];
 };
+export type ComplianceEvidence = {
+  id: string;
+  title: string;
+  kind: "note" | "url" | "entity";
+  summary: string;
+  source_url: string;
+  source_entity_id: string | null;
+  source_entity_name: string | null;
+  collection_start: string | null;
+  collection_end: string | null;
+  created_by: string;
+  created_at: string;
+  reviews: { id: string; status: "collected" | "accepted" | "rejected" | "expired"; decision: string; note: string; reviewed_by: string; reviewed_at: string }[];
+  control_links: { id: string; assignment_id: string; control_id: string; control_revision: number; linked_by: string; linked_at: string }[];
+};
+export type ComplianceEvidenceDraft = Pick<ComplianceEvidence, "title" | "kind" | "summary" | "source_url" | "source_entity_id" | "collection_start" | "collection_end">;
+export type ComplianceEvidenceResult = { results: ComplianceEvidence[]; page: number; page_size: number; count: number; has_more: boolean };
 
 export interface ComplianceClient {
   list(
@@ -123,12 +140,22 @@ export interface ComplianceClient {
     controlId: string,
     draft: ComplianceAssignmentDraft,
   ): Promise<ComplianceAssignment>;
+  evidence(workspace: WorkspaceContext | null, signal?: AbortSignal): Promise<ComplianceEvidenceResult>;
+  createEvidence(workspace: WorkspaceContext | null, draft: ComplianceEvidenceDraft): Promise<ComplianceEvidence>;
+  reviewEvidence(workspace: WorkspaceContext | null, evidenceId: string, draft: { status: ComplianceEvidence["reviews"][number]["status"]; decision: string; note: string }): Promise<ComplianceEvidence["reviews"][number]>;
+  linkEvidence(workspace: WorkspaceContext | null, assignmentId: string, evidenceId: string): Promise<ComplianceEvidence["control_links"][number]>;
 }
 
 function collectionPath(workspace: WorkspaceContext | null) {
   return workspace
     ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/frameworks`
     : "/api/v1/workspaces/msp/compliance/frameworks";
+}
+
+function evidencePath(workspace: WorkspaceContext | null) {
+  return workspace
+    ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/evidence`
+    : "/api/v1/workspaces/msp/compliance/evidence";
 }
 
 function csrfToken() {
@@ -224,4 +251,17 @@ export const browserComplianceClient: ComplianceClient = {
       `${collectionPath(workspace)}/${encodeURIComponent(frameworkId)}/controls/${encodeURIComponent(controlId)}/review`,
       draft,
     ),
+  async evidence(workspace, signal) {
+    return parse(await fetch(`${evidencePath(workspace)}?page=1&page_size=100`, {
+      credentials: "same-origin", headers: { Accept: "application/json" }, signal,
+    }));
+  },
+  createEvidence: (workspace, draft) => post(evidencePath(workspace), draft),
+  reviewEvidence: (workspace, evidenceId, draft) => post(
+    `${evidencePath(workspace)}/${encodeURIComponent(evidenceId)}/review`, draft,
+  ),
+  linkEvidence: (workspace, assignmentId, evidenceId) => post(
+    `${evidencePath(workspace).replace(/\/evidence$/, "")}/assignments/${encodeURIComponent(assignmentId)}/evidence`,
+    { evidence_id: evidenceId },
+  ),
 };

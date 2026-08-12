@@ -96,8 +96,11 @@ DOCUMENT_RLS_TABLES = {
     "core_compliancecontrol",
     "core_compliancecontrolrevision",
     "core_compliancecatalogentry",
-    "core_compliancecontrolassignment",
-    "core_complianceassignmentreview",
+        "core_compliancecontrolassignment",
+        "core_complianceassignmentreview",
+        "core_complianceevidence",
+        "core_complianceevidencelink",
+        "core_complianceevidencereview",
 }
 
 
@@ -287,7 +290,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0083", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0085", verbosity=0, interactive=False)
     call_command("migrate", "accounts", "0017", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids

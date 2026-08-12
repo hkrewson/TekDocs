@@ -177,6 +177,12 @@ from apps.core.network_service_views import (
     WirelessListCreateView,
 )
 from apps.core.network_transfer_views import NetworkCsvExportView, NetworkSearchView
+from apps.core.notification_views import (
+    ClientPortalNotificationListView,
+    ClientPortalNotificationReadView,
+    MSPNotificationListView,
+    MSPNotificationReadView,
+)
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
     MSPPeopleListCreateView,
@@ -240,6 +246,16 @@ urlpatterns = [
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),
     path("api/v1/auth/context", AuthenticatedContextView.as_view(), name="auth-context"),
     path("api/v1/portal/context", ClientPortalContextView.as_view(), name="client-portal-context"),
+    path(
+        "api/v1/portal/notifications",
+        ClientPortalNotificationListView.as_view(),
+        name="client-portal-notification-list",
+    ),
+    path(
+        "api/v1/portal/notifications/<uuid:notification_id>",
+        ClientPortalNotificationReadView.as_view(),
+        name="client-portal-notification-read",
+    ),
     path("api/v1/portal/documents", ClientPortalDocumentListView.as_view(), name="client-portal-document-list"),
     path(
         "api/v1/portal/documents/<uuid:publication_entity_id>",
@@ -252,6 +268,12 @@ urlpatterns = [
         name="client-portal-document-artifact-download",
     ),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
+    path("api/v1/notifications", MSPNotificationListView.as_view(), name="notification-list"),
+    path(
+        "api/v1/notifications/<uuid:notification_id>",
+        MSPNotificationReadView.as_view(),
+        name="notification-read",
+    ),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),
     path(

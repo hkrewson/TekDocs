@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch } from 'react-router'
+import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import {
   Activity,
   BadgeCheck,
@@ -57,6 +57,9 @@ import { browserCommercialClient } from './commercial/api'
 import type { InventoryClient } from './inventory/api'
 import type { NetworksClient } from './networks/api'
 import { Organizations } from './organizations/Organizations'
+import { NotificationInbox } from './notifications/NotificationInbox'
+import { browserNotificationsClient } from './notifications/api'
+import type { NotificationsClient, NotificationTarget } from './notifications/api'
 import { People } from './people/People'
 import { ClientPortal } from './portal/ClientPortal'
 import { browserPeopleClient } from './people/api'
@@ -298,9 +301,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.5.4" />
+      <PageHeader title="Overview" description="TekDocs 0.5.5" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.5.4</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.5.5</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -322,6 +325,7 @@ function Overview() {
             ['Controlled publication decisions', 'Available'],
             ['Client portal identity boundary', 'Available'],
             ['Read-only client publication portal', 'Available'],
+            ['Permission-filtered notification inbox', 'Available'],
             ['1Password credential references', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
             ['Client asset catalog provenance', 'Available'],
@@ -401,7 +405,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
@@ -415,6 +419,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
   inventoryClient?: InventoryClient
+  notificationsClient?: NotificationsClient
   networksClient?: NetworksClient
   onSignOut: () => Promise<void>
   signingOut?: boolean
@@ -425,6 +430,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   const [shellContext, setShellContext] = useState(authContext)
   const [organizationWorkspace, setOrganizationWorkspace] = useState<OrganizationWorkspaceState>({ phase: 'idle' })
   const location = useLocation()
+  const navigate = useNavigate()
   const organizationMatch = useMatch('/workspaces/organizations/:organizationId/*')
   const organizationId = organizationMatch?.params.organizationId
 
@@ -449,6 +455,12 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   }), [shellContext.tenant.id, shellContext.tenant.name])
   const activeArea = workspaceAreaFromPath(location.pathname)
 
+  function openNotificationTarget(target: NotificationTarget) {
+    if (!target.organization_id) return
+    const area = target.kind === 'organization_documentation' ? 'documentation' : 'overview'
+    void navigate(`/workspaces/organizations/${target.organization_id}/${area}`)
+  }
+
   useEffect(() => {
     const areaLabel = activeArea.charAt(0).toUpperCase() + activeArea.slice(1)
     document.title = `${selectedWorkspace?.name ?? shellContext.tenant.name} · ${areaLabel} · TekDocs`
@@ -461,6 +473,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
+          <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main className="main-content" key={location.pathname}>
@@ -495,7 +508,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, networksClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, networksClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
@@ -509,6 +522,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   credentialReferencesClient?: CredentialReferencesClient
   catalogClient?: CatalogClient
   inventoryClient?: InventoryClient
+  notificationsClient?: NotificationsClient
   networksClient?: NetworksClient
   initialAuthContext?: AuthenticatedContext
 }) {
@@ -534,6 +548,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           credentialReferencesClient={credentialReferencesClient}
           catalogClient={catalogClient}
           inventoryClient={inventoryClient}
+          notificationsClient={notificationsClient}
           networksClient={networksClient}
           onSignOut={signOut}
           signingOut={signingOut}

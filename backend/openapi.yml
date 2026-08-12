@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.4
+  version: 0.5.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2184,6 +2184,54 @@ paths:
           description: Invalid or oversized Markdown
         '403':
           description: Documentation view permission required
+  /api/v1/notifications:
+    get:
+      operationId: msp_notifications_list
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxNotificationResult'
+          description: ''
+  /api/v1/notifications/{notification_id}:
+    patch:
+      operationId: msp_notifications_read_update
+      parameters:
+      - in: path
+        name: notification_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxNotification'
+          description: ''
+        '404':
+          description: Notification unavailable
   /api/v1/organizations:
     get:
       operationId: organizations_list
@@ -2537,6 +2585,54 @@ paths:
           description: ''
         '409':
           description: Integrity conflict
+  /api/v1/portal/notifications:
+    get:
+      operationId: client_portal_notifications_list
+      tags:
+      - portal
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxNotificationResult'
+          description: ''
+  /api/v1/portal/notifications/{notification_id}:
+    patch:
+      operationId: client_portal_notifications_read_update
+      parameters:
+      - in: path
+        name: notification_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInboxNotificationRead'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxNotification'
+          description: ''
+        '404':
+          description: Notification unavailable
   /api/v1/recycle-bin:
     get:
       operationId: recycle_bin_msp_list
@@ -14227,6 +14323,51 @@ components:
         * `reserved` - reserved
         * `dhcp` - dhcp
         * `deprecated` - deprecated
+    InboxNotification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        topic:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        target:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTarget'
+          nullable: true
+      required:
+      - created_at
+      - id
+      - message
+      - read
+      - target
+      - title
+      - topic
+    InboxNotificationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InboxNotification'
+        unread_count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+      required:
+      - has_more
+      - results
+      - unread_count
     InstallationLinkWrite:
       type: object
       properties:
@@ -15372,6 +15513,35 @@ components:
       - page
       - page_size
       - results
+    NotificationTarget:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/NotificationTargetKindEnum'
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - kind
+      - organization_id
+      - publication_id
+    NotificationTargetKindEnum:
+      enum:
+      - organization_overview
+      - organization_documentation
+      - portal_documents
+      - portal_document
+      type: string
+      description: |-
+        * `organization_overview` - organization_overview
+        * `organization_documentation` - organization_documentation
+        * `portal_documents` - portal_documents
+        * `portal_document` - portal_document
     ObjectTypeEnum:
       enum:
       - dcim.rack
@@ -15845,6 +16015,11 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedInboxNotificationRead:
+      type: object
+      properties:
+        read:
+          type: boolean
     PatchedInterfaceWrite:
       type: object
       properties:

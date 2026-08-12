@@ -937,6 +937,18 @@ Evidence: `docs/releases/0.5.3.md`.
 
 Evidence: `docs/releases/0.5.4.md`.
 
+### `0.5.5` acceptance criteria
+
+- [x] Successful outbox consumption materializes an idempotent notification edge for each currently eligible MSP or exact-client recipient without copying email addresses, document bodies, publication reasons, or arbitrary event values.
+- [x] MSP recipients require current topic-specific permission and organization access. Client recipients derive only from their immutable exact-client membership; invitation acceptance is visible only to the accepted account.
+- [x] Notification titles, messages, organization labels, and typed navigation targets are reconstructed and re-authorized at every read. Revoked access disappears, and a withdrawn client publication produces only a generic non-linking access-change notice.
+- [x] Separate MSP and portal endpoints expose a bounded newest-first inbox, unread count, and CSRF-protected reversible read state with private/no-store responses and non-disclosing cross-surface/recipient denial.
+- [x] Recipient/event/surface/scope identity is immutable and undeletable in PostgreSQL; only read time may change. Same-tenant membership guards and forced RLS protect direct writes.
+- [x] The restrained bell/popover interface supports keyboard dismissal, loading, empty, error/retry, unread, actionable, and non-actionable states in both application shells without introducing MSP navigation into the portal.
+- [x] Backend projection/API/direct-write tests, frontend component/API/accessibility gates, permission inventory, migration/OpenAPI drift, and exact `0.5.4` upgrade evidence agree. Historical events already consumed by `0.5.4` are deliberately not backfilled.
+
+Evidence: `docs/releases/0.5.5.md`.
+
 ## API and integrations: `0.6.x` → `0.7.0`
 
 | Release | Slice and exit condition |

@@ -58,6 +58,7 @@ TENANT_SCOPED_TABLES = (
     "core_auditevent",
     "core_outboxevent",
     "core_outboxdeliveryreceipt",
+    "core_inboxnotification",
 )
 
 RLS_TABLES = ORGANIZATION_SCOPED_TABLES + TENANT_SCOPED_TABLES

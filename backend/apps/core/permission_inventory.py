@@ -173,9 +173,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route("client-portal-context", ("GET",)),
+    route("client-portal-notification-list", ("GET",)),
+    route("client-portal-notification-read", ("PATCH",)),
     route("client-portal-document-list", ("GET",)),
     route("client-portal-document-detail", ("GET",)),
     route("client-portal-document-artifact-download", ("GET",)),
+    route("notification-list", ("GET",)),
+    route("notification-read", ("PATCH",)),
     route(
         "organization-list-create",
         ("GET", "POST"),

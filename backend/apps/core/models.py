@@ -3656,3 +3656,67 @@ class OutboxDeliveryReceipt(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Outbox delivery receipts are append-only")
+
+
+class NotificationSurface(models.TextChoices):
+    MSP = "msp", "MSP"
+    CLIENT_PORTAL = "client_portal", "Client portal"
+
+
+class InboxNotification(models.Model):
+    """A durable recipient edge whose display projection is authorized at read time."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="inbox_notifications")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="inbox_notifications",
+    )
+    event = models.ForeignKey(OutboxEvent, on_delete=models.PROTECT, related_name="inbox_notifications")
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="inbox_notifications",
+    )
+    surface = models.CharField(max_length=20, choices=NotificationSurface.choices)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "recipient", "surface"),
+                name="unique_event_recipient_surface",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surface__in=NotificationSurface.values),
+                name="inbox_notification_surface_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "recipient", "surface", "read_at", "created_at"),
+                name="core_inbox_recipient_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.recipient_id}:{self.event_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            persisted = InboxNotification.objects.only("read_at").get(pk=self.pk)
+            if any(
+                getattr(self, field) != getattr(persisted, field)
+                for field in ("tenant_id", "organization_id", "event_id", "recipient_id", "surface", "created_at")
+            ):
+                raise ValidationError("Inbox notification identity is immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Inbox notifications cannot be deleted")

@@ -2,13 +2,17 @@ import { ArrowLeft, Download, FileText, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { AuthenticatedContext } from '../auth/api'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
+import { NotificationInbox } from '../notifications/NotificationInbox'
+import { browserPortalNotificationsClient } from '../notifications/api'
+import type { NotificationsClient, NotificationTarget } from '../notifications/api'
 import { portalClient, type PortalDocument, type PortalDocumentDetail } from './api'
 
-export function ClientPortal({ context, onSignOut, signingOut, signOutError }: {
+export function ClientPortal({ context, onSignOut, signingOut, signOutError, notificationsClient = browserPortalNotificationsClient }: {
   context: AuthenticatedContext
   onSignOut: () => Promise<void>
   signingOut: boolean
   signOutError: string | null
+  notificationsClient?: NotificationsClient
 }) {
   const organization = context.organization
   const [documents, setDocuments] = useState<PortalDocument[]>([])
@@ -35,12 +39,27 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError }: {
     finally { setDetailLoading(false) }
   }
 
+  async function openNotificationTarget(target: NotificationTarget) {
+    if (target.kind === 'portal_documents') {
+      setSelected(null)
+      return
+    }
+    if (target.kind === 'portal_document' && target.publication_id) {
+      setDetailLoading(true)
+      setError(null)
+      try { setSelected(await portalClient.getDocument(target.publication_id)) }
+      catch (reason) { setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.') }
+      finally { setDetailLoading(false) }
+    }
+  }
+
   return (
     <div className="client-portal-shell">
       <header className="client-portal-header">
         <div className="client-portal-brand"><span className="brand-mark" aria-hidden="true">T</span><span>TekDocs</span></div>
         <div className="client-portal-account">
           <span>{context.user.display_name}</span>
+          <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <button className="secondary-button" type="button" disabled={signingOut} onClick={() => { void onSignOut() }}>
             <LogOut size={16} aria-hidden="true" />{signingOut ? 'Signing out…' : 'Sign out'}
           </button>

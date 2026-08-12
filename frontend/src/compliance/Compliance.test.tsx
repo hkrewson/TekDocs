@@ -64,6 +64,13 @@ function client(): ComplianceClient {
       owner_id: 'owner-1', owner: 'Compliance Owner', due_date: null, accepted_by: null, accepted_at: null, events: [],
     }),
     reviewRisk: vi.fn(),
+    bundles: vi.fn().mockResolvedValue([]),
+    createBundle: vi.fn().mockResolvedValue({
+      id: 'bundle-1', title: 'Compliance evidence', reason: 'Point-in-time compliance review',
+      audience: 'msp_internal', manifest: {}, content_digest: 'd'.repeat(64), signature: 'signature',
+      signature_algorithm: 'Ed25519', public_key: 'public-key', key_fingerprint: 'e'.repeat(64),
+      created_by: 'Owner', created_at: '2026-08-12T00:00:00Z', verified: true,
+    }),
   }
 }
 
@@ -187,5 +194,19 @@ describe('Compliance', () => {
     await waitFor(() => expect(api.reviewRisk).toHaveBeenCalledWith(null, 'risk-1', expect.objectContaining({
       status: 'accepted', treatment: 'accept', decision: 'Residual risk accepted',
     })))
+  })
+
+  it('creates and displays a verified immutable evidence bundle', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    render(<Compliance workspace={null} client={api} />)
+
+    await screen.findByRole('heading', { name: 'Evidence bundles' })
+    await user.click(screen.getByRole('button', { name: 'Create signed bundle' }))
+
+    await waitFor(() => expect(api.createBundle).toHaveBeenCalledWith(null, expect.objectContaining({
+      reason: 'Point-in-time compliance review', audience: 'msp_internal',
+    })))
+    expect(await screen.findByText('Verified')).toBeInTheDocument()
   })
 })

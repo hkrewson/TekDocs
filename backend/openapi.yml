@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.4
+  version: 0.7.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5742,6 +5742,61 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/compliance/bundles:
+    get:
+      operationId: msp_compliance_bundle_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bundle'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_compliance_bundle_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bundle'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/compliance/evidence:
     get:
       operationId: msp_compliance_evidence_list
@@ -10959,6 +11014,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceEvidenceControlLink'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/bundles:
+    get:
+      operationId: organization_compliance_bundle_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bundle'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_compliance_bundle_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BundleWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bundle'
           description: ''
           headers:
             X-Request-ID:
@@ -18986,6 +19110,73 @@ components:
       required:
       - id
       - name
+    Bundle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        reason:
+          type: string
+        audience:
+          type: string
+        manifest: {}
+        content_digest:
+          type: string
+        signature:
+          type: string
+        signature_algorithm:
+          type: string
+        public_key:
+          type: string
+        key_fingerprint:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        verified:
+          type: boolean
+          readOnly: true
+      required:
+      - audience
+      - content_digest
+      - created_at
+      - created_by
+      - id
+      - key_fingerprint
+      - manifest
+      - public_key
+      - reason
+      - signature
+      - signature_algorithm
+      - title
+      - verified
+    BundleWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        reason:
+          type: string
+          maxLength: 500
+        audience:
+          enum:
+          - msp_internal
+          - client_auditor
+          type: string
+          description: |-
+            * `msp_internal` - msp_internal
+            * `client_auditor` - client_auditor
+          x-spec-enum-id: e04030f37da83590
+      required:
+      - audience
+      - reason
+      - title
     CatalogModel:
       type: object
       properties:

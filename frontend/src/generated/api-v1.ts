@@ -1716,6 +1716,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/compliance/bundles": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_compliance_bundle_list"];
+        readonly put?: never;
+        readonly post: operations["msp_compliance_bundle_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/compliance/evidence": {
         readonly parameters: {
             readonly query?: never;
@@ -3294,6 +3310,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["organization_compliance_assignment_evidence_link"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/bundles": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_compliance_bundle_list"];
+        readonly put?: never;
+        readonly post: operations["organization_compliance_bundle_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -5399,6 +5431,33 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             readonly name: string;
+        };
+        readonly Bundle: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly reason: string;
+            readonly audience: string;
+            readonly manifest: unknown;
+            readonly content_digest: string;
+            readonly signature: string;
+            readonly signature_algorithm: string;
+            readonly public_key: string;
+            readonly key_fingerprint: string;
+            readonly created_by: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly verified: boolean;
+        };
+        readonly BundleWrite: {
+            readonly title: string;
+            readonly reason: string;
+            /**
+             * @description * `msp_internal` - msp_internal
+             *     * `client_auditor` - client_auditor
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_auditor";
         };
         readonly CatalogModel: {
             /** Format: uuid */
@@ -13905,6 +13964,54 @@ export interface operations {
             };
         };
     };
+    readonly msp_compliance_bundle_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Bundle"][];
+                };
+            };
+        };
+    };
+    readonly msp_compliance_bundle_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["BundleWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["BundleWrite"];
+                readonly "multipart/form-data": components["schemas"]["BundleWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Bundle"];
+                };
+            };
+        };
+    };
     readonly msp_compliance_evidence_list: {
         readonly parameters: {
             readonly query?: {
@@ -17842,6 +17949,58 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ComplianceEvidenceControlLink"];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_bundle_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Bundle"][];
+                };
+            };
+        };
+    };
+    readonly organization_compliance_bundle_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["BundleWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["BundleWrite"];
+                readonly "multipart/form-data": components["schemas"]["BundleWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Bundle"];
                 };
             };
         };

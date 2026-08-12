@@ -18,6 +18,7 @@ import type {
   ComplianceRisk,
   ComplianceRiskDraft,
   ComplianceRiskResult,
+  ComplianceBundle,
 } from "./api";
 
 const EMPTY_CONTROL: ComplianceControlDraft = {
@@ -268,6 +269,7 @@ export function Compliance({
   const [riskFormOpen, setRiskFormOpen] = useState(false);
   const [editingRiskId, setEditingRiskId] = useState<string | null>(null);
   const [riskDraft, setRiskDraft] = useState<ComplianceRiskDraft>(EMPTY_RISK);
+  const [bundles, setBundles] = useState<ComplianceBundle[]>([]);
   const [reviewingControl, setReviewingControl] = useState<string | null>(null);
   const [assignmentDraft, setAssignmentDraft] =
     useState<ComplianceAssignmentDraft>(EMPTY_ASSIGNMENT);
@@ -341,6 +343,13 @@ export function Compliance({
       .catch(() => {
         if (!controller.signal.aborted) setError("Compliance evidence could not be loaded.");
       });
+    return () => controller.abort();
+  }, [client, workspace]);
+  useEffect(() => {
+    const controller = new AbortController();
+    client.bundles(workspace, controller.signal).then(setBundles).catch(() => {
+      if (!controller.signal.aborted) setError("Evidence bundles could not be loaded.");
+    });
     return () => controller.abort();
   }, [client, workspace]);
 
@@ -1000,6 +1009,10 @@ export function Compliance({
           <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>Cancel</button></div>
         </div>}
         {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>Review</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
+      </section>
+      <section className="content-section compliance-risks" aria-labelledby="compliance-bundles-heading">
+        <div className="section-heading"><div><h2 id="compliance-bundles-heading">Evidence bundles</h2><p>Immutable signed snapshots of the current controls, evidence, and risks.</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : "The evidence bundle could not be created."); } finally { setSaving(false); } })(); }}>Create signed bundle</button>}</div>
+        {bundles.length === 0 ? <p className="empty-state">No signed evidence bundles have been created.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Integrity</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>SHA-256 {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
       </section>
     </>
   );

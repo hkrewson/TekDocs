@@ -118,6 +118,7 @@ export type ComplianceRisk = {
 };
 export type ComplianceRiskDraft = Pick<ComplianceRisk, "title" | "description" | "assignment_id" | "likelihood" | "impact" | "status" | "treatment" | "treatment_plan" | "owner_id" | "due_date"> & { decision: string; note: string };
 export type ComplianceRiskResult = { results: ComplianceRisk[]; page: number; page_size: number; count: number; has_more: boolean; owner_choices: ComplianceOwnerChoice[]; summary: { total: number; by_status: Record<string, number>; by_band: Record<string, number>; overdue: number } };
+export type ComplianceBundle = { id: string; title: string; reason: string; audience: "msp_internal" | "client_auditor"; manifest: Record<string, unknown>; content_digest: string; signature: string; signature_algorithm: "Ed25519"; public_key: string; key_fingerprint: string; created_by: string; created_at: string; verified: boolean };
 
 export interface ComplianceClient {
   list(
@@ -158,6 +159,8 @@ export interface ComplianceClient {
   risks(workspace: WorkspaceContext | null, signal?: AbortSignal): Promise<ComplianceRiskResult>;
   createRisk(workspace: WorkspaceContext | null, draft: ComplianceRiskDraft): Promise<ComplianceRisk>;
   reviewRisk(workspace: WorkspaceContext | null, riskId: string, draft: ComplianceRiskDraft): Promise<ComplianceRisk>;
+  bundles(workspace: WorkspaceContext | null, signal?: AbortSignal): Promise<ComplianceBundle[]>;
+  createBundle(workspace: WorkspaceContext | null, draft: { title: string; reason: string; audience: ComplianceBundle["audience"] }): Promise<ComplianceBundle>;
 }
 
 function collectionPath(workspace: WorkspaceContext | null) {
@@ -176,6 +179,9 @@ function riskPath(workspace: WorkspaceContext | null) {
   return workspace
     ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/risks`
     : "/api/v1/workspaces/msp/compliance/risks";
+}
+function bundlePath(workspace: WorkspaceContext | null) {
+  return workspace ? `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/compliance/bundles` : "/api/v1/workspaces/msp/compliance/bundles";
 }
 
 function csrfToken() {
@@ -291,4 +297,6 @@ export const browserComplianceClient: ComplianceClient = {
   },
   createRisk: (workspace, draft) => post(riskPath(workspace), draft),
   reviewRisk: (workspace, riskId, draft) => post(`${riskPath(workspace)}/${encodeURIComponent(riskId)}/review`, draft),
+  async bundles(workspace, signal) { return parse(await fetch(bundlePath(workspace), { credentials: "same-origin", headers: { Accept: "application/json" }, signal })); },
+  createBundle: (workspace, draft) => post(bundlePath(workspace), draft),
 };

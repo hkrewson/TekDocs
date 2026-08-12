@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.compliance_bundles import create_bundle, verify_bundle
 from apps.core.compliance_catalogs import ControlInput, create_catalog_version, create_framework, frameworks_for_scope
 from apps.core.compliance_evidence import EvidenceInput, create_evidence, link_evidence, review_evidence
 from apps.core.compliance_operations import AssignmentInput, record_assignment_review
@@ -399,6 +400,24 @@ def test_database_guards_retain_catalog_evidence_and_reject_scope_retargeting(in
         ComplianceCatalogRevision.objects.filter(pk=revision.pk).update(version_label="rewritten")
     with pytest.raises(DatabaseError), transaction.atomic():
         ComplianceCatalogEntry.objects.filter(pk=entry.pk).delete()
+
+
+@pytest.mark.django_db
+def test_signed_compliance_bundle_freezes_and_verifies_current_workspace(installation):
+    workspace = resolve_msp_workspace(installation.owner)
+    bundle = create_bundle(
+        workspace=workspace,
+        actor_id=installation.owner.id,
+        title="Quarterly evidence",
+        reason="Quarterly review",
+        audience="msp_internal",
+    )
+    assert bundle.manifest["format"] == "tekdocs-compliance-evidence/v1"
+    assert verify_bundle(bundle)
+    with pytest.raises(ValidationError):
+        bundle.delete()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        type(bundle).objects.filter(pk=bundle.pk).update(reason="rewritten")
 
 
 @pytest.mark.django_db

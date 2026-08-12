@@ -4953,3 +4953,45 @@ class ComplianceRiskEvent(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Compliance risk events are retained")
+
+
+class ComplianceEvidenceBundle(models.Model):
+    """Immutable signed point-in-time compliance evidence package."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="compliance_evidence_bundles")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="compliance_evidence_bundles")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="compliance_evidence_bundles", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="compliance_evidence_bundle")
+    reason = models.CharField(max_length=500)
+    audience = models.CharField(max_length=32)
+    manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    signature = models.TextField()
+    signature_algorithm = models.CharField(max_length=20, default="Ed25519")
+    public_key = models.TextField()
+    key_fingerprint = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_compliance_evidence_bundles"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_compbundle_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Compliance evidence bundles are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Compliance evidence bundles are retained")

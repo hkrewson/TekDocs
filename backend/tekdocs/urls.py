@@ -49,6 +49,7 @@ from apps.core.commercial_views import (
     ContractCostDetailView,
     ContractCostListCreateView,
 )
+from apps.core.compliance_bundle_views import MSPBundleListCreateView, OrganizationBundleListCreateView
 from apps.core.compliance_catalog_views import (
     MSPComplianceAssignmentListView,
     MSPComplianceAssignmentReviewView,
@@ -694,6 +695,11 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/risks/<uuid:risk_entity_id>/review",
         MSPComplianceRiskReviewView.as_view(),
         name="msp-compliance-risk-review",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/bundles",
+        MSPBundleListCreateView.as_view(),
+        name="msp-compliance-bundle-list-create",
     ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
@@ -1658,6 +1664,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/risks/<uuid:risk_entity_id>/review",
         OrganizationComplianceRiskReviewView.as_view(),
         name="organization-compliance-risk-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/bundles",
+        OrganizationBundleListCreateView.as_view(),
+        name="organization-compliance-bundle-list-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",

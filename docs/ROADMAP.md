@@ -1105,7 +1105,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.2` | **Complete:** Applicability, owners, status, reviews, and scoped control assignments. |
 | `0.7.3` | **Complete:** Evidence links, collection windows, review history, and permission-aware reuse. |
 | `0.7.4` | **Complete:** Risks, treatments, acceptance, deadlines, and reporting. |
-| `0.7.5` | Immutable evidence bundles with manifests, digest, signing, and export. |
+| `0.7.5` | **Complete:** Immutable evidence bundles with manifests, digest, signing, and export. |
 | `0.7.6` | Shared reminder schedules and calendar feeds for compliance and inventory deadlines. |
 | `0.7.7` | Approved egress service with SSRF, redirect, DNS-rebinding, time, and size controls. |
 | `0.7.8` | Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
@@ -1155,6 +1155,15 @@ Evidence: `docs/releases/0.7.3.md`.
 - [x] Strict MSP/organization APIs, the Compliance risk register, permission/IDOR matrix, forced RLS, migration, OpenAPI/generated-client, frontend, architecture, security, threat, risk, ADR 0066, and release evidence agree at `0.7.4`. Signed evidence bundles remain later.
 
 Evidence: `docs/releases/0.7.4.md`.
+
+### `0.7.5` acceptance criteria
+
+- [x] An authorized exact Workspace can freeze its current assignment revisions, evidence links/windows, and risk decisions into canonical JSON without client aggregation.
+- [x] SHA-256 and the deployment Ed25519 publication key bind the manifest; retained public verification material permits independent verification after key rotation.
+- [x] Bundles are Entity-addressable, retained, database-immutable, forced-RLS scoped, and exposed through strict MSP/client APIs and the Compliance surface.
+- [x] Migration, permission/IDOR inventory, OpenAPI/generated client, frontend, security architecture, ADR 0067, risk disposition, and release evidence agree at `0.7.5`.
+
+Evidence: `docs/releases/0.7.5.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

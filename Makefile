@@ -54,7 +54,7 @@ test-notifications:
 	./scripts/frontend-gate.sh test
 
 test-notification-email:
-	docker compose run --rm migrate pytest apps/core/tests/test_email.py apps/core/tests/test_notification_email.py apps/core/tests/test_notifications.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_email.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_notifications.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
 test-policy:

@@ -7,6 +7,11 @@ const defaultPreferences: NotificationPreferences = {
   email_enabled: true,
   invitation_events: true,
   publication_events: true,
+  delivery_mode: 'immediate',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  quiet_start: null,
+  quiet_end: null,
+  daily_digest_hour: 8,
 }
 
 export function NotificationInbox({ client, onOpen }: {
@@ -135,6 +140,11 @@ export function NotificationInbox({ client, onOpen }: {
             <label><input type="checkbox" checked={preferences.email_enabled} onChange={(event) => setPreferences((current) => ({ ...current, email_enabled: event.target.checked }))} />Send notification email</label>
             <label><input type="checkbox" disabled={!preferences.email_enabled} checked={preferences.invitation_events} onChange={(event) => setPreferences((current) => ({ ...current, invitation_events: event.target.checked }))} />Client invitation activity</label>
             <label><input type="checkbox" disabled={!preferences.email_enabled} checked={preferences.publication_events} onChange={(event) => setPreferences((current) => ({ ...current, publication_events: event.target.checked }))} />Published documentation</label>
+            <label className="notification-field"><span>Delivery schedule</span><select disabled={!preferences.email_enabled} value={preferences.delivery_mode} onChange={(event) => setPreferences((current) => ({ ...current, delivery_mode: event.target.value as NotificationPreferences['delivery_mode'] }))}><option value="immediate">As notifications occur</option><option value="hourly">Hourly digest</option><option value="daily">Daily digest</option></select></label>
+            <label className="notification-field"><span>Time zone</span><input type="text" disabled={!preferences.email_enabled} value={preferences.timezone} onChange={(event) => setPreferences((current) => ({ ...current, timezone: event.target.value }))} /></label>
+            {preferences.delivery_mode === 'daily' && <label className="notification-field"><span>Daily delivery hour</span><select disabled={!preferences.email_enabled} value={preferences.daily_digest_hour} onChange={(event) => setPreferences((current) => ({ ...current, daily_digest_hour: Number(event.target.value) }))}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{new Date(2000, 0, 1, hour).toLocaleTimeString([], { hour: 'numeric' })}</option>)}</select></label>}
+            <label><input type="checkbox" disabled={!preferences.email_enabled} checked={preferences.quiet_start !== null} onChange={(event) => setPreferences((current) => ({ ...current, quiet_start: event.target.checked ? '22:00' : null, quiet_end: event.target.checked ? '07:00' : null }))} />Use quiet hours</label>
+            {preferences.quiet_start !== null && <div className="notification-quiet-hours"><label><span>Starts</span><input type="time" value={preferences.quiet_start} onChange={(event) => setPreferences((current) => ({ ...current, quiet_start: event.target.value }))} /></label><label><span>Ends</span><input type="time" value={preferences.quiet_end ?? '07:00'} onChange={(event) => setPreferences((current) => ({ ...current, quiet_end: event.target.value }))} /></label></div>}
             <p>Account-security and invitation-link email is always delivered separately.</p>
             <div><button type="submit" disabled={savingPreferences}>{savingPreferences ? 'Saving…' : 'Save preferences'}</button>{preferencesMessage && <span role="status">{preferencesMessage}</span>}</div>
           </form>}

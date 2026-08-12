@@ -2333,8 +2333,7 @@ class NetBoxReference(TimestampedModel):
             ),
             models.CheckConstraint(condition=models.Q(object_id__gte=1), name="netbox_object_id_positive"),
             models.CheckConstraint(
-                condition=models.Q(observed_fingerprint="")
-                | models.Q(observed_fingerprint__regex=r"^[0-9a-f]{64}$"),
+                condition=models.Q(observed_fingerprint="") | models.Q(observed_fingerprint__regex=r"^[0-9a-f]{64}$"),
                 name="netbox_fingerprint_valid",
             ),
             models.UniqueConstraint(
@@ -2358,8 +2357,7 @@ class NetBoxReference(TimestampedModel):
 
     def clean(self) -> None:
         if self.workspace_id and (
-            self.workspace.tenant_id != self.tenant_id
-            or self.workspace.organization_id != self.organization_id
+            self.workspace.tenant_id != self.tenant_id or self.workspace.organization_id != self.organization_id
         ):
             raise ValidationError("NetBox reference Workspace ownership does not match")
         if self.entity_id and (
@@ -3171,11 +3169,7 @@ class DocumentPublication(models.Model):
         if not successors:
             successors = list(self.successors.all())
         return next(
-            (
-                successor
-                for successor in successors
-                if PublicationControlAction.APPROVED in successor.control_actions
-            ),
+            (successor for successor in successors if PublicationControlAction.APPROVED in successor.control_actions),
             None,
         )
 
@@ -3243,8 +3237,7 @@ class DocumentPublicationControlEvent(models.Model):
 
     def clean(self) -> None:
         if self.publication_id and (
-            self.publication.tenant_id != self.tenant_id
-            or self.publication.organization_id != self.organization_id
+            self.publication.tenant_id != self.tenant_id or self.publication.organization_id != self.organization_id
         ):
             raise ValidationError("Publication control event must use its publication workspace scope")
         if not self.reason.strip() or len(self.reason) > 500:
@@ -3641,9 +3634,7 @@ class OutboxDeliveryReceipt(models.Model):
     scoped = TenantScopedManager()
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["event", "consumer"], name="unique_outbox_consumer_receipt")
-        ]
+        constraints = [models.UniqueConstraint(fields=["event", "consumer"], name="unique_outbox_consumer_receipt")]
         indexes = [models.Index(fields=["tenant", "processed_at"])]
 
     def __str__(self) -> str:
@@ -3736,6 +3727,15 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=True)
     invitation_events = models.BooleanField(default=True)
     publication_events = models.BooleanField(default=True)
+    delivery_mode = models.CharField(
+        max_length=16,
+        choices=(("immediate", "Immediate"), ("hourly", "Hourly digest"), ("daily", "Daily digest")),
+        default="immediate",
+    )
+    timezone = models.CharField(max_length=64, default="UTC")
+    quiet_start = models.TimeField(null=True, blank=True)
+    quiet_end = models.TimeField(null=True, blank=True)
+    daily_digest_hour = models.PositiveSmallIntegerField(default=8)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -3751,6 +3751,24 @@ class NotificationPreference(models.Model):
             models.CheckConstraint(
                 condition=models.Q(surface__in=NotificationSurface.values),
                 name="notification_preference_surface_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(delivery_mode__in=("immediate", "hourly", "daily")),
+                name="notification_preference_delivery_mode_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(daily_digest_hour__lte=23),
+                name="notification_preference_daily_hour_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(quiet_start__isnull=True, quiet_end__isnull=True)
+                    | (
+                        models.Q(quiet_start__isnull=False, quiet_end__isnull=False)
+                        & ~models.Q(quiet_start=models.F("quiet_end"))
+                    )
+                ),
+                name="notification_preference_quiet_window_valid",
             ),
         ]
 
@@ -3800,6 +3818,8 @@ class NotificationEmailDelivery(models.Model):
     locked_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     last_error_code = models.CharField(max_length=64, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    retry_generation = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()

@@ -89,6 +89,7 @@ class PermissionKey(StrEnum):
     COMPLIANCE_EDIT = "compliance.edit"
     INTEGRATIONS_VIEW = "integrations.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
+    NOTIFICATIONS_MANAGE = "notifications.manage"
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +177,7 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
     _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
     _permission(PermissionKey.INTEGRATIONS_MANAGE, "Manage integrations", "Integrations", mfa=True),
+    _permission(PermissionKey.NOTIFICATIONS_MANAGE, "Manage notification delivery", "Administration", mfa=True),
 )
 PERMISSION_BY_KEY = {definition.key: definition for definition in PERMISSION_CATALOG}
 

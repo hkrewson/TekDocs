@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.5.6
+  version: 0.5.7
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2184,6 +2184,57 @@ paths:
           description: Invalid or oversized Markdown
         '403':
           description: Documentation view permission required
+  /api/v1/notification-deliveries:
+    get:
+      operationId: notification_deliveries_list
+      tags:
+      - notification-deliveries
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationDelivery'
+          description: ''
+  /api/v1/notification-deliveries/{delivery_id}/retry:
+    post:
+      operationId: notification_deliveries_retry
+      parameters:
+      - in: path
+        name: delivery_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notification-deliveries
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationDeliveryRetry'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationDeliveryRetry'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationDeliveryRetry'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDelivery'
+          description: ''
+        '404':
+          description: Delivery unavailable
   /api/v1/notification-preferences:
     get:
       operationId: msp_notification_preferences_retrieve
@@ -13028,6 +13079,16 @@ components:
       - name
       - product_kind
       - schema
+    DeliveryModeEnum:
+      enum:
+      - immediate
+      - hourly
+      - daily
+      type: string
+      description: |-
+        * `immediate` - immediate
+        * `hourly` - hourly
+        * `daily` - daily
     DerivedVendor:
       type: object
       properties:
@@ -15589,6 +15650,65 @@ components:
       - page
       - page_size
       - results
+    NotificationDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          type: string
+        surface:
+          type: string
+        attempts:
+          type: integer
+        retry_generation:
+          type: integer
+        event_topic:
+          type: string
+        organization:
+          type: string
+        recipient:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        available_at:
+          type: string
+          format: date-time
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error_code:
+          type: string
+      required:
+      - attempts
+      - available_at
+      - created_at
+      - delivered_at
+      - event_topic
+      - id
+      - last_attempt_at
+      - last_error_code
+      - organization
+      - recipient
+      - retry_generation
+      - state
+      - surface
+    NotificationDeliveryRetry:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 240
+          minLength: 3
+      required:
+      - reason
     NotificationPreference:
       type: object
       properties:
@@ -15598,10 +15718,32 @@ components:
           type: boolean
         publication_events:
           type: boolean
+        delivery_mode:
+          $ref: '#/components/schemas/DeliveryModeEnum'
+        timezone:
+          type: string
+          maxLength: 64
+        quiet_start:
+          type: string
+          format: time
+          nullable: true
+        quiet_end:
+          type: string
+          format: time
+          nullable: true
+        daily_digest_hour:
+          type: integer
+          maximum: 23
+          minimum: 0
       required:
+      - daily_digest_hour
+      - delivery_mode
       - email_enabled
       - invitation_events
       - publication_events
+      - quiet_end
+      - quiet_start
+      - timezone
     NotificationTarget:
       type: object
       properties:
@@ -16291,6 +16433,23 @@ components:
           type: boolean
         publication_events:
           type: boolean
+        delivery_mode:
+          $ref: '#/components/schemas/DeliveryModeEnum'
+        timezone:
+          type: string
+          maxLength: 64
+        quiet_start:
+          type: string
+          format: time
+          nullable: true
+        quiet_end:
+          type: string
+          format: time
+          nullable: true
+        daily_digest_hour:
+          type: integer
+          maximum: 23
+          minimum: 0
     PatchedOrganizationAccessWrite:
       type: object
       properties:

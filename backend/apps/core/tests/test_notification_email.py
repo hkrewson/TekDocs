@@ -35,7 +35,7 @@ def test_smtp_delivery_reauthorizes_and_renders_value_minimized_messages(portal_
         state=NotificationEmailState.SUPPRESSED
     ).count() == 1
     portal_messages = [message for message in mail.outbox if message.to == [portal_user.email]]
-    assert len(portal_messages) == 2
+    assert len(portal_messages) == 1
     combined = "\n".join(message.body for message in portal_messages)
     assert available.title in combined
     assert "A previously available publication was withdrawn." in combined
@@ -43,8 +43,8 @@ def test_smtp_delivery_reauthorizes_and_renders_value_minimized_messages(portal_
     assert sibling.title not in combined
     assert organization.entity.display_name not in combined
     assert "Client distribution" not in combined
-    assert all(message.subject == "TekDocs notification" for message in portal_messages)
-    assert all(message.extra_headers["Message-ID"].startswith("<tekdocs-notification-") for message in portal_messages)
+    assert portal_messages[0].subject.startswith("TekDocs notification")
+    assert portal_messages[0].extra_headers["Message-ID"].startswith("<tekdocs-notification-batch-")
     assert all("document content" in message.body for message in portal_messages)
 
 
@@ -64,6 +64,11 @@ def test_preferences_are_surface_scoped_and_suppress_pending_publication_mail(po
         "email_enabled": True,
         "invitation_events": True,
         "publication_events": True,
+        "delivery_mode": "immediate",
+        "timezone": "UTC",
+        "quiet_start": None,
+        "quiet_end": None,
+        "daily_digest_hour": 8,
     }
     changed = portal.patch(
         url,
@@ -99,7 +104,7 @@ def test_mail_outage_retries_without_persisting_recipient_or_exception_values(po
     assert dispatch_due_notification_emails(tenant=result.tenant, now=first_attempt, sender=unavailable) == 0
     deliveries = NotificationEmailDelivery.objects.all()
     retryable = deliveries.filter(state=NotificationEmailState.PENDING, attempts=1)
-    suppressed = deliveries.filter(state=NotificationEmailState.SUPPRESSED, attempts=1)
+    suppressed = deliveries.filter(state=NotificationEmailState.SUPPRESSED, attempts=0)
     assert retryable.count() + suppressed.count() == deliveries.count()
     assert set(retryable.values_list("last_error_code", flat=True)) == {"smtp_unavailable"}
     assert "password" not in str(list(deliveries.values("last_error_code")))
@@ -113,7 +118,7 @@ def test_mail_outage_retries_without_persisting_recipient_or_exception_values(po
 
     later = first_attempt + timedelta(hours=1)
     assert dispatch_due_notification_emails(tenant=result.tenant, now=later, sender=recovered) == retryable_count
-    assert len(sent) == retryable_count
+    assert 1 <= len(sent) <= retryable_count
     assert not NotificationEmailDelivery.objects.exclude(
         state__in=(NotificationEmailState.DELIVERED, NotificationEmailState.SUPPRESSED)
     ).exists()
@@ -130,7 +135,7 @@ def test_permanent_recipient_rejection_dead_letters_without_raw_smtp_response(po
     assert dispatch_due_notification_emails(tenant=result.tenant, sender=rejected) == 0
     deliveries = NotificationEmailDelivery.objects.all()
     dead_letters = deliveries.filter(state=NotificationEmailState.DEAD_LETTER, attempts=1)
-    suppressed = deliveries.filter(state=NotificationEmailState.SUPPRESSED, attempts=1)
+    suppressed = deliveries.filter(state=NotificationEmailState.SUPPRESSED, attempts=0)
     assert dead_letters.count() + suppressed.count() == deliveries.count()
     assert set(dead_letters.values_list("last_error_code", flat=True)) == {"recipient_rejected"}
 

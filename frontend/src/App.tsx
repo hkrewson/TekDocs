@@ -58,7 +58,8 @@ import type { InventoryClient } from './inventory/api'
 import type { NetworksClient } from './networks/api'
 import { Organizations } from './organizations/Organizations'
 import { NotificationInbox } from './notifications/NotificationInbox'
-import { browserNotificationsClient } from './notifications/api'
+import { NotificationDeliveryAdmin } from './notifications/NotificationDeliveryAdmin'
+import { browserNotificationDeliveryAdminClient, browserNotificationsClient } from './notifications/api'
 import type { NotificationsClient, NotificationTarget } from './notifications/api'
 import { People } from './people/People'
 import { ClientPortal } from './portal/ClientPortal'
@@ -217,9 +218,10 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   )
 }
 
-function ProfileMenu({ user, canManageAccess, onSignOut, signingOut }: {
+function ProfileMenu({ user, canManageAccess, canManageNotifications, onSignOut, signingOut }: {
   user: AuthenticatedContext['user']
   canManageAccess: boolean
+  canManageNotifications: boolean
   onSignOut: () => Promise<void>
   signingOut: boolean
 }) {
@@ -246,6 +248,7 @@ function ProfileMenu({ user, canManageAccess, onSignOut, signingOut }: {
         <div className="profile-popover" role="menu">
           <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
           {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />Access control</AppLink>}
+          {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />Email delivery</AppLink>}
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
@@ -475,7 +478,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
-          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main className="main-content" key={location.pathname}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
@@ -491,6 +494,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
             <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <AccessControl client={accessControlClient} /> : <Navigate to="/overview" replace />} />
+            <Route path="/notification-delivery" element={shellContext.permissions?.includes('notifications.manage') ? <NotificationDeliveryAdmin client={browserNotificationDeliveryAdminClient} /> : <Navigate to="/overview" replace />} />
             <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />

@@ -961,6 +961,17 @@ Evidence: `docs/releases/0.5.5.md`.
 
 Evidence: `docs/releases/0.5.6.md`.
 
+### `0.5.7` acceptance criteria
+
+- [x] Pending notification email is grouped by recipient and surface into bounded 25-item multipart digests; one SMTP result advances every claimed item in that batch without copying rendered content or destinations into PostgreSQL.
+- [x] Per-surface preferences support immediate, hourly, and daily schedules, an explicit validated IANA time zone, a daily delivery hour, and optional quiet hours that may cross midnight. Scheduling defers rather than suppresses mail and does not consume an SMTP attempt.
+- [x] Send-time membership, topic, source, organization, surface, and preference authorization still applies to every digest item; revoked or disabled items are suppressed before a batch is rendered.
+- [x] Owner/administrator delivery administration is protected by the central `notifications.manage` permission and MFA. It exposes only bounded delivery metadata—never email addresses, titles, message copy, document content, reasons, or SMTP response values.
+- [x] Only dead-lettered delivery can be retried. A retry requires an operator reason, resets transport state, increments a generation, and records append-only audit evidence; PostgreSQL rejects unaudited terminal replay.
+- [x] Preference, batching, DST/overnight scheduling, outage, retry, API, permission, PostgreSQL-transition, frontend accessibility, migration, OpenAPI, and production-image gates agree.
+
+Evidence: `docs/releases/0.5.7.md`.
+
 ## API and integrations: `0.6.x` → `0.7.0`
 
 | Release | Slice and exit condition |

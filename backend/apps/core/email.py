@@ -19,6 +19,7 @@ class TransactionalTemplate(StrEnum):
     CREDENTIAL_CHANGED = "password_changed"
     MFA_CHANGED = "mfa_changed"
     NOTIFICATION = "notification"
+    NOTIFICATION_DIGEST = "notification_digest"
 
 
 def send_transactional_email(
@@ -71,6 +72,24 @@ def send_notification_email(
         recipient=recipient,
         context={"notification_title": title, "notification_message": message, "app_url": app_url},
         message_id=f"<tekdocs-notification-{delivery_id}@notification.tekdocs.invalid>",
+    )
+
+
+def send_notification_digest_email(
+    *,
+    recipient: str,
+    notifications: list[dict[str, str]],
+    app_url: str,
+    batch_id: str,
+) -> int:
+    if not 1 <= len(notifications) <= 25:
+        raise ValidationError("Notification digests must contain between 1 and 25 items.")
+    return send_transactional_email(
+        template=TransactionalTemplate.NOTIFICATION_DIGEST,
+        subject="TekDocs notification" if len(notifications) == 1 else f"TekDocs notifications ({len(notifications)})",
+        recipient=recipient,
+        context={"notifications": notifications, "app_url": app_url},
+        message_id=f"<tekdocs-notification-batch-{batch_id}@notification.tekdocs.invalid>",
     )
 
 

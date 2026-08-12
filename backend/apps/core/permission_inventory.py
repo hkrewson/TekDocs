@@ -182,6 +182,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("notification-list", ("GET",)),
     route("notification-read", ("PATCH",)),
     route("notification-preferences", ("GET", "PATCH")),
+    route("notification-delivery-list", ("GET",), PermissionKey.NOTIFICATIONS_MANAGE),
+    route("notification-delivery-retry", ("POST",), mutations=(PermissionKey.NOTIFICATIONS_MANAGE,)),
     route(
         "organization-list-create",
         ("GET", "POST"),

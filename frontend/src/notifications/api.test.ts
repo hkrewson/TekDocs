@@ -20,7 +20,7 @@ describe('notifications API', () => {
     await client.list()
     await client.setRead('notification-1', true)
     await client.getPreferences()
-    await client.updatePreferences({ email_enabled: false, invitation_events: true, publication_events: true })
+    await client.updatePreferences({ email_enabled: false, invitation_events: true, publication_events: true, delivery_mode: 'immediate', timezone: 'UTC', quiet_start: null, quiet_end: null, daily_digest_hour: 8 })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/portal/notifications')
     expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/portal/notifications/notification-1')

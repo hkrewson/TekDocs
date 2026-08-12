@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_NOTIFICATION_UPGRADE_FROM_REF:-848b862}
+baseline_ref=${TEKDOCS_NOTIFICATION_UPGRADE_FROM_REF:-1b8093d}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-notification-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -41,10 +41,10 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-[ "$baseline_version" = "0.5.5" ] || { echo "Notification upgrade expected baseline 0.5.5, found $baseline_version" >&2; exit 1; }
-[ "$current_version" = "0.5.6" ] || { echo "Notification upgrade expected current version 0.5.6, found $current_version" >&2; exit 1; }
+[ "$baseline_version" = "0.5.6" ] || { echo "Notification upgrade expected baseline 0.5.6, found $baseline_version" >&2; exit 1; }
+[ "$current_version" = "0.5.7" ] || { echo "Notification upgrade expected current version 0.5.7, found $current_version" >&2; exit 1; }
 
-echo "Creating a historical inbox notification in TekDocs $baseline_version"
+echo "Creating a historical pending SMTP notification in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/scripts/notification-upgrade-fixture.py"

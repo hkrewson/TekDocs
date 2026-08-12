@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <h1>TekDocs notifications</h1>
+    {% for notification in notifications %}<section><h2>{{ notification.title }}</h2><p>{{ notification.message }}</p></section>{% endfor %}
+    <p><a href="{{ app_url }}">Open TekDocs</a></p>
+    <p>This email contains notification summaries, not document content, credentials, or invitation links.</p>
+  </body>
+</html>

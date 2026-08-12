@@ -23,6 +23,7 @@ def create_fixture():
     from django.db import transaction
 
     from apps.accounts.bootstrap import bootstrap_owner
+    from apps.core.models import NotificationEmailDelivery, NotificationEmailState
     from apps.core.organizations import create_organization
     from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events, enqueue_outbox_event
     from apps.core.rls import OrganizationRLSMode, rls_scope
@@ -59,7 +60,9 @@ def create_fixture():
                 payload={"role": "client_user"},
             )
         assert dispatch_due_outbox_events(tenant=result.tenant) == 1
-    print("Historical 0.5.5 inbox notification projected")
+        delivery = NotificationEmailDelivery.scoped.for_tenant(result.tenant).get()
+        assert delivery.state == NotificationEmailState.PENDING
+    print("Historical 0.5.6 SMTP delivery queued")
 
 
 def verify_fixture():
@@ -84,7 +87,10 @@ def verify_fixture():
             entity__display_name="Notification Upgrade Client"
         )
         assert InboxNotification.scoped.for_tenant(state.tenant).count() == 1
-        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).count() == 0
+        historical = NotificationEmailDelivery.scoped.for_tenant(state.tenant).get()
+        assert historical.state == NotificationEmailState.PENDING
+        assert historical.retry_generation == 0
+        assert historical.last_attempt_at is None
         invitation = _invitation(
             tenant=state.tenant,
             organization=organization,
@@ -106,10 +112,14 @@ def verify_fixture():
         assert notification is not None
         assert notification.recipient_id == state.owner.id
         assert notification.surface == "msp"
-        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).count() == 1
-        assert dispatch_due_notification_emails(tenant=state.tenant) == 1
-        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).get().state == NotificationEmailState.DELIVERED
-    print("Historical inbox retained without email backfill; current event emailed exactly once")
+        assert NotificationEmailDelivery.scoped.for_tenant(state.tenant).count() == 2
+        assert dispatch_due_notification_emails(tenant=state.tenant) == 2
+        assert (
+            not NotificationEmailDelivery.scoped.for_tenant(state.tenant)
+            .exclude(state=NotificationEmailState.DELIVERED)
+            .exists()
+        )
+    print("Historical 0.5.6 queue retained; old and new items delivered through the 0.5.7 batch path")
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

@@ -57,7 +57,7 @@ describe('NotificationInbox', () => {
   })
 
   it('loads and saves explicit email preferences', async () => {
-    const preferences = { email_enabled: true, invitation_events: true, publication_events: true }
+    const preferences = { email_enabled: true, invitation_events: true, publication_events: true, delivery_mode: 'immediate' as const, timezone: 'UTC', quiet_start: null, quiet_end: null, daily_digest_hour: 8 }
     const updatePreferences = vi.fn().mockResolvedValue({ ...preferences, publication_events: false })
     const client = {
       list: vi.fn().mockResolvedValue({ results: [], unread_count: 0, has_more: false }),
@@ -78,6 +78,11 @@ describe('NotificationInbox', () => {
       email_enabled: true,
       invitation_events: true,
       publication_events: false,
+      delivery_mode: 'immediate',
+      timezone: 'UTC',
+      quiet_start: null,
+      quiet_end: null,
+      daily_digest_hour: 8,
     })
     expect(await screen.findByText('Email preferences saved.')).toBeInTheDocument()
   })

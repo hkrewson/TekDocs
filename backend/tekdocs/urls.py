@@ -184,6 +184,8 @@ from apps.core.notification_views import (
     MSPNotificationListView,
     MSPNotificationPreferenceView,
     MSPNotificationReadView,
+    NotificationDeliveryAdminListView,
+    NotificationDeliveryAdminRetryView,
 )
 from apps.core.organization_views import OrganizationDetailView, OrganizationListCreateView
 from apps.core.people_views import (
@@ -285,6 +287,14 @@ urlpatterns = [
         "api/v1/notification-preferences",
         MSPNotificationPreferenceView.as_view(),
         name="notification-preferences",
+    ),
+    path(
+        "api/v1/notification-deliveries", NotificationDeliveryAdminListView.as_view(), name="notification-delivery-list"
+    ),
+    path(
+        "api/v1/notification-deliveries/<uuid:delivery_id>/retry",
+        NotificationDeliveryAdminRetryView.as_view(),
+        name="notification-delivery-retry",
     ),
     path("api/v1/auth/providers", OidcProviderListView.as_view(), name="auth-providers"),
     path("api/v1/access-control/catalog", AccessControlCatalogView.as_view(), name="access-control-catalog"),

@@ -26,6 +26,23 @@ export type NotificationPreferences = {
   email_enabled: boolean
   invitation_events: boolean
   publication_events: boolean
+  delivery_mode: 'immediate' | 'hourly' | 'daily'
+  timezone: string
+  quiet_start: string | null
+  quiet_end: string | null
+  daily_digest_hour: number
+}
+
+export type NotificationDelivery = {
+  id: string; state: 'pending' | 'processing' | 'delivered' | 'suppressed' | 'dead_letter'
+  surface: string; attempts: number; retry_generation: number; event_topic: string
+  organization: string; recipient: string; created_at: string; available_at: string
+  last_attempt_at: string | null; delivered_at: string | null; last_error_code: string
+}
+
+export interface NotificationDeliveryAdminClient {
+  listDeliveries(state?: string): Promise<NotificationDelivery[]>
+  retryDelivery(id: string, reason: string): Promise<NotificationDelivery>
 }
 
 export interface NotificationsClient {
@@ -71,6 +88,22 @@ export function createBrowserNotificationsClient(portal = false): NotificationsC
       }))
     },
   }
+}
+
+export const browserNotificationDeliveryAdminClient: NotificationDeliveryAdminClient = {
+  async listDeliveries(state) {
+    const query = state ? `?state=${encodeURIComponent(state)}` : ''
+    return decode(await fetch(`/api/v1/notification-deliveries${query}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  async retryDelivery(id, reason) {
+    const token = browserCsrfToken()
+    if (!token) throw new Error('The browser security token is unavailable. Refresh and try again.')
+    return decode(await fetch(`/api/v1/notification-deliveries/${id}/retry`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': token },
+      body: JSON.stringify({ reason }),
+    }))
+  },
 }
 
 export const browserNotificationsClient = createBrowserNotificationsClient()

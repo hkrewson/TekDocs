@@ -1,0 +1,6 @@
+{% for notification in notifications %}{{ notification.title }}
+{{ notification.message }}
+
+{% endfor %}Open TekDocs: {{ app_url }}
+
+This email contains notification summaries, not document content, credentials, or invitation links.

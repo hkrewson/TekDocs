@@ -21,3 +21,38 @@ frontend/coverage/
 playwright-report/
 test-results/
 artifacts/
+
+# Property-based test data
+.hypothesis/
+
+# Local scratch and tool caches
+/tmp/
+/.cache/
+frontend/.vite/
+*.tsbuildinfo
+.eslintcache
+
+# Local secret injection and recovery output
+/secrets/
+/.secrets/
+/backups/
+/recovery/
+/*.partial.*
+
+# Local database and process output
+*.sqlite3
+*.log
+*.pid
+
+# Editor and shell-local configuration
+.idea/
+.vscode/
+.direnv/
+.envrc
+!.envrc.example
+*.swp
+*.swo
+*~
+
+# The GitHub Wiki is a separate repository and checkout
+/TekDocs.wiki/

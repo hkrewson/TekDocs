@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.1` adds authenticated encrypted recovery for PostgreSQL, managed media, and deployment keys under a separately custodied recovery key. TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.2` adds a retained-state upgrade matrix from every supported prior minor line and explicit full-recovery rollback procedures. TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 
@@ -71,6 +71,7 @@ make upgrade-rehearsal
 make documentation-upgrade-rehearsal
 make documentation-backup-rehearsal
 make supported-recovery-rehearsal
+make supported-upgrade-matrix
 make security
 ```
 

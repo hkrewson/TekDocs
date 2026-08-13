@@ -3,6 +3,7 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 baseline_ref=${TEKDOCS_CERTIFICATION_UPGRADE_FROM_REF:-8fdde2d}
+expected_baseline_version=${TEKDOCS_CERTIFICATION_UPGRADE_FROM_VERSION:-0.7.13}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-certification-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -34,20 +35,22 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
   echo "TEKDOCS_PORT=0"
   echo "MAILPIT_UI_PORT=0"
 } >> "$environment_file"
-[ "$(tr -d '[:space:]' < "$baseline_directory/VERSION")" = "0.7.13" ]
-[ "$(tr -d '[:space:]' < "$repository_root/VERSION")" = "0.8.0" ]
+baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
+current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
+[ "$baseline_version" = "$expected_baseline_version" ] || { echo "Compliance/monitoring upgrade expected baseline $expected_baseline_version, found $baseline_version" >&2; exit 1; }
+[ "$current_version" != "$baseline_version" ] || { echo "Compliance/monitoring upgrade requires a version newer than $baseline_version" >&2; exit 1; }
 
-echo "Creating retained compliance and monitoring evidence in TekDocs 0.7.13"
+echo "Creating retained compliance and monitoring evidence in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
 baseline_compose down --remove-orphans
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
-echo "Applying TekDocs 0.8.0 to retained 0.7.13 evidence"
+echo "Applying TekDocs $current_version to retained $baseline_version evidence"
 current_compose up -d --build --wait backend worker scheduler
 current_compose exec -T -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend python manage.py makemigrations --check --dry-run
-echo "Compliance and monitoring upgrade rehearsal passed: 0.7.13 -> 0.8.0"
+echo "Compliance and monitoring upgrade rehearsal passed: $baseline_version -> $current_version"

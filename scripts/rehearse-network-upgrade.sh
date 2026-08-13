@@ -3,6 +3,7 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 baseline_ref=${TEKDOCS_NETWORK_UPGRADE_FROM_REF:-2f15710}
+expected_baseline_version=${TEKDOCS_NETWORK_UPGRADE_FROM_VERSION:-0.4.9}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-network-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -41,12 +42,12 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.4.9" ]; then
-  echo "Network upgrade expected baseline 0.4.9, found $baseline_version" >&2
+if [ "$baseline_version" != "$expected_baseline_version" ]; then
+  echo "Network upgrade expected baseline $expected_baseline_version, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.5.0" ]; then
-  echo "Network upgrade expected current version 0.5.0, found $current_version" >&2
+if [ "$current_version" = "$baseline_version" ]; then
+  echo "Network upgrade requires a version newer than $baseline_version" >&2
   exit 1
 fi
 

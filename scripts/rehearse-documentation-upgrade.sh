@@ -3,6 +3,7 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 baseline_ref=${TEKDOCS_DOCUMENTATION_UPGRADE_FROM_REF:-9b9fcc4}
+expected_baseline_version=${TEKDOCS_DOCUMENTATION_UPGRADE_FROM_VERSION:-0.2.8}
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-documentation-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
@@ -35,8 +36,8 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.2.8" ]; then
-  echo "Documentation upgrade expected baseline 0.2.8, found $baseline_version" >&2
+if [ "$baseline_version" != "$expected_baseline_version" ]; then
+  echo "Documentation upgrade expected baseline $expected_baseline_version, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" = "$baseline_version" ]; then
@@ -66,7 +67,7 @@ update_document(document=document, actor_id=result.owner.id, title="Preserved do
 create_document_attachment(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("upgrade.txt", b"preserve this file\n", content_type="text/plain"))
 publish_document(workspace=resolve_msp_workspace(result.owner), document=document, actor_id=result.owner.id, reason="Pre-upgrade publication", audience=PublicationAudience.MSP_INTERNAL, retention=PublicationRetention.PERMANENT, retention_review_on=None)
 scope_context.__exit__(None, None, None)
-print("0.2.8 documentation fixture created")
+print("Documentation fixture created")
 '
 baseline_compose down --remove-orphans
 

@@ -8,6 +8,8 @@ The default Compose services are `db`, `valkey`, a one-shot `migrate` job, `back
 
 Supported full recovery packages PostgreSQL, managed media, and allowlisted deployment keys as independently authenticated AES-256-GCM streams. A separate operator-custodied recovery key authenticates the artifact set and its non-secret manifest; neither TekDocs nor Compose retains that key. Restore authenticates every artifact before exact-project volume replacement, reapplies current non-owner runtime privileges, migrates, and requires health. ADR 0077 defines the boundary.
 
+Supported upgrades are direct forward migrations from one retained stabilization endpoint per prior minor line. The blocking matrix verifies each pinned source version, creates domain-representative state there, and applies the current tree through the owner migration and constrained runtime-role boundary. Post-migration rollback is full restoration of a pre-upgrade encrypted recovery point, not arbitrary reverse migrations or an older binary on the newer schema. ADR 0078 defines this policy.
+
 ## Domain direction
 
 `Tenant` is the one-MSP installation boundary and a future hosted seam, not a currently supported multi-MSP hierarchy. Each tenant has one immutable MSP `Workspace`, and each `Organization` has one immutable organization Workspace. `Entity` is the universal stable UUID and required canonical ownership anchor; typed models attach to it. `EntityLink` supplies referential relationships without generic foreign keys. Tenant/organization columns remain denormalized scope inputs for indexes, RLS, and relationship guards, while the non-null Workspace UUID makes accidental owner omission fail closed. ADR 0035 defines this boundary.

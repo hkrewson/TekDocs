@@ -1263,7 +1263,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | Release | Slice and exit condition |
 | --- | --- |
 | `0.8.1` | **Complete:** Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and initial implementation of `TD-RISK-006`. |
-| `0.8.2` | Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
+| `0.8.2` | **Complete:** Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
 | `0.8.3` | WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | Localization readiness, timezone/locale correctness, and translatable UI contract. |
 | `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
@@ -1284,6 +1284,18 @@ Evidence: `docs/releases/0.8.0.md`.
 - [x] ADR 0077, operator guidance, architecture/security/threat/risk records, release evidence, and version metadata agree. Scheduling, remote retention, point-in-time recovery, and deliberate lost-key exercises remain `0.9.3`.
 
 Evidence: `docs/releases/0.8.1.md`.
+
+### `0.8.2` acceptance criteria
+
+- [x] The support policy identifies one stable endpoint for each prior minor line from `0.1.x` through `0.8.0`; each source commit must contain its declared version.
+- [x] One blocking matrix creates representative retained data at every supported source and migrates it through the current owner/runtime-role production boundary.
+- [x] The matrix covers identity/authentication, documentation/publication, inventory, networks, portal/notifications, integrations, and compliance/monitoring rather than empty schemas alone.
+- [x] Existing domain rehearsals accept an explicit expected source and always target the current release without weakening retained-state assertions.
+- [x] The operator runbook requires a tested encrypted pre-upgrade recovery point and defines before-migration restart versus after-migration full restore, including potential post-backup data loss.
+- [x] Arbitrary migration reversal, manual migration-table changes, old binaries against new schemas, and volume deletion are explicitly unsupported recovery techniques.
+- [x] ADR 0078, migration/backup operations, roadmap, architecture/security/risk records, version metadata, and release evidence agree.
+
+Evidence: `docs/releases/0.8.2.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.10
+  version: 0.7.11
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -6708,6 +6708,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains/{domain_entity_id}/monitoring:
+    get:
+      operationId: workspaces_msp_domains_monitoring_retrieve
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_domains_monitoring_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainMonitorRun'
           description: ''
           headers:
             X-Request-ID:
@@ -14083,6 +14139,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Hostname'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/monitoring:
+    get:
+      operationId: workspaces_organizations_domains_monitoring_retrieve
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_domains_monitoring_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainMonitorRun'
           description: ''
           headers:
             X-Request-ID:
@@ -22852,6 +22976,19 @@ components:
           type: string
           format: date-time
           nullable: true
+        monitoring_enabled:
+          type: boolean
+        monitor_state:
+          type: string
+        monitor_error_code:
+          type: string
+        last_monitor_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_monitor_at:
+          type: string
+          format: date-time
         created_at:
           type: string
           format: date-time
@@ -22859,8 +22996,13 @@ components:
       - created_at
       - expiration_date
       - id
+      - last_monitor_at
       - last_reviewed_at
+      - monitor_error_code
+      - monitor_state
+      - monitoring_enabled
       - name
+      - next_monitor_at
       - notes
       - observed_expiration_date
       - owner
@@ -22871,6 +23013,53 @@ components:
       - renewal_mode
       - review_state
       - status
+    DomainMonitorRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        trigger:
+          type: string
+        state:
+          type: string
+        error_code:
+          type: string
+        rdap_source:
+          type: string
+        observed_expiration_date:
+          type: string
+          format: date
+          nullable: true
+        observed_registrar:
+          type: string
+        dns_source:
+          type: string
+        dnssec_validated:
+          type: boolean
+          nullable: true
+        dns_record_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - created_at
+      - dns_record_count
+      - dns_source
+      - dnssec_validated
+      - error_code
+      - finished_at
+      - id
+      - observed_expiration_date
+      - observed_registrar
+      - rdap_source
+      - state
+      - trigger
     DomainReview:
       type: object
       properties:

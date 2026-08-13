@@ -7,8 +7,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
+from .domain_monitoring import enqueue_domain_monitoring, monitoring_runs_for_domain
 from .domains import DomainError, DomainInput, create_domain, domains_for_scope, review_domain
-from .models import RegisteredDomain
+from .models import DomainMonitorAlert, RegisteredDomain
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -46,6 +47,11 @@ class DomainSerializer(serializers.Serializer):
     review_state = serializers.CharField()
     observed_expiration_date = serializers.DateField(allow_null=True)
     last_reviewed_at = serializers.DateTimeField(allow_null=True)
+    monitoring_enabled = serializers.BooleanField()
+    monitor_state = serializers.CharField()
+    monitor_error_code = serializers.CharField()
+    last_monitor_at = serializers.DateTimeField(allow_null=True)
+    next_monitor_at = serializers.DateTimeField()
     created_at = serializers.DateTimeField()
 
 
@@ -106,6 +112,66 @@ class DomainReviewView(APIView):
         return Response(DomainSerializer(domain).data)
 
 
+class DomainMonitorRunSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    trigger = serializers.CharField()
+    state = serializers.CharField()
+    error_code = serializers.CharField()
+    rdap_source = serializers.CharField()
+    observed_expiration_date = serializers.DateField(allow_null=True)
+    observed_registrar = serializers.CharField()
+    dns_source = serializers.CharField()
+    dnssec_validated = serializers.BooleanField(allow_null=True)
+    dns_record_count = serializers.IntegerField()
+    created_at = serializers.DateTimeField()
+    finished_at = serializers.DateTimeField(allow_null=True)
+
+
+class DomainMonitorAlertSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    kind = serializers.CharField()
+    observed_expiration_date = serializers.DateField(allow_null=True)
+    prior_expiration_date = serializers.DateField(allow_null=True)
+    created_at = serializers.DateTimeField()
+
+
+class DomainMonitoringView(APIView):
+    @extend_schema(responses={200: dict})
+    def get(self, request, domain_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id)
+        require_permission(request.user, PermissionKey.DOMAINS_VIEW, organization=workspace.organization)
+        try:
+            domain = RegisteredDomain.scoped.for_scope(workspace.data_scope).get(
+                entity_id=domain_entity_id, archived_at__isnull=True
+            )
+        except RegisteredDomain.DoesNotExist as exc:
+            raise serializers.ValidationError({"detail": "The selected domain is unavailable."}) from exc
+        runs = monitoring_runs_for_domain(workspace.data_scope, domain_entity_id)[:25]
+        alerts = DomainMonitorAlert.scoped.for_scope(workspace.data_scope).filter(domain=domain)[:50]
+        return Response(
+            {
+                "domain": DomainSerializer(domain).data,
+                "runs": DomainMonitorRunSerializer(runs, many=True).data,
+                "alerts": DomainMonitorAlertSerializer(alerts, many=True).data,
+            }
+        )
+
+    @extend_schema(request=None, responses={202: DomainMonitorRunSerializer})
+    def post(self, request, domain_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id)
+        require_permission(request.user, PermissionKey.DOMAINS_EDIT, organization=workspace.organization)
+        try:
+            domain = RegisteredDomain.scoped.for_scope(workspace.data_scope).get(
+                entity_id=domain_entity_id, archived_at__isnull=True, monitoring_enabled=True
+            )
+        except RegisteredDomain.DoesNotExist as exc:
+            raise serializers.ValidationError({"detail": "The selected domain is unavailable."}) from exc
+        run = enqueue_domain_monitoring(
+            scope=workspace.data_scope, domain=domain, requested_by_id=request.user.pk, trigger="manual"
+        )
+        return Response(DomainMonitorRunSerializer(run).data, status=202)
+
+
 @extend_schema_view(
     get=extend_schema(operation_id="msp_domain_list"),
     post=extend_schema(operation_id="msp_domain_create"),
@@ -127,4 +193,12 @@ class MSPDomainReviewView(DomainReviewView):
 
 
 class OrganizationDomainReviewView(DomainReviewView):
+    pass
+
+
+class MSPDomainMonitoringView(DomainMonitoringView):
+    pass
+
+
+class OrganizationDomainMonitoringView(DomainMonitoringView):
     pass

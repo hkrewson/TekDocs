@@ -2004,6 +2004,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/domains/{domain_entity_id}/monitoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_domains_monitoring_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_domains_monitoring_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/domains/{domain_entity_id}/review": {
         readonly parameters: {
             readonly query?: never;
@@ -4126,6 +4142,22 @@ export interface paths {
         readonly get: operations["workspaces_organizations_domains_hostnames_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_domains_hostnames_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/monitoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_domains_monitoring_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_domains_monitoring_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -6920,8 +6952,33 @@ export interface components {
             readonly observed_expiration_date: string | null;
             /** Format: date-time */
             readonly last_reviewed_at: string | null;
+            readonly monitoring_enabled: boolean;
+            readonly monitor_state: string;
+            readonly monitor_error_code: string;
+            /** Format: date-time */
+            readonly last_monitor_at: string | null;
+            /** Format: date-time */
+            readonly next_monitor_at: string;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        readonly DomainMonitorRun: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly trigger: string;
+            readonly state: string;
+            readonly error_code: string;
+            readonly rdap_source: string;
+            /** Format: date */
+            readonly observed_expiration_date: string | null;
+            readonly observed_registrar: string;
+            readonly dns_source: string;
+            readonly dnssec_validated: boolean | null;
+            readonly dns_record_count: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly finished_at: string | null;
         };
         readonly DomainReview: {
             /**
@@ -15058,6 +15115,54 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_domains_monitoring_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_domains_monitoring_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DomainMonitorRun"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_domains_review_create: {
         readonly parameters: {
             readonly query?: never;
@@ -20422,6 +20527,56 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Hostname"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_domains_monitoring_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_domains_monitoring_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DomainMonitorRun"];
                 };
             };
         };

@@ -10,6 +10,7 @@ from uuid import UUID
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from .compliance_evidence import evidence_for_scope
@@ -17,6 +18,7 @@ from .compliance_operations import assignments_for_scope
 from .compliance_risks import risks_for_scope
 from .models import AuditEvent, ComplianceEvidenceBundle, Entity, EntityVisibility
 from .publications import _encoded_public_key, publication_signing_key
+from .scoping import DataScope
 from .workspaces import ResolvedWorkspace
 
 
@@ -24,7 +26,7 @@ class ComplianceBundleError(ValueError):
     pass
 
 
-def bundles_for_scope(scope):  # type: ignore[no-untyped-def]
+def bundles_for_scope(scope: DataScope) -> QuerySet[ComplianceEvidenceBundle]:
     return ComplianceEvidenceBundle.scoped.for_scope(scope).select_related("entity", "created_by")
 
 
@@ -33,7 +35,9 @@ def canonical_manifest_bytes(manifest: dict[str, object]) -> bytes:
 
 
 @transaction.atomic
-def create_bundle(*, workspace: ResolvedWorkspace, actor_id: UUID, title: str, reason: str, audience: str):
+def create_bundle(
+    *, workspace: ResolvedWorkspace, actor_id: UUID, title: str, reason: str, audience: str
+) -> ComplianceEvidenceBundle:
     if audience not in {"msp_internal", "client_auditor"}:
         raise ComplianceBundleError("Unknown evidence bundle audience.")
     assignments = list(assignments_for_scope(workspace.data_scope).order_by("control__entity_id"))

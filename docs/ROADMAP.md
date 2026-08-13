@@ -1111,7 +1111,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.8` | **Complete:** Workspace-owned registered-domain inventory with normalized names, registrar/provider, registration and expiration dates, renewal mode, responsible owner, status, notes, and Entity relationships. |
 | `0.7.9` | **Complete:** Domain hierarchy for managed subdomains and hostnames, DNS record observations, explicit discovery provenance, and duplicate/cycle protection. |
 | `0.7.10` | **Complete:** Renewal/expiration schedules, review state, calendar integration, and stale or conflicting source handling. Notification delivery consumes the shared reminder boundary in a later dispatcher slice. |
-| `0.7.11` | Safe RDAP and authoritative-DNS collection through the approved egress service, with observed-vs-entered reconciliation and expiration/change notifications. |
+| `0.7.11` | **Complete:** Safe RDAP and DNS-over-HTTPS collection through the approved egress service, with observed-vs-entered reconciliation and retained expiration/change notifications. |
 | `0.7.12` | TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
 | `0.7.13` | Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
 | `0.8.0` | Stabilize and certify compliance evidence and safe monitoring. |
@@ -1212,6 +1212,17 @@ Evidence: `docs/releases/0.7.9.md`.
 - [x] Migration, permission/IDOR, OpenAPI/client, frontend, ADR 0072, security/risk, and release evidence agree at `0.7.10`.
 
 Evidence: `docs/releases/0.7.10.md`.
+
+### `0.7.11` acceptance criteria
+
+- [x] Manual and scheduled checks enqueue bounded worker jobs; browser requests never perform RDAP or DNS collection directly.
+- [x] RDAP and operator-configurable DNS-over-HTTPS requests use the approved public-HTTPS resolver, reviewed-address pinning, TLS hostname verification, no redirects, strict content types, timeouts, and a 512 KiB response limit.
+- [x] Successful runs retain source hostnames, canonical response digests, observed registration expiration and registrar labels, normalized apex DNS answers, DNSSEC validation state, and exact-Workspace history without storing raw remote payloads.
+- [x] Observed expiration remains separate from entered registration data. Automated current/stale/conflict review evidence is append-only and cannot silently rewrite entered truth.
+- [x] Expiration due, expiration changed, DNS changed, and collection failure alerts are retained, exact-Workspace records visible in the Domains monitoring surface. Collection work is idempotently queued and failure values are allowlisted codes.
+- [x] Central domain permissions, route/IDOR inventory, forced RLS, PostgreSQL scope/immutability guards, migration, OpenAPI/generated client, frontend, egress abuse tests, ADR 0073, risk disposition, and release evidence agree at `0.7.11`.
+
+Evidence: `docs/releases/0.7.11.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

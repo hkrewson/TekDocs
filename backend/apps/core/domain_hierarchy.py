@@ -85,8 +85,15 @@ def create_hostname(
 
 @transaction.atomic
 def record_dns_observation(
-    *, hostname: ManagedHostname, actor_id: UUID, record_type: str, value: str, ttl: int | None,
-    provenance: str, source: str, observed_at: datetime
+    *,
+    hostname: ManagedHostname,
+    actor_id: UUID | None,
+    record_type: str,
+    value: str,
+    ttl: int | None,
+    provenance: str,
+    source: str,
+    observed_at: datetime,
 ) -> DomainDNSObservation:
     kind = record_type.upper()
     normalized_value = value.strip()
@@ -99,6 +106,7 @@ def record_dns_observation(
         tenant=hostname.tenant,
         workspace=hostname.workspace,
         organization=hostname.organization,
+        domain=hostname.domain,
         hostname=hostname,
         record_type=kind,
         value=normalized_value,

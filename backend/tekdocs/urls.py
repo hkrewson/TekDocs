@@ -144,17 +144,19 @@ from apps.core.document_views import (
     OrganizationDocumentTemplateInstantiateView,
     OrganizationMarkdownImportView,
 )
-from apps.core.domain_views import (
-    MSPDomainListCreateView,
-    MSPDomainReviewView,
-    OrganizationDomainListCreateView,
-    OrganizationDomainReviewView,
-)
 from apps.core.domain_hierarchy_views import (
     MSPHostnameListCreateView,
     MSPObservationCreateView,
     OrganizationHostnameListCreateView,
     OrganizationObservationCreateView,
+)
+from apps.core.domain_views import (
+    MSPDomainListCreateView,
+    MSPDomainMonitoringView,
+    MSPDomainReviewView,
+    OrganizationDomainListCreateView,
+    OrganizationDomainMonitoringView,
+    OrganizationDomainReviewView,
 )
 from apps.core.integration_views import (
     GitExportDownloadView,
@@ -193,12 +195,6 @@ from apps.core.netbox_reconciliation_views import (
     NetBoxReferenceChoiceView,
     NetBoxReferenceCollectionView,
     NetBoxReferenceDetailView,
-)
-from apps.core.reminder_views import (
-    MSPReminderCalendarView,
-    MSPReminderListCreateView,
-    OrganizationReminderCalendarView,
-    OrganizationReminderListCreateView,
 )
 from apps.core.network_addressing_views import (
     SubnetDetailView,
@@ -276,6 +272,12 @@ from apps.core.relationship_views import (
     OrganizationEntityRelationshipDetailView,
     OrganizationEntityRelationshipListCreateView,
     OrganizationEntitySearchView,
+)
+from apps.core.reminder_views import (
+    MSPReminderCalendarView,
+    MSPReminderListCreateView,
+    OrganizationReminderCalendarView,
+    OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
 from apps.core.site_views import (
@@ -730,9 +732,26 @@ urlpatterns = [
         name="msp-reminder-calendar",
     ),
     path("api/v1/workspaces/msp/domains", MSPDomainListCreateView.as_view(), name="msp-domain-list-create"),
-    path("api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/review", MSPDomainReviewView.as_view(), name="msp-domain-review"),
-    path("api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/hostnames", MSPHostnameListCreateView.as_view(), name="msp-hostname-list-create"),
-    path("api/v1/workspaces/msp/hostnames/<uuid:hostname_entity_id>/observations", MSPObservationCreateView.as_view(), name="msp-domain-observation-create"),
+    path(
+        "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/review",
+        MSPDomainReviewView.as_view(),
+        name="msp-domain-review",
+    ),
+    path(
+        "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/monitoring",
+        MSPDomainMonitoringView.as_view(),
+        name="msp-domain-monitoring",
+    ),
+    path(
+        "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/hostnames",
+        MSPHostnameListCreateView.as_view(),
+        name="msp-hostname-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/hostnames/<uuid:hostname_entity_id>/observations",
+        MSPObservationCreateView.as_view(),
+        name="msp-domain-observation-create",
+    ),
     path("api/v1/workspaces/msp/networks/racks", NetworkRackListCreateView.as_view(), name="msp-network-racks"),
     path(
         "api/v1/workspaces/msp/networks/racks/<uuid:rack_entity_id>",
@@ -1717,9 +1736,26 @@ urlpatterns = [
         OrganizationDomainListCreateView.as_view(),
         name="organization-domain-list-create",
     ),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/review", OrganizationDomainReviewView.as_view(), name="organization-domain-review"),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/hostnames", OrganizationHostnameListCreateView.as_view(), name="organization-hostname-list-create"),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/hostnames/<uuid:hostname_entity_id>/observations", OrganizationObservationCreateView.as_view(), name="organization-domain-observation-create"),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/review",
+        OrganizationDomainReviewView.as_view(),
+        name="organization-domain-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/monitoring",
+        OrganizationDomainMonitoringView.as_view(),
+        name="organization-domain-monitoring",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/hostnames",
+        OrganizationHostnameListCreateView.as_view(),
+        name="organization-hostname-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/hostnames/<uuid:hostname_entity_id>/observations",
+        OrganizationObservationCreateView.as_view(),
+        name="organization-domain-observation-create",
+    ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recycle-bin/<str:record_type>/<uuid:record_id>/restore",
         OrganizationRecycleBinRestoreView.as_view(),

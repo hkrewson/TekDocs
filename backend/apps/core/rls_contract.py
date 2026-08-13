@@ -71,6 +71,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_managedhostname",
     "core_domaindnsobservation",
     "core_domainreviewevent",
+    "core_domainmonitorrun",
+    "core_domainmonitoralert",
 )
 
 TENANT_SCOPED_TABLES = (

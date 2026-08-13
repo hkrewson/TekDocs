@@ -5026,7 +5026,11 @@ class ReminderSchedule(TimestampedModel):
     lead_days = models.PositiveSmallIntegerField(default=30)
     recurrence = models.CharField(max_length=16, choices=ReminderRecurrence.choices, default=ReminderRecurrence.NONE)
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_reminder_schedules", null=True, blank=True
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_reminder_schedules",
+        null=True,
+        blank=True,
     )
     active = models.BooleanField(default=True)
     created_by = models.ForeignKey(
@@ -5070,6 +5074,28 @@ class DomainReviewState(models.TextChoices):
     CONFLICT = "conflict", "Conflicting source"
 
 
+class DomainMonitorState(models.TextChoices):
+    NEVER = "never", "Never checked"
+    QUEUED = "queued", "Queued"
+    RUNNING = "running", "Running"
+    CURRENT = "current", "Current"
+    FAILED = "failed", "Check failed"
+
+
+class DomainMonitorRunState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    SUCCEEDED = "succeeded", "Succeeded"
+    FAILED = "failed", "Failed"
+
+
+class DomainMonitorAlertKind(models.TextChoices):
+    EXPIRATION_DUE = "expiration_due", "Expiration due"
+    EXPIRATION_CHANGED = "expiration_changed", "Expiration changed"
+    DNS_CHANGED = "dns_changed", "DNS changed"
+    COLLECTION_FAILED = "collection_failed", "Collection failed"
+
+
 class RegisteredDomain(TimestampedModel):
     """Workspace-owned entered registration record; observations remain separate."""
 
@@ -5088,7 +5114,11 @@ class RegisteredDomain(TimestampedModel):
     expiration_date = models.DateField(null=True, blank=True)
     renewal_mode = models.CharField(max_length=16, choices=DomainRenewalMode.choices)
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_registered_domains", null=True, blank=True
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_registered_domains",
+        null=True,
+        blank=True,
     )
     status = models.CharField(max_length=16, choices=RegisteredDomainStatus.choices)
     notes = models.TextField(blank=True)
@@ -5097,6 +5127,14 @@ class RegisteredDomain(TimestampedModel):
     )
     observed_expiration_date = models.DateField(null=True, blank=True)
     last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    monitoring_enabled = models.BooleanField(default=True)
+    monitor_interval_hours = models.PositiveSmallIntegerField(default=24)
+    next_monitor_at = models.DateTimeField(default=timezone.now)
+    last_monitor_at = models.DateTimeField(null=True, blank=True)
+    monitor_state = models.CharField(
+        max_length=16, choices=DomainMonitorState.choices, default=DomainMonitorState.NEVER
+    )
+    monitor_error_code = models.CharField(max_length=64, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_registered_domains"
     )
@@ -5134,7 +5172,7 @@ class DomainReviewEvent(models.Model):
     source = models.CharField(max_length=120)
     note = models.TextField(blank=True)
     reviewed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="domain_review_events"
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="domain_review_events", null=True, blank=True
     )
     reviewed_at = models.DateTimeField(auto_now_add=True)
 
@@ -5143,6 +5181,9 @@ class DomainReviewEvent(models.Model):
 
     class Meta:
         ordering = ("-reviewed_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.state}:{self.domain_id}"
 
     def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         if not self._state.adding:
@@ -5192,6 +5233,9 @@ class ManagedHostname(TimestampedModel):
             )
         ]
 
+    def __str__(self) -> str:
+        return self.ascii_name
+
 
 class DomainDNSObservation(models.Model):
     """Append-only normalized DNS answer observed for a managed hostname."""
@@ -5202,7 +5246,10 @@ class DomainDNSObservation(models.Model):
     organization = models.ForeignKey(
         Organization, on_delete=models.PROTECT, related_name="domain_dns_observations", null=True, blank=True
     )
-    hostname = models.ForeignKey(ManagedHostname, on_delete=models.PROTECT, related_name="dns_observations")
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="dns_observations")
+    hostname = models.ForeignKey(
+        ManagedHostname, on_delete=models.PROTECT, related_name="dns_observations", null=True, blank=True
+    )
     record_type = models.CharField(max_length=16)
     value = models.CharField(max_length=1_024)
     ttl = models.PositiveIntegerField(null=True, blank=True)
@@ -5211,7 +5258,11 @@ class DomainDNSObservation(models.Model):
     content_digest = models.CharField(max_length=64)
     observed_at = models.DateTimeField()
     recorded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_domain_dns_observations"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_domain_dns_observations",
+        null=True,
+        blank=True,
     )
 
     objects = models.Manager()
@@ -5222,10 +5273,14 @@ class DomainDNSObservation(models.Model):
         indexes = [models.Index(fields=("workspace", "hostname", "observed_at"), name="core_domain_dns_obs_idx")]
         constraints = [
             models.UniqueConstraint(
-                fields=("hostname", "record_type", "content_digest", "observed_at"),
+                fields=("domain", "hostname", "record_type", "content_digest", "observed_at"),
                 name="domain_dns_observation_unique",
+                nulls_distinct=False,
             )
         ]
+
+    def __str__(self) -> str:
+        return f"{self.record_type}:{self.domain_id}"
 
     def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         if not self._state.adding:
@@ -5234,3 +5289,95 @@ class DomainDNSObservation(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("DNS observations are retained")
+
+
+class DomainMonitorRun(models.Model):
+    """Bounded asynchronous RDAP and DNS collection lifecycle for one domain."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="domain_monitor_runs")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="domain_monitor_runs")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="domain_monitor_runs", null=True, blank=True
+    )
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="monitoring_runs")
+    trigger = models.CharField(max_length=16, choices=(("manual", "Manual"), ("scheduled", "Scheduled")))
+    state = models.CharField(
+        max_length=16, choices=DomainMonitorRunState.choices, default=DomainMonitorRunState.PENDING
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_domain_monitor_runs",
+        null=True,
+        blank=True,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+    rdap_source = models.CharField(max_length=120, blank=True)
+    rdap_digest = models.CharField(max_length=64, blank=True)
+    observed_expiration_date = models.DateField(null=True, blank=True)
+    observed_registrar = models.CharField(max_length=240, blank=True)
+    dns_source = models.CharField(max_length=120, blank=True)
+    dns_digest = models.CharField(max_length=64, blank=True)
+    dnssec_validated = models.BooleanField(null=True, blank=True)
+    dns_record_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        indexes = [
+            models.Index(fields=("workspace", "state", "available_at"), name="core_domainrun_due_idx"),
+            models.Index(fields=("domain", "created_at"), name="core_domainrun_history_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(attempts__lte=5), name="domain_monitor_attempts_bounded"),
+            models.CheckConstraint(
+                condition=models.Q(trigger__in=("manual", "scheduled")), name="domain_monitor_trigger_valid"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Domain monitor run {self.id}"
+
+
+class DomainMonitorAlert(models.Model):
+    """Append-only, value-minimized in-app notification produced by monitoring."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="domain_monitor_alerts")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="domain_monitor_alerts")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="domain_monitor_alerts", null=True, blank=True
+    )
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="monitoring_alerts")
+    run = models.ForeignKey(DomainMonitorRun, on_delete=models.PROTECT, related_name="alerts")
+    kind = models.CharField(max_length=32, choices=DomainMonitorAlertKind.choices)
+    observed_expiration_date = models.DateField(null=True, blank=True)
+    prior_expiration_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [models.UniqueConstraint(fields=("run", "kind"), name="domain_monitor_alert_run_kind_unique")]
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.domain_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Domain monitoring alerts are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Domain monitoring alerts are retained")

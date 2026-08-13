@@ -131,6 +131,10 @@ This register turns known limitations into release obligations. A risk remains o
 
 `TD-RISK-053` and `TD-RISK-054` remain **mitigated with recurring owners**. Domain expiration creates an exact-source schedule, review events retain entered/observed differences, and the authenticated calendar consumes the shared scoped projection. Direct request-path notification is prohibited; the later reminder dispatcher owns outbox integration.
 
+## 0.7.11 domain-monitoring disposition
+
+`TD-RISK-047`, `TD-RISK-053`, and `TD-RISK-054` remain **mitigated with recurring owners**. RDAP and DNS-over-HTTPS collection use the shared pinned public-HTTPS policy with bounded responses and no redirects; remote bodies are digested then discarded. Exact-Workspace jobs, observations, automated reviews, and alerts use forced RLS and database scope/immutability guards, while entered registration truth remains separate. The configured recursive resolver is explicit provenance rather than a claim of direct authoritative access. TLS monitoring and the full monitoring certification remain owned by `0.7.12`–`0.8.0`; general inbox/SMTP recipient projection for monitoring alerts remains a separately reviewed extension.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

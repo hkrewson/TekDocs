@@ -9,6 +9,8 @@ for lock_file in backend/build-requirements.lock backend/requirements.lock backe
   grep -q -- '--hash=sha256:' "$lock_file"
 done
 
+grep -q 'zaproxy/zap-stable@sha256:[0-9a-f]\{64\}' scripts/rehearse-production-image.sh
+
 unpinned_actions=$(rg -n 'uses:[[:space:]]+[^[:space:]]+@' .github/workflows \
   | grep -Ev '@[0-9a-f]{40}([[:space:]]|$)' || true)
 if [ -n "$unpinned_actions" ]; then

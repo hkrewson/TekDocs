@@ -1,0 +1,4 @@
+10020	FAIL	Missing anti-clickjacking header
+10021	FAIL	Missing nosniff header
+10038	FAIL	Missing content security policy
+10063	FAIL	Missing permissions policy

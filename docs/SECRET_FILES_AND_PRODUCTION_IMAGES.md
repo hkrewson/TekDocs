@@ -1,6 +1,6 @@
 # Secret-file injection and production-image contract
 
-Status: implemented in `0.3.2` for production-capable file inputs and local production-image evidence. Removing direct environment compatibility and the remaining container hardening are assigned to `0.8.7`; exact published-image evidence remains `0.9.4`.
+Status: production file-only enforcement and local container hardening are certified in `0.8.7`; exact signed published-image evidence remains `0.9.4`.
 
 ## Configuration sources
 
@@ -27,7 +27,7 @@ Files must use an absolute path, resolve beneath `TEKDOCS_SECRET_ROOT` (default 
 
 Use `.env.production.example` as the non-secret environment starting point. The `TEKDOCS_SECRET_DIRECTORY` source should be an absolute, root-owned runtime directory outside the repository, preferably on host tmpfs such as `/run/tekdocs-secrets`. Source files should be mode `0600`; Compose exposes them read-only and only to the named service under `/run/secrets`.
 
-Development may continue to use `make bootstrap` and direct values in the ignored `.env`. The supported production profile will prohibit direct sensitive environment values in `0.8.7`; the compatibility path remains until then so deployment migrations can be deliberate.
+Development may continue to use `make bootstrap` and direct values in the ignored `.env`. The supported production overlay sets `TEKDOCS_REQUIRE_SECRET_FILES=true`; required direct or missing application secret sources fail startup. Configured SMTP and OIDC credentials also require their file overlays.
 
 ## Rotation boundaries
 
@@ -49,8 +49,9 @@ Automated rotation and key-loss recovery remain later operational work. `0.3.2` 
 - no secret values in container environments, image history, or combined service logs;
 - no host secret-directory path in service logs;
 - fail-closed direct-plus-file ambiguity without value/path disclosure.
+- read-only application roots, explicit tmpfs writes, dropped capabilities, `no-new-privileges`, process ceilings, and structured request evidence.
 
-The rehearsal never reuses the ordinary development database. `0.8.7` will add explicit read-only filesystem/capability/resource/graceful-shutdown/TLS enforcement. `0.9.4` will run the smoke contract against the exact signed release digest and retain SBOM/provenance evidence.
+The rehearsal never reuses the ordinary development database. TLS termination remains the deployment proxy's responsibility. `0.9.4` will run the smoke contract against the exact signed release digest and retain SBOM/provenance evidence.
 
 ## Custody boundary
 

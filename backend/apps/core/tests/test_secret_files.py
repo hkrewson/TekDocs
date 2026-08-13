@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from tekdocs.settings.secret_files import MAX_SECRET_BYTES, read_secret
+from tekdocs.settings.secret_files import MAX_SECRET_BYTES, read_secret, require_file_sources
 
 
 def write_secret(root: Path, name: str, value: bytes = b"safe-runtime-value\n", mode: int = 0o600) -> Path:
@@ -88,3 +88,14 @@ def test_symlink_cannot_escape_the_approved_secret_root(tmp_path):
     assert str(outside) not in str(caught.value)
     assert str(link) not in str(caught.value)
     outside.unlink()
+
+
+def test_production_file_source_policy_rejects_direct_and_missing_sources_without_values():
+    with pytest.raises(ImproperlyConfigured, match="direct values are not supported") as direct:
+        require_file_sources(("DJANGO_SECRET_KEY",), environment={"DJANGO_SECRET_KEY": "must-not-escape"})
+    assert "must-not-escape" not in str(direct.value)
+
+    with pytest.raises(ImproperlyConfigured, match="secret file is required"):
+        require_file_sources(("DJANGO_SECRET_KEY",), environment={})
+
+    require_file_sources(("DJANGO_SECRET_KEY",), environment={"DJANGO_SECRET_KEY_FILE": "/run/secrets/key"})

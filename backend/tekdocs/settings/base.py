@@ -243,6 +243,9 @@ STORAGES = {
 }
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SESSION_COOKIE_HTTPONLY = True
@@ -321,8 +324,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "structured": {
-            "format": '{{"time":"{asctime}","level":"{levelname}","logger":"{name}","message":"{message}"}}',
-            "style": "{",
+            "()": "tekdocs.safe_logging.SafeJsonFormatter",
         }
     },
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "structured"}},

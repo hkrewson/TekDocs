@@ -11,6 +11,17 @@ MAX_SECRET_BYTES = 4096
 DEFAULT_SECRET_ROOT = Path("/run/secrets")
 
 
+def require_file_sources(names: tuple[str, ...], *, environment: Mapping[str, str] | None = None) -> None:
+    """Reject direct or missing secret sources in the supported production profile."""
+
+    values = os.environ if environment is None else environment
+    for name in names:
+        if values.get(name):
+            raise _configuration_error(name, "direct values are not supported in the production profile")
+        if not values.get(f"{name}_FILE"):
+            raise _configuration_error(name, "a secret file is required in the production profile")
+
+
 def _configuration_error(name: str, reason: str) -> ImproperlyConfigured:
     return ImproperlyConfigured(f"Invalid secret configuration for {name}: {reason}")
 

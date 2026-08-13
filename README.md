@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.6` adds desktop Chromium, Firefox, and WebKit regression plus Chromium/WebKit mobile reflow coverage and value-free browser artifacts. TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.7` hardens the file-only production secret boundary, containers, structured application logs, dependency/license gates, authentication abuse suite, and pinned DAST rehearsal. TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 

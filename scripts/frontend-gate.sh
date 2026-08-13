@@ -14,7 +14,10 @@ run_gate() {
       npm --prefix "$repository_root/frontend" run build
       ;;
     test) npm --prefix "$repository_root/frontend" run test -- --maxWorkers=1 --no-file-parallelism ;;
-    audit) npm --prefix "$repository_root/frontend" audit --omit=dev --audit-level=high ;;
+    audit)
+      npm --prefix "$repository_root/frontend" audit --omit=dev --audit-level=high
+      npm --prefix "$repository_root/frontend" run license:check
+      ;;
     *) echo "Unknown frontend gate: $mode" >&2; exit 2 ;;
   esac
 }
@@ -45,7 +48,7 @@ docker run --rm \
     case "$FRONTEND_GATE_MODE" in
       check) npm run api:check && npm run lint && npm run typecheck && npm run test -- --maxWorkers=1 --no-file-parallelism && npm run build ;;
       test) npm run test -- --maxWorkers=1 --no-file-parallelism ;;
-      audit) npm audit --omit=dev --audit-level=high ;;
+      audit) npm audit --omit=dev --audit-level=high && npm run license:check ;;
       *) exit 2 ;;
     esac
   '

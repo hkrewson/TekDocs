@@ -1,4 +1,6 @@
+import logging
 import re
+import time
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -11,6 +13,8 @@ from .models import InstallationState, Organization, Tenant
 from .rls import OrganizationRLSMode, bind_local_rls_scope
 from .scoping import DataScope
 
+request_logger = logging.getLogger("tekdocs.request")
+
 
 class RequestContextMiddleware:
     IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,199}$")
@@ -19,6 +23,7 @@ class RequestContextMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
+        started = time.monotonic()
         request_id = uuid.uuid4()
         request.request_id = request_id  # type: ignore[attr-defined]
         idempotency_key = request.headers.get("Idempotency-Key")
@@ -46,6 +51,17 @@ class RequestContextMiddleware:
         response["X-Request-ID"] = str(request_id)
         if idempotency_key is not None and response.status_code < 500:
             response["Idempotency-Key"] = idempotency_key
+        match = getattr(request, "resolver_match", None)
+        request_logger.info(
+            "request_complete",
+            extra={
+                "request_id": str(request_id),
+                "method": request.method,
+                "route": getattr(match, "view_name", "unresolved") or "unresolved",
+                "status_code": response.status_code,
+                "duration_ms": round((time.monotonic() - started) * 1000, 3),
+            },
+        )
         return response
 
 

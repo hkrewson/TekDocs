@@ -2,6 +2,8 @@
 
 ## Runtime
 
+The `0.8.7` production overlay makes file-backed secret custody and container isolation executable deployment properties. Application roots are read-only, writable runtime paths are explicit tmpfs or managed volumes, privileges/process counts are bounded, and the production rehearsal inspects the resulting container configuration. A bounded JSON formatter owns application/request events and exposes only fixed correlation fields. ADR 0083 defines this public-beta security boundary.
+
 TekDocs ships as a same-origin web application. Nginx serves the React build and proxies `/api/`, `/accounts/`, `/admin/`, and `/static/` to Gunicorn. Celery workers and the scheduler share the Django codebase. PostgreSQL is the system of record; Valkey supplies task transport and cache primitives.
 
 The default Compose services are `db`, `valkey`, a one-shot `migrate` job, `backend`, `worker`, `scheduler`, and `frontend`. The migration job owns schema changes and provisions the fixed `tekdocs_runtime` login; application processes receive only that non-owner credential. Persistent application artifacts use a storage provider: local volumes initially and S3-compatible storage later.

@@ -6,6 +6,7 @@ work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-production-image.XXXXXX")
 environment_file="$work_directory/production-image.env"
 secret_directory="$work_directory/secrets"
 project_name="tekdocs_production_image_$$"
+run_dast=${TEKDOCS_RUN_DAST:-false}
 
 production_compose() {
   docker compose --project-name "$project_name" --env-file "$environment_file" \
@@ -81,6 +82,19 @@ if [ "$backend_user" != "tekdocs" ] && [ "$backend_user" != "10001" ]; then
   exit 1
 fi
 
+echo "Verifying production container isolation controls"
+for service in migrate backend worker scheduler; do
+  container_id=$(production_compose ps -q --all "$service")
+  [ "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = "true" ]
+  docker inspect --format '{{json .HostConfig.CapDrop}}' "$container_id" | grep -q '"ALL"'
+  docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$container_id" | grep -q 'no-new-privileges:true'
+  pids_limit=$(docker inspect --format '{{.HostConfig.PidsLimit}}' "$container_id")
+  [ "$pids_limit" -gt 0 ]
+done
+frontend_id=$(production_compose ps -q frontend)
+[ "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$frontend_id")" = "true" ]
+docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$frontend_id" | grep -q 'no-new-privileges:true'
+
 echo "Verifying production secrets remain file-backed and value-free"
 for service in db migrate backend worker scheduler; do
   container_id=$(production_compose ps -q --all "$service")
@@ -122,6 +136,9 @@ if printf '%s' "$combined_logs" | grep -Fq "$secret_directory"; then
   echo "Production service logs contain the host secret directory" >&2
   exit 1
 fi
+request_log=$(production_compose logs --no-color backend | sed -n 's/^[^|]*| //p' | grep '"event":"request_complete"' | tail -n 1)
+[ -n "$request_log" ] || { echo "Production request did not emit a structured event" >&2; exit 1; }
+printf '%s' "$request_log" | python3 -c 'import json,sys; value=json.load(sys.stdin); required={"timestamp","level","logger","event","request_id","method","route","status_code","duration_ms"}; assert required <= value.keys(); assert value["event"] == "request_complete"'
 
 failure_log="$work_directory/ambiguous-secret.log"
 if production_compose run --rm --no-deps -e DJANGO_SECRET_KEY=ambiguous-direct-value \
@@ -133,5 +150,13 @@ grep -q 'set either DJANGO_SECRET_KEY or DJANGO_SECRET_KEY_FILE, not both' "$fai
 if grep -Fq 'ambiguous-direct-value' "$failure_log" || grep -Fq "$secret_directory" "$failure_log"; then
   echo "Secret-source validation disclosed a value or host path" >&2
   exit 1
+fi
+if [ "$run_dast" = "true" ]; then
+  echo "Running the pinned unauthenticated DAST baseline"
+  docker run --rm --network "container:$frontend_id" \
+    --tmpfs /zap/wrk:rw,noexec,nosuid,size=16m \
+    -v "$repository_root/.zap:/zap/rules:ro" \
+    zaproxy/zap-stable@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef \
+    zap-baseline.py -t http://localhost:8080 -m 1 -I -c /zap/rules/rules.tsv
 fi
 echo "Production-target image rehearsal passed"

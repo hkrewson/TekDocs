@@ -1,6 +1,9 @@
+import os
+
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
+from .secret_files import require_file_sources
 from .validation import (
     validate_production_email,
     validate_production_public_url,
@@ -10,6 +13,26 @@ from .validation import (
 )
 
 DEBUG = False
+
+if env_bool("TEKDOCS_REQUIRE_SECRET_FILES", False):  # noqa: F405
+    _file_only_names = [
+        "DJANGO_SECRET_KEY",
+        "POSTGRES_PASSWORD",
+        "TEKDOCS_MASTER_KEY",
+        "TEKDOCS_PUBLICATION_SIGNING_KEY",
+    ]
+    if TEKDOCS_DATABASE_ROLE == "migration":  # noqa: F405
+        _file_only_names.append("TEKDOCS_DATABASE_RUNTIME_PASSWORD")
+    if os.getenv("EMAIL_HOST_USER"):
+        _file_only_names.append("EMAIL_HOST_PASSWORD")
+    if os.getenv("TEKDOCS_OIDC_PROVIDER_ID"):
+        _file_only_names.append("TEKDOCS_OIDC_CLIENT_SECRET")
+    require_file_sources(tuple(_file_only_names))
+    if os.getenv("TEKDOCS_BOOTSTRAP_TOKEN"):
+        raise ImproperlyConfigured(
+            "Invalid secret configuration for TEKDOCS_BOOTSTRAP_TOKEN: "
+            "direct values are not supported in the production profile"
+        )
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)  # noqa: F405

@@ -2,12 +2,49 @@ services:
   migrate:
     build:
       target: production
+    environment:
+      TEKDOCS_REQUIRE_SECRET_FILES: "true"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
   backend:
     build:
       target: production
+    environment: &production-runtime
+      TEKDOCS_REQUIRE_SECRET_FILES: "true"
+    command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "/dev/null", "--error-logfile", "-", "--graceful-timeout", "30", "--timeout", "60", "--max-requests", "1000", "--max-requests-jitter", "100", "tekdocs.wsgi:application"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    stop_grace_period: 45s
   worker:
     build:
       target: production
+    environment: *production-runtime
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    stop_grace_period: 45s
   scheduler:
     build:
       target: production
+    environment: *production-runtime
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    stop_grace_period: 45s
+  frontend:
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128

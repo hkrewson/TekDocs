@@ -1268,7 +1268,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.4` | **Complete:** Localization readiness, timezone/locale correctness, and translatable UI contract. |
 | `0.8.5` | **Complete:** Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | **Complete:** Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
-| `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
+| `0.8.7` | **Complete:** DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
 | `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion; publish the end-user/operator corpus to the public repository's actual GitHub Wiki, add drift/link checks, and connect stable page-level contextual help to the relevant Wiki topics. |
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
 | `0.9.0` | Feature freeze and public beta; only fixes, hardening, and release evidence follow. |
@@ -1344,6 +1344,19 @@ Evidence: `docs/releases/0.8.5.md`.
 - [x] ADR 0082, browser guidance, security/risk records, roadmap, version metadata, and release evidence agree without claiming physical-device, assistive-technology, or hosted-run certification.
 
 Evidence: `docs/releases/0.8.6.md`.
+
+### `0.8.7` acceptance criteria
+
+- [x] The supported production overlay requires file sources for every required application/database key and any configured SMTP/OIDC credential; direct secret values fail closed without disclosing values or host paths.
+- [x] Migration, web, worker, and scheduler use read-only roots, tmpfs write boundaries, dropped capabilities, `no-new-privileges`, process ceilings, production images, and graceful shutdown; the read-only frontend exposes only bounded Nginx tmpfs paths.
+- [x] The production rehearsal inspects those controls, service-scoped mounts, image/environment/log leakage, non-root backend identity, migration state, and file/direct-source ambiguity.
+- [x] Application and request events are bounded JSON with allowlisted correlation fields, resolved route identity, escaping/redaction tests, and value-free exception signaling. Gunicorn access output is replaced by the request event.
+- [x] Python/npm production vulnerability and declared-license policy checks are blocking; Python hashes, container digests, Action SHAs, and the ZAP image pin remain drift checked.
+- [x] Scheduled/manual and local DAST use the same isolated production-target stack, retain no raw report, and have zero configured FAIL findings; remaining passive warnings have an explicit disposition.
+- [x] Authentication/CSRF/rate-limit, IDOR/policy/RLS, SSRF/rebinding, webhook/replay, hostile-file, Markdown/XSS, and secret-file negative suites remain blocking, with bounded request/upload memory.
+- [x] ADR 0083, architecture/security/threat/risk records, version metadata, roadmap, and release evidence agree without claiming external assessment or signed-image provenance.
+
+Evidence: `docs/releases/0.8.7.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

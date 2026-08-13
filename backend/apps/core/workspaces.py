@@ -61,6 +61,7 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "services",
         "tickets",
         "vendors",
+        "compliance",
         "recycle_bin",
         "integrations",
     ),

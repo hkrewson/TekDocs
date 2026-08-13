@@ -1114,7 +1114,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.11` | **Complete:** Safe RDAP and DNS-over-HTTPS collection through the approved egress service, with observed-vs-entered reconciliation and retained expiration/change notifications. |
 | `0.7.12` | **Complete:** TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
 | `0.7.13` | **Complete:** Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
-| `0.8.0` | Stabilize and certify compliance evidence and safe monitoring. |
+| `0.8.0` | **Complete:** Stabilized and certified compliance evidence and safe monitoring as one composed, exact-Workspace subsystem. |
 
 ### `0.7.1` acceptance criteria
 
@@ -1245,6 +1245,18 @@ Evidence: `docs/releases/0.7.12.md`.
 - [x] Exact-prior `0.7.12` upgrade and independent PostgreSQL/media backup restore preserve terminal domain/certificate evidence. Migration, OpenAPI/client, frontend, architecture/security/threat/risk, ADR 0075, and release evidence agree at `0.7.13`.
 
 Evidence: `docs/releases/0.7.13.md`.
+
+### `0.8.0` acceptance criteria
+
+- [x] Certification adds no model, migration, route, permission, dependency, collector authority, alert-recipient routing, cross-client dashboard, or new domain family.
+- [x] `make test-compliance-monitoring-certification` composes catalogs, assignments, evidence, risks, signed bundles, reminders, domains, hostile egress, certificates, stabilization, policy/IDOR, forced RLS, migration preservation, entity/RBAC certification, and frontend behavior against PostgreSQL.
+- [x] The production-shaped browser journey creates and reviews an exact-client framework, verifies a signed evidence bundle, and persists a registered domain, renewal schedule, and fixed-port certificate endpoint through React, Django, and PostgreSQL.
+- [x] The exact `0.7.13` upgrade preserves a signed compliance bundle and successful digested domain/certificate evidence; an independent PostgreSQL/media restore verifies the same retained fixture.
+- [x] Production-target startup, file-injected deployment secrets, runtime-role RLS, and health checks remain blocking production-image evidence.
+- [x] Architecture, security, threat model, risk disposition, ADR 0076, version, migration/OpenAPI/client drift, release evidence, and the established compliance/monitoring ADRs agree at `0.8.0`.
+- [x] `TD-RISK-047` and `TD-RISK-048` through `TD-RISK-055` are certified for the implemented boundary with recurring owners; supported encrypted/key-loss recovery, proxy-aware DAST, external review, and general monitoring-recipient routing remain explicitly assigned.
+
+Evidence: `docs/releases/0.8.0.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

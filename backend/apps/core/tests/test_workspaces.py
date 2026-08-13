@@ -111,6 +111,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "services",
         "tickets",
         "vendors",
+        "compliance",
         "recycle_bin",
         "integrations",
         "products",

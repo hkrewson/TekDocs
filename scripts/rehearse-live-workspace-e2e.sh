@@ -55,7 +55,8 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
 assert organization.entity.organization_id is None
@@ -93,6 +94,24 @@ assert association.site == site
 assert association.structured_location == location
 assert association.location == "Live Main Campus"
 assert association.office == "Office 214"
+framework = ComplianceFramework.objects.get(entity__display_name="Live monitoring baseline")
+assignment = framework.assignments.get()
+assert framework.organization == organization
+assert framework.current_revision.version_label == "2026.1"
+assert assignment.applicability == "applicable"
+assert assignment.implementation_status == "implemented"
+assert assignment.reviews.get().decision == "Live monitoring control reviewed"
+bundle = ComplianceEvidenceBundle.objects.get(organization=organization)
+assert bundle.manifest["assignments"][0]["id"] == str(assignment.id)
+assert verify_bundle(bundle)
+registered_domain = RegisteredDomain.objects.get(ascii_name="live-acme.example")
+certificate_endpoint = CertificateEndpoint.objects.get(domain=registered_domain)
+assert registered_domain.organization == organization
+assert registered_domain.expiration_date.isoformat() == "2027-08-13"
+assert certificate_endpoint.organization == organization
+assert certificate_endpoint.protocol == "https"
+assert certificate_endpoint.port == 443
+assert ReminderSchedule.objects.get(source_entity=registered_domain.entity).due_on.isoformat() == "2027-08-13"
 definition = CustomFieldDefinition.objects.get(organization=organization, key="support_tier", entity_type="site")
 version = CustomFieldDefinitionVersion.objects.get(definition=definition, version=1)
 envelope = site.entity.custom_fields[str(definition.id)]

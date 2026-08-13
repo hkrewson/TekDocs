@@ -110,7 +110,7 @@ This register turns known limitations into release obligations. A risk remains o
 
 ## 0.7.5 signed-evidence-bundle disposition
 
-`TD-RISK-048` through `TD-RISK-052` are **mitigated with recurring owners**. Exact-Workspace canonical manifests retain control revisions, evidence links and reviews, and risk decisions; SHA-256 and Ed25519 provide offline integrity evidence. Database immutability, forced RLS, bounded bundle size, and non-disclosing APIs protect retention and isolation. Full upgrade/restore composition and compliance certification remain owned by `0.7.14` and `0.8.0`.
+`TD-RISK-048` through `TD-RISK-052` are **mitigated with recurring owners**. Exact-Workspace canonical manifests retain control revisions, evidence links and reviews, and risk decisions; SHA-256 and Ed25519 provide offline integrity evidence. Database immutability, forced RLS, bounded bundle size, and non-disclosing APIs protect retention and isolation. Full upgrade/restore composition and compliance certification remain owned by `0.8.0`.
 
 ## 0.7.6 shared-reminder disposition
 
@@ -143,6 +143,10 @@ This register turns known limitations into release obligations. A risk remains o
 ## 0.7.13 monitoring-stabilization disposition
 
 `TD-RISK-047`, `TD-RISK-053`, `TD-RISK-054`, and `TD-RISK-055` are **mitigated with recurring owners**. Strict IDNA and wildcard handling, typed DoH success validation, explicit DNSSEC/CAA summaries, bounded certificate/SAN evidence, canonical terminal-run digests, database retention guards, bounded history, accessible controls, exact-Workspace regression, and exact-prior upgrade/restore evidence close the stabilization slice. `0.8.0` owns composed compliance-and-monitoring certification. General inbox/SMTP projection remains excluded until recipient routing is separately authorized.
+
+## 0.8.0 compliance-and-monitoring certification disposition
+
+`TD-RISK-047` and `TD-RISK-048` through `TD-RISK-055` are **certified for the implemented one-MSP, exact-Workspace boundary with recurring owners**. The named PostgreSQL composition, real browser-to-Django-to-PostgreSQL journey, exact-`0.7.13` upgrade, independent PostgreSQL/media restore, and production-target secret-file/image rehearsal now form one release contract. This does not close supported encrypted/key-loss recovery (`0.8.1`/`0.9.3`), proxy-aware DAST (`0.8.7`), external security review (`0.8.9`), host/database administrator trust, or general inbox/SMTP routing for monitoring alerts.
 
 ## Release rule
 

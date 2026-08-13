@@ -1265,7 +1265,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.1` | **Complete:** Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and initial implementation of `TD-RISK-006`. |
 | `0.8.2` | **Complete:** Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
 | `0.8.3` | **Complete:** WCAG 2.2 AA audit and remediation across critical workflows. |
-| `0.8.4` | Localization readiness, timezone/locale correctness, and translatable UI contract. |
+| `0.8.4` | **Complete:** Localization readiness, timezone/locale correctness, and translatable UI contract. |
 | `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
 | `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
@@ -1308,6 +1308,18 @@ Evidence: `docs/releases/0.8.2.md`.
 - [x] ADR 0079, accessibility guidance, roadmap/risk records, version metadata, and release evidence agree.
 
 Evidence: `docs/releases/0.8.3.md`.
+
+### `0.8.4` acceptance criteria
+
+- [x] One typed browser seam owns shipped-locale negotiation, document language/direction, stable messages, substitution, and date/time/hour/integer formatting; malformed or unavailable locale hints fall back safely.
+- [x] Offset-aware instants, calendar-stable plain dates, explicit IANA zones, DST transitions, and ambiguous/invalid values have executable tests.
+- [x] Server and Compose defaults are UTC, and production startup rejects an invalid or malformed `TZ`; workflow-specific civil scheduling retains its own validated IANA zone.
+- [x] Shared pagination and bypass navigation use catalog IDs, while common notification, session, and recycle-bin timestamp presentation use the formatter seam.
+- [x] Locale-sensitive presentation cannot enter API identities, canonical Markdown, signed manifests, audit codes, network identifiers, or integration fingerprints.
+- [x] Only `en-US` is advertised. Adding a locale requires a complete reviewed catalog plus direction, plural, reflow, accessibility, mail, PDF, browser, and fallback evidence.
+- [x] ADR 0080, contributor guidance, roadmap/risk records, version metadata, and release evidence agree.
+
+Evidence: `docs/releases/0.8.4.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

@@ -12,6 +12,7 @@ from tekdocs.settings.validation import (
     validate_production_public_url,
     validate_production_security,
     validate_publication_signing_key,
+    validate_time_zone,
 )
 
 VALID_CONFIGURATION = {
@@ -148,6 +149,17 @@ VALID_SECURITY_CONFIGURATION = {
 
 def test_valid_production_security_configuration_is_accepted():
     validate_production_security(**VALID_SECURITY_CONFIGURATION)
+
+
+@pytest.mark.parametrize("value", ["UTC", "America/Chicago", "Pacific/Auckland"])
+def test_valid_iana_time_zone_is_accepted(value):
+    validate_time_zone(value)
+
+
+@pytest.mark.parametrize("value", ["", " America/Chicago", "Mars/Olympus", "UTC\n"])
+def test_invalid_time_zone_is_rejected(value):
+    with pytest.raises(ImproperlyConfigured, match="TZ must be"):
+        validate_time_zone(value)
 
 
 @pytest.mark.parametrize(

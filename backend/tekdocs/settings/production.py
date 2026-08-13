@@ -6,6 +6,7 @@ from .validation import (
     validate_production_public_url,
     validate_production_security,
     validate_publication_signing_key,
+    validate_time_zone,
 )
 
 DEBUG = False
@@ -30,6 +31,7 @@ _invalid = [
 if _invalid:
     raise ImproperlyConfigured(f"Missing or weak production secrets: {', '.join(_invalid)}")
 validate_publication_signing_key(TEKDOCS_PUBLICATION_SIGNING_KEY)  # noqa: F405
+validate_time_zone(TIME_ZONE)  # noqa: F405
 if TEKDOCS_DATABASE_ROLE not in {"migration", "runtime"}:  # noqa: F405
     raise ImproperlyConfigured("TEKDOCS_DATABASE_ROLE must be migration or runtime")
 if TEKDOCS_DATABASE_RUNTIME_ROLE != "tekdocs_runtime":  # noqa: F405

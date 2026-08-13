@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
 import { ApiTokenSettings } from './ApiTokenSettings'
+import { formatDateTime } from '../i18n/localization'
 
 function sessionName(userAgent: string): string {
   const browser = userAgent.includes('Edg/') ? 'Edge' : userAgent.includes('Chrome/') ? 'Chrome' : userAgent.includes('Firefox/') ? 'Firefox' : userAgent.includes('Safari/') ? 'Safari' : 'Browser'
@@ -13,7 +14,7 @@ function sessionName(userAgent: string): string {
 }
 
 function timestamp(value: number): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value * 1000))
+  return formatDateTime(new Date(value * 1000))
 }
 
 function errorMessage(error: unknown, fallback: string): string {

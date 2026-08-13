@@ -231,7 +231,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = os.getenv("TZ", "America/Chicago")
+TIME_ZONE = os.getenv("TZ", "UTC")
 USE_I18N = True
 USE_TZ = True
 

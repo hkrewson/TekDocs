@@ -34,6 +34,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
+import { translate } from './i18n/localization'
 import { AuthGate } from './auth/AuthGate'
 import { browserAccessControlClient } from './access-control/api'
 import type { AccessControlClient } from './access-control/api'
@@ -324,9 +325,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.3" />
+      <PageHeader title="Overview" description="TekDocs 0.8.4" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.3</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.8.4</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -509,7 +510,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
 
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">Skip to main content</a>
+      <a className="skip-link" href="#main-content">{translate('shell.skip')}</a>
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">

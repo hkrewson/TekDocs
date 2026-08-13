@@ -4,6 +4,7 @@ import re
 from collections.abc import Mapping
 from email.utils import getaddresses
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import validate_email
@@ -17,6 +18,15 @@ OIDC_ENVIRONMENT_KEYS = (
     "TEKDOCS_OIDC_CLIENT_SECRET",
 )
 OIDC_PROVIDER_ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+
+
+def validate_time_zone(value: str) -> None:
+    if not value or value.strip() != value or len(value) > 64 or any(ord(character) < 32 for character in value):
+        raise ImproperlyConfigured("TZ must be one valid IANA time-zone name")
+    try:
+        ZoneInfo(value)
+    except (ValueError, ZoneInfoNotFoundError) as exc:
+        raise ImproperlyConfigured("TZ must be one valid IANA time-zone name") from exc
 
 
 def validate_publication_signing_key(value: str) -> None:

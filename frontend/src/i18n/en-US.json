@@ -1,0 +1,8 @@
+{
+  "pagination.label": "{label} pages",
+  "pagination.range": "{first}–{last} of {count}",
+  "pagination.page": "Page {page}",
+  "pagination.previous": "Previous",
+  "pagination.next": "Next",
+  "shell.skip": "Skip to main content"
+}

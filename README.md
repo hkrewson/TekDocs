@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.3` adds a WCAG 2.2 AA accessibility contract and remediates keyboard, focus, contrast, reduced-motion, and forced-colors behavior across critical workflows. TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.4` establishes the translatable interface and explicit locale/timezone contract while continuing to ship only reviewed English copy. TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 

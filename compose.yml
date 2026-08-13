@@ -35,7 +35,7 @@ services:
     environment:
       MP_DATABASE: /data/mailpit.db
       MP_MAX_MESSAGES: "500"
-      TZ: ${TZ:-America/Chicago}
+      TZ: ${TZ:-UTC}
     volumes:
       - mailpit_data:/data
     ports:
@@ -129,7 +129,7 @@ services:
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-TekDocs <noreply@tekdocs.local>}
       TEKDOCS_ALLOW_INSECURE_SMTP: ${TEKDOCS_ALLOW_INSECURE_SMTP:-true}
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-false}
-      TZ: ${TZ:-America/Chicago}
+      TZ: ${TZ:-UTC}
       TEKDOCS_VALIDATE_RUNTIME_DATABASE: "true"
     command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-", "tekdocs.wsgi:application"]
     volumes:

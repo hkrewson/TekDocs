@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RotateCcw, Search } from 'lucide-react'
+import { formatDateTime } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserRecycleBinClient } from './api'
 import type { RecycleBinClient, RecycleBinItem, RecycleBinRecordType } from './api'
@@ -18,7 +19,7 @@ function messageFor(error: unknown) {
 }
 
 function archivedDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return formatDateTime(value)
 }
 
 export function RecycleBin({ workspace, client = browserRecycleBinClient }: { workspace: WorkspaceContext | null; client?: RecycleBinClient }) {

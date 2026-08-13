@@ -82,7 +82,7 @@ The running Docker stack is authoritative for runtime claims. See `AGENTS.md`, t
 
 The hosted validation path is intentionally split into three understandable workflows:
 
-- **Build, test, and secure** is the required pull-request and `main` pipeline. It validates backend, frontend, dependencies, licenses, and repository secrets; exercises the application against PostgreSQL and through real browser journeys; then finishes by building, inventorying, and vulnerability-scanning the production containers.
+- **Build, test, and secure** is the required pull-request and `main` pipeline. It validates backend static contracts, frontend code, dependencies, licenses, and repository secrets; runs the complete backend suite against its required PostgreSQL database; exercises real browser journeys; then finishes by building, inventorying, and vulnerability-scanning the production containers.
 - **Extended validation** runs on a schedule or by request. It covers the complete desktop/mobile browser matrix, the reference performance dataset, and DAST without making every pull request wait for those longer jobs.
 - **CodeQL** remains separate so GitHub code-scanning results retain their native security reporting and permissions boundary.
 

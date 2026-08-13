@@ -44,3 +44,14 @@ def test_key_and_manifest_contract(tmp_path):
     key_file.chmod(0o640)
     with pytest.raises(RecoveryArchiveError, match="group or other"):
         load_key(key_file)
+
+
+def test_key_contract_rejects_links_without_masking_the_reason(tmp_path):
+    target = tmp_path / "recovery-target.key"
+    target.write_bytes(base64.urlsafe_b64encode(os.urandom(32)))
+    target.chmod(0o600)
+    link = tmp_path / "recovery.key"
+    link.symlink_to(target)
+
+    with pytest.raises(RecoveryArchiveError, match="regular file, not a link"):
+        load_key(link)

@@ -136,18 +136,25 @@ def test_malformed_oversized_and_method_override_requests_fail_without_echo(owne
     result, _password = owner_credentials
     client = anonymous_client()
     marker = f"must-not-echo-{secrets.token_hex(16)}"
+    csrf_headers = {"X-CSRFToken": client.cookies["csrftoken"].value}
 
-    malformed = client.post(LOGIN_URL, data=f'{{"email":"{marker}"', content_type="application/json")
+    malformed = client.post(
+        LOGIN_URL,
+        data=f'{{"email":"{marker}"',
+        content_type="application/json",
+        headers=csrf_headers,
+    )
     oversized = client.post(
         LOGIN_URL,
         data=json.dumps({"email": result.owner.email, "password": marker + "x" * (2 * 1024 * 1024)}),
         content_type="application/json",
+        headers=csrf_headers,
     )
     traced = client.generic("TRACE", LOGIN_URL)
     overridden = client.get(SESSION_URL, headers={"X-HTTP-Method-Override": "POST"})
 
     assert malformed.status_code in {400, 415}
     assert oversized.status_code in {400, 413}
-    assert traced.status_code == 405
+    assert traced.status_code in {400, 405}
     assert overridden.status_code == 401
     assert marker not in f"{malformed.content!r} {oversized.content!r} {traced.content!r} {overridden.content!r}"

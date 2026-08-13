@@ -34,6 +34,8 @@ def load_key(path: Path) -> bytes:
             raise RecoveryArchiveError("The recovery key must not be accessible to group or other users.")
         encoded = path.read_bytes().strip()
         key = base64.urlsafe_b64decode(encoded + b"=" * (-len(encoded) % 4))
+    except RecoveryArchiveError:
+        raise
     except (OSError, binascii.Error, ValueError) as exc:
         raise RecoveryArchiveError("The recovery key is unavailable or malformed.") from exc
     if len(key) != 32:

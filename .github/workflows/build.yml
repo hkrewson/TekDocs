@@ -45,7 +45,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   backend:
-    name: Backend code and tests
+    name: Backend static validation
     needs: prepare
     runs-on: ubuntu-latest
     steps:
@@ -68,9 +68,6 @@ jobs:
           python manage.py makemigrations --check --dry-run --settings=tekdocs.settings.test
           python manage.py spectacular --file /tmp/openapi.yml --validate --settings=tekdocs.settings.test
           diff -u openapi.yml /tmp/openapi.yml
-      - name: Backend test suite
-        working-directory: backend
-        run: pytest --cov
 
   frontend:
     name: Frontend code and tests
@@ -138,7 +135,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   postgres-runtime:
-    name: PostgreSQL runtime and isolation
+    name: PostgreSQL backend tests, runtime, and isolation
     needs: [backend, frontend, security]
     runs-on: ubuntu-latest
     steps:

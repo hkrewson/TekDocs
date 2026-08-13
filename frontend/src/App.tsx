@@ -236,19 +236,30 @@ function ProfileMenu({ user, canManageAccess, canManageNotifications, onSignOut,
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
     const close = (event: MouseEvent) => {
       if (!ref.current?.contains(event.target as Node)) setOpen(false)
     }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
     document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', escape)
+    }
   }, [open])
 
   return (
     <div className="profile-menu" ref={ref}>
-      <button className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Account menu for ${user.display_name}`}>
+      <button ref={triggerRef} className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={`Account menu for ${user.display_name}`}>
         <CircleUserRound size={22} />
         <span className="profile-copy"><strong>{user.display_name}</strong><span>{user.email}</span></span>
         <ChevronDown size={15} />
@@ -313,9 +324,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.2" />
+      <PageHeader title="Overview" description="TekDocs 0.8.3" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.2</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.8.3</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -452,6 +463,8 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   const [organizationWorkspace, setOrganizationWorkspace] = useState<OrganizationWorkspaceState>({ phase: 'idle' })
   const location = useLocation()
   const navigate = useNavigate()
+  const mainRef = useRef<HTMLElement>(null)
+  const previousPathname = useRef(location.pathname)
   const organizationMatch = useMatch('/workspaces/organizations/:organizationId/*')
   const organizationId = organizationMatch?.params.organizationId
 
@@ -487,8 +500,16 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
     document.title = `${selectedWorkspace?.name ?? shellContext.tenant.name} · ${areaLabel} · TekDocs`
   }, [activeArea, selectedWorkspace?.name, shellContext.tenant.name])
 
+  useEffect(() => {
+    if (previousPathname.current !== location.pathname) {
+      mainRef.current?.focus({ preventScroll: true })
+      previousPathname.current = location.pathname
+    }
+  }, [location.pathname])
+
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
@@ -497,7 +518,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
-        <main className="main-content" key={location.pathname}>
+        <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />

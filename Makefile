@@ -33,7 +33,7 @@ check:
 	./scripts/frontend-gate.sh check
 
 test:
-	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend pytest --cov
+	docker compose run --rm migrate pytest --cov
 	./scripts/frontend-gate.sh test
 
 test-api-contracts:

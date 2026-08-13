@@ -1264,7 +1264,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | --- | --- |
 | `0.8.1` | **Complete:** Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and initial implementation of `TD-RISK-006`. |
 | `0.8.2` | **Complete:** Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
-| `0.8.3` | WCAG 2.2 AA audit and remediation across critical workflows. |
+| `0.8.3` | **Complete:** WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | Localization readiness, timezone/locale correctness, and translatable UI contract. |
 | `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
@@ -1296,6 +1296,18 @@ Evidence: `docs/releases/0.8.1.md`.
 - [x] ADR 0078, migration/backup operations, roadmap, architecture/security/risk records, version metadata, and release evidence agree.
 
 Evidence: `docs/releases/0.8.2.md`.
+
+### `0.8.3` acceptance criteria
+
+- [x] A WCAG 2.2 AA engineering contract names the critical surfaces, semantic, keyboard, focus, contrast, reflow, motion, forced-colors, error, and verification requirements without claiming automated or independent certification.
+- [x] Authenticated navigation has a first-focusable visible bypass link; client-side route changes focus the new main region while initial load retains normal browser focus order.
+- [x] Profile-menu Escape handling returns focus and Markdown editor tabs implement the ARIA tab/tabpanel relationship plus Left/Right/Home/End keyboard behavior.
+- [x] Low-contrast quiet text and hidden workspace-search focus are remediated; reduced-motion and forced-colors preferences retain usable state.
+- [x] Component/build gates and Chromium Playwright cover the remediated interactions, while critical axe checks explicitly select WCAG 2.2 AA rules alongside prior A/AA rules.
+- [x] Manual keyboard, VoiceOver, zoom/reflow, text-spacing, contrast-mode, timeout, and error-recovery review remains a named recurring release obligation; Firefox/WebKit, external review, and final candidate remediation remain assigned to `0.8.6`, `0.8.9`, and `0.9.5`.
+- [x] ADR 0079, accessibility guidance, roadmap/risk records, version metadata, and release evidence agree.
+
+Evidence: `docs/releases/0.8.3.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

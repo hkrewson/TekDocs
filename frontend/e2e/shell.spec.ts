@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
+const wcag22Tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
+
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -63,8 +65,15 @@ test('authenticated application shell exposes primary navigation and backend hea
   await page.goto('/overview')
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(page.getByText('Example MSP', { exact: true })).toBeVisible()
+  const skipLink = page.getByRole('link', { name: 'Skip to main content' })
+  await page.keyboard.press('Tab')
+  await expect(skipLink).toBeFocused()
+  await expect(skipLink).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('main')).toBeFocused()
   await page.getByRole('link', { name: 'Documentation' }).click()
   await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
+  await expect(page.locator('main')).toBeFocused()
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
@@ -73,7 +82,13 @@ test('raw Markdown remains the editable canonical representation', async ({ page
   await page.goto('/documentation')
   await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
   await page.getByRole('tab', { name: 'Markdown' }).click()
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('tab', { name: 'Preview' })).toBeFocused()
+  await expect(page.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('Home')
+  await expect(page.getByRole('tab', { name: 'Editor' })).toBeFocused()
   const source = page.getByLabel('Markdown source')
+  await page.getByRole('tab', { name: 'Markdown' }).click()
   await expect(source).toHaveValue(/# UniFi Network Setup Guide/)
   await source.fill('# Updated procedure\n\nUse **approved** access.')
   await page.getByRole('tab', { name: 'Editor' }).click()
@@ -110,7 +125,7 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await page.getByRole('tab', { name: 'Preview' }).click()
   await expect(page.locator('.markdown-preview mark')).toHaveText('VLAN 10')
   await expect(page.locator('.markdown-preview blockquote')).toHaveAttribute('data-callout', 'warning')
-  expect((await new AxeBuilder({ page }).include('.editor-section').analyze()).violations).toEqual([])
+  expect((await new AxeBuilder({ page }).include('.editor-section').withTags(wcag22Tags).analyze()).violations).toEqual([])
 
   await page.getByRole('tab', { name: 'Formatting help' }).click()
   await expect(page.getByRole('heading', { name: 'TekDocs Markdown' })).toBeVisible()
@@ -129,7 +144,7 @@ test('revision history pagination and diffs remain keyboard-accessible', async (
   await expect(page.getByRole('heading', { name: 'Revision 1 changes' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Newer revisions' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Older revisions' })).toBeEnabled()
-  expect((await new AxeBuilder({ page }).include('.revision-history').analyze()).violations).toEqual([])
+  expect((await new AxeBuilder({ page }).include('.revision-history').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
 test('mobile authenticated navigation is operable', async ({ page }) => {
@@ -158,7 +173,7 @@ test('first-owner browser setup enters the authenticated shell', async ({ page, 
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
 
   await page.goto('/')
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect((await new AxeBuilder({ page }).withTags(wcag22Tags).analyze()).violations).toEqual([])
   const password = `${crypto.randomUUID()}Aa7!`
   await page.getByLabel('Deployment token').fill(crypto.randomUUID())
   await page.getByLabel('MSP name').fill('Example MSP')
@@ -181,7 +196,7 @@ test('sign-in boundary has no detectable accessibility violations', async ({ pag
   await page.goto('/')
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect((await new AxeBuilder({ page }).withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
 test('sign out removes the shell and returns to sign in', async ({ page, baseURL }) => {
@@ -200,4 +215,15 @@ test('sign out removes the shell and returns to sign in', async ({ page, baseURL
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Overview' })).not.toBeVisible()
+})
+
+test('account menu closes with Escape and restores trigger focus', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/overview')
+  const trigger = page.getByRole('button', { name: /Account menu for Primary Owner/ })
+  await trigger.click()
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).not.toBeVisible()
+  await expect(trigger).toBeFocused()
 })

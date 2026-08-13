@@ -1273,6 +1273,28 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
 | `0.9.0` | Feature freeze and public beta; only fixes, hardening, and release evidence follow. |
 
+### `0.8.8` acceptance criteria
+
+- [x] A checked manifest defines stable Wiki slugs, end-user/operator/security/API audience coverage, reviewed source coverage, and exact contextual-help membership without creating a duplicate manual under `docs/`.
+- [x] Local and hosted checks reject missing/unsafe source links, unsafe or duplicate slugs, audience gaps, and application/Wiki topic drift; an authorized separate Wiki checkout can be checked for all required pages and local links.
+- [x] MSP and organization routes expose concise bundled page-level help, share logical-area topics, return focus on Escape, and never fetch or render remote content inside the authenticated application.
+- [x] Because the intended repository and Wiki return 404 and this checkout has no remote, the application clearly reports pending publication and does not emit broken public links.
+- [ ] The public GitHub repository and actual Wiki exist; the separately reviewed 28-page corpus passes `scripts/check-documentation.py --wiki-checkout ...` and has been pushed with explicit authorization.
+- [ ] Every contextual help link is enabled, publicly reachable, browser-tested, and recorded with the exact Wiki commit in `docs/releases/0.8.8.md`.
+- [ ] Version metadata, ADR 0084, release evidence, the public corpus, production image, browser matrix, and roadmap all agree at `0.8.8`.
+
+`0.8.8` remains blocked at the external publication boundary. Local preparation must not be described or committed as the completed release.
+
+### `0.8.9` acceptance criteria
+
+- [x] The assessment scope explicitly covers authentication, authorization/RLS, content and files, secret custody/recovery, integrations/notifications, egress/monitoring, production deployment, and operational abuse.
+- [x] A value-minimized finding registry and fail-closed gate require a named reviewer, exact 40-character scope commit, timezone-aware completion, private-report reference, complete disposition/evidence, and zero unresolved Critical/High findings.
+- [ ] An independent reviewer has assessed the frozen release candidate and supplied the private report represented by `.github/external-security-review.json`.
+- [ ] Every finding has been reproduced, fixed or acceptably disposed, regression-tested, and rechecked by the reviewer; no release-blocking result remains.
+- [ ] Version metadata, release evidence, security/threat/risk records, external-review record, production/browser gates, and roadmap agree at `0.8.9`.
+
+`0.8.9` remains blocked until an actual external reviewer completes the assessment. Local automation cannot satisfy that requirement.
+
 ### `0.8.1` acceptance criteria
 
 - [x] PostgreSQL, managed media, and allowlisted deployment keys stream into separate authenticated encrypted artifacts without plaintext host staging.

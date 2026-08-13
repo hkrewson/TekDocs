@@ -34,6 +34,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
+import { ContextualHelp } from './help/ContextualHelp'
 import { translate } from './i18n/localization'
 import { AuthGate } from './auth/AuthGate'
 import { browserAccessControlClient } from './access-control/api'
@@ -516,6 +517,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
+          <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>

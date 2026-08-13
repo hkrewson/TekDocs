@@ -229,3 +229,18 @@ test('account menu closes with Escape and restores trigger focus', async ({ page
   await expect(page.getByRole('menu')).not.toBeVisible()
   await expect(trigger).toBeFocused()
 })
+
+test('contextual help follows the page without embedding unpublished Wiki content', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/documentation')
+  const trigger = page.getByRole('button', { name: 'Help for Documentation' })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: 'Documentation help' })
+  await expect(dialog).toContainText('reuse live or pinned blocks')
+  await expect(dialog.getByRole('status')).toContainText('public Wiki guide has not been published')
+  await expect(dialog.getByRole('link')).toHaveCount(0)
+  expect((await new AxeBuilder({ page }).include('.context-help-popover').withTags(wcag22Tags).analyze()).violations).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+})

@@ -1,0 +1,33 @@
+{
+  "wiki_url": "https://github.com/hkrewson/TekDocs/wiki",
+  "pages": [
+    {"slug": "Home", "audience": "end_user", "sources": ["docs/PRODUCT_CHARTER.md"]},
+    {"slug": "Workspaces-and-organizations", "audience": "end_user", "contextual": true, "sources": ["docs/INFORMATION_ARCHITECTURE.md"]},
+    {"slug": "Organizations", "audience": "end_user", "contextual": true, "sources": ["docs/INFORMATION_ARCHITECTURE.md"]},
+    {"slug": "People-and-access", "audience": "end_user", "contextual": true, "sources": ["docs/AUTHENTICATION.md", "docs/INFORMATION_ARCHITECTURE.md"]},
+    {"slug": "Sites-and-locations", "audience": "end_user", "contextual": true, "sources": ["docs/INFORMATION_ARCHITECTURE.md"]},
+    {"slug": "Documentation", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0019-markdown-dialect-rendering-and-help.md", "docs/adr/0022-live-pinned-placement-resolution.md", "docs/adr/0025-immutable-static-publication-and-signing.md"]},
+    {"slug": "Files-and-attachments", "audience": "end_user", "contextual": true, "sources": ["docs/SECURITY.md"]},
+    {"slug": "Assets", "audience": "end_user", "contextual": true, "sources": ["docs/CLIENT_ASSET_PROVENANCE.md", "docs/PRODUCT_CATALOGS.md"]},
+    {"slug": "Software-and-licenses", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0032-software-installations-and-licensing.md"]},
+    {"slug": "Networks", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0057-simple-network-record-boundary.md"]},
+    {"slug": "Domains-and-certificates", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0073-safe-domain-monitoring.md", "docs/adr/0074-safe-certificate-monitoring.md"]},
+    {"slug": "Credential-references", "audience": "end_user", "contextual": true, "sources": ["docs/CREDENTIAL_REFERENCES.md"]},
+    {"slug": "Services-and-contracts", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0033-commercial-contracts-and-cost-projection.md"]},
+    {"slug": "Vendors-and-products", "audience": "end_user", "contextual": true, "sources": ["docs/PRODUCT_CATALOGS.md", "docs/CLIENT_ASSET_PROVENANCE.md"]},
+    {"slug": "Custom-fields", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0010-versioned-custom-fields.md"]},
+    {"slug": "Compliance", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0063-versioned-compliance-framework-catalogs.md", "docs/adr/0068-shared-reminder-schedules.md"]},
+    {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true, "sources": ["docs/SECURITY.md"]},
+    {"slug": "Recycle-bin", "audience": "end_user", "contextual": true, "sources": ["docs/adr/0016-recovery-audit-and-idor-certification.md"]},
+    {"slug": "Integrations-and-API", "audience": "api", "contextual": true, "sources": ["backend/openapi.yml", "docs/adr/0059-public-api-and-generated-client-contract.md", "docs/adr/0062-read-only-integration-runtime-and-sanitized-export.md"]},
+    {"slug": "Account-security", "audience": "end_user", "contextual": true, "sources": ["docs/AUTHENTICATION.md"]},
+    {"slug": "Roles-and-permissions", "audience": "security", "contextual": true, "sources": ["docs/OPERATOR_AUTHENTICATION.md", "docs/SECURITY.md"]},
+    {"slug": "Notifications", "audience": "operator", "contextual": true, "sources": ["docs/EMAIL.md"]},
+    {"slug": "Product-boundaries", "audience": "end_user", "contextual": true, "sources": ["docs/PRODUCT_CHARTER.md"]},
+    {"slug": "Install-and-configure", "audience": "operator", "sources": ["README.md", "docs/SECRET_FILES_AND_PRODUCTION_IMAGES.md"]},
+    {"slug": "Backup-and-recovery", "audience": "operator", "sources": ["docs/BACKUP_AND_RECOVERY.md"]},
+    {"slug": "Upgrade-and-rollback", "audience": "operator", "sources": ["docs/UPGRADE_AND_ROLLBACK.md", "docs/MIGRATION_TESTING.md"]},
+    {"slug": "Security-model", "audience": "security", "sources": ["docs/SECURITY.md", "docs/THREAT_MODEL.md"]},
+    {"slug": "API-v1", "audience": "api", "sources": ["backend/openapi.yml"]}
+  ]
+}

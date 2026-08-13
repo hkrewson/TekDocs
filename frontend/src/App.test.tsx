@@ -102,6 +102,19 @@ describe('application shell', () => {
     expect(screen.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
   })
 
+  it('provides stable page-level help without loading remote content', async () => {
+    const user = userEvent.setup()
+    render(app('/documentation'))
+
+    await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
+    expect(screen.getByRole('dialog', { name: 'Documentation help' })).toHaveTextContent('reuse live or pinned blocks')
+    expect(screen.getByRole('status')).toHaveTextContent('public Wiki guide has not been published')
+    expect(screen.queryByRole('link', { name: /Open the full guide/ })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Documentation help' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Help for Documentation' })).toHaveFocus()
+  })
+
   it('renders MSP-owned assets instead of an aggregate placeholder', async () => {
     render(app('/assets'))
 

@@ -78,6 +78,16 @@ make security
 
 The running Docker stack is authoritative for runtime claims. See `AGENTS.md`, the current milestone or issue, and the public GitHub Wiki when it is available before substantive work.
 
+## GitHub automation
+
+The hosted validation path is intentionally split into three understandable workflows:
+
+- **Build, test, and secure** is the required pull-request and `main` pipeline. It validates backend, frontend, dependencies, licenses, and repository secrets; exercises the application against PostgreSQL and through real browser journeys; then finishes by building, inventorying, and vulnerability-scanning the production containers.
+- **Extended validation** runs on a schedule or by request. It covers the complete desktop/mobile browser matrix, the reference performance dataset, and DAST without making every pull request wait for those longer jobs.
+- **CodeQL** remains separate so GitHub code-scanning results retain their native security reporting and permissions boundary.
+
+Dependabot is configuration rather than a fourth workflow. It opens grouped weekly Python, npm, Docker, and GitHub Actions updates, which are then evaluated by the same required build pipeline.
+
 ## Documentation
 
 The public GitHub Wiki is the sole public product and operator manual. This repository does not maintain a competing `docs/` tree. In-repository prose is limited to the README, contribution/security policies, source comments, generated OpenAPI reference, and project-local agent instructions required to build and review the code.

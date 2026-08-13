@@ -1,21 +1,25 @@
-name: Browser regression
+name: Extended validation
 
 on:
-  pull_request:
   workflow_dispatch:
   schedule:
-    - cron: "41 7 * * 2"
+    - cron: "29 8 * * 1"
 
 permissions:
   contents: read
 
+concurrency:
+  group: extended-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  browser:
+  browser-matrix:
+    name: Browser (${{ matrix.project }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        project: ${{ fromJSON(github.event_name == 'pull_request' && '["chromium"]' || '["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"]') }}
+        project: [chromium, firefox, webkit, mobile-chromium, mobile-webkit]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: ./scripts/rehearse-browser-e2e.sh ${{ matrix.project }}
@@ -27,8 +31,8 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  public-beta-performance:
-    if: github.event_name != 'pull_request'
+  performance:
+    name: Public-beta performance reference
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -40,3 +44,11 @@ jobs:
           name: public-beta-performance
           path: artifacts/playwright-performance/
           retention-days: 14
+
+  dast:
+    name: Dynamic application security test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: make dast

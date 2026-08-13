@@ -16,6 +16,9 @@ from .approved_egress import ApprovedEgressError, is_public_address
 
 PROTOCOL_PORTS = {"https": 443, "smtps": 465, "imaps": 993, "pop3s": 995}
 CONNECT_TIMEOUT_SECONDS = 5.0
+MAX_CERTIFICATE_BYTES = 64 * 1024
+MAX_CHAIN_BYTES = 1024 * 1024
+MAX_SAN_NAMES = 500
 
 
 class CertificateCollectionError(ApprovedEgressError):
@@ -42,6 +45,33 @@ class CollectedCertificateEvidence:
 
 Resolver = Callable[..., list[Any]]
 ConnectionFactory = Callable[..., socket.socket]
+
+
+def _ascii_dns_name(value: str, *, allow_wildcard: bool = False) -> str:
+    candidate = value.strip().rstrip(".").lower()
+    wildcard = allow_wildcard and candidate.startswith("*.")
+    if wildcard:
+        candidate = candidate[2:]
+    try:
+        normalized = candidate.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise CertificateCollectionError("certificate_hostname_invalid") from exc
+    labels = normalized.split(".")
+    if (
+        not normalized
+        or len(normalized) > 253
+        or len(labels) < 2
+        or any(
+            not label
+            or len(label) > 63
+            or label.startswith("-")
+            or label.endswith("-")
+            or not label.replace("-", "").isalnum()
+            for label in labels
+        )
+    ):
+        raise CertificateCollectionError("certificate_hostname_invalid")
+    return f"*.{normalized}" if wildcard else normalized
 
 
 def protocol_port(protocol: str) -> int:
@@ -100,6 +130,9 @@ def _handshake(
         if not leaf:
             tls.close()
             raise CertificateCollectionError("certificate_missing")
+        if len(leaf) > MAX_CERTIFICATE_BYTES:
+            tls.close()
+            raise CertificateCollectionError("certificate_too_large")
         return leaf, tls
     except Exception:
         raw.close()
@@ -117,12 +150,17 @@ def _presented_chain(tls: ssl.SSLSocket, leaf_der: bytes) -> tuple[str, int]:
     except (AttributeError, ssl.SSLError):
         chain = []
     encoded: list[bytes] = []
+    encoded_size = 0
     for certificate in chain[:20]:
         if isinstance(certificate, bytes):
-            encoded.append(certificate)
+            raw_value = certificate
         else:
             value = certificate.public_bytes()
-            encoded.append(value.encode() if isinstance(value, str) else value)
+            raw_value = value.encode() if isinstance(value, str) else value
+        encoded_size += len(raw_value)
+        if len(raw_value) > MAX_CERTIFICATE_BYTES or encoded_size > MAX_CHAIN_BYTES:
+            raise CertificateCollectionError("certificate_chain_too_large")
+        encoded.append(raw_value)
     if not encoded:
         encoded = [leaf_der]
     digests = b"".join(hashlib.sha256(item).digest() for item in encoded)
@@ -130,8 +168,11 @@ def _presented_chain(tls: ssl.SSLSocket, leaf_der: bytes) -> tuple[str, int]:
 
 
 def _dnsname_matches(pattern: str, hostname: str) -> bool:
-    expected = pattern.rstrip(".").lower()
-    actual = hostname.rstrip(".").lower()
+    try:
+        expected = _ascii_dns_name(pattern, allow_wildcard=True)
+        actual = _ascii_dns_name(hostname)
+    except CertificateCollectionError:
+        return False
     if "*" not in expected:
         return expected == actual
     if not expected.startswith("*.") or expected.count("*") != 1:
@@ -146,6 +187,7 @@ def collect_certificate_evidence(
     resolver: Resolver = socket.getaddrinfo,
     connection_factory: ConnectionFactory = socket.create_connection,
 ) -> CollectedCertificateEvidence:
+    hostname = _ascii_dns_name(hostname)
     port = protocol_port(protocol)
     address = _public_address(hostname, port, resolver)
     try:
@@ -167,11 +209,14 @@ def collect_certificate_evidence(
             unverified.close()
         certificate = x509.load_der_x509_certificate(leaf_der)
         try:
-            sans = sorted(
-                certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(
-                    x509.DNSName
-                )
+            raw_sans: list[str] = list(
+                certificate.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName
+                ).value.get_values_for_type(x509.DNSName)
             )
+            if len(raw_sans) > MAX_SAN_NAMES or any(len(value) > 253 for value in raw_sans):
+                raise CertificateCollectionError("certificate_san_invalid")
+            sans = sorted(_ascii_dns_name(san_value, allow_wildcard=True) for san_value in raw_sans)
         except x509.ExtensionNotFound:
             sans = []
         subject_common_name = _common_name(certificate.subject)

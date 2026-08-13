@@ -136,6 +136,8 @@ class DomainMonitorRunSerializer(serializers.Serializer):
     dns_source = serializers.CharField()
     dnssec_validated = serializers.BooleanField(allow_null=True)
     dns_record_count = serializers.IntegerField()
+    caa_record_count = serializers.IntegerField()
+    evidence_digest = serializers.CharField()
     created_at = serializers.DateTimeField()
     finished_at = serializers.DateTimeField(allow_null=True)
 
@@ -233,6 +235,7 @@ class CertificateMonitorRunSerializer(serializers.Serializer):
     trust_valid = serializers.BooleanField(allow_null=True)
     tls_version = serializers.CharField()
     cipher_name = serializers.CharField()
+    evidence_digest = serializers.CharField()
     created_at = serializers.DateTimeField()
     finished_at = serializers.DateTimeField(allow_null=True)
 

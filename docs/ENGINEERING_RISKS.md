@@ -140,6 +140,10 @@ This register turns known limitations into release obligations. A risk remains o
 
 `TD-RISK-047`, `TD-RISK-054`, and `TD-RISK-055` are **mitigated with recurring owners**. Fixed protocol ports, every-answer public-address validation, address pinning, authored SNI, TLS 1.2+, separate hostname/trust results, reduced retained evidence, exact-Workspace workers, database guards, forced RLS, and negative tests establish the initial certificate-monitoring boundary. `0.7.13` still owns expanded IDN/wildcard/SAN evidence, scale/accessibility/isolation stabilization, and upgrade/restore proof; `0.8.0` owns composed certification. General inbox/SMTP projection remains excluded until recipient routing is separately authorized.
 
+## 0.7.13 monitoring-stabilization disposition
+
+`TD-RISK-047`, `TD-RISK-053`, `TD-RISK-054`, and `TD-RISK-055` are **mitigated with recurring owners**. Strict IDNA and wildcard handling, typed DoH success validation, explicit DNSSEC/CAA summaries, bounded certificate/SAN evidence, canonical terminal-run digests, database retention guards, bounded history, accessible controls, exact-Workspace regression, and exact-prior upgrade/restore evidence close the stabilization slice. `0.8.0` owns composed compliance-and-monitoring certification. General inbox/SMTP projection remains excluded until recipient routing is separately authorized.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

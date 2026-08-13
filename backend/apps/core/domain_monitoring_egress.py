@@ -12,9 +12,11 @@ from django.conf import settings
 from urllib3.exceptions import HTTPError
 
 from .approved_egress import ApprovedEgressError, pinned_https_pool, resolve_public_https_target
+from .domains import DomainError, normalize_domain_name
 
 MAX_MONITOR_RESPONSE_BYTES = 512 * 1024
 DNS_TYPES = ("A", "AAAA", "MX", "NS", "CAA")
+DNS_TYPE_CODES = {1: "A", 2: "NS", 5: "CNAME", 15: "MX", 28: "AAAA", 257: "CAA"}
 
 
 class DomainCollectionError(ApprovedEgressError):
@@ -38,6 +40,8 @@ class CollectedDomainEvidence:
     dns_digest: str
     dnssec_validated: bool | None
     dns_answers: tuple[DNSAnswer, ...]
+    caa_digest: str
+    caa_record_count: int
 
 
 def _get_json(url: str, *, accept: str) -> dict[str, Any]:
@@ -114,20 +118,33 @@ def _rdap_registrar(payload: dict[str, Any]) -> str:
 
 
 def _doh_answers(payload: dict[str, Any], expected_type: str) -> tuple[list[DNSAnswer], bool | None]:
+    status = payload.get("Status")
+    if not isinstance(status, int) or status != 0:
+        raise DomainCollectionError("dns_response_invalid")
     answers: list[DNSAnswer] = []
     for answer in payload.get("Answer", []):
         if not isinstance(answer, dict) or len(answers) >= 100:
             continue
+        answer_type = answer.get("type")
+        if not isinstance(answer_type, int):
+            continue
+        record_type = DNS_TYPE_CODES.get(answer_type)
         value = answer.get("data")
         ttl = answer.get("TTL")
+        if record_type is None or record_type not in {expected_type, "CNAME"}:
+            continue
         if not isinstance(value, str) or not value.strip() or len(value) > 1_024:
             continue
-        answers.append(DNSAnswer(expected_type, value.strip(), ttl if isinstance(ttl, int) and ttl >= 0 else None))
+        answers.append(DNSAnswer(record_type, value.strip(), ttl if isinstance(ttl, int) and ttl >= 0 else None))
     validated = payload.get("AD")
     return answers, validated if isinstance(validated, bool) else None
 
 
 def collect_domain_evidence(ascii_name: str) -> CollectedDomainEvidence:
+    try:
+        ascii_name = normalize_domain_name(ascii_name)
+    except DomainError as exc:
+        raise DomainCollectionError("domain_name_invalid") from exc
     bootstrap = _get_json(settings.TEKDOCS_RDAP_BOOTSTRAP_URL, accept="application/json")
     tld = ascii_name.rsplit(".", 1)[-1]
     rdap_base = ""
@@ -160,6 +177,7 @@ def collect_domain_evidence(ascii_name: str) -> CollectedDomainEvidence:
         if validated is not None:
             validations.append(validated)
     canonical_dns = sorted((item.record_type, item.value, item.ttl) for item in answers)
+    canonical_caa = sorted((item.value, item.ttl) for item in answers if item.record_type == "CAA")
     return CollectedDomainEvidence(
         rdap_source=urlsplit(rdap_base).hostname or "rdap",
         rdap_digest=_digest(rdap),
@@ -169,4 +187,6 @@ def collect_domain_evidence(ascii_name: str) -> CollectedDomainEvidence:
         dns_digest=_digest(canonical_dns),
         dnssec_validated=all(validations) if validations else None,
         dns_answers=tuple(answers),
+        caa_digest=_digest(canonical_caa),
+        caa_record_count=len(canonical_caa),
     )

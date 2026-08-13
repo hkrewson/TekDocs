@@ -58,6 +58,7 @@ describe('Domains', () => {
         id: 'run-1', trigger: 'scheduled' as const, state: 'succeeded' as const, error_code: '',
         rdap_source: 'rdap.example', observed_expiration_date: '2027-08-12', observed_registrar: 'Registrar',
         dns_source: 'doh.example', dnssec_validated: true, dns_record_count: 4,
+        caa_record_count: 1, evidence_digest: 'c'.repeat(64),
         created_at: '2026-08-12T01:00:00Z', finished_at: '2026-08-12T01:00:01Z',
       }],
     }
@@ -77,6 +78,7 @@ describe('Domains', () => {
         subject_common_name: 'example.com', issuer_common_name: 'Example CA', san_count: 1,
         not_before: '2026-07-12T01:00:00Z', not_after: '2026-09-12T01:00:00Z',
         hostname_valid: true, trust_valid: false, tls_version: 'TLSv1.3', cipher_name: 'TLS_AES_256_GCM_SHA384',
+        evidence_digest: 'd'.repeat(64),
         created_at: '2026-08-12T01:00:00Z', finished_at: '2026-08-12T01:00:01Z',
       }],
     }
@@ -101,13 +103,18 @@ describe('Domains', () => {
     const user = userEvent.setup()
     render(<Domains workspace={null} client={client} />)
 
-    await user.click(await screen.findByRole('button', { name: 'Details' }))
+    const detailsButton = await screen.findByRole('button', { name: 'Details' })
+    expect(detailsButton).toHaveAttribute('aria-expanded', 'false')
+    await user.click(detailsButton)
+    expect(detailsButton).toHaveAttribute('aria-expanded', 'true')
     expect(await screen.findByText('dns changed')).toBeInTheDocument()
     expect(screen.getByText('4 records via doh.example')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Recent RDAP and DNS monitoring evidence' })).toBeInTheDocument()
     expect(screen.getByText('TLS certificate endpoints')).toBeInTheDocument()
     expect(screen.getByText('Untrusted')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'History' }))
     expect(await screen.findByText('Example CA')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Immutable TLS certificate monitoring evidence' })).toBeInTheDocument()
     expect(screen.getByText('expiration due')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Check certificate' }))
     await waitFor(() => expect(scanCertificate).toHaveBeenCalledWith(null, domain.id, certificate.id))

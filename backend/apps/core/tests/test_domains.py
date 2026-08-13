@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
@@ -130,17 +131,24 @@ def test_domain_monitoring_retains_remote_evidence_and_change_notifications(inst
         dns_source="doh.example.invalid",
         dns_digest="b" * 64,
         dnssec_validated=True,
-        dns_answers=(DNSAnswer("NS", "ns1.example.invalid.", 3600),),
+        dns_answers=(
+            DNSAnswer("NS", "ns1.example.invalid.", 3600),
+            DNSAnswer("CAA", '0 issue "letsencrypt.org"', 3600),
+        ),
+        caa_digest="e" * 64,
+        caa_record_count=1,
     )
 
     assert process_domain_monitoring_run(run_id=run.id, collector=lambda _name: evidence)
     run.refresh_from_db()
     domain.refresh_from_db()
     assert run.state == DomainMonitorRunState.SUCCEEDED
-    assert run.dns_record_count == 1
+    assert run.dns_record_count == 2
+    assert run.caa_record_count == 1
+    assert domain.dns_observations.filter(record_type="CAA").exists()
     assert domain.review_state == "conflict"
     assert domain.observed_expiration_date.isoformat() == "2027-08-13"
-    assert domain.dns_observations.get().recorded_by is None
+    assert not domain.dns_observations.exclude(recorded_by=None).exists()
 
     second = enqueue_domain_monitoring(
         scope=workspace.data_scope,
@@ -157,12 +165,25 @@ def test_domain_monitoring_retains_remote_evidence_and_change_notifications(inst
         dns_digest="d" * 64,
         dnssec_validated=False,
         dns_answers=(DNSAnswer("NS", "ns2.example.invalid.", 3600),),
+        caa_digest="f" * 64,
+        caa_record_count=0,
     )
     assert process_domain_monitoring_run(run_id=second.id, collector=lambda _name: changed)
     assert set(DomainMonitorAlert.objects.filter(run=second).values_list("kind", flat=True)) == {
         "expiration_changed",
         "dns_changed",
     }
+    second.refresh_from_db()
+    assert len(second.evidence_digest) == 64
+    if connection.vendor == "postgresql":
+        with pytest.raises(DatabaseError, match="terminal evidence is immutable"), transaction.atomic():
+            second.__class__.objects.filter(pk=second.pk).update(evidence_digest="0" * 64)
+        with (
+            pytest.raises(DatabaseError, match="runs are retained"),
+            transaction.atomic(),
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM core_domainmonitorrun WHERE id = %s", [second.pk])
 
 
 @pytest.mark.django_db

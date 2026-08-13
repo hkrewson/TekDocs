@@ -20,6 +20,7 @@ from .models import (
     DomainReviewState,
     RegisteredDomain,
 )
+from .monitoring_evidence import canonical_evidence_digest
 from .scoping import DataScope
 
 Collector = Callable[[str], CollectedDomainEvidence]
@@ -185,6 +186,25 @@ def _finish_success(*, run_id: UUID, evidence: CollectedDomainEvidence, now) -> 
         run.dns_digest = evidence.dns_digest
         run.dnssec_validated = evidence.dnssec_validated
         run.dns_record_count = len(evidence.dns_answers)
+        run.caa_digest = evidence.caa_digest
+        run.caa_record_count = evidence.caa_record_count
+        run.evidence_digest = canonical_evidence_digest(
+            "domain_monitor_run",
+            {
+                "rdap_source": run.rdap_source,
+                "rdap_digest": run.rdap_digest,
+                "observed_expiration_date": (
+                    run.observed_expiration_date.isoformat() if run.observed_expiration_date else None
+                ),
+                "observed_registrar": run.observed_registrar,
+                "dns_source": run.dns_source,
+                "dns_digest": run.dns_digest,
+                "dnssec_validated": run.dnssec_validated,
+                "dns_record_count": run.dns_record_count,
+                "caa_digest": run.caa_digest,
+                "caa_record_count": run.caa_record_count,
+            },
+        )
         run.save(
             update_fields=(
                 "state",
@@ -199,6 +219,9 @@ def _finish_success(*, run_id: UUID, evidence: CollectedDomainEvidence, now) -> 
                 "dns_digest",
                 "dnssec_validated",
                 "dns_record_count",
+                "caa_digest",
+                "caa_record_count",
+                "evidence_digest",
             )
         )
         if previous and previous.observed_expiration_date != evidence.expiration_date:

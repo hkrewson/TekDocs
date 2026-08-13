@@ -83,7 +83,10 @@ def test_domain_collector_normalizes_expiration_registrar_dns_and_dnssec(monkeyp
                 "events": [{"eventAction": "expiration", "eventDate": "2027-09-01T00:00:00Z"}],
                 "entities": [{"roles": ["registrar"], "vcardArray": ["vcard", [["fn", {}, "text", "Registrar Inc"]]]}],
             }
-        return {"AD": True, "Answer": [{"data": "192.0.2.10", "TTL": 300}]}
+        record_type = next(value for value in ("AAAA", "CAA", "MX", "NS", "A") if f"type={value}" in url)
+        type_code = {"A": 1, "AAAA": 28, "MX": 15, "NS": 2, "CAA": 257}[record_type]
+        value = '0 issue "letsencrypt.org"' if record_type == "CAA" else "192.0.2.10"
+        return {"Status": 0, "AD": True, "Answer": [{"type": type_code, "data": value, "TTL": 300}]}
 
     monkeypatch.setattr("apps.core.domain_monitoring_egress._get_json", fake_get)
     evidence = collect_domain_evidence("example.com")
@@ -92,4 +95,18 @@ def test_domain_collector_normalizes_expiration_registrar_dns_and_dnssec(monkeyp
     assert evidence.registrar == "Registrar Inc"
     assert evidence.dnssec_validated is True
     assert len(evidence.dns_answers) == 5
+    assert evidence.caa_record_count == 1
+    assert len(evidence.caa_digest) == 64
     assert len(json.dumps(calls)) < 2_000
+
+
+def test_doh_rejects_failed_status_and_ignores_mislabeled_answers():
+    from apps.core.domain_monitoring_egress import _doh_answers
+
+    with pytest.raises(DomainCollectionError, match="dns_response_invalid"):
+        _doh_answers({"Status": 2, "AD": False}, "CAA")
+    answers, validated = _doh_answers(
+        {"Status": 0, "AD": True, "Answer": [{"type": 1, "data": "192.0.2.10", "TTL": 60}]}, "CAA"
+    )
+    assert answers == []
+    assert validated is True

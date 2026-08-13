@@ -89,6 +89,8 @@ def test_certificate_endpoint_scan_retains_validation_and_change_evidence(instal
     assert endpoint.current_trust_valid is True
     assert endpoint.current_hostname_valid is True
     assert endpoint.current_not_after is not None
+    run.refresh_from_db()
+    assert len(run.evidence_digest) == 64
     assert CertificateMonitorAlert.objects.filter(run=run, kind="expiration_due").exists()
 
     assert browser.post(scan_url, {}, content_type="application/json").status_code == 202
@@ -109,7 +111,11 @@ def test_certificate_endpoint_scan_retains_validation_and_change_evidence(instal
             CertificateEndpoint.objects.filter(pk=endpoint.pk).update(protocol="smtps", port=465)
         with pytest.raises(DatabaseError, match="terminal evidence is immutable"), transaction.atomic():
             CertificateMonitorRun.objects.filter(pk=run.pk).update(error_code="rewritten")
-        with pytest.raises(DatabaseError, match="runs are retained"), transaction.atomic(), connection.cursor() as cursor:
+        with (
+            pytest.raises(DatabaseError, match="runs are retained"),
+            transaction.atomic(),
+            connection.cursor() as cursor,
+        ):
             cursor.execute("DELETE FROM core_certificatemonitorrun WHERE id = %s", [run.pk])
         alert = CertificateMonitorAlert.objects.filter(run=run).first()
         assert alert is not None

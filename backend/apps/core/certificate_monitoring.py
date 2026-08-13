@@ -27,6 +27,7 @@ from .models import (
     ManagedHostname,
     RegisteredDomain,
 )
+from .monitoring_evidence import canonical_evidence_digest
 from .scoping import DataScope
 
 Collector = Callable[[str, str], CollectedCertificateEvidence]
@@ -182,6 +183,25 @@ def _finish_success(*, run_id: UUID, evidence: CollectedCertificateEvidence, now
             "cipher_name",
         ):
             setattr(run, field, getattr(evidence, field))
+        run.evidence_digest = canonical_evidence_digest(
+            "certificate_monitor_run",
+            {
+                "leaf_sha256": run.leaf_sha256,
+                "chain_sha256": run.chain_sha256,
+                "chain_length": run.chain_length,
+                "subject_common_name": run.subject_common_name,
+                "issuer_common_name": run.issuer_common_name,
+                "serial_sha256": run.serial_sha256,
+                "san_sha256": run.san_sha256,
+                "san_count": run.san_count,
+                "not_before": run.not_before.isoformat() if run.not_before else None,
+                "not_after": run.not_after.isoformat() if run.not_after else None,
+                "hostname_valid": run.hostname_valid,
+                "trust_valid": run.trust_valid,
+                "tls_version": run.tls_version,
+                "cipher_name": run.cipher_name,
+            },
+        )
         run.save()
         endpoint.last_monitor_at = now
         endpoint.next_monitor_at = now + timedelta(hours=endpoint.monitor_interval_hours)

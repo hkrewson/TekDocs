@@ -10,11 +10,12 @@ from apps.core import certificate_monitoring_egress as collector
 
 
 class FakeTLS:
-    def __init__(self, certificate: bytes):
+    def __init__(self, certificate: bytes, chain: list[bytes] | None = None):
         self.certificate = certificate
+        self.chain = chain or [certificate]
 
     def get_unverified_chain(self):  # type: ignore[no-untyped-def]
-        return [self.certificate]
+        return self.chain
 
     def version(self):
         return "TLSv1.3"
@@ -26,7 +27,7 @@ class FakeTLS:
         return None
 
 
-def _certificate(hostname: str) -> bytes:
+def _certificate(hostname: str, *, sans: list[str] | None = None) -> bytes:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostname)])
     now = datetime.now(UTC)
@@ -38,7 +39,9 @@ def _certificate(hostname: str) -> bytes:
         .serial_number(x509.random_serial_number())
         .not_valid_before(now - timedelta(days=1))
         .not_valid_after(now + timedelta(days=30))
-        .add_extension(x509.SubjectAlternativeName([x509.DNSName(hostname)]), critical=False)
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(value) for value in (sans or [hostname])]), critical=False
+        )
         .sign(key, hashes.SHA256())
     )
     return certificate.public_bytes(serialization.Encoding.DER)
@@ -80,5 +83,27 @@ def test_certificate_protocols_are_fixed_and_wildcards_match_one_label():
     assert collector.protocol_port("smtps") == 465
     assert collector._dnsname_matches("*.example.com", "mail.example.com")
     assert not collector._dnsname_matches("*.example.com", "nested.mail.example.com")
+    assert collector._dnsname_matches("*.bücher.example", "shop.xn--bcher-kva.example")
+    assert not collector._dnsname_matches("*.*.example.com", "mail.dev.example.com")
     with pytest.raises(collector.CertificateCollectionError, match="certificate_protocol_invalid"):
         collector.protocol_port("starttls")
+
+
+def test_certificate_collection_rejects_unbounded_chain_and_san_metadata(monkeypatch):
+    certificate = _certificate("www.example.com")
+    with pytest.raises(collector.CertificateCollectionError, match="certificate_chain_too_large"):
+        collector._presented_chain(FakeTLS(certificate, [b"x" * (collector.MAX_CERTIFICATE_BYTES + 1)]), certificate)
+
+    oversized_sans = [f"host-{index}.example.com" for index in range(collector.MAX_SAN_NAMES + 1)]
+    oversized_certificate = _certificate("www.example.com", sans=oversized_sans)
+    monkeypatch.setattr(
+        collector,
+        "_handshake",
+        lambda **_kwargs: (oversized_certificate, FakeTLS(oversized_certificate)),
+    )
+    with pytest.raises(collector.CertificateCollectionError, match="certificate_san_invalid"):
+        collector.collect_certificate_evidence(
+            "www.example.com",
+            "https",
+            resolver=lambda *_args, **_kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
+        )

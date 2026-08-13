@@ -5897,6 +5897,7 @@ export interface components {
             readonly trust_valid: boolean | null;
             readonly tls_version: string;
             readonly cipher_name: string;
+            readonly evidence_digest: string;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
@@ -7098,6 +7099,8 @@ export interface components {
             readonly dns_source: string;
             readonly dnssec_validated: boolean | null;
             readonly dns_record_count: number;
+            readonly caa_record_count: number;
+            readonly evidence_digest: string;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */

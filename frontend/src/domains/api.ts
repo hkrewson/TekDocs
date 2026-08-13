@@ -34,6 +34,8 @@ export type DomainMonitorRun = {
   dns_source: string
   dnssec_validated: boolean | null
   dns_record_count: number
+  caa_record_count: number
+  evidence_digest: string
   created_at: string
   finished_at: string | null
 }
@@ -87,6 +89,7 @@ export type CertificateMonitorRun = {
   trust_valid: boolean | null
   tls_version: string
   cipher_name: string
+  evidence_digest: string
   created_at: string
   finished_at: string | null
 }

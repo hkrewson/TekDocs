@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.12
+  version: 0.7.13
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -20585,6 +20585,8 @@ components:
           type: string
         cipher_name:
           type: string
+        evidence_digest:
+          type: string
         created_at:
           type: string
           format: date-time
@@ -20598,6 +20600,7 @@ components:
       - cipher_name
       - created_at
       - error_code
+      - evidence_digest
       - finished_at
       - hostname_valid
       - id
@@ -23485,6 +23488,10 @@ components:
           nullable: true
         dns_record_count:
           type: integer
+        caa_record_count:
+          type: integer
+        evidence_digest:
+          type: string
         created_at:
           type: string
           format: date-time
@@ -23493,11 +23500,13 @@ components:
           format: date-time
           nullable: true
       required:
+      - caa_record_count
       - created_at
       - dns_record_count
       - dns_source
       - dnssec_validated
       - error_code
+      - evidence_digest
       - finished_at
       - id
       - observed_expiration_date

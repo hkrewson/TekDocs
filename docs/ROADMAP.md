@@ -1113,7 +1113,7 @@ Evidence: `docs/releases/0.7.0.md`.
 | `0.7.10` | **Complete:** Renewal/expiration schedules, review state, calendar integration, and stale or conflicting source handling. Notification delivery consumes the shared reminder boundary in a later dispatcher slice. |
 | `0.7.11` | **Complete:** Safe RDAP and DNS-over-HTTPS collection through the approved egress service, with observed-vs-entered reconciliation and retained expiration/change notifications. |
 | `0.7.12` | **Complete:** TLS endpoint inventory related to domains/hostnames, protocol-aware validation, leaf/chain/hostname/trust/expiry evidence, scan history, and safe failure handling. |
-| `0.7.13` | Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
+| `0.7.13` | **Complete:** Domain/certificate stabilization, IDN normalization, wildcard/SAN coverage, DNSSEC/CAA observations, evidence integrity, accessibility, scale, isolation, and upgrade evidence. |
 | `0.8.0` | Stabilize and certify compliance evidence and safe monitoring. |
 
 ### `0.7.1` acceptance criteria
@@ -1234,6 +1234,17 @@ Evidence: `docs/releases/0.7.11.md`.
 - [x] Central domain permissions, route/IDOR inventory, PostgreSQL scope/immutability guards, forced RLS, migration, OpenAPI/generated client, frontend, hostile-resolution tests, ADR 0074, risk disposition, and release evidence agree at `0.7.12`.
 
 Evidence: `docs/releases/0.7.12.md`.
+
+### `0.7.13` acceptance criteria
+
+- [x] Domain and certificate inputs use one strict IDNA normalization boundary; malformed labels and ambiguous wildcard forms fail closed, and certificate wildcard matching remains limited to one DNS label.
+- [x] DNS-over-HTTPS responses require successful typed envelopes. CAA observations and DNSSEC state are retained separately from the broader DNS evidence without storing raw resolver payloads.
+- [x] Successful domain and certificate runs retain canonical evidence digests. PostgreSQL requires valid digests, rejects terminal evidence rewrites and retained-run deletion, and exact-Workspace RLS/IDOR coverage remains blocking.
+- [x] Certificate leaf, chain, and SAN processing has explicit count and byte ceilings. Large monitoring histories return a stable bounded window with fixed query ceilings.
+- [x] Monitoring controls and history tables expose labels, captions, expanded state, live errors, and keyboard-compatible native controls while remaining inside the established Domains surface.
+- [x] Exact-prior `0.7.12` upgrade and independent PostgreSQL/media backup restore preserve terminal domain/certificate evidence. Migration, OpenAPI/client, frontend, architecture/security/threat/risk, ADR 0075, and release evidence agree at `0.7.13`.
+
+Evidence: `docs/releases/0.7.13.md`.
 
 ## Public beta hardening: `0.8.x` → `0.9.0`
 

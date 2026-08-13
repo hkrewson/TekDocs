@@ -5340,6 +5340,9 @@ class DomainMonitorRun(models.Model):
     dns_digest = models.CharField(max_length=64, blank=True)
     dnssec_validated = models.BooleanField(null=True, blank=True)
     dns_record_count = models.PositiveSmallIntegerField(default=0)
+    caa_digest = models.CharField(max_length=64, blank=True)
+    caa_record_count = models.PositiveSmallIntegerField(default=0)
+    evidence_digest = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -5356,10 +5359,17 @@ class DomainMonitorRun(models.Model):
             models.CheckConstraint(
                 condition=models.Q(trigger__in=("manual", "scheduled")), name="domain_monitor_trigger_valid"
             ),
+            models.CheckConstraint(
+                condition=~models.Q(state=DomainMonitorRunState.SUCCEEDED) | ~models.Q(evidence_digest=""),
+                name="domain_monitor_success_has_digest",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"Domain monitor run {self.id}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Domain monitoring runs are retained")
 
 
 class DomainMonitorAlert(models.Model):
@@ -5509,6 +5519,7 @@ class CertificateMonitorRun(models.Model):
     trust_valid = models.BooleanField(null=True, blank=True)
     tls_version = models.CharField(max_length=32, blank=True)
     cipher_name = models.CharField(max_length=64, blank=True)
+    evidence_digest = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -5520,6 +5531,10 @@ class CertificateMonitorRun(models.Model):
             models.CheckConstraint(condition=models.Q(attempts__lte=5), name="certificate_run_attempts_bounded"),
             models.CheckConstraint(
                 condition=models.Q(trigger__in=("manual", "scheduled")), name="certificate_run_trigger_valid"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(state=DomainMonitorRunState.SUCCEEDED) | ~models.Q(evidence_digest=""),
+                name="certificate_run_success_has_digest",
             ),
         ]
         indexes = [

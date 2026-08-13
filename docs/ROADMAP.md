@@ -1262,7 +1262,7 @@ Evidence: `docs/releases/0.8.0.md`.
 
 | Release | Slice and exit condition |
 | --- | --- |
-| `0.8.1` | Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and implementation of `TD-RISK-006`. |
+| `0.8.1` | **Complete:** Encrypted backup/restore tooling, separate-key recovery, destructive-operation safeguards, and initial implementation of `TD-RISK-006`. |
 | `0.8.2` | Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
 | `0.8.3` | WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | Localization readiness, timezone/locale correctness, and translatable UI contract. |
@@ -1272,6 +1272,18 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion; publish the end-user/operator corpus to the public repository's actual GitHub Wiki, add drift/link checks, and connect stable page-level contextual help to the relevant Wiki topics. |
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
 | `0.9.0` | Feature freeze and public beta; only fixes, hardening, and release evidence follow. |
+
+### `0.8.1` acceptance criteria
+
+- [x] PostgreSQL, managed media, and allowlisted deployment keys stream into separate authenticated encrypted artifacts without plaintext host staging.
+- [x] A 256-bit recovery key remains outside TekDocs and the deployment-secret directory; insecure key files, wrong keys, modified manifests, checksum mismatches, and incomplete sets fail closed with value-free diagnostics.
+- [x] Backup output is atomic and refuses overwrite; both producer and encryptor failure abort promotion.
+- [x] Restore authenticates and decrypts every input before destructive work, validates archive members, requires exact project confirmation, refuses existing secret output, and replaces only the confirmed project's database/media volumes.
+- [x] Restored PostgreSQL receives current non-owner runtime privileges before health checks, while forced RLS and ordinary migrations remain authoritative.
+- [x] The production-target rehearsal proves retained application state, no plaintext leakage, destructive-confirmation and wrong-key refusal, independent-volume restore, recovered key equality, and final health.
+- [x] ADR 0077, operator guidance, architecture/security/threat/risk records, release evidence, and version metadata agree. Scheduling, remote retention, point-in-time recovery, and deliberate lost-key exercises remain `0.9.3`.
+
+Evidence: `docs/releases/0.8.1.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

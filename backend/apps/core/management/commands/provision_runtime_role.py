@@ -35,4 +35,17 @@ class Command(BaseCommand):
                     sql.Identifier(configured_role),
                 )
             )
+            cursor.execute(
+                sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(configured_role))
+            )
+            cursor.execute(
+                sql.SQL(
+                    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {}"
+                ).format(sql.Identifier(configured_role))
+            )
+            cursor.execute(
+                sql.SQL("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {}").format(
+                    sql.Identifier(configured_role)
+                )
+            )
         self.stdout.write("PostgreSQL runtime role provisioned without exposing its credential.")

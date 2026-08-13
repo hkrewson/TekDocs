@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.3.4` creates client assets from exact supplier catalog revisions, retains applicable client-visible STATIC product documentation, and derives each client's vendor list from immutable provenance while retaining the external-custody credential boundary; TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.1` adds authenticated encrypted recovery for PostgreSQL, managed media, and deployment keys under a separately custodied recovery key. TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 
@@ -18,6 +18,8 @@ Compose runs schema changes through a one-shot migration container using the dat
 Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
 
 Production-capable secret files are configured with `.env.production.example`, `compose.production.yml`, and `compose.secret-files.yml`. Optional authenticated SMTP, OIDC, and first-owner bootstrap secrets use their own least-scope overlays. Direct and file sources are mutually exclusive; invalid files fail startup without echoing values or host paths. See `docs/SECRET_FILES_AND_PRODUCTION_IMAGES.md` and `docs/ONEPASSWORD_RUNTIME_INJECTION.md` before using this deployment boundary.
+
+Supported encrypted backup and restore commands, custody requirements, and destructive safeguards are documented in `docs/BACKUP_AND_RECOVERY.md`. Run `make supported-recovery-rehearsal` to prove a complete isolated restore; possessing a backup without its separate recovery key is intentionally insufficient.
 
 Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
 
@@ -68,6 +70,7 @@ make clean-install-rehearsal
 make upgrade-rehearsal
 make documentation-upgrade-rehearsal
 make documentation-backup-rehearsal
+make supported-recovery-rehearsal
 make security
 ```
 

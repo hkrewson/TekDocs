@@ -6,6 +6,8 @@ TekDocs ships as a same-origin web application. Nginx serves the React build and
 
 The default Compose services are `db`, `valkey`, a one-shot `migrate` job, `backend`, `worker`, `scheduler`, and `frontend`. The migration job owns schema changes and provisions the fixed `tekdocs_runtime` login; application processes receive only that non-owner credential. Persistent application artifacts use a storage provider: local volumes initially and S3-compatible storage later.
 
+Supported full recovery packages PostgreSQL, managed media, and allowlisted deployment keys as independently authenticated AES-256-GCM streams. A separate operator-custodied recovery key authenticates the artifact set and its non-secret manifest; neither TekDocs nor Compose retains that key. Restore authenticates every artifact before exact-project volume replacement, reapplies current non-owner runtime privileges, migrates, and requires health. ADR 0077 defines the boundary.
+
 ## Domain direction
 
 `Tenant` is the one-MSP installation boundary and a future hosted seam, not a currently supported multi-MSP hierarchy. Each tenant has one immutable MSP `Workspace`, and each `Organization` has one immutable organization Workspace. `Entity` is the universal stable UUID and required canonical ownership anchor; typed models attach to it. `EntityLink` supplies referential relationships without generic foreign keys. Tenant/organization columns remain denormalized scope inputs for indexes, RLS, and relationship guards, while the non-null Workspace UUID makes accidental owner omission fail closed. ADR 0035 defines this boundary.

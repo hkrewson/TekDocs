@@ -4,8 +4,8 @@ These instructions apply to the entire repository. More specific instructions in
 
 ## Before changing code
 
-1. Read `docs/PRODUCT_CHARTER.md`, `docs/ROADMAP.md`, the relevant ADRs under `docs/adr/`, and `docs/SECURITY.md` for security-sensitive work.
-2. Name the current roadmap slice and its acceptance criteria before editing. Do not silently expand it.
+1. Read `README.md`, these instructions, the relevant subsystem instructions, and the public GitHub Wiki when it is available.
+2. Name the current roadmap slice or issue and its acceptance criteria before editing. Do not silently expand it.
 3. Inspect the working tree. Preserve unrelated and user-owned changes.
 
 ## Delivery rules
@@ -20,4 +20,4 @@ These instructions apply to the entire repository. More specific instructions in
 
 ## Required closeout
 
-A slice is complete only when its code, migration path, API contract, positive and negative tests, Docker runtime evidence, docs, and known-risk disposition agree. Run the strongest relevant `make` gate. If a gate cannot run, report exactly why and which hosted gate must confirm it.
+A slice is complete only when its code, migration path, API contract, positive and negative tests, Docker runtime evidence, required Wiki change, and known-risk disposition agree. Run the strongest relevant `make` gate. If a gate cannot run, report exactly why and which hosted gate must confirm it.

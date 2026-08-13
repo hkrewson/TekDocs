@@ -15,15 +15,15 @@ Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with ge
 
 Compose runs schema changes through a one-shot migration container using the database owner. Web, worker, and scheduler containers connect as the fixed, non-owner `tekdocs_runtime` role and validate its forced-RLS policy inventory before startup. Python installs use reviewed hash locks; run `./scripts/update-python-locks.sh` after intentionally changing backend requirements.
 
-Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox. See `docs/EMAIL.md` for production SMTP configuration.
+Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox.
 
-Production-capable secret files are configured with `.env.production.example`, `compose.production.yml`, and `compose.secret-files.yml`. Optional authenticated SMTP, OIDC, and first-owner bootstrap secrets use their own least-scope overlays. Direct and file sources are mutually exclusive; invalid files fail startup without echoing values or host paths. See `docs/SECRET_FILES_AND_PRODUCTION_IMAGES.md` and `docs/ONEPASSWORD_RUNTIME_INJECTION.md` before using this deployment boundary.
+Production-capable secret files are configured with `.env.production.example`, `compose.production.yml`, and `compose.secret-files.yml`. Optional authenticated SMTP, OIDC, and first-owner bootstrap secrets use their own least-scope overlays. Direct and file sources are mutually exclusive; invalid files fail startup without echoing values or host paths. Complete operator instructions will be maintained in the public GitHub Wiki before public beta.
 
-Supported encrypted backup and restore commands, custody requirements, and destructive safeguards are documented in `docs/BACKUP_AND_RECOVERY.md`. Run `make supported-recovery-rehearsal` to prove a complete isolated restore; possessing a backup without its separate recovery key is intentionally insufficient.
+Supported encrypted backup and restore use `scripts/tekdocs-backup.sh` and `scripts/tekdocs-restore.sh`. Run `make supported-recovery-rehearsal` to prove a complete isolated restore; possessing a backup without its separately held recovery key is intentionally insufficient.
 
-Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links, and see `docs/INVITATIONS.md` and `docs/AUTHENTICATION.md` for token and lifecycle behavior.
+Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links. The generated API reference is available at `/api/v1/docs/` on a running installation.
 
-Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use. Optional OpenID Connect configuration is documented in `docs/AUTHENTICATION.md`.
+Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use.
 
 The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL. The workspace control searches the authorized organization directory, preserves equivalent section routes when switching, exposes the union of classification capabilities, and always provides a return to the MSP workspace.
 
@@ -48,7 +48,7 @@ curl --fail-with-body http://localhost:3200/api/v1/bootstrap/owner \
   --data '{"tenant_name":"Example MSP","owner_email":"owner@example.com","owner_display_name":"Primary Owner","password":"use-a-unique-password-manager-generated-value"}'
 ```
 
-`GET /api/v1/bootstrap/status` returns only whether bootstrap is required. A successful claim creates one tenant and one normal product owner identity, records a value-free audit event, and permanently closes this endpoint. A production deployment may then remove `compose.bootstrap-secret.yml` and the bootstrap-token source file; readiness requires the token only while the installation is unclaimed. Public registration remains closed. See `docs/AUTHENTICATION.md` for the session and CSRF contract.
+`GET /api/v1/bootstrap/status` returns only whether bootstrap is required. A successful claim creates one tenant and one normal product owner identity, records a value-free audit event, and permanently closes this endpoint. A production deployment may then remove `compose.bootstrap-secret.yml` and the bootstrap-token source file; readiness requires the token only while the installation is unclaimed. Public registration remains closed.
 
 Useful gates:
 
@@ -76,7 +76,11 @@ make supported-upgrade-matrix
 make security
 ```
 
-The running Docker stack is authoritative for runtime claims. Authentication operations are documented in `docs/OPERATOR_AUTHENTICATION.md`; the current regression fixture and upgrade contract are in `docs/PERFORMANCE_BASELINE.md` and `docs/MIGRATION_TESTING.md`. See `docs/PRODUCT_CHARTER.md`, `docs/ROADMAP.md`, and `AGENTS.md` before substantive work.
+The running Docker stack is authoritative for runtime claims. See `AGENTS.md`, the current milestone or issue, and the public GitHub Wiki when it is available before substantive work.
+
+## Documentation
+
+The public GitHub Wiki is the sole public product and operator manual. This repository does not maintain a competing `docs/` tree. In-repository prose is limited to the README, contribution/security policies, source comments, generated OpenAPI reference, and project-local agent instructions required to build and review the code.
 
 ## Current boundaries
 

@@ -107,8 +107,9 @@ describe('application shell', () => {
     render(app('/documentation'))
 
     await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
-    expect(screen.getByRole('dialog', { name: 'Documentation help' })).toHaveTextContent('reuse live or pinned blocks')
-    expect(screen.getByRole('status')).toHaveTextContent('public Wiki guide has not been published')
+    const help = within(screen.getByRole('dialog', { name: 'Documentation help' }))
+    expect(help.getByText(/reuse live or pinned blocks/)).toBeInTheDocument()
+    expect(help.getByRole('status')).toHaveTextContent('public Wiki guide has not been published')
     expect(screen.queryByRole('link', { name: /Open the full guide/ })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Documentation help' })).not.toBeInTheDocument()

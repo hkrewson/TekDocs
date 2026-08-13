@@ -56,3 +56,6 @@ frontend/.vite/
 
 # The GitHub Wiki is a separate repository and checkout
 /TekDocs.wiki/
+
+# Public documentation is maintained in the separate GitHub Wiki repository
+/docs/

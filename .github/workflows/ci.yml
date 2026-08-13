@@ -35,8 +35,6 @@ jobs:
           python manage.py makemigrations --check --dry-run --settings=tekdocs.settings.test
           python manage.py spectacular --file /tmp/openapi.yml --validate --settings=tekdocs.settings.test
           diff -u openapi.yml /tmp/openapi.yml
-      - name: Documentation drift and links
-        run: python scripts/check-documentation.py
       - name: Backend tests
         working-directory: backend
         run: pytest --cov

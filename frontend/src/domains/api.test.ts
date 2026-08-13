@@ -16,6 +16,10 @@ describe('domains API client', () => {
     await browserDomainsClient.create(workspace, { name: 'example.com' } as never)
     await browserDomainsClient.monitoring(workspace, 'domain/1')
     await browserDomainsClient.scan(workspace, 'domain/1')
+    await browserDomainsClient.listCertificates(workspace, 'domain/1')
+    await browserDomainsClient.createCertificate(workspace, 'domain/1', 'https', null)
+    await browserDomainsClient.certificateMonitoring(workspace, 'domain/1', 'endpoint/1')
+    await browserDomainsClient.scanCertificate(workspace, 'domain/1', 'endpoint/1')
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/domains/domain%2F1/monitoring',
@@ -27,6 +31,10 @@ describe('domains API client', () => {
     )
     const scan = vi.mocked(fetch).mock.calls.find(([, options]) => options?.method === 'POST' && options.body === '{}')
     expect((scan?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('domain-csrf')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/domains/domain%2F1/certificates/endpoint%2F1/monitoring',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 
   it('uses the explicit MSP boundary and surfaces structured errors', async () => {

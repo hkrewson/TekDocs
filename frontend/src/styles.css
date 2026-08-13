@@ -1124,6 +1124,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .domain-monitor-alerts li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .domain-monitor-alerts strong { font-size: 13px; text-transform: capitalize; }
 .domain-monitor-alerts span { color: var(--muted); font-size: 12px; }
+.domain-subsection-heading { margin-top: 28px; }
+.certificate-form-row { align-items: end; display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 18px; }
+.certificate-form-row label { display: grid; gap: 6px; min-width: 220px; }
+.certificate-history { border-top: 1px solid var(--border); margin-top: 22px; padding-top: 18px; }
 
 @media (max-width: 720px) {
   .compliance-assignment-form { grid-template-columns: 1fr; }

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.7.11
+  version: 0.7.12
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -6639,6 +6639,143 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Domain'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains/{domain_entity_id}/certificates:
+    get:
+      operationId: msp_certificate_endpoint_list
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CertificateEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_certificate_endpoint_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/domains/{domain_entity_id}/certificates/{endpoint_entity_id}/monitoring:
+    get:
+      operationId: msp_certificate_monitoring_history
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: endpoint_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_certificate_monitoring_scan
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: endpoint_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateMonitorRun'
           description: ''
           headers:
             X-Request-ID:
@@ -14065,6 +14202,167 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/certificates:
+    get:
+      operationId: organization_certificate_endpoint_list
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CertificateEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_certificate_endpoint_create
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CertificateEndpointWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/certificates/{endpoint_entity_id}/monitoring
+  : get:
+      operationId: organization_certificate_monitoring_history
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: endpoint_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_certificate_monitoring_scan
+      parameters:
+      - in: path
+        name: domain_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: endpoint_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateMonitorRun'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/hostnames:
     get:
       operationId: workspaces_organizations_domains_hostnames_list
@@ -20166,6 +20464,153 @@ components:
       required:
       - can_manage
       - results
+    CertificateEndpoint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        domain_id:
+          type: string
+          format: uuid
+        hostname_id:
+          type: string
+          format: uuid
+          nullable: true
+        target_name:
+          type: string
+        protocol:
+          type: string
+        port:
+          type: integer
+        monitor_state:
+          type: string
+        monitor_error_code:
+          type: string
+        last_monitor_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_monitor_at:
+          type: string
+          format: date-time
+        current_leaf_sha256:
+          type: string
+        current_not_after:
+          type: string
+          format: date-time
+          nullable: true
+        current_hostname_valid:
+          type: boolean
+          nullable: true
+        current_trust_valid:
+          type: boolean
+          nullable: true
+      required:
+      - current_hostname_valid
+      - current_leaf_sha256
+      - current_not_after
+      - current_trust_valid
+      - domain_id
+      - hostname_id
+      - id
+      - last_monitor_at
+      - monitor_error_code
+      - monitor_state
+      - next_monitor_at
+      - port
+      - protocol
+      - target_name
+    CertificateEndpointWrite:
+      type: object
+      properties:
+        protocol:
+          enum:
+          - https
+          - smtps
+          - imaps
+          - pop3s
+          type: string
+          description: |-
+            * `https` - https
+            * `smtps` - smtps
+            * `imaps` - imaps
+            * `pop3s` - pop3s
+          x-spec-enum-id: b0429121e84f9f70
+        hostname_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - protocol
+    CertificateMonitorRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        trigger:
+          type: string
+        state:
+          type: string
+        error_code:
+          type: string
+        leaf_sha256:
+          type: string
+        chain_sha256:
+          type: string
+        chain_length:
+          type: integer
+        subject_common_name:
+          type: string
+        issuer_common_name:
+          type: string
+        san_count:
+          type: integer
+        not_before:
+          type: string
+          format: date-time
+          nullable: true
+        not_after:
+          type: string
+          format: date-time
+          nullable: true
+        hostname_valid:
+          type: boolean
+          nullable: true
+        trust_valid:
+          type: boolean
+          nullable: true
+        tls_version:
+          type: string
+        cipher_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - chain_length
+      - chain_sha256
+      - cipher_name
+      - created_at
+      - error_code
+      - finished_at
+      - hostname_valid
+      - id
+      - issuer_common_name
+      - leaf_sha256
+      - not_after
+      - not_before
+      - san_count
+      - state
+      - subject_common_name
+      - tls_version
+      - trigger
+      - trust_valid
     Choice:
       type: object
       properties:

@@ -46,7 +46,56 @@ export type DomainMonitorAlert = {
   created_at: string
 }
 
-export type DomainMonitoring = { domain: RegisteredDomain; runs: DomainMonitorRun[]; alerts: DomainMonitorAlert[] }
+export type DomainMonitoring = {
+  domain: RegisteredDomain
+  runs: DomainMonitorRun[]
+  alerts: DomainMonitorAlert[]
+  hostnames: { id: string; name: string }[]
+}
+
+export type CertificateEndpoint = {
+  id: string
+  domain_id: string
+  hostname_id: string | null
+  target_name: string
+  protocol: 'https' | 'smtps' | 'imaps' | 'pop3s'
+  port: number
+  monitor_state: RegisteredDomain['monitor_state']
+  monitor_error_code: string
+  last_monitor_at: string | null
+  next_monitor_at: string
+  current_leaf_sha256: string
+  current_not_after: string | null
+  current_hostname_valid: boolean | null
+  current_trust_valid: boolean | null
+}
+
+export type CertificateMonitorRun = {
+  id: string
+  trigger: 'manual' | 'scheduled'
+  state: DomainMonitorRun['state']
+  error_code: string
+  leaf_sha256: string
+  chain_sha256: string
+  chain_length: number
+  subject_common_name: string
+  issuer_common_name: string
+  san_count: number
+  not_before: string | null
+  not_after: string | null
+  hostname_valid: boolean | null
+  trust_valid: boolean | null
+  tls_version: string
+  cipher_name: string
+  created_at: string
+  finished_at: string | null
+}
+
+export type CertificateMonitoring = {
+  endpoint: CertificateEndpoint
+  runs: CertificateMonitorRun[]
+  alerts: { id: string; kind: string; observed_not_after: string | null; prior_not_after: string | null; created_at: string }[]
+}
 
 export type DomainDraft = Pick<RegisteredDomain, 'name' | 'registrar_id' | 'registration_date' | 'expiration_date' | 'renewal_mode' | 'owner_id' | 'status' | 'notes'>
 
@@ -55,6 +104,10 @@ export interface DomainsClient {
   create(workspace: WorkspaceContext | null, draft: DomainDraft): Promise<RegisteredDomain>
   monitoring(workspace: WorkspaceContext | null, domainId: string, signal?: AbortSignal): Promise<DomainMonitoring>
   scan(workspace: WorkspaceContext | null, domainId: string): Promise<DomainMonitorRun>
+  listCertificates(workspace: WorkspaceContext | null, domainId: string): Promise<CertificateEndpoint[]>
+  createCertificate(workspace: WorkspaceContext | null, domainId: string, protocol: CertificateEndpoint['protocol'], hostnameId: string | null): Promise<CertificateEndpoint>
+  certificateMonitoring(workspace: WorkspaceContext | null, domainId: string, endpointId: string): Promise<CertificateMonitoring>
+  scanCertificate(workspace: WorkspaceContext | null, domainId: string, endpointId: string): Promise<CertificateMonitorRun>
 }
 
 function path(workspace: WorkspaceContext | null) {
@@ -65,6 +118,14 @@ function path(workspace: WorkspaceContext | null) {
 
 function monitoringPath(workspace: WorkspaceContext | null, domainId: string) {
   return `${path(workspace)}/${encodeURIComponent(domainId)}/monitoring`
+}
+
+function certificatesPath(workspace: WorkspaceContext | null, domainId: string) {
+  return `${path(workspace)}/${encodeURIComponent(domainId)}/certificates`
+}
+
+function certificateMonitoringPath(workspace: WorkspaceContext | null, domainId: string, endpointId: string) {
+  return `${certificatesPath(workspace, domainId)}/${encodeURIComponent(endpointId)}/monitoring`
 }
 
 function csrfToken() {
@@ -99,6 +160,32 @@ export const browserDomainsClient: DomainsClient = {
   async scan(workspace, domainId) {
     await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
     return parse(await fetch(monitoringPath(workspace, domainId), {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+      body: '{}',
+    }))
+  },
+  async listCertificates(workspace, domainId) {
+    return parse(await fetch(certificatesPath(workspace, domainId), {
+      credentials: 'same-origin', headers: { Accept: 'application/json' },
+    }))
+  },
+  async createCertificate(workspace, domainId, protocol, hostnameId) {
+    await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    return parse(await fetch(certificatesPath(workspace, domainId), {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+      body: JSON.stringify({ protocol, hostname_id: hostnameId }),
+    }))
+  },
+  async certificateMonitoring(workspace, domainId, endpointId) {
+    return parse(await fetch(certificateMonitoringPath(workspace, domainId, endpointId), {
+      credentials: 'same-origin', headers: { Accept: 'application/json' },
+    }))
+  },
+  async scanCertificate(workspace, domainId, endpointId) {
+    await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    return parse(await fetch(certificateMonitoringPath(workspace, domainId, endpointId), {
       method: 'POST', credentials: 'same-origin',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
       body: '{}',

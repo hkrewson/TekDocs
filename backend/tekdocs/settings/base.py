@@ -306,6 +306,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.core.tasks.dispatch_domain_monitoring",
         "schedule": 30.0,
     },
+    "schedule-certificate-monitoring": {
+        "task": "apps.core.tasks.schedule_certificate_monitoring",
+        "schedule": 3600.0,
+    },
+    "dispatch-certificate-monitoring": {
+        "task": "apps.core.tasks.dispatch_certificate_monitoring",
+        "schedule": 30.0,
+    },
 }
 
 LOGGING = {

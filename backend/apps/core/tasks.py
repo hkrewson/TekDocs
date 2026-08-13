@@ -4,9 +4,11 @@ from uuid import UUID
 from celery import shared_task
 from django.utils import timezone
 
+from .certificate_monitoring import process_certificate_monitoring_run, schedule_due_certificate_monitoring
 from .domain_monitoring import process_domain_monitoring_run, schedule_due_domain_monitoring
 from .integrations import process_sync_job, purge_integration_logs, schedule_due_connections
 from .models import (
+    CertificateMonitorRun,
     DomainMonitorRun,
     DomainMonitorRunState,
     InstallationState,
@@ -164,6 +166,60 @@ def dispatch_domain_monitoring() -> int:
             )
             for run_id in run_ids:
                 process_domain_monitoring.delay(
+                    str(run_id),
+                    str(scope.tenant_id),
+                    str(scope.workspace_id),
+                    str(scope.organization_id) if scope.organization_id else None,
+                )
+                total += 1
+    return total
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def schedule_certificate_monitoring() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with rls_scope(scope, organization_mode=mode):
+            total += schedule_due_certificate_monitoring(scope=scope)
+    return total
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def process_certificate_monitoring(
+    run_id: str, tenant_id: str, workspace_id: str, organization_id: str | None
+) -> None:
+    scope = DataScope(UUID(tenant_id), UUID(workspace_id), UUID(organization_id) if organization_id else None)
+    mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
+    with rls_scope(scope, organization_mode=mode):
+        process_certificate_monitoring_run(run_id=UUID(run_id))
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def dispatch_certificate_monitoring() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with rls_scope(scope, organization_mode=mode):
+            run_ids = list(
+                CertificateMonitorRun.scoped.for_scope(scope)
+                .filter(state=DomainMonitorRunState.PENDING, available_at__lte=timezone.now())
+                .order_by("available_at", "created_at")
+                .values_list("id", flat=True)[:25]
+            )
+            CertificateMonitorRun.scoped.for_scope(scope).filter(id__in=run_ids).update(
+                available_at=timezone.now() + INTEGRATION_DISPATCH_LEASE
+            )
+            for run_id in run_ids:
+                process_certificate_monitoring.delay(
                     str(run_id),
                     str(scope.tenant_id),
                     str(scope.workspace_id),

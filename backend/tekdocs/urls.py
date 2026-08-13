@@ -151,9 +151,13 @@ from apps.core.domain_hierarchy_views import (
     OrganizationObservationCreateView,
 )
 from apps.core.domain_views import (
+    MSPCertificateEndpointListCreateView,
+    MSPCertificateMonitoringView,
     MSPDomainListCreateView,
     MSPDomainMonitoringView,
     MSPDomainReviewView,
+    OrganizationCertificateEndpointListCreateView,
+    OrganizationCertificateMonitoringView,
     OrganizationDomainListCreateView,
     OrganizationDomainMonitoringView,
     OrganizationDomainReviewView,
@@ -741,6 +745,16 @@ urlpatterns = [
         "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/monitoring",
         MSPDomainMonitoringView.as_view(),
         name="msp-domain-monitoring",
+    ),
+    path(
+        "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/certificates",
+        MSPCertificateEndpointListCreateView.as_view(),
+        name="msp-certificate-endpoint-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/certificates/<uuid:endpoint_entity_id>/monitoring",
+        MSPCertificateMonitoringView.as_view(),
+        name="msp-certificate-monitoring",
     ),
     path(
         "api/v1/workspaces/msp/domains/<uuid:domain_entity_id>/hostnames",
@@ -1745,6 +1759,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/monitoring",
         OrganizationDomainMonitoringView.as_view(),
         name="organization-domain-monitoring",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/certificates",
+        OrganizationCertificateEndpointListCreateView.as_view(),
+        name="organization-certificate-endpoint-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/certificates/<uuid:endpoint_entity_id>/monitoring",
+        OrganizationCertificateMonitoringView.as_view(),
+        name="organization-certificate-monitoring",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains/<uuid:domain_entity_id>/hostnames",

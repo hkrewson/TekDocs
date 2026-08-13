@@ -1988,6 +1988,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/domains/{domain_entity_id}/certificates": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_certificate_endpoint_list"];
+        readonly put?: never;
+        readonly post: operations["msp_certificate_endpoint_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/domains/{domain_entity_id}/certificates/{endpoint_entity_id}/monitoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_certificate_monitoring_history"];
+        readonly put?: never;
+        readonly post: operations["msp_certificate_monitoring_scan"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/domains/{domain_entity_id}/hostnames": {
         readonly parameters: {
             readonly query?: never;
@@ -4132,6 +4164,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/certificates": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_certificate_endpoint_list"];
+        readonly put?: never;
+        readonly post: operations["organization_certificate_endpoint_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/certificates/{endpoint_entity_id}/monitoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_certificate_monitoring_history"];
+        readonly put?: never;
+        readonly post: operations["organization_certificate_monitoring_scan"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains/{domain_entity_id}/hostnames": {
         readonly parameters: {
             readonly query?: never;
@@ -5778,6 +5842,65 @@ export interface components {
         readonly CatalogProductResult: {
             readonly results: readonly components["schemas"]["CatalogProduct"][];
             readonly can_manage: boolean;
+        };
+        readonly CertificateEndpoint: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly domain_id: string;
+            /** Format: uuid */
+            readonly hostname_id: string | null;
+            readonly target_name: string;
+            readonly protocol: string;
+            readonly port: number;
+            readonly monitor_state: string;
+            readonly monitor_error_code: string;
+            /** Format: date-time */
+            readonly last_monitor_at: string | null;
+            /** Format: date-time */
+            readonly next_monitor_at: string;
+            readonly current_leaf_sha256: string;
+            /** Format: date-time */
+            readonly current_not_after: string | null;
+            readonly current_hostname_valid: boolean | null;
+            readonly current_trust_valid: boolean | null;
+        };
+        readonly CertificateEndpointWrite: {
+            /**
+             * @description * `https` - https
+             *     * `smtps` - smtps
+             *     * `imaps` - imaps
+             *     * `pop3s` - pop3s
+             * @enum {string}
+             */
+            readonly protocol: "https" | "smtps" | "imaps" | "pop3s";
+            /** Format: uuid */
+            readonly hostname_id?: string | null;
+        };
+        readonly CertificateMonitorRun: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly trigger: string;
+            readonly state: string;
+            readonly error_code: string;
+            readonly leaf_sha256: string;
+            readonly chain_sha256: string;
+            readonly chain_length: number;
+            readonly subject_common_name: string;
+            readonly issuer_common_name: string;
+            readonly san_count: number;
+            /** Format: date-time */
+            readonly not_before: string | null;
+            /** Format: date-time */
+            readonly not_after: string | null;
+            readonly hostname_valid: boolean | null;
+            readonly trust_valid: boolean | null;
+            readonly tls_version: string;
+            readonly cipher_name: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly finished_at: string | null;
         };
         readonly Choice: {
             /** Format: uuid */
@@ -15063,6 +15186,108 @@ export interface operations {
             };
         };
     };
+    readonly msp_certificate_endpoint_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["CertificateEndpoint"][];
+                };
+            };
+        };
+    };
+    readonly msp_certificate_endpoint_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CertificateEndpointWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CertificateEndpointWrite"];
+                readonly "multipart/form-data": components["schemas"]["CertificateEndpointWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CertificateEndpoint"];
+                };
+            };
+        };
+    };
+    readonly msp_certificate_monitoring_history: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly endpoint_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    readonly msp_certificate_monitoring_scan: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly endpoint_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CertificateMonitorRun"];
+                };
+            };
+        };
+    };
     readonly msp_hostname_list: {
         readonly parameters: {
             readonly query?: never;
@@ -20473,6 +20698,112 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
+    readonly organization_certificate_endpoint_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["CertificateEndpoint"][];
+                };
+            };
+        };
+    };
+    readonly organization_certificate_endpoint_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CertificateEndpointWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CertificateEndpointWrite"];
+                readonly "multipart/form-data": components["schemas"]["CertificateEndpointWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CertificateEndpoint"];
+                };
+            };
+        };
+    };
+    readonly organization_certificate_monitoring_history: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly endpoint_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    readonly organization_certificate_monitoring_scan: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly domain_entity_id: string;
+                readonly endpoint_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 202: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CertificateMonitorRun"];
                 };
             };
         };

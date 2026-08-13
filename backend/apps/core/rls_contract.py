@@ -73,6 +73,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_domainreviewevent",
     "core_domainmonitorrun",
     "core_domainmonitoralert",
+    "core_certificateendpoint",
+    "core_certificatemonitorrun",
+    "core_certificatemonitoralert",
 )
 
 TENANT_SCOPED_TABLES = (

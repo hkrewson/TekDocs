@@ -5096,6 +5096,20 @@ class DomainMonitorAlertKind(models.TextChoices):
     COLLECTION_FAILED = "collection_failed", "Collection failed"
 
 
+class CertificateEndpointProtocol(models.TextChoices):
+    HTTPS = "https", "HTTPS"
+    SMTPS = "smtps", "SMTP over TLS"
+    IMAPS = "imaps", "IMAP over TLS"
+    POP3S = "pop3s", "POP3 over TLS"
+
+
+class CertificateMonitorAlertKind(models.TextChoices):
+    EXPIRATION_DUE = "expiration_due", "Certificate expiration due"
+    CERTIFICATE_CHANGED = "certificate_changed", "Certificate changed"
+    VALIDATION_FAILED = "validation_failed", "Certificate validation failed"
+    COLLECTION_FAILED = "collection_failed", "Certificate collection failed"
+
+
 class RegisteredDomain(TimestampedModel):
     """Workspace-owned entered registration record; observations remain separate."""
 
@@ -5381,3 +5395,175 @@ class DomainMonitorAlert(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Domain monitoring alerts are retained")
+
+
+class CertificateEndpoint(TimestampedModel):
+    """One direct-TLS service endpoint related to a registered domain or managed hostname."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="certificate_endpoints")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="certificate_endpoints")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="certificate_endpoints", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="certificate_endpoint")
+    domain = models.ForeignKey(RegisteredDomain, on_delete=models.PROTECT, related_name="certificate_endpoints")
+    hostname = models.ForeignKey(
+        ManagedHostname, on_delete=models.PROTECT, related_name="certificate_endpoints", null=True, blank=True
+    )
+    protocol = models.CharField(max_length=16, choices=CertificateEndpointProtocol.choices)
+    port = models.PositiveSmallIntegerField()
+    monitoring_enabled = models.BooleanField(default=True)
+    monitor_interval_hours = models.PositiveSmallIntegerField(default=24)
+    next_monitor_at = models.DateTimeField(default=timezone.now)
+    last_monitor_at = models.DateTimeField(null=True, blank=True)
+    monitor_state = models.CharField(
+        max_length=16, choices=DomainMonitorState.choices, default=DomainMonitorState.NEVER
+    )
+    monitor_error_code = models.CharField(max_length=64, blank=True)
+    current_leaf_sha256 = models.CharField(max_length=64, blank=True)
+    current_not_after = models.DateTimeField(null=True, blank=True)
+    current_hostname_valid = models.BooleanField(null=True, blank=True)
+    current_trust_valid = models.BooleanField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_certificate_endpoints"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("domain__ascii_name", "hostname__ascii_name", "protocol", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("workspace", "domain", "protocol"),
+                condition=models.Q(archived_at__isnull=True, hostname__isnull=True),
+                name="certificate_apex_endpoint_active_unique",
+            ),
+            models.UniqueConstraint(
+                fields=("workspace", "hostname", "protocol"),
+                condition=models.Q(archived_at__isnull=True, hostname__isnull=False),
+                name="certificate_host_endpoint_active_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(protocol__in=CertificateEndpointProtocol.values),
+                name="certificate_endpoint_protocol_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("workspace", "monitor_state", "next_monitor_at"), name="core_certendpoint_due_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.protocol}://{self.target_name}:{self.port}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Certificate endpoints must be archived")
+
+    @property
+    def target_name(self) -> str:
+        if self.hostname_id and self.hostname is not None:
+            return self.hostname.ascii_name
+        return self.domain.ascii_name
+
+
+class CertificateMonitorRun(models.Model):
+    """Retained, bounded certificate and validation evidence for one endpoint scan."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="certificate_monitor_runs")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="certificate_monitor_runs")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="certificate_monitor_runs", null=True, blank=True
+    )
+    endpoint = models.ForeignKey(CertificateEndpoint, on_delete=models.PROTECT, related_name="monitoring_runs")
+    trigger = models.CharField(max_length=16, choices=(("manual", "Manual"), ("scheduled", "Scheduled")))
+    state = models.CharField(
+        max_length=16, choices=DomainMonitorRunState.choices, default=DomainMonitorRunState.PENDING
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_certificate_monitor_runs",
+        null=True,
+        blank=True,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+    leaf_sha256 = models.CharField(max_length=64, blank=True)
+    chain_sha256 = models.CharField(max_length=64, blank=True)
+    chain_length = models.PositiveSmallIntegerField(default=0)
+    subject_common_name = models.CharField(max_length=253, blank=True)
+    issuer_common_name = models.CharField(max_length=253, blank=True)
+    serial_sha256 = models.CharField(max_length=64, blank=True)
+    san_sha256 = models.CharField(max_length=64, blank=True)
+    san_count = models.PositiveSmallIntegerField(default=0)
+    not_before = models.DateTimeField(null=True, blank=True)
+    not_after = models.DateTimeField(null=True, blank=True)
+    hostname_valid = models.BooleanField(null=True, blank=True)
+    trust_valid = models.BooleanField(null=True, blank=True)
+    tls_version = models.CharField(max_length=32, blank=True)
+    cipher_name = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(attempts__lte=5), name="certificate_run_attempts_bounded"),
+            models.CheckConstraint(
+                condition=models.Q(trigger__in=("manual", "scheduled")), name="certificate_run_trigger_valid"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("workspace", "state", "available_at"), name="core_certrun_due_idx"),
+            models.Index(fields=("endpoint", "created_at"), name="core_certrun_history_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Certificate monitor run {self.id}"
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Certificate monitoring runs are retained")
+
+
+class CertificateMonitorAlert(models.Model):
+    """Append-only value-minimized certificate monitoring alert."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="certificate_monitor_alerts")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="certificate_monitor_alerts")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="certificate_monitor_alerts", null=True, blank=True
+    )
+    endpoint = models.ForeignKey(CertificateEndpoint, on_delete=models.PROTECT, related_name="monitoring_alerts")
+    run = models.ForeignKey(CertificateMonitorRun, on_delete=models.PROTECT, related_name="alerts")
+    kind = models.CharField(max_length=32, choices=CertificateMonitorAlertKind.choices)
+    observed_not_after = models.DateTimeField(null=True, blank=True)
+    prior_not_after = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [models.UniqueConstraint(fields=("run", "kind"), name="certificate_alert_run_kind_unique")]
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.endpoint_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Certificate monitoring alerts are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Certificate monitoring alerts are retained")

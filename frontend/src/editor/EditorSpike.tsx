@@ -105,7 +105,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
     event.preventDefault()
     const nextMode = editorModes[nextIndex]
     selectMode(nextMode)
-    requestAnimationFrame(() => tabRefs.current[nextMode]?.focus())
+    tabRefs.current[nextMode]?.focus()
   }
 
   const tab = (tabMode: EditorMode, label: string) => (

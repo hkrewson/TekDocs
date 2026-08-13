@@ -924,8 +924,8 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 }
 
 @media (max-width: 800px) {
-  .sidebar { width: 244px; transform: translateX(-100%); transition: transform 150ms ease; }
-  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar { width: 244px; transform: translateX(-100%); visibility: hidden; transition: transform 150ms ease; }
+  .sidebar.mobile-open { transform: translateX(0); visibility: visible; }
   .sidebar.collapsed { width: 244px; }
   .sidebar.collapsed .brand-name, .sidebar.collapsed .tenant-copy, .sidebar.collapsed .tenant-switcher svg, .sidebar.collapsed .nav-link span { display: initial; }
   .sidebar.collapsed .tenant-switcher, .sidebar.collapsed .nav-link { justify-content: flex-start; padding-inline: 10px; }

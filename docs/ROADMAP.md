@@ -1267,7 +1267,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.3` | **Complete:** WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | **Complete:** Localization readiness, timezone/locale correctness, and translatable UI contract. |
 | `0.8.5` | **Complete:** Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
-| `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
+| `0.8.6` | **Complete:** Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
 | `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
 | `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion; publish the end-user/operator corpus to the public repository's actual GitHub Wiki, add drift/link checks, and connect stable page-level contextual help to the relevant Wiki topics. |
 | `0.8.9` | External security review intake and resolution of all release-blocking findings. |
@@ -1332,6 +1332,18 @@ Evidence: `docs/releases/0.8.4.md`.
 - [x] ADR 0081, performance guidance, architecture/threat/risk records, version metadata, roadmap, and release evidence agree without claiming a capacity SLA or physical-device certification.
 
 Evidence: `docs/releases/0.8.5.md`.
+
+### `0.8.6` acceptance criteria
+
+- [x] Pull requests retain the complete desktop Chromium gate; scheduled and manually dispatched runs add desktop Firefox/WebKit plus Pixel-class Chromium and iPhone-class WebKit responsive projects.
+- [x] The responsive projects exercise real production assets, mobile navigation, reflow/no-horizontal-page-overflow, touch/keyboard-operable controls, and the WCAG 2.2 automated ruleset.
+- [x] Local and hosted browser jobs use the same isolated Compose rehearsal and pinned Playwright runtime rather than a host-browser exception.
+- [x] Trace, screenshot, and video capture are disabled by default because authentication, MFA, recovery, invite, token, document, and client workflows can place sensitive values in browser state.
+- [x] A custom reporter retains only project/title/status/duration/retry metadata in quarantine; a tested blocking allowlist, size, symlink, schema, and secret-marker gate promotes only accepted reports into CI's uploadable directory.
+- [x] Hosted retention targets only one value-free JSON summary per project for seven days; raw reports, DOM snapshots, request bodies, storage state, console output, and attachments are not uploaded.
+- [x] ADR 0082, browser guidance, security/risk records, roadmap, version metadata, and release evidence agree without claiming physical-device, assistive-technology, or hosted-run certification.
+
+Evidence: `docs/releases/0.8.6.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

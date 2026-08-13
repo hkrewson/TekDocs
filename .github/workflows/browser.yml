@@ -15,26 +15,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chromium"]' || '["chromium", "firefox", "webkit"]') }}
+        project: ${{ fromJSON(github.event_name == 'pull_request' && '["chromium"]' || '["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"]') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: ./scripts/bootstrap-env.sh .env
-      - run: docker compose up -d --build --wait
-      - working-directory: frontend
-        run: npm ci --no-audit --no-fund && npx playwright install --with-deps ${{ matrix.browser }}
-      - working-directory: frontend
-        run: npx playwright test --project=${{ matrix.browser }}
+      - run: ./scripts/rehearse-browser-e2e.sh ${{ matrix.project }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
+        if: always()
         with:
-          name: playwright-${{ matrix.browser }}-artifacts
-          path: artifacts/
+          name: playwright-${{ matrix.project }}-summary
+          path: artifacts/playwright-safe/${{ matrix.project }}.json
           retention-days: 7
+          if-no-files-found: warn
 
   public-beta-performance:
     if: github.event_name != 'pull_request'

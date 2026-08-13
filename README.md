@@ -1,6 +1,6 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.5` adds full public-beta reference-capacity evidence and constrained-device editor measurements while preserving exact-workspace authorization. TekDocs does not store or retrieve customer credential values.
+TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.6` adds desktop Chromium, Firefox, and WebKit regression plus Chromium/WebKit mobile reflow coverage and value-free browser artifacts. TekDocs does not store or retrieve customer credential values.
 
 ## Start locally
 
@@ -81,7 +81,7 @@ The running Docker stack is authoritative for runtime claims. Authentication ope
 ## Current boundaries
 
 - Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
-- The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The `0.8.5` regression gate reaches the planned 100-client/100,000-Entity/250,000-revision/25,000-asset reference shape, but it is not a maximum-capacity or sustained-throughput promise. Public GitHub Wiki publication remains a later milestone.
+- The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The `0.8.5` regression gate reaches the planned 100-client/100,000-Entity/250,000-revision/25,000-asset reference shape, while `0.8.6` repeats critical browser behavior across the release engine/device matrix without retaining raw traces or screenshots. Neither is a maximum-capacity, physical-device, or external certification claim. Public GitHub Wiki publication remains a later milestone.
 - Organizations, People, Sites, Locations, versioned custom fields, typed Entity relationships, supplier catalogs, and MSP/client operational inventory are active entity-backed foundations. Every Entity has a non-null immutable MSP/organization Workspace owner; `Tenant` remains the supported one-MSP installation boundary and future hosted seam.
 - TekDocs does not store customer credential values. Provider-neutral external credential references arrived in `0.3.1`; production runtime secret-file injection is implemented in `0.3.2`, with mandatory removal of environment fallback remaining assigned to `0.8.7`.
 

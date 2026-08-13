@@ -2,7 +2,20 @@
 
 TekDocs treats performance as an authorization-preserving release property. A faster query is not acceptable when it broadens tenant, organization, audience, or field visibility.
 
-## Current reference fixture
+## Public-beta reference fixture
+
+`backend/apps/core/tests/test_public_beta_capacity.py` expands the fixed PostgreSQL shape to:
+
+- 100 client Workspaces;
+- at least 100,000 addressable Entities;
+- 250,000 immutable revisions in one intentionally deep history; and
+- 25,000 assets in one intentionally large operational Workspace.
+
+It measures warmed first/middle/final asset pages, the last revision-history page, broad exact-Workspace Entity search, whole-request query ceilings, and an eight-request authorized burst. Ordinary reads retain the 500 ms local p95 tripwire; the burst has a separate two-second ceiling. This composition is deliberately available through `make test-public-beta-performance` rather than making every fast edit loop rebuild hundreds of thousands of rows.
+
+The frontend side of that gate uses the production build with deterministic Chromium CPU/network throttling for constrained desktop and mobile viewports. It proves the optional editor is not loaded before a document opens and applies ready-time plus decoded-JavaScript ceilings. Emulation makes regression runs comparable; it is not a physical-device certification.
+
+## Earlier stabilization fixture
 
 `backend/apps/core/tests/test_stabilization_performance.py` creates a fixed-shape PostgreSQL fixture with:
 
@@ -51,6 +64,7 @@ Run the performance fixture alone when profiling:
 ```sh
 docker compose run --rm migrate pytest apps/core/tests/test_stabilization_performance.py -q -s
 docker compose run --rm migrate pytest apps/core/tests/test_inventory_stabilization.py -q -s
+make test-public-beta-performance
 ```
 
 ## Interpretation and growth
@@ -58,5 +72,5 @@ docker compose run --rm migrate pytest apps/core/tests/test_inventory_stabilizat
 - The 500 ms threshold applies to ordinary indexed reads on the documented reference environment, not imports, reports, or external integrations.
 - Query-count budgets are ceilings. A change that exceeds one must be optimized or explicitly reviewed with updated evidence; increasing the number to make a failure pass is not a fix.
 - Cold image startup and fixture construction are excluded from request timing.
-- The fixture exercises the entity/RBAC foundation plus documentation history at the `0.3.0` certification boundary. Asset records join as their models ship, and the dataset still must grow toward the 1.0 target of 100 clients, 100,000 entities, 250,000 block revisions, and 25,000 assets.
-- Before 1.0, measurements require a quieter documented reference host, search-index coverage, concurrency/load testing, and retained trend artifacts. This baseline is an early regression tripwire, not a production sizing guide.
+- The public-beta fixture reaches the planned 1.0 reference record counts. It does not establish the maximum supported dataset, sustained concurrency, a hosted-service SLA, or an operator-specific production sizing guide.
+- Final release-candidate measurements still require a quiet documented reference host, retained trend artifacts, and remediation of any browser, database, or external-review regression.

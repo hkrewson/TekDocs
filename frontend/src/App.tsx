@@ -40,16 +40,12 @@ import { browserAccessControlClient } from './access-control/api'
 import type { AccessControlClient } from './access-control/api'
 import { browserAuthClient } from './auth/api'
 import type { AuthClient, AuthenticatedContext } from './auth/api'
-import { SecuritySettings } from './auth/SecuritySettings'
-import { Products } from './catalog/Products'
 import { browserCatalogClient } from './catalog/api'
 import type { CatalogClient } from './catalog/api'
 import { browserComplianceClient } from './compliance/api'
 import type { ComplianceClient } from './compliance/api'
-import { CustomFields } from './custom-fields/CustomFields'
 import { browserCustomFieldsClient } from './custom-fields/api'
 import type { CustomFieldsClient } from './custom-fields/api'
-import { CredentialReferences } from './credential-references/CredentialReferences'
 import { browserCredentialReferencesClient } from './credential-references/api'
 import type { CredentialReferencesClient } from './credential-references/api'
 import { browserDocumentsClient } from './documentation/api'
@@ -62,21 +58,15 @@ import type { InventoryClient } from './inventory/api'
 import { browserWebhooksClient } from './integrations/api'
 import type { WebhooksClient } from './integrations/api'
 import type { NetworksClient } from './networks/api'
-import { Organizations } from './organizations/Organizations'
-import { NotificationInbox } from './notifications/NotificationInbox'
-import { NotificationDeliveryAdmin } from './notifications/NotificationDeliveryAdmin'
 import { browserNotificationDeliveryAdminClient, browserNotificationsClient } from './notifications/api'
 import type { NotificationsClient, NotificationTarget } from './notifications/api'
-import { People } from './people/People'
-import { ClientPortal } from './portal/ClientPortal'
+import { NotificationInbox } from './notifications/NotificationInbox'
 import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
 import { browserRelationshipsClient } from './relationships/api'
 import type { RelationshipsClient } from './relationships/api'
-import { RecycleBin } from './recycle-bin/RecycleBin'
 import { browserRecycleBinClient } from './recycle-bin/api'
 import type { RecycleBinClient } from './recycle-bin/api'
-import { Sites } from './sites/Sites'
 import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
@@ -88,7 +78,17 @@ import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
 const AccessControl = lazy(async () => ({ default: (await import('./access-control/AccessControl')).AccessControl }))
+const ClientPortal = lazy(async () => ({ default: (await import('./portal/ClientPortal')).ClientPortal }))
+const CredentialReferences = lazy(async () => ({ default: (await import('./credential-references/CredentialReferences')).CredentialReferences }))
+const CustomFields = lazy(async () => ({ default: (await import('./custom-fields/CustomFields')).CustomFields }))
 const Documentation = lazy(async () => ({ default: (await import('./documentation/Documentation')).Documentation }))
+const NotificationDeliveryAdmin = lazy(async () => ({ default: (await import('./notifications/NotificationDeliveryAdmin')).NotificationDeliveryAdmin }))
+const Organizations = lazy(async () => ({ default: (await import('./organizations/Organizations')).Organizations }))
+const People = lazy(async () => ({ default: (await import('./people/People')).People }))
+const Products = lazy(async () => ({ default: (await import('./catalog/Products')).Products }))
+const RecycleBin = lazy(async () => ({ default: (await import('./recycle-bin/RecycleBin')).RecycleBin }))
+const SecuritySettings = lazy(async () => ({ default: (await import('./auth/SecuritySettings')).SecuritySettings }))
+const Sites = lazy(async () => ({ default: (await import('./sites/Sites')).Sites }))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
@@ -325,9 +325,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.4" />
+      <PageHeader title="Overview" description="TekDocs 0.8.5" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.4</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.8.5</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -521,7 +521,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
-          <Routes>
+          <Suspense fallback={<section className="content-section" role="status"><h1>Loading workspace</h1><p>Please wait…</p></section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
             <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} /></Suspense>} />
@@ -548,7 +548,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
-          </Routes>
+          </Routes></Suspense>
         </main>
       </div>
     </div>
@@ -579,12 +579,12 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   const application = (
     <AuthGate client={authClient} initialContext={initialAuthContext}>
       {({ context, signOut, signingOut, signOutError }) => (
-        context.surface === 'client_portal' ? <ClientPortal
+        context.surface === 'client_portal' ? <Suspense fallback={<section className="content-section" role="status">Loading client portal…</section>}><ClientPortal
           context={context}
           onSignOut={signOut}
           signingOut={signingOut}
           signOutError={signOutError}
-        /> : <ApplicationShell
+        /></Suspense> : <ApplicationShell
           authContext={context}
           authClient={authClient}
           accessControlClient={accessControlClient}

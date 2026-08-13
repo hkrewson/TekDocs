@@ -34,6 +34,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
       root: editorRoot.current,
       defaultValue: editorSeed,
       features: {
+        [CrepeFeature.CodeMirror]: false,
         [CrepeFeature.ImageBlock]: false,
         [CrepeFeature.Latex]: false,
         [CrepeFeature.TopBar]: false,

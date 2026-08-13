@@ -86,7 +86,7 @@ describe('application shell', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
     render(<App initialPath="/overview" initialAuthContext={portalContext} authClient={authClient} />)
 
-    expect(screen.getByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
     expect(screen.getByText('Only approved, current client-visible STATIC publications appear here.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
@@ -122,14 +122,14 @@ describe('application shell', () => {
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.queryByRole('menuitem', { name: 'Integrations' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 
   it('collapses the desktop navigation without removing accessible links', async () => {
     const user = userEvent.setup()
     render(app('/organizations'))
 
-    expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()

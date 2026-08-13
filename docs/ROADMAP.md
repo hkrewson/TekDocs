@@ -1266,7 +1266,7 @@ Evidence: `docs/releases/0.8.0.md`.
 | `0.8.2` | **Complete:** Upgrade rehearsal from every supported minor release and rollback/recovery runbooks. |
 | `0.8.3` | **Complete:** WCAG 2.2 AA audit and remediation across critical workflows. |
 | `0.8.4` | **Complete:** Localization readiness, timezone/locale correctness, and translatable UI contract. |
-| `0.8.5` | Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
+| `0.8.5` | **Complete:** Reference-dataset load, editor bundle/device performance (`TD-RISK-013`), profiling, and p95 remediation. |
 | `0.8.6` | Chromium/Firefox/WebKit regression, responsive/device coverage, and browser artifact hygiene. |
 | `0.8.7` | DAST, secret-file enforcement (`TD-RISK-004`), production runtime/migration hardening (`TD-RISK-007`), pinned supply-chain inputs (`TD-RISK-009`), structured-log review (`TD-RISK-015`), dependency/license review, and abuse-suite remediation. |
 | `0.8.8` | Operator, security, backup, upgrade, API, and end-user documentation completion; publish the end-user/operator corpus to the public repository's actual GitHub Wiki, add drift/link checks, and connect stable page-level contextual help to the relevant Wiki topics. |
@@ -1320,6 +1320,18 @@ Evidence: `docs/releases/0.8.3.md`.
 - [x] ADR 0080, contributor guidance, roadmap/risk records, version metadata, and release evidence agree.
 
 Evidence: `docs/releases/0.8.4.md`.
+
+### `0.8.5` acceptance criteria
+
+- [x] A dedicated PostgreSQL gate constructs 100 client Workspaces, at least 100,000 Entities, 250,000 immutable block revisions, and 25,000 assets through schema-valid ownership relationships.
+- [x] First, middle, and last asset pages, deep revision history, and broad exact-Workspace Entity search remain below the established 500 ms warmed local p95 tripwire with fixed whole-request query ceilings.
+- [x] Eight simultaneous authorized asset-page reads complete inside a separate two-second burst ceiling without cross-Workspace caching or MSP aggregation.
+- [x] Additional feature surfaces are route-lazy and the executable base-shell ceiling tightens from 500 KiB to 400 KiB; editor and stylesheet ceilings remain blocking.
+- [x] WYSIWYG CodeMirror execution is removed without changing canonical fenced Markdown, raw mode, secure preview, or the supported dialect.
+- [x] A production-build Chromium rehearsal records constrained desktop/mobile CPU/network metrics, proves the editor is absent before a document opens, and blocks decoded-JavaScript and ready-time regressions.
+- [x] ADR 0081, performance guidance, architecture/threat/risk records, version metadata, roadmap, and release evidence agree without claiming a capacity SLA or physical-device certification.
+
+Evidence: `docs/releases/0.8.5.md`.
 
 ## Release candidates: `0.9.x` → `1.0.0`
 

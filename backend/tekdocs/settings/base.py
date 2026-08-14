@@ -34,12 +34,21 @@ def env_int(name: str, default: int) -> int:
 SECRET_KEY = read_secret("DJANGO_SECRET_KEY", default="development-only-not-for-production")
 TEKDOCS_MASTER_KEY = read_secret("TEKDOCS_MASTER_KEY")
 TEKDOCS_PUBLICATION_SIGNING_KEY = read_secret("TEKDOCS_PUBLICATION_SIGNING_KEY")
+TEKDOCS_PUBLICATION_RETIRED_KEY_FINGERPRINTS = tuple(
+    env_list("TEKDOCS_PUBLICATION_RETIRED_KEY_FINGERPRINTS")
+)
 TEKDOCS_BOOTSTRAP_TOKEN = read_secret("TEKDOCS_BOOTSTRAP_TOKEN")
 TEKDOCS_DATABASE_ROLE = os.getenv("TEKDOCS_DATABASE_ROLE", "runtime")
 TEKDOCS_DATABASE_RUNTIME_ROLE = os.getenv("TEKDOCS_DATABASE_RUNTIME_ROLE", "tekdocs_runtime")
 TEKDOCS_DATABASE_RUNTIME_PASSWORD = read_secret("TEKDOCS_DATABASE_RUNTIME_PASSWORD")
 TEKDOCS_PUBLIC_URL = os.getenv("TEKDOCS_PUBLIC_URL", "http://localhost:3200").rstrip("/")
 TEKDOCS_ALLOW_INSECURE_PUBLIC_URL = env_bool("TEKDOCS_ALLOW_INSECURE_PUBLIC_URL", False)
+TEKDOCS_ATTACHMENT_SCANNER = os.getenv(
+    "TEKDOCS_ATTACHMENT_SCANNER", "apps.core.attachment_security.StrictAttachmentScanner"
+)
+TEKDOCS_CLAMAV_HOST = os.getenv("TEKDOCS_CLAMAV_HOST", "")
+TEKDOCS_CLAMAV_PORT = env_int("TEKDOCS_CLAMAV_PORT", 3310)
+TEKDOCS_CLAMAV_TIMEOUT = env_int("TEKDOCS_CLAMAV_TIMEOUT", 10)
 INVITATION_TTL_HOURS = env_int("INVITATION_TTL_HOURS", 168)
 if not 1 <= INVITATION_TTL_HOURS <= 2160:
     raise ImproperlyConfigured("INVITATION_TTL_HOURS must be between 1 and 2160")
@@ -207,7 +216,11 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    "DEFAULT_THROTTLE_RATES": {"staff_invitations": "30/h"},
+    "DEFAULT_THROTTLE_RATES": {
+        "staff_invitations": "30/h",
+        "inbound_webhook_sources": "600/m",
+        "inbound_webhooks": "120/m",
+    },
 }
 
 SPECTACULAR_SETTINGS = {

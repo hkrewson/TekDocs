@@ -1,9 +1,12 @@
+import base64
 import secrets
 import uuid
 from hashlib import sha256
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -39,7 +42,7 @@ from apps.core.models import (
     Organization,
     OrganizationClassification,
 )
-from apps.core.publications import canonical_json, publish_document, verify_publication
+from apps.core.publications import canonical_json, publish_document, snapshot_payload, verify_publication
 from apps.core.workspaces import resolve_msp_workspace
 
 
@@ -207,6 +210,7 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "digest_valid": True,
             "signature_valid": True,
             "key_fingerprint_valid": True,
+            "trusted_key": True,
         }
         assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v2"
         assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
@@ -246,7 +250,29 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "digest_valid": False,
             "signature_valid": False,
             "key_fingerprint_valid": True,
+            "trusted_key": True,
         }
+        publication.refresh_from_db()
+        attacker_key = Ed25519PrivateKey.generate()
+        attacker_public = attacker_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        digest = sha256(
+            snapshot_payload(
+                manifest=publication.manifest,
+                markdown=publication.canonical_markdown,
+                sanitized_html=publication.sanitized_html,
+            )
+        ).digest()
+        publication.public_key = base64.urlsafe_b64encode(attacker_public).decode("ascii")
+        publication.key_fingerprint = sha256(attacker_public).hexdigest()
+        publication.signature = base64.urlsafe_b64encode(attacker_key.sign(digest)).decode("ascii")
+        forged = verify_publication(publication)
+        assert forged["signature_valid"] is True
+        assert forged["key_fingerprint_valid"] is True
+        assert forged["trusted_key"] is False
+        assert forged["valid"] is False
         publication.refresh_from_db()
 
         publication_detail = reverse(

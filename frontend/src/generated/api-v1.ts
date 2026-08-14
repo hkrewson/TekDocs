@@ -9164,6 +9164,7 @@ export interface components {
             readonly digest_valid: boolean;
             readonly signature_valid: boolean;
             readonly key_fingerprint_valid: boolean;
+            readonly trusted_key: boolean;
         };
         readonly Record: {
             /** Format: uuid */
@@ -11925,7 +11926,27 @@ export interface operations {
     readonly document_mentions_msp_search: {
         readonly parameters: {
             readonly query?: {
-                readonly entity_type?: string;
+                /**
+                 * @description * `organization` - organization
+                 *     * `person` - person
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `client_asset` - client_asset
+                 *     * `network_rack` - network_rack
+                 *     * `network_device` - network_device
+                 *     * `network_vrf` - network_vrf
+                 *     * `network_vlan` - network_vlan
+                 *     * `network_subnet` - network_subnet
+                 *     * `network_interface` - network_interface
+                 *     * `network_ip_address` - network_ip_address
+                 *     * `network_mac_address` - network_mac_address
+                 *     * `wireless_network` - wireless_network
+                 *     * `dns_zone` - dns_zone
+                 *     * `dns_record` - dns_record
+                 *     * `network_circuit` - network_circuit
+                 *     * `network_circuit_handoff` - network_circuit_handoff
+                 */
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -20662,7 +20683,27 @@ export interface operations {
     readonly document_mentions_organization_search: {
         readonly parameters: {
             readonly query?: {
-                readonly entity_type?: string;
+                /**
+                 * @description * `organization` - organization
+                 *     * `person` - person
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `client_asset` - client_asset
+                 *     * `network_rack` - network_rack
+                 *     * `network_device` - network_device
+                 *     * `network_vrf` - network_vrf
+                 *     * `network_vlan` - network_vlan
+                 *     * `network_subnet` - network_subnet
+                 *     * `network_interface` - network_interface
+                 *     * `network_ip_address` - network_ip_address
+                 *     * `network_mac_address` - network_mac_address
+                 *     * `wireless_network` - wireless_network
+                 *     * `dns_zone` - dns_zone
+                 *     * `dns_record` - dns_record
+                 *     * `network_circuit` - network_circuit
+                 *     * `network_circuit_handoff` - network_circuit_handoff
+                 */
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

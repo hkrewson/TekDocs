@@ -5,6 +5,7 @@ import os
 import pytest
 from cryptography.exceptions import InvalidTag
 
+import tekdocs.recovery_archive as recovery_archive
 from tekdocs.recovery_archive import RecoveryArchiveError, decrypt_file, encrypt_stream, load_key, manifest_mac
 
 
@@ -55,3 +56,19 @@ def test_key_contract_rejects_links_without_masking_the_reason(tmp_path):
 
     with pytest.raises(RecoveryArchiveError, match="regular file, not a link"):
         load_key(link)
+
+
+def test_archive_encryption_and_decryption_enforce_plaintext_security_bound(tmp_path, monkeypatch):
+    key = os.urandom(32)
+    monkeypatch.setattr(recovery_archive, "MAX_PLAINTEXT_BYTES", 8)
+    with pytest.raises(RecoveryArchiveError, match="16 GiB"):
+        encrypt_stream(io.BytesIO(b"123456789"), io.BytesIO(), key=key, label="database")
+
+    encrypted = io.BytesIO()
+    monkeypatch.setattr(recovery_archive, "MAX_PLAINTEXT_BYTES", 64)
+    encrypt_stream(io.BytesIO(b"123456789"), encrypted, key=key, label="database")
+    artifact = tmp_path / "oversized.tdr"
+    artifact.write_bytes(encrypted.getvalue())
+    monkeypatch.setattr(recovery_archive, "MAX_PLAINTEXT_BYTES", 8)
+    with pytest.raises(RecoveryArchiveError, match="16 GiB"):
+        decrypt_file(artifact, tmp_path / "restored.dump", key=key, label="database")

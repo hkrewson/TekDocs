@@ -354,6 +354,7 @@ class PublicationVerificationSerializer(serializers.Serializer):
     digest_valid = serializers.BooleanField()
     signature_valid = serializers.BooleanField()
     key_fingerprint_valid = serializers.BooleanField()
+    trusted_key = serializers.BooleanField()
 
 
 class DocumentPublicationWriteSerializer(serializers.Serializer):

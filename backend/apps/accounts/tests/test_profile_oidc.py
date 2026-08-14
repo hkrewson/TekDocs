@@ -3,8 +3,16 @@ import secrets
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from allauth.account.internal.stagekit import LOGIN_SESSION_KEY
+from allauth.core.context import request_context
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from allauth.socialaccount.adapter import get_adapter as get_socialaccount_adapter
+from allauth.socialaccount.internal.flows.login import _login as complete_existing_social_login
+from allauth.socialaccount.models import SocialAccount, SocialLogin
 from allauth.socialaccount.providers.openid_connect.views import OpenIDConnectOAuth2Adapter
-from django.test import Client, override_settings
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -153,3 +161,27 @@ def test_oidc_redirect_uses_allauth_state_boundary(client, monkeypatch):
     assert set(query["scope"][0].split()) == {"openid", "profile", "email"}
     assert query["state"][0]
     assert OIDC_PROVIDER["client_secret"] not in response["Location"]
+
+
+@pytest.mark.django_db
+@override_settings(TEKDOCS_OIDC_PROVIDER=OIDC_PROVIDER, SOCIALACCOUNT_PROVIDERS=OIDC_ALLAUTH_SETTINGS)
+def test_existing_oidc_identity_with_enrolled_totp_stops_at_mfa(owner):
+    TOTP.activate(owner.owner, generate_totp_secret())
+    request = RequestFactory().get("/", HTTP_HOST="testserver")
+    SessionMiddleware(lambda _request: None).process_request(request)
+    request.session.save()
+    request.user = AnonymousUser()
+    with request_context(request):
+        provider = get_socialaccount_adapter(request).get_provider(request, OIDC_PROVIDER["id"])
+        sociallogin = SocialLogin(
+            user=owner.owner,
+            account=SocialAccount(provider=OIDC_PROVIDER["id"], uid="trusted-issuer-subject"),
+            provider=provider,
+        )
+        sociallogin._did_authenticate_by_email = owner.owner.email
+        complete_existing_social_login(request, sociallogin)
+
+    pending_login = request.session[LOGIN_SESSION_KEY]
+    assert pending_login["state"]["stages"]["current"] == "mfa_authenticate"
+    assert request.session.get("_auth_user_id") is None
+    assert SocialAccount.objects.filter(user=owner.owner, provider=OIDC_PROVIDER["id"]).exists()

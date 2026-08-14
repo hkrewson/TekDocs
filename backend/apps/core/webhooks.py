@@ -7,6 +7,7 @@ import json
 import re
 import secrets
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
@@ -46,6 +47,16 @@ DELIVERY_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$")
 SIGNATURE_PATTERN = re.compile(r"^v1=[0-9a-f]{64}$")
 
 WebhookSender = Callable[..., int]
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimedWebhookDelivery:
+    delivery_id: UUID
+    attempt: int
+    locked_at: datetime
+    url: str
+    body: bytes
+    headers: dict[str, str]
 
 
 def _raw_secret() -> str:
@@ -299,9 +310,7 @@ def _response_error(status: int) -> tuple[str, bool]:
     return "remote_rejected", True
 
 
-def _dispatch_delivery(
-    *, tenant: Tenant, delivery_id: UUID, now: datetime, sender: WebhookSender
-) -> bool:
+def _claim_delivery(*, tenant: Tenant, delivery_id: UUID, now: datetime) -> ClaimedWebhookDelivery | None:
     with transaction.atomic():
         delivery = (
             WebhookOutboundDelivery.scoped.for_tenant(tenant)
@@ -314,19 +323,19 @@ def _dispatch_delivery(
             WebhookDeliveryState.DELIVERED,
             WebhookDeliveryState.DEAD_LETTER,
         }:
-            return False
+            return None
         if delivery.state == WebhookDeliveryState.PROCESSING and (
             delivery.locked_at is None or delivery.locked_at > now - PROCESSING_LEASE
         ):
-            return False
+            return None
         if delivery.state == WebhookDeliveryState.PENDING and delivery.available_at > now:
-            return False
+            return None
         if not delivery.endpoint.active:
             delivery.state = WebhookDeliveryState.DEAD_LETTER
             delivery.last_error_code = "endpoint_inactive"
             delivery.locked_at = None
             delivery.save(update_fields=("state", "last_error_code", "locked_at"))
-            return False
+            return None
         delivery.state = WebhookDeliveryState.PROCESSING
         delivery.locked_at = now
         delivery.last_attempt_at = now
@@ -362,16 +371,38 @@ def _dispatch_delivery(
             ),
             "User-Agent": "TekDocs-Webhooks/0.6.3",
         }
+        return ClaimedWebhookDelivery(
+            delivery_id=delivery.id,
+            attempt=delivery.attempts,
+            locked_at=now,
+            url=delivery.endpoint.url,
+            body=body,
+            headers=headers,
+        )
+
+
+def _record_delivery_outcome(
+    *, tenant: Tenant, claim: ClaimedWebhookDelivery, now: datetime, status: int | None, error_code: str
+) -> bool:
+    with transaction.atomic():
+        delivery = (
+            WebhookOutboundDelivery.scoped.for_tenant(tenant)
+            .select_for_update()
+            .filter(
+                pk=claim.delivery_id,
+                state=WebhookDeliveryState.PROCESSING,
+                attempts=claim.attempt,
+                locked_at=claim.locked_at,
+            )
+            .first()
+        )
+        if delivery is None:
+            return False
+        delivery.response_status = status
+        delivery.last_error_code = error_code
         permanent = False
-        try:
-            status = sender(url=delivery.endpoint.url, body=body, headers=headers)
-            delivery.response_status = status
-            if not 200 <= status < 300:
-                delivery.last_error_code, permanent = _response_error(status)
-        except WebhookEgressError as exc:
-            delivery.last_error_code = str(exc)
-        except Exception:
-            delivery.last_error_code = "delivery_failed"
+        if status is not None and not 200 <= status < 300:
+            delivery.last_error_code, permanent = _response_error(status)
         if not delivery.last_error_code:
             delivery.state = WebhookDeliveryState.DELIVERED
             delivery.delivered_at = now
@@ -394,6 +425,29 @@ def _dispatch_delivery(
             )
         )
         return False
+
+
+def _dispatch_delivery(
+    *, tenant: Tenant, delivery_id: UUID, now: datetime, sender: WebhookSender
+) -> bool:
+    claim = _claim_delivery(tenant=tenant, delivery_id=delivery_id, now=now)
+    if claim is None:
+        return False
+    status: int | None = None
+    error_code = ""
+    try:
+        status = sender(url=claim.url, body=claim.body, headers=claim.headers)
+    except WebhookEgressError as exc:
+        error_code = str(exc)
+    except Exception:
+        error_code = "delivery_failed"
+    return _record_delivery_outcome(
+        tenant=tenant,
+        claim=claim,
+        now=now,
+        status=status,
+        error_code=error_code,
+    )
 
 
 def dispatch_due_webhooks(
@@ -433,7 +487,7 @@ def accept_inbound_webhook(
         .first()
     )
     if endpoint is None:
-        raise NotFound("The webhook endpoint is unavailable.")
+        raise PermissionDenied("The webhook signature is invalid or expired.")
     secret = decrypt_webhook_secret(
         envelope_payload=endpoint.secret_envelope,
         tenant_id=endpoint.tenant_id,

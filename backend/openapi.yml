@@ -2586,9 +2586,48 @@ paths:
       - in: query
         name: entity_type
         schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - client_asset
+          - network_rack
+          - network_device
+          - network_vrf
+          - network_vlan
+          - network_subnet
+          - network_interface
+          - network_ip_address
+          - network_mac_address
+          - wireless_network
+          - dns_zone
+          - dns_record
+          - network_circuit
+          - network_circuit_handoff
+          - ''
           type: string
+          x-spec-enum-id: 5564163d3f234e72
           default: ''
-          maxLength: 80
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+          * `client_asset` - client_asset
+          * `network_rack` - network_rack
+          * `network_device` - network_device
+          * `network_vrf` - network_vrf
+          * `network_vlan` - network_vlan
+          * `network_subnet` - network_subnet
+          * `network_interface` - network_interface
+          * `network_ip_address` - network_ip_address
+          * `network_mac_address` - network_mac_address
+          * `wireless_network` - wireless_network
+          * `dns_zone` - dns_zone
+          * `dns_record` - dns_record
+          * `network_circuit` - network_circuit
+          * `network_circuit_handoff` - network_circuit_handoff
       - in: query
         name: page
         schema:
@@ -14122,9 +14161,48 @@ paths:
       - in: query
         name: entity_type
         schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - client_asset
+          - network_rack
+          - network_device
+          - network_vrf
+          - network_vlan
+          - network_subnet
+          - network_interface
+          - network_ip_address
+          - network_mac_address
+          - wireless_network
+          - dns_zone
+          - dns_record
+          - network_circuit
+          - network_circuit_handoff
+          - ''
           type: string
+          x-spec-enum-id: 5564163d3f234e72
           default: ''
-          maxLength: 80
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+          * `client_asset` - client_asset
+          * `network_rack` - network_rack
+          * `network_device` - network_device
+          * `network_vrf` - network_vrf
+          * `network_vlan` - network_vlan
+          * `network_subnet` - network_subnet
+          * `network_interface` - network_interface
+          * `network_ip_address` - network_ip_address
+          * `network_mac_address` - network_mac_address
+          * `wireless_network` - wireless_network
+          * `dns_zone` - dns_zone
+          * `dns_record` - dns_record
+          * `network_circuit` - network_circuit
+          * `network_circuit_handoff` - network_circuit_handoff
       - in: path
         name: organization_entity_id
         schema:
@@ -28207,10 +28285,13 @@ components:
           type: boolean
         key_fingerprint_valid:
           type: boolean
+        trusted_key:
+          type: boolean
       required:
       - digest_valid
       - key_fingerprint_valid
       - signature_valid
+      - trusted_key
       - valid
     Record:
       type: object

@@ -8,11 +8,20 @@ from .validation import (
     validate_production_email,
     validate_production_public_url,
     validate_production_security,
+    validate_publication_key_fingerprints,
     validate_publication_signing_key,
     validate_time_zone,
 )
 
 DEBUG = False
+
+_image_variant = os.getenv("TEKDOCS_IMAGE_VARIANT", "unknown")
+_allow_development_image = env_bool("TEKDOCS_ALLOW_DEVELOPMENT_IMAGE", False)  # noqa: F405
+if _image_variant != "production" and not _allow_development_image:
+    raise ImproperlyConfigured(
+        "Production settings require the production image; local development must explicitly set "
+        "TEKDOCS_ALLOW_DEVELOPMENT_IMAGE=true"
+    )
 
 if env_bool("TEKDOCS_REQUIRE_SECRET_FILES", False):  # noqa: F405
     _file_only_names = [
@@ -54,6 +63,7 @@ _invalid = [
 if _invalid:
     raise ImproperlyConfigured(f"Missing or weak production secrets: {', '.join(_invalid)}")
 validate_publication_signing_key(TEKDOCS_PUBLICATION_SIGNING_KEY)  # noqa: F405
+validate_publication_key_fingerprints(TEKDOCS_PUBLICATION_RETIRED_KEY_FINGERPRINTS)  # noqa: F405
 validate_time_zone(TIME_ZONE)  # noqa: F405
 if TEKDOCS_DATABASE_ROLE not in {"migration", "runtime"}:  # noqa: F405
     raise ImproperlyConfigured("TEKDOCS_DATABASE_ROLE must be migration or runtime")
@@ -65,6 +75,10 @@ if TEKDOCS_DATABASE_ROLE == "migration" and len(TEKDOCS_DATABASE_RUNTIME_PASSWOR
     raise ImproperlyConfigured("Migration startup requires the generated runtime database password")
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must contain explicit production hosts")
+if _image_variant == "production" and TEKDOCS_ATTACHMENT_SCANNER != "apps.core.attachment_security.ClamAVAttachmentScanner":  # noqa: F405,E501
+    raise ImproperlyConfigured("Production deployments require the ClamAV attachment scanner provider")
+if _image_variant == "production" and not TEKDOCS_CLAMAV_HOST:  # noqa: F405
+    raise ImproperlyConfigured("Production deployments require TEKDOCS_CLAMAV_HOST")
 
 validate_production_email(
     backend=EMAIL_BACKEND,  # noqa: F405

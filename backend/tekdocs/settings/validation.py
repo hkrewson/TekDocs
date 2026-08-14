@@ -40,6 +40,13 @@ def validate_publication_signing_key(value: str) -> None:
         raise ImproperlyConfigured("TEKDOCS_PUBLICATION_SIGNING_KEY must encode exactly 32 bytes")
 
 
+def validate_publication_key_fingerprints(values: tuple[str, ...]) -> None:
+    if len(values) != len(set(values)) or any(re.fullmatch(r"[0-9a-f]{64}", value) is None for value in values):
+        raise ImproperlyConfigured(
+            "TEKDOCS_PUBLICATION_RETIRED_KEY_FINGERPRINTS must contain unique lowercase SHA-256 fingerprints"
+        )
+
+
 def oidc_provider_from_environment(environment: Mapping[str, str]) -> dict[str, str] | None:
     values = {key: environment.get(key, "") for key in OIDC_ENVIRONMENT_KEYS}
     configured = [key for key, value in values.items() if value]

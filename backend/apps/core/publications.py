@@ -598,6 +598,12 @@ def withdraw_publication(
     return locked
 
 
+def publication_trusted_key_fingerprints() -> tuple[str, frozenset[str]]:
+    _public_key, current_fingerprint = _encoded_public_key(publication_signing_key())
+    retired = frozenset(getattr(settings, "TEKDOCS_PUBLICATION_RETIRED_KEY_FINGERPRINTS", ()))
+    return current_fingerprint, retired | {current_fingerprint}
+
+
 def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
     payload = snapshot_payload(
         manifest=publication.manifest,
@@ -608,6 +614,7 @@ def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
     digest_valid = calculated.hex() == publication.content_digest
     signature_valid = False
     key_fingerprint_valid = False
+    current_key_fingerprint, trusted_fingerprints = publication_trusted_key_fingerprints()
     try:
         raw_public_key = base64.b64decode(publication.public_key.encode("ascii"), altchars=b"-_", validate=True)
         signature = base64.b64decode(publication.signature.encode("ascii"), altchars=b"-_", validate=True)
@@ -620,6 +627,7 @@ def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
         digest_valid
         and signature_valid
         and key_fingerprint_valid
+        and publication.key_fingerprint in trusted_fingerprints
         and publication.signature_algorithm == SIGNATURE_ALGORITHM
     )
     return {
@@ -627,6 +635,7 @@ def verify_publication(publication: DocumentPublication) -> dict[str, bool]:
         "digest_valid": digest_valid,
         "signature_valid": signature_valid,
         "key_fingerprint_valid": key_fingerprint_valid,
+        "trusted_key": publication.key_fingerprint in trusted_fingerprints,
     }
 
 

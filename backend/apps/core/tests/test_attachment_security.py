@@ -15,6 +15,7 @@ from django.urls import reverse
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.attachment_security import (
     AttachmentSecurityError,
+    ClamAVAttachmentScanner,
     DjangoAttachmentStorageProvider,
     StrictAttachmentScanner,
 )
@@ -90,6 +91,55 @@ def test_strict_scanner_rejects_active_polyglot_and_unsafe_archive_content():
     for filename, media_type, content in rejected:
         with pytest.raises(AttachmentSecurityError):
             scanner.scan(filename=filename, media_type=media_type, content=content)
+
+
+class FakeClamAVConnection:
+    def __init__(self, response: bytes):
+        self.response = response
+        self.sent = bytearray()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+    def settimeout(self, _timeout):
+        return None
+
+    def sendall(self, content: bytes):
+        self.sent.extend(content)
+
+    def recv(self, _size: int) -> bytes:
+        return self.response
+
+
+@override_settings(TEKDOCS_CLAMAV_HOST="clamav.internal", TEKDOCS_CLAMAV_PORT=3310, TEKDOCS_CLAMAV_TIMEOUT=4)
+def test_clamav_provider_streams_content_and_fails_closed(monkeypatch):
+    clean = FakeClamAVConnection(b"stream: OK\0")
+    monkeypatch.setattr("apps.core.attachment_security.socket.create_connection", lambda *_args, **_kwargs: clean)
+    result = ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"safe")
+    assert result.engine == "clamav/instream"
+    assert clean.sent.startswith(b"zINSTREAM\0")
+
+    with pytest.raises(AttachmentSecurityError):
+        ClamAVAttachmentScanner().scan(
+            filename="active.pdf", media_type="application/pdf", content=b"%PDF-1.7\n/JavaScript\n%%EOF"
+        )
+
+    infected = FakeClamAVConnection(b"stream: Eicar-Test-Signature FOUND\0")
+    monkeypatch.setattr(
+        "apps.core.attachment_security.socket.create_connection", lambda *_args, **_kwargs: infected
+    )
+    with pytest.raises(AttachmentSecurityError, match="antivirus"):
+        ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"unsafe")
+
+    monkeypatch.setattr(
+        "apps.core.attachment_security.socket.create_connection",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("offline")),
+    )
+    with pytest.raises(AttachmentSecurityError, match="unavailable"):
+        ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"safe")
 
 
 def test_storage_provider_quarantines_promotes_and_verifies_bytes(tmp_path):

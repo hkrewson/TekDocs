@@ -5,10 +5,13 @@ from uuid import uuid4
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
 from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework.settings import api_settings
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import (
@@ -184,8 +187,10 @@ def test_outbound_projection_signing_retry_and_metadata_only_inspection(installa
     event = publication_event(installation, record)
     assert project_webhook_deliveries(event) == 1
     captured = {}
+    baseline_savepoints = len(connection.savepoint_ids)
 
     def reject_once(**request):  # type: ignore[no-untyped-def]
+        assert len(connection.savepoint_ids) == baseline_savepoints
         captured.update(request)
         return 503
 
@@ -211,6 +216,63 @@ def test_outbound_projection_signing_retry_and_metadata_only_inspection(installa
     delivery.refresh_from_db()
     assert delivery.state == WebhookDeliveryState.DELIVERED
     assert delivery.attempts == 2
+
+
+@pytest.mark.django_db
+def test_inbound_endpoint_failures_are_uniform_and_requests_are_throttled(installation, monkeypatch):
+    record = organization(installation)
+    inbound = endpoint(
+        installation,
+        record,
+        direction=WebhookDirection.INBOUND,
+        topics=["integration.ping"],
+    )
+    monkeypatch.setitem(api_settings.DEFAULT_THROTTLE_RATES, "inbound_webhooks", "1/m")
+    cache.clear()
+    client = Client(REMOTE_ADDR="192.0.2.40")
+    headers = {
+        "TekDocs-Webhook-Id": "delivery-12345678",
+        "TekDocs-Webhook-Timestamp": str(int(timezone.now().timestamp())),
+        "TekDocs-Webhook-Signature": "v1=" + "0" * 64,
+    }
+
+    known = client.post(
+        reverse("inbound-webhook", kwargs={"endpoint_id": inbound.id}),
+        data=b'{"type":"integration.ping","data":{}}',
+        content_type="application/json",
+        headers=headers,
+    )
+    unknown = client.post(
+        reverse("inbound-webhook", kwargs={"endpoint_id": uuid4()}),
+        data=b'{"type":"integration.ping","data":{}}',
+        content_type="application/json",
+        headers=headers,
+    )
+    throttled = client.post(
+        reverse("inbound-webhook", kwargs={"endpoint_id": inbound.id}),
+        data=b'{"type":"integration.ping","data":{}}',
+        content_type="application/json",
+        headers=headers,
+    )
+
+    assert known.status_code == unknown.status_code == 403
+    assert known.json()["error"]["message"] == unknown.json()["error"]["message"]
+    assert known.json()["error"]["detail"] == unknown.json()["error"]["detail"]
+    assert throttled.status_code == 429
+
+    monkeypatch.setitem(api_settings.DEFAULT_THROTTLE_RATES, "inbound_webhooks", "100/m")
+    monkeypatch.setitem(api_settings.DEFAULT_THROTTLE_RATES, "inbound_webhook_sources", "2/m")
+    cache.clear()
+    rotated = [
+        client.post(
+            reverse("inbound-webhook", kwargs={"endpoint_id": uuid4()}),
+            data=b'{"type":"integration.ping","data":{}}',
+            content_type="application/json",
+            headers=headers,
+        )
+        for _index in range(3)
+    ]
+    assert [response.status_code for response in rotated] == [403, 403, 429]
 
 
 @pytest.mark.parametrize(

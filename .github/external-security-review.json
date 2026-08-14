@@ -56,58 +56,88 @@
     {
       "id": "TD-PUB-TRUST-ANCHOR",
       "severity": "low",
-      "status": "open",
+      "status": "resolved",
       "title": "Publication verification lacks an operator trust anchor",
-      "disposition": "Assigned to 0.9.5 external-review remediation: pin current and retired publication-key fingerprints and reject self-asserted keys.",
-      "evidence": ["Milestone 0.9.5 owner: publication integrity"]
+      "disposition": "Verification now trusts only the current deployment key and explicitly configured retired-key fingerprints; a valid self-signed publication from an unknown key is rejected.",
+      "evidence": [
+        "backend/apps/core/publications.py::publication_trusted_key_fingerprints",
+        "backend/apps/core/tests/test_documents.py::test_static_publication_freezes_dependencies_and_verifies_after_source_changes",
+        "backend/apps/core/tests/test_email_settings.py::test_publication_trust_fingerprints_are_strict_and_unique"
+      ]
     },
     {
       "id": "TD-WEBHOOK-TXN",
       "severity": "low",
-      "status": "open",
+      "status": "resolved",
       "title": "Outbound webhook HTTP occurs inside a database transaction",
-      "disposition": "Assigned to 0.9.1 beta defect triage: commit the delivery lease before network I/O and record the outcome in a second short transaction.",
-      "evidence": ["Milestone 0.9.1 owner: integration runtime"]
+      "disposition": "Delivery claiming and outcome persistence now use separate short transactions; outbound network I/O occurs after the claim transaction commits and stale workers cannot overwrite a newer lease.",
+      "evidence": [
+        "backend/apps/core/webhooks.py::_claim_delivery",
+        "backend/apps/core/webhooks.py::_record_delivery_outcome",
+        "backend/apps/core/tests/test_webhooks.py::test_outbound_projection_signing_retry_and_metadata_only_inspection"
+      ]
     },
     {
       "id": "TD-INBOUND-THROTTLE",
       "severity": "low",
-      "status": "open",
+      "status": "resolved",
       "title": "Inbound webhook endpoint lacks anonymous throttling",
-      "disposition": "Assigned to 0.9.1 beta defect triage: add bounded endpoint/IP throttling and uniform authentication failure responses.",
-      "evidence": ["Milestone 0.9.1 owner: integration runtime"]
+      "disposition": "Inbound webhook requests are bounded by an endpoint-and-IP throttle and unknown endpoints return the same authentication failure shape as invalid signatures.",
+      "evidence": [
+        "backend/apps/accounts/throttles.py::InboundWebhookSourceThrottle",
+        "backend/apps/accounts/throttles.py::InboundWebhookEndpointThrottle",
+        "backend/apps/core/webhook_views.py::InboundWebhookView",
+        "backend/apps/core/tests/test_webhooks.py::test_inbound_endpoint_failures_are_uniform_and_requests_are_throttled"
+      ]
     },
     {
       "id": "TD-SCANNER-CLAIM",
       "severity": "low",
-      "status": "open",
+      "status": "resolved",
       "title": "Attachment quarantine is structural validation rather than antivirus",
-      "disposition": "Assigned to 0.9.5 security remediation: document the boundary and add a maintained antivirus provider behind the existing scanner interface.",
-      "evidence": ["Milestone 0.9.5 owner: attachment security"]
+      "disposition": "Production requires a fail-closed ClamAV streaming provider in addition to structural validation; local structural-only behavior and the external scanner trust boundary are documented explicitly.",
+      "evidence": [
+        "backend/apps/core/attachment_security.py::ClamAVAttachmentScanner",
+        "backend/apps/core/tests/test_attachment_security.py::test_clamav_provider_streams_content_and_fails_closed",
+        "https://github.com/hkrewson/TekDocs/wiki/Files-and-attachments"
+      ]
     },
     {
       "id": "TD-COMPOSE-DEFAULT",
       "severity": "low",
-      "status": "open",
+      "status": "resolved",
       "title": "Base Compose defaults can appear production-ready while remaining development-shaped",
-      "disposition": "Assigned to 0.9.2 and 0.9.4: make insecure development opt-ins explicit and certify only the production overlay/image combination.",
-      "evidence": ["Milestones 0.9.2 and 0.9.4 owner: production operations"]
+      "disposition": "Insecure URL and SMTP behavior now require explicit development opt-ins, production settings reject development images, and the production rehearsal asserts the image variant, scanner provider, secret boundaries, and container hardening.",
+      "evidence": [
+        "compose.yml",
+        "compose.production.yml",
+        "backend/Dockerfile",
+        "backend/tekdocs/settings/production.py",
+        "scripts/rehearse-production-image.sh"
+      ]
     },
     {
       "id": "TD-OIDC-EMAIL-AUTH",
       "severity": "informational",
-      "status": "open",
+      "status": "resolved",
       "title": "OIDC verified-email auto-connect needs an explicit MFA regression",
-      "disposition": "Assigned to 0.9.1 authentication triage: document trusted issuer constraints and prove enrolled TOTP remains required after identity binding.",
-      "evidence": ["Milestone 0.9.1 owner: authentication"]
+      "disposition": "An explicit social-login pipeline regression proves an existing account with enrolled TOTP remains in the MFA authentication stage and receives no authenticated session; issuer constraints are documented.",
+      "evidence": [
+        "backend/apps/accounts/tests/test_profile_oidc.py::test_existing_oidc_identity_with_enrolled_totp_stops_at_mfa",
+        "https://github.com/hkrewson/TekDocs/wiki/Account-security"
+      ]
     },
     {
       "id": "TD-GCM-STREAM-LIMIT",
       "severity": "informational",
-      "status": "open",
+      "status": "resolved",
       "title": "Backup encryption uses one AES-GCM nonce per artifact stream",
-      "disposition": "Assigned to 0.9.3 recovery certification: enforce a supported artifact limit or adopt authenticated chunking with counter-derived nonces.",
-      "evidence": ["Milestone 0.9.3 owner: backup and recovery"]
+      "disposition": "Encryption and decryption now enforce a 16 GiB plaintext artifact ceiling, with the supported limit and recovery-key compromise boundary documented for operators.",
+      "evidence": [
+        "backend/tekdocs/recovery_archive.py::MAX_PLAINTEXT_BYTES",
+        "backend/apps/core/tests/test_recovery_archive.py::test_archive_encryption_and_decryption_enforce_plaintext_security_bound",
+        "https://github.com/hkrewson/TekDocs/wiki/Backup-and-recovery"
+      ]
     }
   ]
 }

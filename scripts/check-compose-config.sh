@@ -3,7 +3,7 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 
-docker compose \
+TEKDOCS_CLAMAV_HOST=clamav.example.invalid docker compose \
   --env-file "$repository_root/.env.example" \
   -f "$repository_root/compose.yml" \
   -f "$repository_root/compose.production.yml" \

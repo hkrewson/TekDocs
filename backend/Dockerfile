@@ -31,12 +31,14 @@ RUN chmod 0555 /entrypoint.sh \
     && chown -R tekdocs:tekdocs /app
 
 FROM base AS development
+ENV TEKDOCS_IMAGE_VARIANT=development
 USER root
 RUN pip install --require-hashes -r requirements-dev.lock
 USER tekdocs
 ENTRYPOINT ["/entrypoint.sh"]
 
 FROM base AS production
+ENV TEKDOCS_IMAGE_VARIANT=production
 USER root
 # Build tooling is not part of the application runtime. Removing it also keeps
 # pip's independently versioned vendored libraries out of the shipped image.

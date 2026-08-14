@@ -19,6 +19,7 @@ MAGIC = b"TEKDOCS1"
 NONCE_SIZE = 12
 TAG_SIZE = 16
 CHUNK_SIZE = 1024 * 1024
+MAX_PLAINTEXT_BYTES = 16 * 1024 * 1024 * 1024
 
 
 class RecoveryArchiveError(ValueError):
@@ -54,7 +55,11 @@ def encrypt_stream(source: BinaryIO, destination: BinaryIO, *, key: bytes, label
     encryptor = Cipher(algorithms.AES(key), modes.GCM(nonce)).encryptor()
     encryptor.authenticate_additional_data(_aad(label))
     destination.write(MAGIC + nonce)
+    plaintext_bytes = 0
     while chunk := source.read(CHUNK_SIZE):
+        plaintext_bytes += len(chunk)
+        if plaintext_bytes > MAX_PLAINTEXT_BYTES:
+            raise RecoveryArchiveError("The recovery artifact exceeds the supported 16 GiB plaintext limit.")
         destination.write(encryptor.update(chunk))
     destination.write(encryptor.finalize())
     destination.write(encryptor.tag)
@@ -72,6 +77,8 @@ def decrypt_file(source_path: Path, destination_path: Path, *, key: bytes, label
         source.seek(-TAG_SIZE, os.SEEK_END)
         tag = source.read(TAG_SIZE)
         ciphertext_size = size - minimum_size
+        if ciphertext_size > MAX_PLAINTEXT_BYTES:
+            raise RecoveryArchiveError("The recovery artifact exceeds the supported 16 GiB plaintext limit.")
         source.seek(len(MAGIC) + NONCE_SIZE)
         decryptor = Cipher(algorithms.AES(key), modes.GCM(nonce, tag)).decryptor()
         decryptor.authenticate_additional_data(_aad(label))

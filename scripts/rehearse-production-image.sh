@@ -68,6 +68,7 @@ chmod 0600 "$secret_directory/email_host_password" "$secret_directory/oidc_clien
   echo "TEKDOCS_OIDC_PROVIDER_NAME=Rehearsal SSO"
   echo "TEKDOCS_OIDC_DISCOVERY_URL=https://identity.example.invalid/.well-known/openid-configuration"
   echo "TEKDOCS_OIDC_CLIENT_ID=tekdocs-rehearsal"
+  echo "TEKDOCS_CLAMAV_HOST=clamav.example.invalid"
 } >> "$environment_file"
 
 echo "Starting isolated production-target image rehearsal"
@@ -75,6 +76,7 @@ production_compose up -d --build --wait
 production_compose exec -T frontend wget -q -O - http://127.0.0.1:8080/api/v1/health/ready | grep -q '"status":"ok"'
 production_compose exec -T backend python manage.py migrate --check
 production_compose exec -T backend python -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None'
+production_compose exec -T backend python -c 'import os; from django.conf import settings; assert os.environ["TEKDOCS_IMAGE_VARIANT"] == "production"; assert settings.TEKDOCS_ATTACHMENT_SCANNER == "apps.core.attachment_security.ClamAVAttachmentScanner"; assert settings.TEKDOCS_CLAMAV_HOST'
 backend_id=$(production_compose ps -q backend)
 backend_user=$(docker inspect --format '{{.Config.User}}' "$backend_id")
 if [ "$backend_user" != "tekdocs" ] && [ "$backend_user" != "10001" ]; then

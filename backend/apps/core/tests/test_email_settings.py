@@ -11,6 +11,7 @@ from tekdocs.settings.validation import (
     validate_production_email,
     validate_production_public_url,
     validate_production_security,
+    validate_publication_key_fingerprints,
     validate_publication_signing_key,
     validate_time_zone,
 )
@@ -34,6 +35,13 @@ def test_valid_production_email_configuration_is_accepted():
 
 def test_valid_publication_signing_key_is_accepted():
     validate_publication_signing_key(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii"))
+
+
+def test_publication_trust_fingerprints_are_strict_and_unique():
+    validate_publication_key_fingerprints(("a" * 64, "b" * 64))
+    for values in (("A" * 64,), ("a" * 63,), ("a" * 64, "a" * 64)):
+        with pytest.raises(ImproperlyConfigured, match="RETIRED_KEY_FINGERPRINTS"):
+            validate_publication_key_fingerprints(values)
 
 
 @pytest.mark.parametrize("value", ["", "too-short", "+" + "A" * 42 + "="])

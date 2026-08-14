@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import re
+import socket
+import struct
 import zipfile
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -119,6 +121,41 @@ class StrictAttachmentScanner:
                         raise AttachmentSecurityError("The ZIP compression ratio exceeds the safety limit.")
         except (zipfile.BadZipFile, UnicodeError) as exc:
             raise AttachmentSecurityError("The ZIP attachment is malformed.") from exc
+
+
+class ClamAVAttachmentScanner:
+    """Stream structurally validated content to a separately operated clamd service."""
+
+    engine = "clamav/instream"
+
+    def scan(self, *, filename: str, media_type: str, content: bytes) -> ScanResult:
+        StrictAttachmentScanner().scan(filename=filename, media_type=media_type, content=content)
+        host = str(getattr(settings, "TEKDOCS_CLAMAV_HOST", "")).strip()
+        port = int(getattr(settings, "TEKDOCS_CLAMAV_PORT", 3310))
+        timeout = float(getattr(settings, "TEKDOCS_CLAMAV_TIMEOUT", 10))
+        if not host or not 1 <= port <= 65535 or not 1 <= timeout <= 60:
+            raise AttachmentSecurityError("The ClamAV scanner configuration is invalid.")
+        try:
+            with socket.create_connection((host, port), timeout=timeout) as connection:
+                connection.settimeout(timeout)
+                connection.sendall(b"zINSTREAM\0")
+                for offset in range(0, len(content), 64 * 1024):
+                    chunk = content[offset : offset + 64 * 1024]
+                    connection.sendall(struct.pack("!I", len(chunk)) + chunk)
+                connection.sendall(struct.pack("!I", 0))
+                response = bytearray()
+                while len(response) <= 4096:
+                    chunk = connection.recv(4097 - len(response))
+                    if not chunk:
+                        break
+                    response.extend(chunk)
+                    if b"\0" in chunk or b"\n" in chunk:
+                        break
+        except (OSError, TimeoutError, ValueError) as exc:
+            raise AttachmentSecurityError("ClamAV scanning is unavailable; the upload was rejected.") from exc
+        if len(response) > 4096 or not bytes(response).split(b"\0", 1)[0].rstrip(b"\r\n").endswith(b": OK"):
+            raise AttachmentSecurityError("The attachment was rejected by antivirus scanning.")
+        return ScanResult(engine=self.engine)
 
 
 class DjangoAttachmentStorageProvider:

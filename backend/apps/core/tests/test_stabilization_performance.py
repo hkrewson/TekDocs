@@ -119,7 +119,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
             tenant=result.tenant,
             organization=organizations[index % REFERENCE_ORGANIZATIONS],
             workspace=organization_workspaces[organizations[index % REFERENCE_ORGANIZATIONS].id],
-            entity_type="reference_record",
+            entity_type="client_asset",
             display_name=f"Reference Record {index:05d}",
         )
         for index in range(REFERENCE_ENTITIES)

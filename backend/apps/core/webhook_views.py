@@ -10,6 +10,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.throttles import InboundWebhookEndpointThrottle, InboundWebhookSourceThrottle
+
 from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageSerializer, paginate
 from .models import WebhookDeliveryState, WebhookDirection, WebhookEndpoint
 from .outbox import OutboxTopic
@@ -222,6 +224,7 @@ class OrganizationWebhookDeliveryRetryView(APIView):
 class InboundWebhookView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [AllowAny]
+    throttle_classes = [InboundWebhookSourceThrottle, InboundWebhookEndpointThrottle]
 
     @extend_schema(
         request=None,

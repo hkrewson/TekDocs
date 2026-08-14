@@ -94,6 +94,14 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
       <p className="auth-intro">Create the MSP workspace and its first owner. The deployment token is read from your server’s secret configuration.</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
         <label>Deployment token<input value={deploymentToken} onChange={(event) => setDeploymentToken(event.target.value)} autoComplete="off" spellCheck={false} required /></label>
+        <div className="bootstrap-token-help" aria-labelledby="bootstrap-token-help-heading">
+          <p id="bootstrap-token-help-heading"><strong>Retrieve the token from the deployment shell</strong></p>
+          <p>Run this from the directory containing <code>.env</code>:</p>
+          <pre><code>sed -n 's/^TEKDOCS_BOOTSTRAP_TOKEN=//p' .env</code></pre>
+          <p>For a production secret-file deployment:</p>
+          <pre><code>secret_dir="$(sed -n 's/^TEKDOCS_SECRET_DIRECTORY=//p' .env)" &amp;&amp; cat "$secret_dir/bootstrap_token"</code></pre>
+          <p>Paste the output above. Do not share or save it in documentation.</p>
+        </div>
         <label>MSP name<input value={tenantName} onChange={(event) => setTenantName(event.target.value)} autoComplete="organization" required /></label>
         <label>Your name<input value={ownerDisplayName} onChange={(event) => setOwnerDisplayName(event.target.value)} autoComplete="name" required /></label>
         <label>Email address<input type="email" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} autoComplete="email" required /></label>

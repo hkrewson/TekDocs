@@ -587,6 +587,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .auth-panel h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; letter-spacing: -.015em; }
 .auth-intro { margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .auth-form { display: flex; flex-direction: column; gap: 16px; }
+.bootstrap-token-help { display: grid; gap: 8px; padding: 12px; color: var(--muted); background: var(--canvas); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; line-height: 1.45; }
+.bootstrap-token-help p { margin: 0; }
+.bootstrap-token-help strong { color: var(--text); font-size: 13px; }
+.bootstrap-token-help pre { max-width: 100%; margin: 0; padding: 9px 10px; overflow-x: auto; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .auth-form label { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: 13px; font-weight: 600; }
 .auth-form label span { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
 .auth-form input { width: 100%; min-height: 40px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }

@@ -71,6 +71,8 @@ describe('authentication boundary', () => {
     render(<App authClient={authClient} />)
 
     await screen.findByRole('heading', { name: 'Set up TekDocs' })
+    expect(screen.getByText("sed -n 's/^TEKDOCS_BOOTSTRAP_TOKEN=//p' .env")).toBeVisible()
+    expect(screen.getByText(/TEKDOCS_SECRET_DIRECTORY/)).toBeVisible()
     await user.type(screen.getByLabelText('Deployment token'), deploymentToken)
     await user.type(screen.getByLabelText('MSP name'), 'Example MSP')
     await user.type(screen.getByLabelText('Your name'), 'Primary Owner')

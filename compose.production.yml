@@ -1,4 +1,10 @@
 services:
+  clamav:
+    image: clamav/clamav-debian:1.5.3@sha256:741e6c447241220e0792a901befcaec1d55a755c5097fc9cd88d7fd8be251a5c
+    volumes:
+      - clamav_data:/var/lib/clamav
+    restart: unless-stopped
+    networks: [internal]
   migrate:
     build:
       target: production
@@ -6,7 +12,7 @@ services:
       TEKDOCS_REQUIRE_SECRET_FILES: "true"
       TEKDOCS_ALLOW_DEVELOPMENT_IMAGE: "false"
       TEKDOCS_ATTACHMENT_SCANNER: apps.core.attachment_security.ClamAVAttachmentScanner
-      TEKDOCS_CLAMAV_HOST: ${TEKDOCS_CLAMAV_HOST:?Set TEKDOCS_CLAMAV_HOST}
+      TEKDOCS_CLAMAV_HOST: ${TEKDOCS_CLAMAV_HOST:-clamav}
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -19,7 +25,7 @@ services:
       TEKDOCS_REQUIRE_SECRET_FILES: "true"
       TEKDOCS_ALLOW_DEVELOPMENT_IMAGE: "false"
       TEKDOCS_ATTACHMENT_SCANNER: apps.core.attachment_security.ClamAVAttachmentScanner
-      TEKDOCS_CLAMAV_HOST: ${TEKDOCS_CLAMAV_HOST:?Set TEKDOCS_CLAMAV_HOST}
+      TEKDOCS_CLAMAV_HOST: ${TEKDOCS_CLAMAV_HOST:-clamav}
     command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "/dev/null", "--error-logfile", "-", "--graceful-timeout", "30", "--timeout", "60", "--max-requests", "1000", "--max-requests-jitter", "100", "tekdocs.wsgi:application"]
     read_only: true
     tmpfs: [/tmp]
@@ -27,6 +33,8 @@ services:
     security_opt: [no-new-privileges:true]
     pids_limit: 256
     stop_grace_period: 45s
+    depends_on:
+      clamav: { condition: service_healthy }
   worker:
     build:
       target: production
@@ -54,3 +62,6 @@ services:
       - /var/run
     security_opt: [no-new-privileges:true]
     pids_limit: 128
+
+volumes:
+  clamav_data:

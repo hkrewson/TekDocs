@@ -513,10 +513,12 @@ def accept_inbound_webhook(
         or payload.get("data") != {}
     ):
         raise ValidationError({"body": "The inbound webhook event is not supported."})
-    from .rls import OrganizationRLSMode, rls_scope
+    from .rls import OrganizationRLSMode, system_rls_scope
 
     try:
-        with rls_scope(DataScope.tenant(endpoint.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        with system_rls_scope(
+            DataScope.tenant(endpoint.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
+        ):
             with transaction.atomic():
                 return WebhookInboundReceipt.objects.create(
                     tenant=endpoint.tenant,

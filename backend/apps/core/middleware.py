@@ -10,7 +10,7 @@ from django.db import connection, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from .models import InstallationState, Organization, Tenant
-from .rls import OrganizationRLSMode, bind_local_rls_scope
+from .rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
 from .scoping import DataScope
 
 request_logger = logging.getLogger("tekdocs.request")
@@ -119,6 +119,7 @@ class RLSRequestScopeMiddleware:
                         tenant_scope,
                         organization_mode=OrganizationRLSMode.MSP_ONLY,
                         actor_user_id=request.user.pk,
+                        principal_mode=RLSPrincipalMode.USER,
                     )
             return self.get_response(request)
 
@@ -144,5 +145,6 @@ class RLSRequestScopeMiddleware:
                 DataScope.organization(tenant, organization),
                 organization_mode=OrganizationRLSMode.ORGANIZATION,
                 actor_user_id=request.user.pk,
+                principal_mode=RLSPrincipalMode.USER,
             )
         return None

@@ -18,7 +18,7 @@ from .models import (
 )
 from .notification_email import dispatch_due_notification_emails
 from .outbox import dispatch_due_outbox_events
-from .rls import OrganizationRLSMode, rls_scope
+from .rls import OrganizationRLSMode, system_rls_scope
 from .scoping import DataScope
 from .webhooks import dispatch_due_webhooks
 
@@ -30,7 +30,7 @@ def dispatch_outbox_events() -> int:
     installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
     if installation.tenant is None:
         return 0
-    with rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+    with system_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
         return dispatch_due_outbox_events(tenant=installation.tenant)
 
 
@@ -39,7 +39,7 @@ def dispatch_notification_emails() -> int:
     installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
     if installation.tenant is None:
         return 0
-    with rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+    with system_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
         return dispatch_due_notification_emails(tenant=installation.tenant)
 
 
@@ -48,7 +48,7 @@ def dispatch_webhook_deliveries() -> int:
     installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
     if installation.tenant is None:
         return 0
-    with rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+    with system_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
         return dispatch_due_webhooks(tenant=installation.tenant)
 
 
@@ -61,7 +61,7 @@ def schedule_integration_syncs() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             total += schedule_due_connections(tenant=installation.tenant, scope=scope)
     return total
 
@@ -74,7 +74,7 @@ def process_integration_sync_job(job_id: str, tenant_id: str, workspace_id: str,
         organization_id=UUID(organization_id) if organization_id else None,
     )
     mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
-    with rls_scope(scope, organization_mode=mode):
+    with system_rls_scope(scope, organization_mode=mode):
         process_sync_job(job_id=UUID(job_id))
 
 
@@ -87,7 +87,7 @@ def dispatch_integration_syncs() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             now = timezone.now()
             job_ids = list(
                 IntegrationSyncJob.scoped.for_scope(scope)
@@ -118,7 +118,7 @@ def purge_expired_integration_logs() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             total += purge_integration_logs(tenant=installation.tenant)
     return total
 
@@ -132,7 +132,7 @@ def schedule_domain_monitoring() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             total += schedule_due_domain_monitoring(scope=scope)
     return total
 
@@ -141,7 +141,7 @@ def schedule_domain_monitoring() -> int:
 def process_domain_monitoring(run_id: str, tenant_id: str, workspace_id: str, organization_id: str | None) -> None:
     scope = DataScope(UUID(tenant_id), UUID(workspace_id), UUID(organization_id) if organization_id else None)
     mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
-    with rls_scope(scope, organization_mode=mode):
+    with system_rls_scope(scope, organization_mode=mode):
         process_domain_monitoring_run(run_id=UUID(run_id))
 
 
@@ -154,7 +154,7 @@ def dispatch_domain_monitoring() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             run_ids = list(
                 DomainMonitorRun.scoped.for_scope(scope)
                 .filter(state=DomainMonitorRunState.PENDING, available_at__lte=timezone.now())
@@ -184,7 +184,7 @@ def schedule_certificate_monitoring() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             total += schedule_due_certificate_monitoring(scope=scope)
     return total
 
@@ -195,7 +195,7 @@ def process_certificate_monitoring(
 ) -> None:
     scope = DataScope(UUID(tenant_id), UUID(workspace_id), UUID(organization_id) if organization_id else None)
     mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
-    with rls_scope(scope, organization_mode=mode):
+    with system_rls_scope(scope, organization_mode=mode):
         process_certificate_monitoring_run(run_id=UUID(run_id))
 
 
@@ -208,7 +208,7 @@ def dispatch_certificate_monitoring() -> int:
     for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
         scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
-        with rls_scope(scope, organization_mode=mode):
+        with system_rls_scope(scope, organization_mode=mode):
             run_ids = list(
                 CertificateMonitorRun.scoped.for_scope(scope)
                 .filter(state=DomainMonitorRunState.PENDING, available_at__lte=timezone.now())

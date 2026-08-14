@@ -165,17 +165,18 @@ def collect_domain_evidence(ascii_name: str) -> CollectedDomainEvidence:
     rdap_url = f"{rdap_base}/domain/{quote(ascii_name, safe='')}"
     rdap = _get_json(rdap_url, accept="application/rdap+json, application/json")
 
-    doh_base = settings.TEKDOCS_DOH_URL
-    parsed_doh = urlsplit(doh_base)
-    separator = "&" if parsed_doh.query else "?"
+    doh_base = str(settings.TEKDOCS_DOH_URL).strip()
     answers: list[DNSAnswer] = []
     validations: list[bool] = []
-    for record_type in DNS_TYPES:
-        query_url = f"{doh_base}{separator}{urlencode({'name': ascii_name, 'type': record_type, 'do': '1'})}"
-        records, validated = _doh_answers(_get_json(query_url, accept="application/dns-json"), record_type)
-        answers.extend(records)
-        if validated is not None:
-            validations.append(validated)
+    if doh_base:
+        parsed_doh = urlsplit(doh_base)
+        separator = "&" if parsed_doh.query else "?"
+        for record_type in DNS_TYPES:
+            query_url = f"{doh_base}{separator}{urlencode({'name': ascii_name, 'type': record_type, 'do': '1'})}"
+            records, validated = _doh_answers(_get_json(query_url, accept="application/dns-json"), record_type)
+            answers.extend(records)
+            if validated is not None:
+                validations.append(validated)
     canonical_dns = sorted((item.record_type, item.value, item.ttl) for item in answers)
     canonical_caa = sorted((item.value, item.ttl) for item in answers if item.record_type == "CAA")
     return CollectedDomainEvidence(
@@ -183,7 +184,7 @@ def collect_domain_evidence(ascii_name: str) -> CollectedDomainEvidence:
         rdap_digest=_digest(rdap),
         expiration_date=_rdap_date(rdap),
         registrar=_rdap_registrar(rdap),
-        dns_source=urlsplit(doh_base).hostname or "doh",
+        dns_source=(urlsplit(doh_base).hostname or "doh") if doh_base else "disabled",
         dns_digest=_digest(canonical_dns),
         dnssec_validated=all(validations) if validations else None,
         dns_answers=tuple(answers),

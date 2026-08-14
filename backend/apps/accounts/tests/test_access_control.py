@@ -261,9 +261,10 @@ def test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_ty
     mentions = technician_client.get(reverse("msp-document-mention-search"))
 
     assert people.status_code == 200
-    assert [item["display_name"] for item in people.json()["results"]] == ["Visible Assigned Contact"]
+    assert people.json()["results"] == []
     assert [item["display_name"] for item in organizations.json()["results"]] == ["Assigned Search Client"]
     assert "Restricted Search Client" not in {item["display_name"] for item in mentions.json()["results"]}
+    assert "Visible Assigned Contact" not in {item["display_name"] for item in mentions.json()["results"]}
     assert "Hidden Restricted Contact" not in {item["display_name"] for item in mentions.json()["results"]}
     assert "Hidden Credential Reference Title" not in {item["display_name"] for item in untyped.json()["results"]}
     assert "Hidden Credential Reference Title" not in {item["display_name"] for item in mentions.json()["results"]}

@@ -124,7 +124,10 @@ test-rls:
 	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
 
 test-runtime-authorization:
-	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions -q
+	docker compose run --rm migrate pytest \
+		apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions \
+		apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal \
+		apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor -q
 
 test-organizations:
 	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q

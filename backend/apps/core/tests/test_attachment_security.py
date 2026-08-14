@@ -117,9 +117,18 @@ class FakeClamAVConnection:
 @override_settings(TEKDOCS_CLAMAV_HOST="clamav.internal", TEKDOCS_CLAMAV_PORT=3310, TEKDOCS_CLAMAV_TIMEOUT=4)
 def test_clamav_provider_streams_content_and_fails_closed(monkeypatch):
     clean = FakeClamAVConnection(b"stream: OK\0")
-    monkeypatch.setattr("apps.core.attachment_security.socket.create_connection", lambda *_args, **_kwargs: clean)
+    monkeypatch.setattr(
+        "apps.core.attachment_security.socket.getaddrinfo",
+        lambda *_args, **_kwargs: [(2, 1, 6, "", ("10.20.30.40", 3310))],
+    )
+    destinations = []
+    monkeypatch.setattr(
+        "apps.core.attachment_security.socket.create_connection",
+        lambda destination, **_kwargs: destinations.append(destination) or clean,
+    )
     result = ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"safe")
     assert result.engine == "clamav/instream"
+    assert destinations == [("10.20.30.40", 3310)]
     assert clean.sent.startswith(b"zINSTREAM\0")
 
     with pytest.raises(AttachmentSecurityError):
@@ -140,6 +149,19 @@ def test_clamav_provider_streams_content_and_fails_closed(monkeypatch):
     )
     with pytest.raises(AttachmentSecurityError, match="unavailable"):
         ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"safe")
+
+
+@override_settings(TEKDOCS_CLAMAV_HOST="scanner.example", TEKDOCS_CLAMAV_PORT=3310)
+def test_clamav_provider_rejects_public_and_mixed_resolution(monkeypatch):
+    for addresses in (("8.8.8.8",), ("192.0.2.10",), ("10.20.30.40", "1.1.1.1")):
+        monkeypatch.setattr(
+            "apps.core.attachment_security.socket.getaddrinfo",
+            lambda *_args, addresses=addresses, **_kwargs: [
+                (2, 1, 6, "", (address, 3310)) for address in addresses
+            ],
+        )
+        with pytest.raises(AttachmentSecurityError, match="private addresses"):
+            ClamAVAttachmentScanner().scan(filename="notes.txt", media_type="text/plain", content=b"safe")
 
 
 def test_storage_provider_quarantines_promotes_and_verifies_bytes(tmp_path):

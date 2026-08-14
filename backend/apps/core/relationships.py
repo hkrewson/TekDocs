@@ -138,16 +138,13 @@ def _visible_entities(
     if not allowed_entity_types:
         return entities.none()
     entities = entities.filter(entity_type__in=allowed_entity_types)
-    accessible_organization_ids = accessible_organizations(
-        member,
-        PermissionKey.ORGANIZATIONS_VIEW,
-    ).values("id")
+    accessible_organization_ids = accessible_organizations(member, PermissionKey.ORGANIZATIONS_VIEW).values("id")
     if workspace.kind == "msp":
         visibility = Q(organization__isnull=True)
         visibility &= ~Q(entity_type="organization") | Q(organization_record__id__in=accessible_organization_ids)
         visibility &= ~Q(entity_type="person") | (
             Q(person_record__associations__organization__isnull=True)
-            | Q(person_record__associations__organization_id__in=accessible_organization_ids)
+            & Q(person_record__associations__archived_at__isnull=True)
         )
         entities = entities.filter(visibility)
     else:

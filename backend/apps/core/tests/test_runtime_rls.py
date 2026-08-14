@@ -1,6 +1,7 @@
 import secrets
 import uuid
 from contextlib import contextmanager
+from datetime import timedelta
 from hashlib import sha256
 
 import psycopg
@@ -9,9 +10,10 @@ from django.conf import settings
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
+from apps.accounts.models import BuiltInRole, Invitation, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
     Block,
@@ -25,15 +27,25 @@ from apps.core.models import (
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
     Entity,
+    InboxNotification,
     InstallationState,
     Organization,
     OrganizationClassification,
     OutboxEvent,
+    OutboxEventState,
     Person,
     PersonAssociation,
     Tenant,
 )
+from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events
+from apps.core.rls import (
+    OrganizationRLSMode,
+    RLSPrincipalMode,
+    bind_local_rls_scope,
+    system_rls_scope,
+)
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
+from apps.core.scoping import DataScope
 
 
 def _organization(tenant: Tenant, name: str) -> Organization:
@@ -62,6 +74,10 @@ def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None):
     cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(organization_id or "")])
     cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [mode])
     cursor.execute("SELECT set_config('tekdocs.user_id', %s, true)", [str(user_id or "")])
+    cursor.execute(
+        "SELECT set_config('tekdocs.principal_mode', %s, true)",
+        ["user" if user_id else "system"],
+    )
 
 
 @contextmanager
@@ -216,6 +232,96 @@ def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(
     mention_names = {item["display_name"] for item in mentions.json()["results"]}
     assert "Runtime Restricted Client" not in mention_names
     assert "Runtime Hidden Contact" not in mention_names
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_preserves_request_actor_and_system_outbox_principal():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Runtime notification MSP",
+        owner_email="runtime-notification-owner@example.invalid",
+        owner_display_name="Runtime Notification Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = _organization(installation.tenant, "Runtime Notification Client")
+    OrganizationClassification.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        kind="client",
+    )
+    invitation = Invitation.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        role=BuiltInRole.CLIENT_USER,
+        email="runtime-invitee@example.invalid",
+        token_digest="a" * 64,
+        invited_by=installation.owner,
+        expires_at=timezone.now() + timedelta(days=1),
+    )
+    event = OutboxEvent.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        topic=OutboxTopic.INVITATION_ISSUED,
+        subject_id=invitation.id,
+        idempotency_key="runtime-notification-invitation",
+        payload={"role": BuiltInRole.CLIENT_USER},
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+
+    with _django_runtime_role():
+        with system_rls_scope(
+            DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
+        ):
+            assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
+        response = browser.get(reverse("notification-list"))
+
+    event.refresh_from_db()
+    assert event.state == OutboxEventState.DELIVERED
+    assert InboxNotification.objects.filter(event=event, recipient=installation.owner).exists()
+    assert response.status_code == 200
+    assert response.json()["results"][0]["message"] == (
+        "A client user invitation for Runtime Notification Client was issued."
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Runtime client tenant", slug=f"runtime-client-{uuid.uuid4()}")
+    client = _organization(tenant, "Runtime Portal Client")
+    sibling = _organization(tenant, "Runtime Portal Sibling")
+    user = User.objects.create_user(email="runtime-portal@example.invalid", display_name="Runtime Portal User")
+    TenantMembership.objects.create(
+        tenant=tenant,
+        user=user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=client,
+    )
+
+    with _django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, client),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=user.id,
+            principal_mode=RLSPrincipalMode.USER,
+        )
+        assert Entity.objects.filter(id=client.entity_id).exists()
+        assert not Entity.objects.filter(id=sibling.entity_id).exists()
+        with system_rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT current_setting('tekdocs.principal_mode', true)")
+                assert cursor.fetchone() == ("system",)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT current_setting('tekdocs.principal_mode', true), current_setting('tekdocs.user_id', true)"
+            )
+            assert cursor.fetchone() == ("user", str(user.id))
 
 
 @pytest.mark.django_db(transaction=True)

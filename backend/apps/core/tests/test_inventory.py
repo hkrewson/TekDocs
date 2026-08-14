@@ -1067,6 +1067,7 @@ def test_postgres_rejects_client_asset_provenance_mutation(owner_client, install
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(installation.tenant.id)])
         cursor.execute("SELECT set_config('tekdocs.user_id', %s, true)", [str(installation.owner.id)])
+        cursor.execute("SELECT set_config('tekdocs.principal_mode', 'user', true)")
         cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(client.id)])
         cursor.execute("SELECT set_config('tekdocs.organization_mode', 'organization', true)")
         cursor.execute("SELECT id FROM core_catalogmodel WHERE id = %s", [asset.model_id])

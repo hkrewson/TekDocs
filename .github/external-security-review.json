@@ -1,9 +1,10 @@
 {
-  "status": "remediation",
+  "status": "complete",
   "reviewer": "Independent senior engineer (identity pending release record)",
   "scope_commit": "01ed514777b4f67a6c5399f1f2a722a83db16342",
-  "completed_at": null,
+  "completed_at": "2026-08-14T11:12:00-05:00",
   "report_reference": "Private report: TekDocs-security-review-01ed514.md",
+  "validation_reference": "Private report: TekDocs-remediation-validation-2efbb8b.md",
   "findings": [
     {
       "id": "TD-ENTITY-SEARCH-SCOPE",
@@ -47,9 +48,11 @@
       "severity": "medium",
       "status": "resolved",
       "title": "Authorization requests were not exercised through the runtime database role",
-      "disposition": "A dedicated Django request regression reconnects as the non-superuser runtime role and drives entity search and mention isolation through middleware, policy, ORM, and PostgreSQL RLS.",
+      "disposition": "Dedicated Django regressions reconnect as the non-superuser runtime role and drive entity search, mentions, client membership, notification projection, and outbox dispatch through middleware, policy, ORM, and PostgreSQL RLS.",
       "evidence": [
         "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor",
         "Makefile::test-runtime-authorization"
       ]
     },
@@ -137,6 +140,56 @@
         "backend/tekdocs/recovery_archive.py::MAX_PLAINTEXT_BYTES",
         "backend/apps/core/tests/test_recovery_archive.py::test_archive_encryption_and_decryption_enforce_plaintext_security_bound",
         "https://github.com/hkrewson/TekDocs/wiki/Backup-and-recovery"
+      ]
+    },
+    {
+      "id": "TD-RLS-ACTOR-CLEARED",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Nested RLS bindings cleared the request actor and blinded organization anchors",
+      "disposition": "Nested user scopes preserve the request principal. Background work uses an explicit tenant/workspace-scoped system principal whose prior actor and principal are restored on exit. Organization-anchor RLS recognizes only those two principal modes.",
+      "evidence": [
+        "backend/apps/core/rls.py",
+        "backend/apps/core/migrations/0107_explicit_rls_principals.py",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor"
+      ]
+    },
+    {
+      "id": "TD-CLAMAV-EGRESS",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Attachment bytes could stream to an unvalidated ClamAV host",
+      "disposition": "TekDocs rejects scanner names unless every resolved address is private, loopback, or link-local, pins the selected address for the connection, ships a digest-pinned private ClamAV service, and exercises a live scan in the production-image rehearsal.",
+      "evidence": [
+        "backend/apps/core/attachment_security.py::_resolve_private_scanner_address",
+        "backend/apps/core/tests/test_attachment_security.py::test_clamav_provider_rejects_public_and_mixed_resolution",
+        "compose.production.yml",
+        "scripts/rehearse-production-image.sh"
+      ]
+    },
+    {
+      "id": "TD-DOH-DEFAULT",
+      "severity": "low",
+      "status": "resolved",
+      "title": "Domain inventory was sent to Cloudflare DNS by default",
+      "disposition": "DNS-over-HTTPS monitoring is disabled by default and requires an explicit operator-selected endpoint; the disclosure and privacy boundary are documented.",
+      "evidence": [
+        "backend/tekdocs/settings/base.py",
+        "backend/apps/core/tests/test_domain_monitoring_egress.py::test_domain_collector_does_not_disclose_domain_to_dns_provider_without_opt_in",
+        "https://github.com/hkrewson/TekDocs/wiki/Domains-and-certificates"
+      ]
+    },
+    {
+      "id": "TD-PERSON-LAYER-DRIFT",
+      "severity": "low",
+      "status": "resolved",
+      "title": "Application and RLS person visibility rules disagreed in the MSP workspace",
+      "disposition": "MSP entity discovery now exposes only MSP-associated people and matches the database policy, including archived-association filtering.",
+      "evidence": [
+        "backend/apps/core/relationships.py::_visible_entities",
+        "backend/apps/accounts/tests/test_access_control.py::test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_types",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions"
       ]
     }
   ]

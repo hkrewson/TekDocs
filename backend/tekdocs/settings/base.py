@@ -280,7 +280,7 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
 TEKDOCS_ALLOW_INSECURE_SMTP = env_bool("TEKDOCS_ALLOW_INSECURE_SMTP", False)
 TEKDOCS_RDAP_BOOTSTRAP_URL = os.getenv("TEKDOCS_RDAP_BOOTSTRAP_URL", "https://data.iana.org/rdap/dns.json")
-TEKDOCS_DOH_URL = os.getenv("TEKDOCS_DOH_URL", "https://cloudflare-dns.com/dns-query")
+TEKDOCS_DOH_URL = os.getenv("TEKDOCS_DOH_URL", "")
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://valkey:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://valkey:6379/1")

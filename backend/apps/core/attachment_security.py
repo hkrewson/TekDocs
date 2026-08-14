@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import ipaddress
 import re
 import socket
 import struct
@@ -31,6 +32,9 @@ _EXECUTABLE_MAGICS = (
 _EICAR_MARKER = b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE"
 _TEXT_CONTROL = re.compile(rb"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _NESTED_ARCHIVE_SUFFIXES = {".7z", ".bz2", ".gz", ".rar", ".tar", ".tgz", ".xz", ".zip"}
+_PRIVATE_SCANNER_NETWORKS = tuple(
+    ipaddress.ip_network(cidr) for cidr in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")
+)
 
 
 class AttachmentSecurityError(ValueError):
@@ -135,8 +139,9 @@ class ClamAVAttachmentScanner:
         timeout = float(getattr(settings, "TEKDOCS_CLAMAV_TIMEOUT", 10))
         if not host or not 1 <= port <= 65535 or not 1 <= timeout <= 60:
             raise AttachmentSecurityError("The ClamAV scanner configuration is invalid.")
+        scanner_address = _resolve_private_scanner_address(host, port)
         try:
-            with socket.create_connection((host, port), timeout=timeout) as connection:
+            with socket.create_connection((scanner_address, port), timeout=timeout) as connection:
                 connection.settimeout(timeout)
                 connection.sendall(b"zINSTREAM\0")
                 for offset in range(0, len(content), 64 * 1024):
@@ -156,6 +161,32 @@ class ClamAVAttachmentScanner:
         if len(response) > 4096 or not bytes(response).split(b"\0", 1)[0].rstrip(b"\r\n").endswith(b": OK"):
             raise AttachmentSecurityError("The attachment was rejected by antivirus scanning.")
         return ScanResult(engine=self.engine)
+
+
+def _resolve_private_scanner_address(host: str, port: int) -> str:
+    """Resolve and pin clamd to an entirely non-public address set."""
+
+    try:
+        results = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise AttachmentSecurityError("The ClamAV scanner address could not be resolved.") from exc
+    addresses = {str(result[4][0]) for result in results if result[4]}
+    if not addresses:
+        raise AttachmentSecurityError("The ClamAV scanner address could not be resolved.")
+    for address in addresses:
+        try:
+            parsed = ipaddress.ip_address(address)
+        except ValueError as exc:
+            raise AttachmentSecurityError("The ClamAV scanner address is invalid.") from exc
+        if parsed.version == 6 and parsed.ipv4_mapped is not None:
+            parsed = parsed.ipv4_mapped
+        if not (
+            parsed.is_loopback
+            or parsed.is_link_local
+            or any(parsed in network for network in _PRIVATE_SCANNER_NETWORKS if parsed.version == network.version)
+        ):
+            raise AttachmentSecurityError("The ClamAV scanner must resolve only to private addresses.")
+    return sorted(addresses)[0]
 
 
 class DjangoAttachmentStorageProvider:

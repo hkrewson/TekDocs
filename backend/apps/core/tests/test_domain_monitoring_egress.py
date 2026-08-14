@@ -100,6 +100,29 @@ def test_domain_collector_normalizes_expiration_registrar_dns_and_dnssec(monkeyp
     assert len(json.dumps(calls)) < 2_000
 
 
+@override_settings(
+    TEKDOCS_RDAP_BOOTSTRAP_URL="https://iana.example/rdap/dns.json",
+    TEKDOCS_DOH_URL="",
+)
+def test_domain_collector_does_not_disclose_domain_to_dns_provider_without_opt_in(monkeypatch):
+    calls = []
+
+    def fake_get(url, *, accept):  # type: ignore[no-untyped-def]
+        calls.append((url, accept))
+        if "iana.example" in url:
+            return {"services": [[["com"], ["https://rdap.example"]]]}
+        return {"events": [], "entities": []}
+
+    monkeypatch.setattr("apps.core.domain_monitoring_egress._get_json", fake_get)
+    evidence = collect_domain_evidence("private-client.example.com")
+
+    assert len(calls) == 2
+    assert all("type=" not in url for url, _accept in calls)
+    assert evidence.dns_source == "disabled"
+    assert evidence.dns_answers == ()
+    assert evidence.dnssec_validated is None
+
+
 def test_doh_rejects_failed_status_and_ignores_mislabeled_answers():
     from apps.core.domain_monitoring_egress import _doh_answers
 

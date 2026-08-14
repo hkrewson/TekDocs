@@ -1,7 +1,22 @@
 SHELL := /bin/sh
 
+BACKEND_IMAGE_GATES := check security \
+	test test-localization test-api-contracts test-api-tokens test-webhooks test-integrations \
+	test-integration-stabilization test-integration-certification test-monitoring-stabilization \
+	test-compliance-catalogs test-compliance-monitoring-certification test-auth-abuse \
+	test-client-portal-boundary test-outbox test-notifications test-notification-email \
+	test-portal-notification-stabilization test-portal-notification-certification test-policy \
+	test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people \
+	test-sites test-custom-fields test-relationships test-recovery test-stabilization \
+	test-public-beta-performance test-certification test-documentation-certification \
+	test-publication-control test-credential-references test-catalogs test-inventory \
+	test-inventory-certification test-commercial test-networks test-network-stabilization \
+	test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all \
+	test-browser-artifact-hygiene test-e2e-live
+
 .PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-certification notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
 .PHONY: test-compliance-catalogs test-compliance-monitoring-certification compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check
+.PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
 .PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-certification test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-certification-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
 
@@ -12,6 +27,11 @@ bootstrap:
 
 build:
 	docker compose build
+
+backend-test-images:
+	docker compose build backend migrate
+
+$(BACKEND_IMAGE_GATES): backend-test-images
 
 up:
 	docker compose up -d --build
@@ -127,7 +147,9 @@ test-runtime-authorization:
 	docker compose run --rm migrate pytest \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal \
-		apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor -q
+		apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor \
+		apps/core/tests/test_runtime_rls.py::test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal \
+		apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration -q
 
 test-organizations:
 	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q

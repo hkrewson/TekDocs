@@ -51,9 +51,7 @@ def installation(db):
 
 
 def organization(installation, name="Webhook client"):  # type: ignore[no-untyped-def]
-    entity = Entity.objects.create_owned(
-        tenant=installation.tenant, entity_type="organization", display_name=name
-    )
+    entity = Entity.objects.create_owned(tenant=installation.tenant, entity_type="organization", display_name=name)
     record = Organization.objects.create(tenant=installation.tenant, entity=entity)
     OrganizationClassification.objects.create(tenant=installation.tenant, organization=record, kind="client")
     return record
@@ -124,8 +122,8 @@ def test_management_api_issues_secret_once_and_keeps_audit_value_free(installati
     assert created["Cache-Control"] == "private, no-store"
 
 
-@pytest.mark.django_db
-def test_inbound_signature_replay_tampering_and_expiration(installation):
+@pytest.mark.django_db(transaction=True)
+def test_inbound_signature_replay_tampering_and_expiration(installation, django_runtime_role):  # type: ignore[no-untyped-def]
     record = organization(installation)
     secret = b"inbound-signing-secret"
     inbound = endpoint(
@@ -140,39 +138,40 @@ def test_inbound_signature_replay_tampering_and_expiration(installation):
     timestamp = int(timezone.now().timestamp())
     supplied = signature(secret, delivery_id=delivery_id, timestamp=timestamp, body=body)
 
-    receipt = accept_inbound_webhook(
-        endpoint_id=inbound.id,
-        delivery_id=delivery_id,
-        timestamp_value=str(timestamp),
-        supplied_signature=supplied,
-        body=body,
-    )
-    assert receipt.body_sha256 and not hasattr(receipt, "body")
-    with pytest.raises(Exception, match="already been accepted"):
-        accept_inbound_webhook(
+    with django_runtime_role():
+        receipt = accept_inbound_webhook(
             endpoint_id=inbound.id,
             delivery_id=delivery_id,
             timestamp_value=str(timestamp),
             supplied_signature=supplied,
             body=body,
         )
-    with pytest.raises(Exception, match="invalid or expired"):
-        accept_inbound_webhook(
-            endpoint_id=inbound.id,
-            delivery_id="delivery-tampered",
-            timestamp_value=str(timestamp),
-            supplied_signature=supplied,
-            body=body + b" ",
-        )
-    old = int((timezone.now() - timedelta(minutes=6)).timestamp())
-    with pytest.raises(Exception, match="invalid or expired"):
-        accept_inbound_webhook(
-            endpoint_id=inbound.id,
-            delivery_id="delivery-expired",
-            timestamp_value=str(old),
-            supplied_signature=signature(secret, delivery_id="delivery-expired", timestamp=old, body=body),
-            body=body,
-        )
+        assert receipt.body_sha256 and not hasattr(receipt, "body")
+        with pytest.raises(Exception, match="already been accepted"):
+            accept_inbound_webhook(
+                endpoint_id=inbound.id,
+                delivery_id=delivery_id,
+                timestamp_value=str(timestamp),
+                supplied_signature=supplied,
+                body=body,
+            )
+        with pytest.raises(Exception, match="invalid or expired"):
+            accept_inbound_webhook(
+                endpoint_id=inbound.id,
+                delivery_id="delivery-tampered",
+                timestamp_value=str(timestamp),
+                supplied_signature=supplied,
+                body=body + b" ",
+            )
+        old = int((timezone.now() - timedelta(minutes=6)).timestamp())
+        with pytest.raises(Exception, match="invalid or expired"):
+            accept_inbound_webhook(
+                endpoint_id=inbound.id,
+                delivery_id="delivery-expired",
+                timestamp_value=str(old),
+                supplied_signature=signature(secret, delivery_id="delivery-expired", timestamp=old, body=body),
+                body=body,
+            )
 
 
 @pytest.mark.django_db
@@ -208,11 +207,14 @@ def test_outbound_projection_signing_retry_and_metadata_only_inspection(installa
     )
     assert not hasattr(delivery, "response_body")
 
-    assert dispatch_due_webhooks(
-        tenant=installation.tenant,
-        now=delivery.available_at + timedelta(seconds=1),
-        sender=lambda **_request: 204,
-    ) == 1
+    assert (
+        dispatch_due_webhooks(
+            tenant=installation.tenant,
+            now=delivery.available_at + timedelta(seconds=1),
+            sender=lambda **_request: 204,
+        )
+        == 1
+    )
     delivery.refresh_from_db()
     assert delivery.state == WebhookDeliveryState.DELIVERED
     assert delivery.attempts == 2
@@ -298,9 +300,7 @@ def test_postgres_guards_reject_cross_scope_and_receipt_mutation(installation):
         pytest.skip("Webhook database guards require PostgreSQL")
     first = organization(installation, "First")
     second = organization(installation, "Second")
-    inbound = endpoint(
-        installation, first, direction=WebhookDirection.INBOUND, topics=["integration.ping"]
-    )
+    inbound = endpoint(installation, first, direction=WebhookDirection.INBOUND, topics=["integration.ping"])
     with pytest.raises(DatabaseError), transaction.atomic():
         WebhookInboundReceipt.objects.create(
             tenant=installation.tenant,

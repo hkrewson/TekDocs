@@ -552,3 +552,52 @@ def test_every_cataloged_privileged_mutation_method_requires_mfa(contract, metho
     client = Client()
     client.force_login(installation.owner)
     assert _request(client, method, contract.route_name).status_code in {403, 404}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_enforces_complete_route_authorization_matrix(
+    installation,
+    django_runtime_role,  # type: ignore[no-untyped-def]
+):
+    anonymous = Client()
+    outsider = User.objects.create_user(
+        email=f"{uuid.uuid4()}@example.com",
+        display_name="Runtime outsider",
+    )
+    outsider_client = Client()
+    outsider_client.force_login(outsider)
+    reader = User.objects.create_user(
+        email=f"{uuid.uuid4()}@example.com",
+        display_name="Runtime reader",
+    )
+    TenantMembership.objects.create(tenant=installation.tenant, user=reader, role=BuiltInRole.READ_ONLY)
+    reader_client = Client()
+    reader_client.force_login(reader)
+    csrf_client = Client(enforce_csrf_checks=True)
+    csrf_client.force_login(installation.owner)
+    privileged_client = Client()
+    privileged_client.force_login(installation.owner)
+    installation.owner.authenticator_set.all().delete()
+
+    with django_runtime_role():
+        for contract in AUTHENTICATED_ROUTE_PERMISSIONS:
+            method = contract.methods[0]
+            assert _request(anonymous, method, contract.route_name).status_code == 403, contract.route_name
+            assert _request(outsider_client, method, contract.route_name).status_code in {
+                403,
+                404,
+            }, contract.route_name
+        for contract, method in MUTATION_ROUTE_METHODS:
+            assert _request(reader_client, method, contract.route_name).status_code in {
+                403,
+                404,
+            }, contract.route_name
+            assert _request(privileged_client, method, contract.route_name).status_code in {
+                403,
+                404,
+            }, contract.route_name
+        for contract in AUTHENTICATED_ROUTE_PERMISSIONS:
+            unsafe_methods = tuple(method for method in contract.methods if method != "GET")
+            if unsafe_methods:
+                response = _request(csrf_client, unsafe_methods[0], contract.route_name)
+                assert response.status_code == 403, contract.route_name

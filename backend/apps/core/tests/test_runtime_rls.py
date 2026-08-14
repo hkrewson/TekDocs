@@ -1,6 +1,5 @@
 import secrets
 import uuid
-from contextlib import contextmanager
 from datetime import timedelta
 from hashlib import sha256
 
@@ -30,6 +29,7 @@ from apps.core.models import (
     InboxNotification,
     InstallationState,
     Organization,
+    OrganizationAccessMode,
     OrganizationClassification,
     OutboxEvent,
     OutboxEventState,
@@ -63,7 +63,7 @@ def _runtime_connection():
     )
 
 
-def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None):
+def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None, principal_mode=None):
     cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(tenant_id)])
     cursor.execute(
         "SELECT id FROM core_workspace WHERE tenant_id = %s AND organization_id IS NOT DISTINCT FROM %s",
@@ -76,23 +76,8 @@ def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None):
     cursor.execute("SELECT set_config('tekdocs.user_id', %s, true)", [str(user_id or "")])
     cursor.execute(
         "SELECT set_config('tekdocs.principal_mode', %s, true)",
-        ["user" if user_id else "system"],
+        [principal_mode if principal_mode is not None else ("user" if user_id else "system")],
     )
-
-
-@contextmanager
-def _django_runtime_role():
-    original_user = connection.settings_dict["USER"]
-    original_password = connection.settings_dict["PASSWORD"]
-    connection.close()
-    connection.settings_dict["USER"] = RUNTIME_ROLE
-    connection.settings_dict["PASSWORD"] = settings.TEKDOCS_DATABASE_RUNTIME_PASSWORD
-    try:
-        yield
-    finally:
-        connection.close()
-        connection.settings_dict["USER"] = original_user
-        connection.settings_dict["PASSWORD"] = original_password
 
 
 @pytest.mark.django_db(transaction=True)
@@ -167,7 +152,7 @@ def test_runtime_organization_scope_can_stage_tenant_person_identity_until_assoc
 
 
 @pytest.mark.django_db(transaction=True)
-def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions():
+def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(django_runtime_role):  # type: ignore[no-untyped-def]
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role certification requires PostgreSQL")
 
@@ -217,7 +202,7 @@ def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(
     browser = Client()
     browser.force_login(reader)
 
-    with _django_runtime_role():
+    with django_runtime_role():
         with connection.cursor() as cursor:
             cursor.execute("SELECT current_user")
             assert cursor.fetchone() == (RUNTIME_ROLE,)
@@ -235,7 +220,7 @@ def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_runtime_role_preserves_request_actor_and_system_outbox_principal():
+def test_runtime_role_preserves_request_actor_and_system_outbox_principal(django_runtime_role):  # type: ignore[no-untyped-def]
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role certification requires PostgreSQL")
 
@@ -272,10 +257,8 @@ def test_runtime_role_preserves_request_actor_and_system_outbox_principal():
     browser = Client()
     browser.force_login(installation.owner)
 
-    with _django_runtime_role():
-        with system_rls_scope(
-            DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
-        ):
+    with django_runtime_role():
+        with system_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
             assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
         response = browser.get(reverse("notification-list"))
 
@@ -289,7 +272,9 @@ def test_runtime_role_preserves_request_actor_and_system_outbox_principal():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor():
+def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor(
+    django_runtime_role,  # type: ignore[no-untyped-def]
+):
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role certification requires PostgreSQL")
 
@@ -304,7 +289,7 @@ def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scop
         organization=client,
     )
 
-    with _django_runtime_role(), transaction.atomic():
+    with django_runtime_role(), transaction.atomic():
         bind_local_rls_scope(
             DataScope.organization(tenant, client),
             organization_mode=OrganizationRLSMode.ORGANIZATION,
@@ -322,6 +307,132 @@ def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scop
                 "SELECT current_setting('tekdocs.principal_mode', true), current_setting('tekdocs.user_id', true)"
             )
             assert cursor.fetchone() == ("user", str(user.id))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Runtime anchor principal MSP",
+        owner_email="runtime-anchor-owner@example.invalid",
+        owner_display_name="Runtime Anchor Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    assigned = _organization(installation.tenant, "Runtime Principal Assigned")
+    restricted = _organization(installation.tenant, "Runtime Principal Restricted")
+    all_authorized = _organization(installation.tenant, "Runtime Principal All Authorized")
+    all_authorized.access_mode = OrganizationAccessMode.ALL_AUTHORIZED
+    all_authorized.save(update_fields=("access_mode", "updated_at"))
+
+    staff = User.objects.create_user(
+        email="runtime-principal-staff@example.invalid",
+        display_name="Runtime Principal Staff",
+    )
+    staff_membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=staff,
+        role=BuiltInRole.READ_ONLY,
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        membership=staff_membership,
+        created_by=installation.owner,
+    )
+    portal_user = User.objects.create_user(
+        email="runtime-principal-portal@example.invalid",
+        display_name="Runtime Principal Portal",
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=portal_user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=restricted,
+    )
+    stranger = User.objects.create_user(
+        email="runtime-principal-stranger@example.invalid",
+        display_name="Runtime Principal Stranger",
+    )
+
+    def person(name: str, organization: Organization | None) -> None:
+        entity = Entity.objects.create_owned(
+            tenant=installation.tenant,
+            entity_type="person",
+            display_name=name,
+        )
+        record = Person.objects.create(tenant=installation.tenant, entity=entity)
+        PersonAssociation.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            person=record,
+            kind="employee" if organization is None else "contact",
+        )
+
+    person("Runtime Principal MSP Person", None)
+    person("Runtime Principal Assigned Person", assigned)
+    person("Runtime Principal Restricted Person", restricted)
+
+    def names(cursor, entity_type: str) -> set[str]:  # type: ignore[no-untyped-def]
+        cursor.execute(
+            "SELECT display_name FROM core_entity WHERE entity_type = %s ORDER BY display_name",
+            [entity_type],
+        )
+        return {row[0] for row in cursor.fetchall()}
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, installation.tenant.id, "msp", principal_mode="")
+        assert names(cursor, "organization") == set()
+        assert names(cursor, "person") == set()
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "msp", user_id=stranger.id)
+        assert names(cursor, "organization") == set()
+        assert names(cursor, "person") == set()
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "msp", user_id=staff.id)
+        assert names(cursor, "organization") == {
+            "Runtime Principal Assigned",
+            "Runtime Principal All Authorized",
+        }
+        assert names(cursor, "person") == {"Runtime Principal MSP Person"}
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "organization", restricted.id, staff.id)
+        assert "Runtime Principal Restricted" not in names(cursor, "organization")
+        assert "Runtime Principal Restricted Person" not in names(cursor, "person")
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "organization", restricted.id, portal_user.id)
+        assert names(cursor, "organization") == {"Runtime Principal Restricted"}
+        assert names(cursor, "person") == {"Runtime Principal Restricted Person"}
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "msp", user_id=installation.owner.id)
+        assert names(cursor, "organization") == {
+            "Runtime Principal Assigned",
+            "Runtime Principal All Authorized",
+            "Runtime Principal Restricted",
+        }
+        assert names(cursor, "person") == {"Runtime Principal MSP Person"}
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "msp")
+        assert names(cursor, "organization") == {
+            "Runtime Principal Assigned",
+            "Runtime Principal All Authorized",
+            "Runtime Principal Restricted",
+        }
+        assert names(cursor, "person") == {"Runtime Principal MSP Person"}
+        runtime.rollback()
+
+        _bind(cursor, installation.tenant.id, "organization", restricted.id)
+        assert names(cursor, "organization") == {"Runtime Principal Restricted"}
+        assert names(cursor, "person") == {"Runtime Principal Restricted Person"}
+        runtime.rollback()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -394,7 +505,7 @@ def test_runtime_outbox_is_tenant_isolated_and_event_payload_is_immutable():
         assert cursor.fetchall() == [(first_event.id,)]
         with pytest.raises(psycopg.errors.RaiseException, match="payload are immutable"):
             cursor.execute(
-                "UPDATE core_outboxevent SET payload='{\"audience\": \"msp_internal\"}'::jsonb WHERE id=%s",
+                'UPDATE core_outboxevent SET payload=\'{"audience": "msp_internal"}\'::jsonb WHERE id=%s',
                 [first_event.id],
             )
         runtime.rollback()
@@ -464,13 +575,9 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
     tenant = Tenant.objects.create(name="Document RLS tenant", slug=f"documents-{uuid.uuid4()}")
     selected_org = _organization(tenant, "Selected client")
     sibling_org = _organization(tenant, "Sibling client")
-    document_entity = Entity.objects.create_owned(
-        tenant=tenant, entity_type="document", display_name="Shared runbook"
-    )
+    document_entity = Entity.objects.create_owned(tenant=tenant, entity_type="document", display_name="Shared runbook")
     document = Document.objects.create(tenant=tenant, entity=document_entity)
-    block_entity = Entity.objects.create_owned(
-        tenant=tenant, entity_type="document_block", display_name="Shared block"
-    )
+    block_entity = Entity.objects.create_owned(tenant=tenant, entity_type="document_block", display_name="Shared block")
     block = Block.objects.create(tenant=tenant, entity=block_entity)
     revision = BlockRevision.objects.create(
         tenant=tenant,

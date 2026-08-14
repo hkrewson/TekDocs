@@ -1,10 +1,12 @@
 {
   "status": "complete",
   "reviewer": "Independent senior engineer (identity pending release record)",
-  "scope_commit": "01ed514777b4f67a6c5399f1f2a722a83db16342",
-  "completed_at": "2026-08-14T11:12:00-05:00",
-  "report_reference": "Private report: TekDocs-security-review-01ed514.md",
+  "scope_commit": "c16b3159b1905b464af6d4490d77ab13ac076b8c",
+  "completed_at": "2026-08-14T13:17:59-05:00",
+  "report_reference": "Private report: TekDocs-review-3-c16b315.md",
+  "prior_report_reference": "Private report: TekDocs-security-review-01ed514.md",
   "validation_reference": "Private report: TekDocs-remediation-validation-2efbb8b.md",
+  "remediation_validation": "Implemented and locally validated after the reviewed commit; independent follow-up validation remains separate from this triage record.",
   "findings": [
     {
       "id": "TD-ENTITY-SEARCH-SCOPE",
@@ -48,8 +50,10 @@
       "severity": "medium",
       "status": "resolved",
       "title": "Authorization requests were not exercised through the runtime database role",
-      "disposition": "Dedicated Django regressions reconnect as the non-superuser runtime role and drive entity search, mentions, client membership, notification projection, and outbox dispatch through middleware, policy, ORM, and PostgreSQL RLS.",
+      "disposition": "A shared fixture reconnects Django as the non-superuser runtime role. Dedicated regressions cover entity anchors and worker boundaries, while an exhaustive constrained-role pass exercises every cataloged authenticated route against anonymous, non-member, read-only, CSRF, and MFA-denial cases.",
       "evidence": [
+        "backend/apps/conftest.py::django_runtime_role",
+        "backend/apps/core/tests/test_permission_idor_matrix.py::test_runtime_role_enforces_complete_route_authorization_matrix",
         "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions",
         "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal",
         "backend/apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor",
@@ -190,6 +194,52 @@
         "backend/apps/core/relationships.py::_visible_entities",
         "backend/apps/accounts/tests/test_access_control.py::test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_types",
         "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions"
+      ]
+    },
+    {
+      "id": "TD-STALE-TEST-IMAGE",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Local test targets executed stale baked source",
+      "disposition": "Every backend-bearing local test and check gate now rebuilds the backend and migration test images before execution, so the source under test matches the working tree without changing persistent development data.",
+      "evidence": [
+        "Makefile::backend-test-images",
+        "Makefile::BACKEND_IMAGE_GATES",
+        "Makefile::test-runtime-authorization"
+      ]
+    },
+    {
+      "id": "TD-PERSON-ANCHOR-UNPRINCIPLED",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Person-anchor RLS trusted organization binding without a principal",
+      "disposition": "Person-anchor visibility now requires an explicit USER or SYSTEM principal. User organization scope delegates entitlement to the organization-anchor policy, MSP scope requires MSP staff membership, and unbound transactions fail closed.",
+      "evidence": [
+        "backend/apps/core/migrations/0108_principal_aware_entity_anchor_rls.py",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal"
+      ]
+    },
+    {
+      "id": "TD-ALL-AUTHORIZED-NO-MEMBERSHIP",
+      "severity": "low",
+      "status": "resolved",
+      "title": "All-authorized organization RLS accepted users without MSP membership",
+      "disposition": "The all-authorized branch now requires a tenant membership with no client organization, matching the intended all-authorized-MSP-staff meaning while preserving owner, explicit assignment, portal, and SYSTEM paths.",
+      "evidence": [
+        "backend/apps/core/migrations/0108_principal_aware_entity_anchor_rls.py::tekdocs_is_msp_staff",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal"
+      ]
+    },
+    {
+      "id": "TD-WEBHOOK-SYSTEM-PRINCIPAL",
+      "severity": "low",
+      "status": "resolved",
+      "title": "Public inbound webhook processing entered the SYSTEM principal",
+      "disposition": "After signature and payload verification, inbound receipt creation binds only the endpoint tenant scope. It no longer enters SYSTEM mode or dereferences RLS-protected organization relations.",
+      "evidence": [
+        "backend/apps/core/webhooks.py::accept_inbound_webhook",
+        "backend/apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration",
+        "Makefile::test-runtime-authorization"
       ]
     }
   ]

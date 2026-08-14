@@ -407,9 +407,7 @@ def _record_delivery_outcome(
             delivery.state = WebhookDeliveryState.DELIVERED
             delivery.delivered_at = now
             delivery.locked_at = None
-            delivery.save(
-                update_fields=("state", "delivered_at", "locked_at", "response_status", "last_error_code")
-            )
+            delivery.save(update_fields=("state", "delivered_at", "locked_at", "response_status", "last_error_code"))
             return True
         exhausted = delivery.attempts >= MAX_WEBHOOK_ATTEMPTS
         delivery.state = WebhookDeliveryState.DEAD_LETTER if permanent or exhausted else WebhookDeliveryState.PENDING
@@ -427,9 +425,7 @@ def _record_delivery_outcome(
         return False
 
 
-def _dispatch_delivery(
-    *, tenant: Tenant, delivery_id: UUID, now: datetime, sender: WebhookSender
-) -> bool:
+def _dispatch_delivery(*, tenant: Tenant, delivery_id: UUID, now: datetime, sender: WebhookSender) -> bool:
     claim = _claim_delivery(tenant=tenant, delivery_id=delivery_id, now=now)
     if claim is None:
         return False
@@ -481,11 +477,11 @@ def accept_inbound_webhook(
         timestamp = int(timestamp_value)
     except ValueError as exc:
         raise PermissionDenied("The webhook signature is invalid or expired.") from exc
-    endpoint = (
-        WebhookEndpoint.objects.select_related("tenant", "organization")
-        .filter(pk=endpoint_id, direction=WebhookDirection.INBOUND, active=True)
-        .first()
-    )
+    endpoint = WebhookEndpoint.objects.filter(
+        pk=endpoint_id,
+        direction=WebhookDirection.INBOUND,
+        active=True,
+    ).first()
     if endpoint is None:
         raise PermissionDenied("The webhook signature is invalid or expired.")
     secret = decrypt_webhook_secret(
@@ -513,17 +509,15 @@ def accept_inbound_webhook(
         or payload.get("data") != {}
     ):
         raise ValidationError({"body": "The inbound webhook event is not supported."})
-    from .rls import OrganizationRLSMode, system_rls_scope
+    from .rls import OrganizationRLSMode, rls_scope
 
     try:
-        with system_rls_scope(
-            DataScope.tenant(endpoint.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
-        ):
+        with rls_scope(DataScope.tenant(endpoint.tenant_id), organization_mode=OrganizationRLSMode.MSP_ONLY):
             with transaction.atomic():
                 return WebhookInboundReceipt.objects.create(
-                    tenant=endpoint.tenant,
-                    organization=endpoint.organization,
-                    endpoint=endpoint,
+                    tenant_id=endpoint.tenant_id,
+                    organization_id=endpoint.organization_id,
+                    endpoint_id=endpoint.id,
                     delivery_id=delivery_id,
                     event_type=payload["type"],
                     body_sha256=hashlib.sha256(body).hexdigest(),

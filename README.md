@@ -1,104 +1,163 @@
 # TekDocs
 
-TekDocs is a greenfield, self-hosted MSP knowledge and inventory platform centered on addressable, reusable documentation blocks. Version `0.8.7` hardens the file-only production secret boundary, containers, structured application logs, dependency/license gates, authentication abuse suite, and pinned DAST rehearsal. TekDocs does not store or retrieve customer credential values.
+TekDocs is a self-hosted MSP documentation and inventory platform built around reusable, addressable Markdown blocks. It supports one MSP per installation while enforcing explicit ownership and authorization boundaries for MSP and client data.
 
-## Start locally
+TekDocs is under active pre-1.0 development. Do not deploy it without tested backups, controlled access, and an upgrade plan.
 
-Requirements: Docker with Compose, Node.js 24, npm, and OpenSSL.
+## Capabilities
 
-```sh
+- MSP, client, vendor, manufacturer, and partner workspaces
+- Markdown-first documentation with visual editing, raw Markdown, secure preview, and revision history
+- Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references
+- Immutable STATIC publications with signed manifests and retained PDF artifacts
+- People, sites, locations, custom fields, and typed entity relationships
+- Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history
+- Simplified network records for locations, VLANs, CIDRs, ranges, gateways, DNS, and asset MAC addresses
+- Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
+- Scoped built-in and custom roles at MSP, organization, and collection boundaries
+- Public API, personal and service tokens, signed webhooks, integration jobs, reconciliation, and sanitized Git export
+- Compliance controls, evidence, risks, reviews, and immutable evidence bundles
+
+TekDocs stores provider-neutral credential references. It does not store or retrieve customer credential values.
+
+## Production setup
+
+Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.
+
+The first owner must complete these steps in order:
+
+1. Create the MSP workspace with the deployment token.
+2. Enroll a TOTP authenticator using the displayed QR code.
+3. Save and acknowledge the recovery codes.
+4. Confirm the owner can sign in.
+5. Remove the bootstrap Compose overlay and bootstrap-token file.
+
+Owners and administrators must enroll TOTP before TekDocs permits privileged actions.
+
+## Local development
+
+Requirements:
+
+- Docker Engine with Docker Compose
+- Node.js 24
+- npm 11
+- OpenSSL
+
+Create the local environment and start TekDocs:
+
+```bash
 make bootstrap
 make up
 ```
 
-Open <http://localhost:3200>. `make bootstrap` creates an ignored `.env` with generated local secrets, installs the frontend lockfile, and builds the images. For an existing `.env`, it only adds newly required generated values and never replaces an existing value.
+Open:
 
-Compose runs schema changes through a one-shot migration container using the database owner. Web, worker, and scheduler containers connect as the fixed, non-owner `tekdocs_runtime` role and validate its forced-RLS policy inventory before startup. Python installs use reviewed hash locks; run `./scripts/update-python-locks.sh` after intentionally changing backend requirements.
-
-Development email is captured by Mailpit at <http://127.0.0.1:8025>; its UI is bound only to the local machine. Use `make mail-test EMAIL_TO=you@example.com` to verify delivery through the configured backend. Do not use real customer addresses or content in the development inbox.
-
-Production-capable secret files are configured with `.env.production.example`, `compose.production.yml`, and `compose.secret-files.yml`. Optional authenticated SMTP, OIDC, and first-owner bootstrap secrets use their own least-scope overlays. Direct and file sources are mutually exclusive; invalid files fail startup without echoing values or host paths. Complete operator instructions will be maintained in the public GitHub Wiki before public beta.
-
-Supported encrypted backup and restore use `scripts/tekdocs-backup.sh` and `scripts/tekdocs-restore.sh`. Run `make supported-recovery-rehearsal` to prove a complete isolated restore; possessing a backup without its separately held recovery key is intentionally insufficient.
-
-Invitation issuance is currently API-only and restricted to the installation owner. Configure the externally reachable `TEKDOCS_PUBLIC_URL` before sending invitations or password-reset links. The generated API reference is available at `/api/v1/docs/` on a running installation.
-
-Authenticated users can open **Profile → Settings** to update their display name, manage two-factor authentication, review active browser sessions, and revoke any session other than the one currently in use.
-
-The installation owner can open **Organizations** to create, classify, edit, filter, and archive client, vendor, manufacturer, and partner records. An organization may hold more than one classification. Clicking its title opens a stable organization-workspace URL. The workspace control searches the authorized organization directory, preserves equivalent section routes when switching, exposes the union of classification capabilities, and always provides a return to the MSP workspace.
-
-**Profile → Access control** manages built-in MSP roles, organization access modes, explicit client-by-client MSP staff assignments, access collections, and custom roles scoped to the tenant, one organization, or one collection. An assignment allows an existing role to reach an assigned-only client; it never grants permissions or replaces MFA. The entity/RBAC foundation is certified for the supported one-MSP-per-installation topology.
-
-The **Custom fields** area defines validated extensions for Organization, Person, Site, and Location entities. MSP-wide definitions are inherited by matching client records, while organization definitions stay inside their owning workspace. Each definition change creates an immutable version; existing values retain the exact version that validated them. The first value-entry workflow is available from Site and Location rows.
-
-The **Documentation** area persists workspace-owned Markdown in immutable, reusable block revisions. It offers visual block controls, raw Markdown, secure preview, revision history, live/pinned reuse, references, templates, managed attachments, and immutable signed STATIC publications with retained PDFs. Semantic highlight uses `==important context==`; NOTE, TIP, IMPORTANT, WARNING, and CAUTION callouts use the portable blockquote form `> [!WARNING]`. Raw HTML, MDX, scripts, inline styles, and document-authored CSS are intentionally unsupported.
-
-Vendor and manufacturer workspaces expose **Products** for supplier-owned hardware/software families, concrete models, and reusable specification sets. Specification versions and model revisions are immutable and checksummed; stale edits fail without overwriting either writer. Client asset instantiation and retained supplier provenance follow in `0.3.4`.
-
-### First-owner bootstrap
-
-Open TekDocs in a browser and enter `TEKDOCS_BOOTSTRAP_TOKEN` from the deployment secret store when prompted. The form keeps the token and password only long enough to submit the request, clears both fields immediately, and signs the new owner into a normal server-side session. Do not copy the token into tickets, chat, logs, or screenshots.
-
-The narrow API remains available for automated setup:
-
-```sh
-curl --fail-with-body http://localhost:3200/api/v1/bootstrap/owner \
-  --header 'Content-Type: application/json' \
-  --header 'X-TekDocs-Bootstrap-Token: <deployment-secret>' \
-  --data '{"tenant_name":"Example MSP","owner_email":"owner@example.com","owner_display_name":"Primary Owner","password":"use-a-unique-password-manager-generated-value"}'
+```text
+http://localhost:3200
 ```
 
-`GET /api/v1/bootstrap/status` returns only whether bootstrap is required. A successful claim creates one tenant and one normal product owner identity, records a value-free audit event, and permanently closes this endpoint. A production deployment may then remove `compose.bootstrap-secret.yml` and the bootstrap-token source file; readiness requires the token only while the installation is unclaimed. Public registration remains closed.
+Mailpit captures development email at:
 
-Useful gates:
+```text
+http://127.0.0.1:8025
+```
 
-```sh
+`make bootstrap` creates an ignored `.env`, generates local-only secrets, installs frontend dependencies, and builds the images. Existing environment values are not replaced.
+
+## Runtime
+
+- Django 5.2 LTS and Django REST Framework
+- PostgreSQL 17
+- Celery and Valkey
+- React 19, TypeScript, and Vite
+- Nginx frontend proxy
+- Docker Compose
+
+Database migrations run through a one-shot owner container. The web, worker, and scheduler services use the restricted `tekdocs_runtime` PostgreSQL role and validate the row-level security policy inventory before startup.
+
+Production secrets are file-backed. Direct environment values and secret-file sources are mutually exclusive in the production profile.
+
+## Development gates
+
+Run the fast local gate:
+
+```bash
 make check
+```
+
+Run the complete unit and component suites:
+
+```bash
 make test
+```
+
+Run production-shaped and browser validation:
+
+```bash
 make test-compose
 make test-e2e
-make test-e2e-all
-make test-e2e-live
-make test-stabilization
-make test-public-beta-performance
-make test-certification
-make test-documentation-certification
-make test-secret-files
-make test-markdown
-make compose-doctor
 make production-image-rehearsal
-make clean-install-rehearsal
-make upgrade-rehearsal
-make documentation-upgrade-rehearsal
-make documentation-backup-rehearsal
-make supported-recovery-rehearsal
-make supported-upgrade-matrix
+```
+
+Run security checks:
+
+```bash
 make security
 ```
 
-The running Docker stack is authoritative for runtime claims. See `AGENTS.md`, the current milestone or issue, and the public GitHub Wiki when it is available before substantive work.
+Run the complete release gate:
+
+```bash
+make release-gate
+```
+
+Docker Compose results are authoritative for runtime claims.
+
+## Backup and recovery
+
+Create and restore supported encrypted backups with:
+
+```text
+scripts/tekdocs-backup.sh
+scripts/tekdocs-restore.sh
+```
+
+Verify the recovery path before deployment:
+
+```bash
+make supported-recovery-rehearsal
+```
+
+Store the recovery key separately from the backup. Neither is sufficient without the other.
+
+## API
+
+The generated API reference is available on a running installation at:
+
+```text
+/api/v1/docs/
+```
+
+TekDocs uses session and CSRF authentication for the browser application. Personal tokens, service tokens, and webhook credentials use explicit scopes and separate security boundaries.
 
 ## GitHub automation
 
-The hosted validation path is intentionally split into three understandable workflows:
+The repository uses three primary workflows:
 
-- **Build, test, and secure** is the required pull-request and `main` pipeline. It validates backend static contracts, frontend code, dependencies, licenses, and repository secrets; runs the complete backend suite against its required PostgreSQL database; exercises real browser journeys; then finishes by building, inventorying, and vulnerability-scanning the production containers.
-- **Extended validation** runs on a schedule or by request. It covers the complete desktop/mobile browser matrix, the reference performance dataset, and DAST without making every pull request wait for those longer jobs.
-- **CodeQL** remains separate so GitHub code-scanning results retain their native security reporting and permissions boundary.
+- **Build, test, and secure** validates backend and frontend code, PostgreSQL behavior, permissions, isolation, dependencies, licenses, repository secrets, browser journeys, and production container builds.
+- **Extended validation** runs the full browser matrix, reference performance dataset, backup and upgrade rehearsals, and DAST.
+- **CodeQL** publishes Python and JavaScript/TypeScript findings through GitHub code scanning.
 
-Dependabot is configuration rather than a fourth workflow. It opens grouped weekly Python, npm, Docker, and GitHub Actions updates, which are then evaluated by the same required build pipeline.
+Dependabot submits grouped weekly updates for Python, npm, Docker, and GitHub Actions dependencies.
 
 ## Documentation
 
-The public GitHub Wiki is the sole public product and operator manual. This repository does not maintain a competing `docs/` tree. In-repository prose is limited to the README, contribution/security policies, source comments, generated OpenAPI reference, and project-local agent instructions required to build and review the code.
+The [TekDocs Wiki](https://github.com/hkrewson/TekDocs/wiki) is the public product and operator manual. This repository does not maintain a second public documentation tree.
 
-## Current boundaries
-
-- Registration is deliberately closed. Owners issue invitations through controlled APIs; recipients can activate a verified account and recover its password through single-use links.
-- The documentation foundation is certified for the implemented single-installation scope: persistence, revision/reuse, transfer, and immutable STATIC-publication contracts are active. The `0.8.5` regression gate reaches the planned 100-client/100,000-Entity/250,000-revision/25,000-asset reference shape, while `0.8.6` repeats critical browser behavior across the release engine/device matrix without retaining raw traces or screenshots. Neither is a maximum-capacity, physical-device, or external certification claim. Public GitHub Wiki publication remains a later milestone.
-- Organizations, People, Sites, Locations, versioned custom fields, typed Entity relationships, supplier catalogs, and MSP/client operational inventory are active entity-backed foundations. Every Entity has a non-null immutable MSP/organization Workspace owner; `Tenant` remains the supported one-MSP installation boundary and future hosted seam.
-- TekDocs does not store customer credential values. Provider-neutral external credential references arrived in `0.3.1`; production runtime secret-file injection is implemented in `0.3.2`, with mandatory removal of environment fallback remaining assigned to `0.8.7`.
+Before contributing, read `AGENTS.md`, the applicable backend or frontend instructions, and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization.
 
 ## License
 
-Copyright (C) 2026 TekDocs contributors. TekDocs is licensed under the GNU Affero General Public License version 3 only. See `LICENSE`, `TRADEMARKS.md`, and `CONTRIBUTING.md`.
+Copyright (C) 2026 TekDocs contributors.
+
+TekDocs is licensed under the GNU Affero General Public License version 3 only. See `LICENSE`, `TRADEMARKS.md`, and `CONTRIBUTING.md`.

@@ -3,6 +3,7 @@ import { helpTopicForPath, helpTopicSlugs, helpTopicUrl, WIKI_BASE_URL } from '.
 describe('contextual help topics', () => {
   it('normalizes MSP and organization workspace routes to the same stable topic', () => {
     expect(helpTopicForPath('/documentation').slug).toBe('Documentation')
+    expect(helpTopicForPath('/staff').slug).toBe('People-and-access')
     expect(helpTopicForPath('/workspaces/organizations/123/documentation').slug).toBe('Documentation')
     expect(helpTopicForPath('/workspaces/organizations/123/recycle_bin').slug).toBe('Recycle-bin')
   })

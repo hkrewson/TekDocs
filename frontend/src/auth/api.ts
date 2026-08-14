@@ -12,6 +12,7 @@ export type AuthenticatedContext = {
   permissions: string[]
   surface: 'msp' | 'client_portal'
   organization: { id: string; name: string } | null
+  mfa_enrollment_required: boolean
 }
 
 export type BootstrapDetails = {
@@ -144,10 +145,31 @@ type AllauthRecoveryResponse = {
 }
 
 export class AuthRequestError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(message: string, readonly status?: number, readonly code?: string) {
     super(message)
     this.name = 'AuthRequestError'
   }
+}
+
+type ApiErrorEnvelope = { error?: { code?: string } }
+
+export async function responseErrorCode(response: Response): Promise<string | undefined> {
+  try {
+    return ((await response.clone().json()) as ApiErrorEnvelope).error?.code
+  } catch {
+    return undefined
+  }
+}
+
+export async function privilegedActionError(response: Response, fallback: string): Promise<AuthRequestError> {
+  const code = await responseErrorCode(response)
+  return new AuthRequestError(
+    code === 'privileged_mfa_required'
+      ? 'Two-factor authentication is required for this action.'
+      : fallback,
+    response.status,
+    code,
+  )
 }
 
 export function browserCsrfToken(): string | null {

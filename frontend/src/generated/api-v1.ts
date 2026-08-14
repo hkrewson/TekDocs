@@ -5666,6 +5666,7 @@ export interface components {
             readonly organization: {
                 readonly [key: string]: unknown;
             } | null;
+            readonly mfa_enrollment_required: boolean;
         };
         readonly AuthenticatedUser: {
             /** Format: uuid */
@@ -12434,6 +12435,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
+            /** @description Invitation mutation rate limit exceeded */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
             /** @description Invitation retained but email delivery failed */
             readonly 503: {
                 headers: {
@@ -12501,6 +12513,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
+            /** @description Invitation mutation rate limit exceeded */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
             /** @description Invitation retained but email delivery failed */
             readonly 503: {
                 headers: {
@@ -12559,6 +12582,17 @@ export interface operations {
             };
             /** @description Invitation is not pending */
             readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Invitation mutation rate limit exceeded */
+            readonly 429: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

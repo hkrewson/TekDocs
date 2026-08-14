@@ -1,4 +1,5 @@
 import { afterEach, expect, vi } from 'vitest'
+import { AuthRequestError } from '../auth/api'
 import { browserAccessControlClient } from './api'
 
 function response(body: object, status = 200) {
@@ -11,6 +12,16 @@ afterEach(() => {
 })
 
 describe('access-control API', () => {
+  it('reports an MFA requirement distinctly from an authorization denial', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 'privileged_mfa_required' } }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })))
+
+    await expect(browserAccessControlClient.catalog()).rejects.toEqual(
+      new AuthRequestError('Two-factor authentication is required for this action.', 403, 'privileged_mfa_required'),
+    )
+  })
   it('loads each bounded administration resource', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response({ permissions: [], roles: [], custom_assignable_permissions: [] }))

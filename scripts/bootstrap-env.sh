@@ -2,6 +2,7 @@
 set -eu
 
 target="${1:-.env}"
+target_directory=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
 
 generate_url_safe_32_byte_key() {
   openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'
@@ -10,6 +11,10 @@ generate_url_safe_32_byte_key() {
 if [ -e "$target" ]; then
   umask 077
   changed=false
+  if ! grep -q '^TEKDOCS_SECRET_DIRECTORY=' "$target"; then
+    echo "TEKDOCS_SECRET_DIRECTORY=$target_directory/secrets" >> "$target"
+    changed=true
+  fi
   if ! grep -q '^TEKDOCS_BOOTSTRAP_TOKEN=' "$target"; then
     echo "TEKDOCS_BOOTSTRAP_TOKEN=$(openssl rand -base64 32 | tr -d '\n')" >> "$target"
     changed=true
@@ -60,13 +65,17 @@ bootstrap_token="$(openssl rand -base64 32 | tr -d '\n')"
 
 {
   echo "COMPOSE_PROJECT_NAME=tekdocs"
+  echo "TEKDOCS_DOMAIN=localhost"
+  echo "TEKDOCS_PROXY_NETWORK=proxy"
+  echo "TEKDOCS_TRAEFIK_ENTRYPOINT=http"
+  echo "TEKDOCS_SECRET_DIRECTORY=$target_directory/secrets"
   echo "POSTGRES_DB=tekdocs"
   echo "POSTGRES_OWNER_USER=tekdocs_owner"
   echo "POSTGRES_OWNER_PASSWORD=$postgres_owner_password"
   echo "POSTGRES_RUNTIME_USER=tekdocs_runtime"
   echo "POSTGRES_RUNTIME_PASSWORD=$postgres_runtime_password"
   echo "DJANGO_SECRET_KEY=$django_secret"
-  echo "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend"
+  echo "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,tekdocs-backend,frontend"
   echo "DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3200"
   echo "TEKDOCS_MASTER_KEY=$master_key"
   echo "TEKDOCS_PUBLICATION_SIGNING_KEY=$signing_key"

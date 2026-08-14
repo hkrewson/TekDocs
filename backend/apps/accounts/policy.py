@@ -63,6 +63,10 @@ class PermissionKey(StrEnum):
     INVITATIONS_CREATE = "invitations.create"
     INVITATIONS_REVOKE = "invitations.revoke"
     INVITATIONS_RESEND = "invitations.resend"
+    STAFF_INVITATIONS_VIEW = "staff_invitations.view"
+    STAFF_INVITATIONS_CREATE = "staff_invitations.create"
+    STAFF_INVITATIONS_REVOKE = "staff_invitations.revoke"
+    STAFF_INVITATIONS_RESEND = "staff_invitations.resend"
     MEMBERSHIPS_VIEW = "memberships.view"
     MEMBERSHIPS_ASSIGN_ROLE = "memberships.assign_role"
     CUSTOM_ROLES_VIEW = "custom_roles.view"
@@ -150,6 +154,10 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.INVITATIONS_CREATE, "Issue invitations", "Administration", mfa=True),
     _permission(PermissionKey.INVITATIONS_REVOKE, "Revoke invitations", "Administration", mfa=True),
     _permission(PermissionKey.INVITATIONS_RESEND, "Resend invitations", "Administration", mfa=True),
+    _permission(PermissionKey.STAFF_INVITATIONS_VIEW, "View MSP staff invitations", "Administration"),
+    _permission(PermissionKey.STAFF_INVITATIONS_CREATE, "Issue MSP staff invitations", "Administration", mfa=True),
+    _permission(PermissionKey.STAFF_INVITATIONS_REVOKE, "Revoke MSP staff invitations", "Administration", mfa=True),
+    _permission(PermissionKey.STAFF_INVITATIONS_RESEND, "Resend MSP staff invitations", "Administration", mfa=True),
     _permission(PermissionKey.MEMBERSHIPS_VIEW, "View tenant members and built-in roles", "Administration"),
     _permission(PermissionKey.MEMBERSHIPS_ASSIGN_ROLE, "Assign tenant member roles", "Administration", mfa=True),
     _permission(PermissionKey.CUSTOM_ROLES_VIEW, "View custom roles and assignments", "Administration"),
@@ -234,6 +242,10 @@ ADMINISTRATOR_PERMISSIONS = frozenset(
     if definition.key
     not in {
         PermissionKey.INSTALLATION_MANAGE,
+        PermissionKey.STAFF_INVITATIONS_VIEW,
+        PermissionKey.STAFF_INVITATIONS_CREATE,
+        PermissionKey.STAFF_INVITATIONS_REVOKE,
+        PermissionKey.STAFF_INVITATIONS_RESEND,
         PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,
         PermissionKey.CUSTOM_ROLES_MANAGE,
         PermissionKey.CUSTOM_ROLES_ASSIGN,

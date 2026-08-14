@@ -52,6 +52,7 @@ class AuthenticatedContextSerializer(serializers.Serializer):
     permissions = serializers.ListField(child=serializers.CharField())
     surface = serializers.ChoiceField(choices=("msp", "client_portal"))
     organization = serializers.DictField(allow_null=True)
+    mfa_enrollment_required = serializers.BooleanField()
 
 
 class ProfileUpdateSerializer(serializers.Serializer):

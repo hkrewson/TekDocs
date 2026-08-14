@@ -103,6 +103,27 @@ def test_client_invitation_binds_portal_session_to_exact_organization(owner_clie
 
 
 @pytest.mark.django_db
+def test_administrator_can_invite_a_client_user_without_managing_msp_staff(installation):
+    organization = _client_organization(installation, "Administrator Client")
+    administrator = User.objects.create_user(
+        email="portal-administrator@example.invalid", display_name="Portal Administrator"
+    )
+    TenantMembership.objects.create(tenant=installation.tenant, user=administrator, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(administrator, generate_totp_secret())
+    client = Client()
+    client.force_login(administrator)
+
+    client_invitation = client.post(
+        reverse("client-invitation-list-create", kwargs={"organization_entity_id": organization.entity_id}),
+        {"email": "client-user@example.invalid"},
+        content_type="application/json",
+    )
+
+    assert client_invitation.status_code == 201
+    assert client.get(reverse("invitation-list-create")).status_code == 403
+
+
+@pytest.mark.django_db
 def test_msp_session_cannot_enter_portal_and_non_client_invitation_is_hidden(owner_client, installation):
     vendor = create_organization(
         tenant=installation.tenant,

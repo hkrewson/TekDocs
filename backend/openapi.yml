@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.7
+  version: 0.8.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -3226,6 +3226,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+        '429':
+          description: Invitation mutation rate limit exceeded
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
         '503':
           description: Invitation retained but email delivery failed
           headers:
@@ -3302,6 +3314,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+        '429':
+          description: Invitation mutation rate limit exceeded
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
         '503':
           description: Invitation retained but email delivery failed
           headers:
@@ -3368,6 +3392,18 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
         '409':
           description: Invitation is not pending
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '429':
+          description: Invitation mutation rate limit exceeded
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -20012,7 +20048,10 @@ components:
           type: object
           additionalProperties: {}
           nullable: true
+        mfa_enrollment_required:
+          type: boolean
       required:
+      - mfa_enrollment_required
       - organization
       - permissions
       - role

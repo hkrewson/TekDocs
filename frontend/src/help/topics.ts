@@ -29,6 +29,7 @@ const topics: Record<string, HelpTopic> = {
   recycle_bin: { title: 'Recycle bin', summary: 'Recover archived records through the same workspace and authorization boundaries.', slug: 'Recycle-bin' },
   integrations: { title: 'Integrations', summary: 'Configure scoped tokens, webhooks, read-only synchronization, reconciliation, and exports.', slug: 'Integrations-and-API' },
   settings: { title: 'Account security', summary: 'Manage profile details, sessions, MFA, recovery codes, and API tokens.', slug: 'Account-security' },
+  staff: { title: 'Staff and invitations', summary: 'Invite MSP staff, review invitation delivery and expiry, and continue into role and client assignment.', slug: 'People-and-access' },
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
   tickets: { title: 'Tickets', summary: 'Understand the planned service-request boundary for a future release.', slug: 'Product-boundaries' },

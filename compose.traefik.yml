@@ -1,0 +1,19 @@
+services:
+  frontend:
+    ports: !reset []
+    expose: ["8080"]
+    networks: [internal, proxy]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TEKDOCS_PROXY_NETWORK:-proxy}"
+      - "traefik.http.middlewares.tekdocs-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.tekdocs.entrypoints=${TEKDOCS_TRAEFIK_ENTRYPOINT:-http}"
+      - "traefik.http.routers.tekdocs.middlewares=tekdocs-headers"
+      - "traefik.http.routers.tekdocs.rule=Host(`${TEKDOCS_DOMAIN:?Set TEKDOCS_DOMAIN in .env}`)"
+      - "traefik.http.routers.tekdocs.service=tekdocs"
+      - "traefik.http.services.tekdocs.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true
+    name: ${TEKDOCS_PROXY_NETWORK:-proxy}

@@ -1,4 +1,4 @@
-import { AuthRequestError, browserCsrfToken } from '../auth/api'
+import { AuthRequestError, browserCsrfToken, privilegedActionError } from '../auth/api'
 
 export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
@@ -212,7 +212,7 @@ async function parse<T>(response: Response): Promise<T> {
       : response.status === 404
         ? 'That document or workspace is no longer available.'
         : 'The documentation request was not completed.'
-    throw new AuthRequestError(message, response.status)
+    throw await privilegedActionError(response, message)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

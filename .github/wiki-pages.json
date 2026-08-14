@@ -1,0 +1,33 @@
+{
+  "wiki_url": "https://github.com/hkrewson/TekDocs/wiki",
+  "pages": [
+    {"slug": "Home", "audience": "end_user"},
+    {"slug": "TekDocs-Setup", "audience": "operator"},
+    {"slug": "Workspaces-and-organizations", "audience": "end_user", "contextual": true},
+    {"slug": "Organizations", "audience": "end_user", "contextual": true},
+    {"slug": "People-and-access", "audience": "end_user", "contextual": true},
+    {"slug": "Sites-and-locations", "audience": "end_user", "contextual": true},
+    {"slug": "Documentation", "audience": "end_user", "contextual": true},
+    {"slug": "Files-and-attachments", "audience": "end_user", "contextual": true},
+    {"slug": "Assets", "audience": "end_user", "contextual": true},
+    {"slug": "Software-and-licenses", "audience": "end_user", "contextual": true},
+    {"slug": "Networks", "audience": "end_user", "contextual": true},
+    {"slug": "Domains-and-certificates", "audience": "end_user", "contextual": true},
+    {"slug": "Credential-references", "audience": "end_user", "contextual": true},
+    {"slug": "Services-and-contracts", "audience": "end_user", "contextual": true},
+    {"slug": "Vendors-and-products", "audience": "end_user", "contextual": true},
+    {"slug": "Custom-fields", "audience": "end_user", "contextual": true},
+    {"slug": "Compliance", "audience": "end_user", "contextual": true},
+    {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true},
+    {"slug": "Recycle-bin", "audience": "end_user", "contextual": true},
+    {"slug": "Integrations-and-API", "audience": "api", "contextual": true},
+    {"slug": "Account-security", "audience": "end_user", "contextual": true},
+    {"slug": "Roles-and-permissions", "audience": "security", "contextual": true},
+    {"slug": "Notifications", "audience": "operator", "contextual": true},
+    {"slug": "Product-boundaries", "audience": "end_user", "contextual": true},
+    {"slug": "Backup-and-recovery", "audience": "operator"},
+    {"slug": "Upgrade-and-rollback", "audience": "operator"},
+    {"slug": "Security-model", "audience": "security"},
+    {"slug": "API-v1", "audience": "api"}
+  ]
+}

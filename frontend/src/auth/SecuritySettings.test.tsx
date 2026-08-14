@@ -12,6 +12,7 @@ const context: AuthenticatedContext = {
   permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
   surface: 'msp',
   organization: null,
+  mfa_enrollment_required: false,
 }
 
 const current: AuthSession = {

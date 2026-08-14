@@ -1,8 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AuthRequestError } from '../auth/api'
 import { browserDocumentsClient } from './api'
 
 describe('documentation placement API client', () => {
   afterEach(() => vi.restoreAllMocks())
+
+  it('reports required MFA instead of an authorization denial for document changes', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: { code: 'privileged_mfa_required' } }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(browserDocumentsClient.create({}, { title: 'Guide', category: 'guide', markdown: '# Guide', is_template: false })).rejects.toEqual(
+      new AuthRequestError('Two-factor authentication is required for this action.', 403, 'privileged_mfa_required'),
+    )
+  })
 
   it('requests bounded revision-history pages', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 3, page_size: 50, has_more: false }), { status: 200 }))

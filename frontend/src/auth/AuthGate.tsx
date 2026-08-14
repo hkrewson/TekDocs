@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError, browserCsrfToken, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
 import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance, OidcProvider } from './api'
 
@@ -101,6 +102,146 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Creating workspace…' : 'Create workspace'}</button>
       </form>
+    </AuthFrame>
+  )
+}
+
+function RequiredMfaSetup({ client, context, complete }: {
+  client: AuthClient
+  context: AuthenticatedContext
+  complete: (context: AuthenticatedContext) => void
+}) {
+  const [setup, setSetup] = useState<Awaited<ReturnType<AuthClient['beginTotp']>> | null>(null)
+  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [reauthenticationRequired, setReauthenticationRequired] = useState(false)
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const accountKind = context.role === 'owner' ? 'owner' : 'administrator'
+
+  useEffect(() => {
+    let active = true
+    client.loadMfa()
+      .then((status) => {
+        if (active && status.totpEnabled) complete({ ...context, mfa_enrollment_required: false })
+      })
+      .catch((loadError: unknown) => active && setError(message(loadError)))
+    return () => { active = false }
+  }, [client, complete, context])
+
+  const begin = async () => {
+    setError(null)
+    setWorking(true)
+    try {
+      setSetup(await client.beginTotp())
+    } catch (setupError) {
+      if (setupError instanceof AuthRequestError && setupError.status === 401) setReauthenticationRequired(true)
+      else setError(message(setupError))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const confirmPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    const submittedPassword = password
+    setPassword('')
+    setError(null)
+    setWorking(true)
+    try {
+      await client.reauthenticate(submittedPassword)
+      setReauthenticationRequired(false)
+      if (!setup) setSetup(await client.beginTotp())
+    } catch (confirmationError) {
+      setError(message(confirmationError))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const activate = async (event: FormEvent) => {
+    event.preventDefault()
+    const submittedCode = code
+    setCode('')
+    setError(null)
+    setWorking(true)
+    try {
+      setRecoveryCodes(await client.activateTotp(submittedCode))
+      setSetup(null)
+    } catch (activationError) {
+      if (activationError instanceof AuthRequestError && activationError.status === 401) setReauthenticationRequired(true)
+      else setError(message(activationError))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const recoveryText = recoveryCodes?.join('\n') ?? ''
+  const copyRecoveryCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryText)
+    } catch {
+      setError('Recovery codes could not be copied. Save them manually before continuing.')
+    }
+  }
+  const downloadRecoveryCodes = () => {
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob([`${recoveryText}\n`], { type: 'text/plain' }))
+    link.download = 'tekdocs-recovery-codes.txt'
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  if (ready) {
+    return (
+      <AuthFrame>
+        <h1>Setup complete</h1>
+        <p className="auth-intro">Two-factor authentication is enabled. Remove the bootstrap overlay and bootstrap-token file from the deployment after confirming this account can sign in.</p>
+        <button className="primary-button auth-submit" type="button" onClick={() => complete({ ...context, mfa_enrollment_required: false })}>Enter MSP workspace</button>
+      </AuthFrame>
+    )
+  }
+
+  return (
+    <AuthFrame>
+      <h1>Secure the {accountKind} account</h1>
+      <p className="auth-intro">Two-factor authentication is required before privileged TekDocs actions are available.</p>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      {!setup && !recoveryCodes && !reauthenticationRequired && (
+        <button className="primary-button auth-submit" type="button" disabled={working} onClick={() => { void begin() }}>{working ? 'Starting…' : 'Set up authenticator'}</button>
+      )}
+      {reauthenticationRequired && (
+        <form className="auth-form" onSubmit={(event) => { void confirmPassword(event) }}>
+          <label>Current password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
+          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? 'Confirming…' : 'Confirm password'}</button>
+        </form>
+      )}
+      {setup && !reauthenticationRequired && (
+        <form className="auth-form" onSubmit={(event) => { void activate(event) }}>
+          <figure className="mfa-qr-code">
+            <QRCodeSVG value={setup.totpUrl} size={192} level="M" marginSize={4} aria-hidden="true" />
+            <figcaption>Scan with your authenticator app</figcaption>
+          </figure>
+          <details className="mfa-manual-setup"><summary>Enter a setup key manually</summary><code>{setup.secret}</code></details>
+          <label>Authentication code<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
+          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? 'Verifying…' : 'Enable two-factor authentication'}</button>
+        </form>
+      )}
+      {recoveryCodes && (
+        <div className="recovery-codes" role="region" aria-labelledby="required-recovery-heading">
+          <div><strong id="required-recovery-heading">Save these recovery codes now</strong><p>They will not be shown again. Store them separately from your password.</p></div>
+          <ul>{recoveryCodes.map((recoveryCode) => <li key={recoveryCode}><code>{recoveryCode}</code></li>)}</ul>
+          <div className="settings-actions">
+            <button className="secondary-button" type="button" onClick={() => { void copyRecoveryCodes() }}>Copy codes</button>
+            <button className="secondary-button" type="button" onClick={downloadRecoveryCodes}>Download text file</button>
+          </div>
+          <label className="recovery-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />I saved the recovery codes in a secure location.</label>
+          <button className="primary-button" type="button" disabled={!acknowledged} onClick={() => { setRecoveryCodes(null); setReady(true) }}>Continue</button>
+        </div>
+      )}
     </AuthFrame>
   )
 }
@@ -466,5 +607,8 @@ export function AuthGate({ client, initialContext, children }: {
   if (state.phase === 'invitation-unavailable') return <InvitationUnavailableState />
   if (state.phase === 'invitation') return <InvitationForm token={state.token} submit={acceptInvitation} unavailable={() => setState({ phase: 'invitation-unavailable' })} />
   if (state.phase === 'error') return <ErrorState detail={state.message} retry={() => { setState({ phase: 'loading' }); setAttempt((value) => value + 1) }} />
+  if (state.context.mfa_enrollment_required) {
+    return <RequiredMfaSetup client={client} context={state.context} complete={(updated) => setState({ phase: 'authenticated', context: updated })} />
+  }
   return children({ context: state.context, signOut, signingOut, signOutError })
 }

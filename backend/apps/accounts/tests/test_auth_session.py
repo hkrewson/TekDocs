@@ -2,6 +2,7 @@ import json
 import secrets
 
 import pytest
+from allauth.mfa.models import Authenticator
 from django.test import Client
 from django.urls import reverse
 
@@ -61,6 +62,7 @@ def test_browser_session_requires_csrf_for_login_and_logout(owner_credentials):
     assert context.status_code == 200
     context_payload = context.json()
     assert context_payload["role"] == "owner"
+    assert context_payload["mfa_enrollment_required"] is True
     assert "memberships.assign_role" in context_payload["permissions"]
     assert {key: context_payload[key] for key in ("user", "tenant")} == {
         "user": {
@@ -79,6 +81,19 @@ def test_browser_session_requires_csrf_for_login_and_logout(owner_credentials):
     assert logout.status_code == 401
     assert logout.json()["meta"]["is_authenticated"] is False
     assert client.get(reverse("auth-context")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_owner_context_clears_mfa_enrollment_requirement_after_totp_exists(owner_credentials):
+    client = Client()
+    result, _password = owner_credentials
+    Authenticator.objects.create(user=result.owner, type=Authenticator.Type.TOTP, data={"secret": "test-secret"})
+    client.force_login(result.owner)
+
+    response = client.get(reverse("auth-context"))
+
+    assert response.status_code == 200
+    assert response.json()["mfa_enrollment_required"] is False
 
 
 @pytest.mark.django_db

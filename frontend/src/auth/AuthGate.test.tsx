@@ -12,6 +12,7 @@ const context: AuthenticatedContext = {
   permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
   surface: 'msp',
   organization: null,
+  mfa_enrollment_required: false,
 }
 
 function client(overrides: Partial<AuthClient> = {}): AuthClient {
@@ -88,6 +89,34 @@ describe('authentication boundary', () => {
     })
     expect(screen.queryByDisplayValue(deploymentToken)).not.toBeInTheDocument()
     expect(screen.queryByDisplayValue(password)).not.toBeInTheDocument()
+  })
+
+  it('requires owner MFA enrollment and recovery-code acknowledgement before rendering the workspace', async () => {
+    const user = userEvent.setup()
+    const recoveryCodes = ['recovery-one', 'recovery-two']
+    const activateTotp = vi.fn().mockResolvedValue(recoveryCodes)
+    const authClient = client({
+      loadMfa: vi.fn().mockResolvedValue({ totpEnabled: false, recoveryCodeTotal: 0, recoveryCodeUnused: 0 }),
+      beginTotp: vi.fn().mockResolvedValue({ secret: 'manual-secret', totpUrl: 'otpauth://totp/TekDocs:owner?secret=manual-secret' }),
+      activateTotp,
+    })
+    render(<App authClient={authClient} initialAuthContext={{ ...context, mfa_enrollment_required: true }} />)
+
+    expect(await screen.findByRole('heading', { name: 'Secure the owner account' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set up authenticator' }))
+    await user.type(await screen.findByLabelText('Authentication code'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Enable two-factor authentication' }))
+
+    expect(await screen.findByText('recovery-one')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /saved the recovery codes/i }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('heading', { name: 'Setup complete' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Enter MSP workspace' }))
+
+    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+    expect(activateTotp).toHaveBeenCalledWith('123456')
   })
 
   it('shows a safe sign-in denial and clears the password field', async () => {

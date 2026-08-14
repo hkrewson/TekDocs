@@ -41,7 +41,8 @@ if ! grep -A 3 '"node_modules/@playwright/test"' "$repository_root/frontend/pack
 fi
 
 echo "Starting isolated real-stack workspace browser journey"
-live_compose up -d --build --wait
+live_compose build --quiet
+live_compose up -d --wait
 docker build --build-arg "PLAYWRIGHT_VERSION=$playwright_version" -f "$repository_root/frontend/Dockerfile.e2e" -t "$playwright_image" "$repository_root/frontend" >/dev/null
 frontend_id=$(live_compose ps -q frontend)
 docker run --rm \

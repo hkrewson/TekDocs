@@ -7,18 +7,21 @@ from unittest.mock import patch
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core import mail
+from django.core.cache import cache
 from django.db import connection
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.settings import api_settings
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, Invitation, InvitationState, TenantMembership, User
-from apps.core.models import AuditEvent, InstallationState, Tenant
+from apps.core.models import AuditEvent, Entity, InstallationState, Organization, OrganizationClassification, Tenant
 
 
 @pytest.fixture
 def installation(db):
+    cache.clear()
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     result = bootstrap_owner(
         tenant_name="Example MSP",
@@ -28,6 +31,26 @@ def installation(db):
     )
     TOTP.activate(result.owner, generate_totp_secret())
     return result
+
+
+@pytest.mark.django_db
+def test_owner_invitation_mutations_are_rate_limited(owner_client, installation, monkeypatch):
+    monkeypatch.setitem(api_settings.DEFAULT_THROTTLE_RATES, "staff_invitations", "1/h")
+
+    first = owner_client.post(
+        reverse("invitation-list-create"),
+        {"email": "first@example.com"},
+        content_type="application/json",
+    )
+    limited = owner_client.post(
+        reverse("invitation-list-create"),
+        {"email": "second@example.com"},
+        content_type="application/json",
+    )
+
+    assert first.status_code == 201
+    assert limited.status_code == 429
+    assert Invitation.objects.filter(tenant=installation.tenant).count() == 1
 
 
 @pytest.fixture
@@ -247,6 +270,60 @@ def test_invitation_endpoints_deny_anonymous_unrelated_and_cross_tenant_access(c
     assert denied.status_code == 403
     assert hidden.status_code == 404
     assert Invitation.objects.filter(tenant=installation.tenant).count() == 0
+
+
+@pytest.mark.django_db
+def test_administrator_cannot_view_or_issue_msp_staff_invitations(client, installation):
+    administrator = User.objects.create_user(email="administrator@example.com", display_name="Administrator")
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=administrator,
+        role=BuiltInRole.ADMINISTRATOR,
+    )
+    TOTP.activate(administrator, generate_totp_secret())
+    client.force_login(administrator)
+
+    listed = client.get(reverse("invitation-list-create"))
+    issued = client.post(
+        reverse("invitation-list-create"),
+        {"email": "new-staff@example.com"},
+        content_type="application/json",
+    )
+
+    assert listed.status_code == 403
+    assert issued.status_code == 403
+    assert Invitation.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_msp_staff_invitation_list_excludes_client_portal_invitations(owner_client, installation):
+    client_organization = Organization.objects.create(
+        tenant=installation.tenant,
+        entity=Entity.objects.create_owned(
+            tenant=installation.tenant,
+            entity_type="organization",
+            display_name="Client organization",
+        ),
+    )
+    OrganizationClassification.objects.create(
+        tenant=installation.tenant,
+        organization=client_organization,
+        kind="client",
+    )
+    Invitation.objects.create(
+        tenant=installation.tenant,
+        organization=client_organization,
+        role=BuiltInRole.CLIENT_USER,
+        email="client-user@example.com",
+        token_digest=Invitation.digest_token(secrets.token_urlsafe(32)),
+        invited_by=installation.owner,
+        expires_at=timezone.now() + timedelta(days=1),
+    )
+
+    listed = owner_client.get(reverse("invitation-list-create"))
+
+    assert listed.status_code == 200
+    assert listed.json() == []
 
 
 @pytest.mark.django_db

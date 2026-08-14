@@ -1,4 +1,4 @@
-import { AuthRequestError, browserCsrfToken } from '../auth/api'
+import { AuthRequestError, browserCsrfToken, privilegedActionError } from '../auth/api'
 
 export type BuiltInRole = 'owner' | 'administrator' | 'technician' | 'contributor' | 'read_only' | 'client_administrator' | 'client_user'
 export type TenantRole = 'administrator' | 'technician' | 'contributor' | 'read_only'
@@ -59,8 +59,9 @@ async function payload<T>(response: Response): Promise<T> {
   }
 }
 
-function requestError(response: Response) {
-  return new AuthRequestError(
+async function requestError(response: Response) {
+  return privilegedActionError(
+    response,
     response.status === 403
       ? 'Your account is not authorized to manage access control.'
       : response.status === 404
@@ -68,13 +69,12 @@ function requestError(response: Response) {
         : response.status === 400
           ? 'The selected access-control change is not valid.'
           : 'Access control is unavailable.',
-    response.status,
   )
 }
 
 async function load<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
-  if (!response.ok) throw requestError(response)
+  if (!response.ok) throw await requestError(response)
   return payload<T>(response)
 }
 
@@ -95,7 +95,7 @@ async function mutate<T>(method: 'PATCH' | 'POST' | 'DELETE', path: string, body
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': token },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  if (!response.ok) throw requestError(response)
+  if (!response.ok) throw await requestError(response)
   if (response.status === 204) return undefined as T
   return payload<T>(response)
 }

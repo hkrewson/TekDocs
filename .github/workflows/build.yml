@@ -28,7 +28,10 @@ jobs:
           ./scripts/check-version.sh
           echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
       - name: Validate pinned supply chain
-        run: ./scripts/check-supply-chain-pins.sh
+        run: |
+          ./scripts/check-supply-chain-pins.sh
+          ./scripts/check-wiki.py
+          ./scripts/check-compose-config.sh
       - name: Validate workflow syntax
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9
       - name: Explain this workflow

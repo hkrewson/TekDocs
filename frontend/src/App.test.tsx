@@ -8,14 +8,16 @@ import type { WorkspaceClient } from './workspaces/api'
 import type { PeopleClient } from './people/api'
 import type { SitesClient } from './sites/api'
 import type { InventoryClient } from './inventory/api'
+import type { StaffAdministrationClient } from './staff/api'
 
 const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: '00000000-0000-4000-8000-000000000002', name: 'Example MSP' },
   role: 'owner',
-  permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
+  permissions: ['staff_invitations.view', 'memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
   surface: 'msp',
   organization: null,
+  mfa_enrollment_required: false,
 }
 
 const authClient = {
@@ -77,7 +79,11 @@ const inventoryClient = {
   assetCsvExportUrl: vi.fn().mockReturnValue('/assets.csv'),
   assetCsvTemplateUrl: vi.fn().mockReturnValue('/assets-template.csv'),
 } as unknown as InventoryClient
-const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />
+const staffAdministrationClient = {
+  members: vi.fn().mockResolvedValue([]),
+  invitations: vi.fn().mockResolvedValue([]),
+} as unknown as StaffAdministrationClient
+const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />
 
 describe('application shell', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -134,9 +140,21 @@ describe('application shell', () => {
 
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('menuitem', { name: 'Staff & invitations' })).toHaveAttribute('href', '/staff')
     expect(screen.queryByRole('menuitem', { name: 'Integrations' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+  })
+
+  it('opens owner staff administration from the profile menu', async () => {
+    const user = userEvent.setup()
+    render(app('/overview'))
+
+    await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Staff & invitations' }))
+
+    expect(await screen.findByRole('heading', { name: 'Staff & invitations' })).toBeInTheDocument()
+    expect(await screen.findByText('No invitations match this view.')).toBeInTheDocument()
   })
 
   it('collapses the desktop navigation without removing accessible links', async () => {

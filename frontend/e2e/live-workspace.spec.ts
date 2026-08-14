@@ -24,38 +24,38 @@ async function invitationTokenFromMailpit(page: Page, recipient: string) {
   throw new Error(`The invitation for ${recipient} did not arrive in Mailpit.`)
 }
 
-async function enrollTotp(page: Page, password: string) {
-  await page.goto('/settings')
+async function completeRequiredPrivilegedTotp(page: Page, password: string, accountKind: 'owner' | 'administrator') {
+  await expect(page.getByRole('heading', { name: `Secure the ${accountKind} account` })).toBeVisible()
   await page.getByRole('button', { name: 'Set up authenticator' }).click()
   const currentPassword = page.getByLabel('Current password')
-  const setupAddressDisclosure = page.getByText('Show setup address')
-  await Promise.race([currentPassword.waitFor(), setupAddressDisclosure.waitFor()])
+  const manualSetup = page.getByText('Enter a setup key manually')
+  await Promise.race([currentPassword.waitFor(), manualSetup.waitFor()])
   if (await currentPassword.isVisible()) {
     await currentPassword.fill(password)
-    await page.getByRole('button', { name: 'Confirm change' }).click()
+    await page.getByRole('button', { name: 'Confirm password' }).click()
   }
-  await setupAddressDisclosure.click()
-  const setupAddress = await page.locator('.mfa-manual-setup details code').textContent()
-  if (!setupAddress) throw new Error('Authenticator setup address was unavailable.')
-  const totp = OTPAuth.URI.parse(setupAddress)
-  if (!(totp instanceof OTPAuth.TOTP)) throw new Error('Authenticator setup did not return a TOTP address.')
-  const enterCurrentCode = async () => {
-    const secondsIntoWindow = Math.floor(Date.now() / 1000) % totp.period
-    if (secondsIntoWindow >= totp.period - 5) {
-      await page.waitForTimeout((totp.period - secondsIntoWindow + 1) * 1000)
-    }
+  await manualSetup.click()
+  const secret = await page.locator('.mfa-manual-setup code').textContent()
+  if (!secret) throw new Error('Required owner setup did not return a TOTP secret.')
+  const totp = new OTPAuth.TOTP({ secret })
+  const secondsIntoWindow = Math.floor(Date.now() / 1000) % totp.period
+  if (secondsIntoWindow >= totp.period - 5) {
+    await page.waitForTimeout((totp.period - secondsIntoWindow + 1) * 1000)
+  }
+  await page.getByLabel('Authentication code').fill(totp.generate())
+  await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
+  const recoveryAcknowledgement = page.getByLabel('I saved the recovery codes in a secure location.')
+  await Promise.race([recoveryAcknowledgement.waitFor(), currentPassword.waitFor()])
+  if (await currentPassword.isVisible()) {
+    await currentPassword.fill(password)
+    await page.getByRole('button', { name: 'Confirm password' }).click()
     await page.getByLabel('Authentication code').fill(totp.generate())
     await page.getByRole('button', { name: 'Enable two-factor authentication' }).click()
   }
-  await enterCurrentCode()
-  const savedCodes = page.getByRole('button', { name: 'I saved these codes' })
-  await Promise.race([savedCodes.waitFor(), currentPassword.waitFor()])
-  if (await currentPassword.isVisible()) {
-    await currentPassword.fill(password)
-    await page.getByRole('button', { name: 'Confirm change' }).click()
-    await enterCurrentCode()
-  }
-  await savedCodes.click()
+  await recoveryAcknowledgement.check()
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('heading', { name: 'Setup complete' })).toBeVisible()
+  await page.getByRole('button', { name: 'Enter MSP workspace' }).click()
 }
 
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
@@ -78,15 +78,14 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Create workspace' }).click()
   const bootstrapAlert = page.getByRole('alert')
   await Promise.race([
-    page.getByRole('heading', { name: 'Overview' }).waitFor(),
+    page.getByRole('heading', { name: 'Secure the owner account' }).waitFor(),
     bootstrapAlert.waitFor(),
   ])
   if (await bootstrapAlert.isVisible()) {
     throw new Error(`Owner bootstrap failed in the live stack: ${await bootstrapAlert.textContent()}`)
   }
+  await completeRequiredPrivilegedTotp(page, password, 'owner')
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
-
-  await enrollTotp(page, password)
 
   await page.goto('/organizations')
   await page.getByRole('button', { name: 'New organization' }).click()
@@ -103,13 +102,12 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   if (!clientId) throw new Error('The created client did not expose its stable organization identifier.')
 
   const staffEmail = `live-technician-${suffix}@example.invalid`
-  const csrfCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
-  if (!csrfCookie) throw new Error('The owner session did not expose a CSRF cookie.')
-  const invitationResponse = await page.request.post('/api/v1/invitations', {
-    data: { email: staffEmail },
-    headers: { 'X-CSRFToken': csrfCookie.value },
-  })
-  expect(invitationResponse.status()).toBe(201)
+  await page.getByRole('button', { name: /Account menu for Live Workspace Owner/ }).click()
+  await page.getByRole('menuitem', { name: 'Staff & invitations' }).click()
+  await expect(page.getByRole('heading', { name: 'Staff & invitations' })).toBeVisible()
+  await page.getByLabel('Email address').fill(staffEmail)
+  await page.getByRole('button', { name: 'Send invitation' }).click()
+  await expect(page.getByRole('status')).toContainText(`Invitation sent to ${staffEmail}`)
   const invitationToken = await invitationTokenFromMailpit(page, staffEmail)
 
   const staffContext = await browser.newContext()
@@ -143,7 +141,8 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('alertdialog')).toContainText('Change Live Assigned Technician from Read-only to Administrator')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText("Live Assigned Technician's role was updated")
-  await enrollTotp(staffPage, staffPassword)
+  await staffPage.goto('/settings')
+  await completeRequiredPrivilegedTotp(staffPage, staffPassword, 'administrator')
 
   const assignedWorkspace = await staffPage.request.get(`/api/v1/workspaces/organizations/${clientId}`)
   expect(assignedWorkspace.status()).toBe(200)

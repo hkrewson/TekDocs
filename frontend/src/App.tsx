@@ -28,6 +28,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  UserPlus,
   ScrollText,
   TicketCheck,
   Trash2,
@@ -59,6 +60,8 @@ import type { InventoryClient } from './inventory/api'
 import { browserWebhooksClient } from './integrations/api'
 import type { WebhooksClient } from './integrations/api'
 import type { NetworksClient } from './networks/api'
+import { browserStaffAdministrationClient } from './staff/api'
+import type { StaffAdministrationClient } from './staff/api'
 import { browserNotificationDeliveryAdminClient, browserNotificationsClient } from './notifications/api'
 import type { NotificationsClient, NotificationTarget } from './notifications/api'
 import { NotificationInbox } from './notifications/NotificationInbox'
@@ -89,6 +92,7 @@ const People = lazy(async () => ({ default: (await import('./people/People')).Pe
 const Products = lazy(async () => ({ default: (await import('./catalog/Products')).Products }))
 const RecycleBin = lazy(async () => ({ default: (await import('./recycle-bin/RecycleBin')).RecycleBin }))
 const SecuritySettings = lazy(async () => ({ default: (await import('./auth/SecuritySettings')).SecuritySettings }))
+const StaffAdministration = lazy(async () => ({ default: (await import('./staff/StaffAdministration')).StaffAdministration }))
 const Sites = lazy(async () => ({ default: (await import('./sites/Sites')).Sites }))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
@@ -229,9 +233,10 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   )
 }
 
-function ProfileMenu({ user, canManageAccess, canManageNotifications, onSignOut, signingOut }: {
+function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotifications, onSignOut, signingOut }: {
   user: AuthenticatedContext['user']
   canManageAccess: boolean
+  canManageStaff: boolean
   canManageNotifications: boolean
   onSignOut: () => Promise<void>
   signingOut: boolean
@@ -269,6 +274,7 @@ function ProfileMenu({ user, canManageAccess, canManageNotifications, onSignOut,
       {open && (
         <div className="profile-popover" role="menu">
           <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
+          {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={() => setOpen(false)}><UserPlus size={17} />Staff &amp; invitations</AppLink>}
           {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />Access control</AppLink>}
           {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />Email delivery</AppLink>}
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
@@ -436,10 +442,11 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   )
 }
 
-export function ApplicationShell({ authContext, authClient, accessControlClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
+export function ApplicationShell({ authContext, authClient, accessControlClient, staffAdministrationClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
   authContext: AuthenticatedContext
   authClient: AuthClient
   accessControlClient: AccessControlClient
+  staffAdministrationClient: StaffAdministrationClient
   workspaceClient: WorkspaceClient
   peopleClient: PeopleClient
   sitesClient: SitesClient
@@ -519,7 +526,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
-          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
@@ -534,6 +541,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/recycle-bin" element={<RecycleBin workspace={null} client={recycleBinClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
+            <Route path="/staff" element={shellContext.permissions?.includes('staff_invitations.view') ? <Suspense fallback={<section className="content-section" role="status">Loading staff administration…</section>}><StaffAdministration client={staffAdministrationClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <Suspense fallback={<section className="content-section" role="status">Loading access control…</section>}><AccessControl client={accessControlClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/notification-delivery" element={shellContext.permissions?.includes('notifications.manage') ? <NotificationDeliveryAdmin client={browserNotificationDeliveryAdminClient} /> : <Navigate to="/overview" replace />} />
             <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
@@ -557,10 +565,11 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   )
 }
 
-export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, initialAuthContext }: {
+export function App({ initialPath, authClient = browserAuthClient, accessControlClient = browserAccessControlClient, staffAdministrationClient = browserStaffAdministrationClient, workspaceClient = browserWorkspaceClient, peopleClient = browserPeopleClient, sitesClient = browserSitesClient, customFieldsClient = browserCustomFieldsClient, relationshipsClient = browserRelationshipsClient, recycleBinClient = browserRecycleBinClient, documentsClient = browserDocumentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, initialAuthContext }: {
   initialPath?: string
   authClient?: AuthClient
   accessControlClient?: AccessControlClient
+  staffAdministrationClient?: StaffAdministrationClient
   workspaceClient?: WorkspaceClient
   peopleClient?: PeopleClient
   sitesClient?: SitesClient
@@ -590,6 +599,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
           authContext={context}
           authClient={authClient}
           accessControlClient={accessControlClient}
+          staffAdministrationClient={staffAdministrationClient}
           workspaceClient={workspaceClient}
           peopleClient={peopleClient}
           sitesClient={sitesClient}

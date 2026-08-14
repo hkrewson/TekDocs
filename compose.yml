@@ -55,7 +55,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: tekdocs.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,tekdocs-backend,frontend}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3200}
       POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
       POSTGRES_USER: ${POSTGRES_OWNER_USER:?Run make bootstrap}
@@ -93,7 +93,7 @@ services:
     environment: &backend-environment
       DJANGO_SETTINGS_MODULE: tekdocs.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,tekdocs-backend,frontend}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3200}
       POSTGRES_DB: ${POSTGRES_DB:?Run make bootstrap}
       POSTGRES_USER: ${POSTGRES_RUNTIME_USER:?Run make bootstrap}
@@ -146,7 +146,9 @@ services:
       start_period: 15s
       retries: 10
     restart: unless-stopped
-    networks: [internal]
+    networks:
+      internal:
+        aliases: [tekdocs-backend]
 
   worker:
     build:

@@ -2,6 +2,7 @@ import secrets
 from typing import Any
 from uuid import UUID
 
+from allauth.mfa.models import Authenticator
 from django.conf import settings
 from django.contrib.auth import login
 from django.db import transaction
@@ -40,11 +41,15 @@ from .serializers import (
     OwnerBootstrapSerializer,
     ProfileUpdateSerializer,
 )
+from .throttles import StaffInvitationMutationThrottle
 
 BOOTSTRAP_AUTH_HEADER = "X-TekDocs-Bootstrap-Token"
 
 
 def _context_payload(user: User, context: InstallationMemberContext) -> dict[str, object]:
+    mfa_enrollment_required = context.role in {BuiltInRole.OWNER, BuiltInRole.ADMINISTRATOR} and not (
+        Authenticator.objects.filter(user=user, type=Authenticator.Type.TOTP).exists()
+    )
     return {
         "user": {"id": str(user.pk), "email": user.email, "display_name": user.display_name},
         "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
@@ -59,6 +64,7 @@ def _context_payload(user: User, context: InstallationMemberContext) -> dict[str
             if context.organization is not None
             else None
         ),
+        "mfa_enrollment_required": mfa_enrollment_required,
     }
 
 
@@ -194,10 +200,16 @@ class InvitationAcceptView(APIView):
 
 
 class InvitationListCreateView(APIView):
+    throttle_classes = [StaffInvitationMutationThrottle]
+
     @extend_schema(responses={200: InvitationSerializer(many=True), 403: OpenApiResponse(description="Owner required")})
     def get(self, request):  # type: ignore[no-untyped-def]
-        context = require_permission(request.user, PermissionKey.INVITATIONS_VIEW)
-        invitations = Invitation.scoped.for_tenant(context.tenant).select_related("organization__entity")
+        context = require_permission(request.user, PermissionKey.STAFF_INVITATIONS_VIEW)
+        invitations = (
+            Invitation.scoped.for_tenant(context.tenant)
+            .filter(organization__isnull=True)
+            .select_related("organization__entity")[:200]
+        )
         return Response(InvitationSerializer(invitations, many=True).data)
 
     @extend_schema(
@@ -207,11 +219,12 @@ class InvitationListCreateView(APIView):
             400: OpenApiResponse(description="Invalid invitation details"),
             403: OpenApiResponse(description="Owner required"),
             409: OpenApiResponse(description="Invitation conflict"),
+            429: OpenApiResponse(description="Invitation mutation rate limit exceeded"),
             503: OpenApiResponse(description="Invitation retained but email delivery failed"),
         },
     )
     def post(self, request):  # type: ignore[no-untyped-def]
-        context = require_permission(request.user, PermissionKey.INVITATIONS_CREATE)
+        context = require_permission(request.user, PermissionKey.STAFF_INVITATIONS_CREATE)
         serializer = InvitationRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invitation = issue_invitation(
@@ -266,6 +279,8 @@ class ClientInvitationListCreateView(APIView):
 
 
 class InvitationRevokeView(APIView):
+    throttle_classes = [StaffInvitationMutationThrottle]
+
     @extend_schema(
         request=None,
         responses={
@@ -273,15 +288,20 @@ class InvitationRevokeView(APIView):
             403: OpenApiResponse(description="Owner required"),
             404: OpenApiResponse(description="Invitation not found"),
             409: OpenApiResponse(description="Invitation is not pending"),
+            429: OpenApiResponse(description="Invitation mutation rate limit exceeded"),
         },
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
-        context = require_permission(request.user, PermissionKey.INVITATIONS_REVOKE)
-        invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
+        context = require_permission(request.user, PermissionKey.STAFF_INVITATIONS_REVOKE)
+        invitation = get_object_or_404(
+            Invitation.scoped.for_tenant(context.tenant).filter(organization__isnull=True), pk=invitation_id
+        )
         return Response(InvitationSerializer(revoke_invitation(invitation=invitation, actor=request.user)).data)
 
 
 class InvitationResendView(APIView):
+    throttle_classes = [StaffInvitationMutationThrottle]
+
     @extend_schema(
         request=None,
         responses={
@@ -289,10 +309,13 @@ class InvitationResendView(APIView):
             403: OpenApiResponse(description="Owner required"),
             404: OpenApiResponse(description="Invitation not found"),
             409: OpenApiResponse(description="Invitation is not pending"),
+            429: OpenApiResponse(description="Invitation mutation rate limit exceeded"),
             503: OpenApiResponse(description="Invitation retained but email delivery failed"),
         },
     )
     def post(self, request, invitation_id):  # type: ignore[no-untyped-def]
-        context = require_permission(request.user, PermissionKey.INVITATIONS_RESEND)
-        invitation = get_object_or_404(Invitation.scoped.for_tenant(context.tenant), pk=invitation_id)
+        context = require_permission(request.user, PermissionKey.STAFF_INVITATIONS_RESEND)
+        invitation = get_object_or_404(
+            Invitation.scoped.for_tenant(context.tenant).filter(organization__isnull=True), pk=invitation_id
+        )
         return Response(InvitationSerializer(resend_invitation(invitation=invitation, actor=request.user)).data)

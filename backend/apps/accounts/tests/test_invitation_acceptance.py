@@ -190,7 +190,7 @@ def test_acceptance_requires_csrf_and_anonymous_session(installation):
     assert User.objects.filter(email="invitee@example.com").exists() is False
 
 
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_acceptance_creates_exactly_one_account(installation):
     if connection.vendor != "postgresql":
         pytest.skip("Invitation acceptance concurrency contract requires PostgreSQL")

@@ -269,3 +269,49 @@ def test_rls_scope_binding_requires_atomic_transaction():
             DataScope(tenant_id=uuid.uuid4(), workspace_id=uuid.uuid4()),
             organization_mode=OrganizationRLSMode.MSP_ONLY,
         )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_scoped_queries_compose_with_database_workspace_isolation(django_runtime_role):  # type: ignore[no-untyped-def]
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role scoped-query validation requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Runtime Scope MSP", slug="runtime-scope")
+    foreign_tenant = Tenant.objects.create(name="Runtime Foreign MSP", slug="runtime-foreign")
+    selected = _organization(tenant, "Runtime Selected Client")
+    sibling = _organization(tenant, "Runtime Sibling Client")
+    foreign = _organization(foreign_tenant, "Runtime Foreign Client")
+    selected_entity = Entity.objects.create_owned(
+        tenant=tenant,
+        organization=selected,
+        entity_type="document",
+        display_name="Runtime selected document",
+    )
+    sibling_entity = Entity.objects.create_owned(
+        tenant=tenant,
+        organization=sibling,
+        entity_type="document",
+        display_name="Runtime sibling document",
+    )
+    Entity.objects.create_owned(
+        tenant=foreign_tenant,
+        organization=foreign,
+        entity_type="document",
+        display_name="Runtime foreign document",
+    )
+    selected_scope = DataScope.organization(tenant, selected)
+    sibling_scope = DataScope.organization(tenant, sibling)
+
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(selected_scope, organization_mode=OrganizationRLSMode.ORGANIZATION)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_user")
+            assert cursor.fetchone() == ("tekdocs_runtime",)
+        assert list(
+            Entity.scoped.for_scope(selected_scope).values_list("id", flat=True)
+        ) == [selected_entity.id]
+        assert not Entity.scoped.for_scope(sibling_scope).exists()
+        assert list(
+            Entity.objects.filter(entity_type="document").values_list("display_name", flat=True)
+        ) == ["Runtime selected document"]
+        assert Entity.objects.filter(pk=sibling_entity.id).update(display_name="Scope bypass") == 0

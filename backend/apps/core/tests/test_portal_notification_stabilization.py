@@ -33,7 +33,8 @@ pytest_plugins = ("apps.core.tests.test_portal_documents",)
 NOTIFICATION_HISTORY_SIZE = 250
 NOTIFICATION_QUERY_BUDGET = 32
 PORTAL_DOCUMENT_HISTORY_SIZE = 125
-PORTAL_DOCUMENT_QUERY_BUDGET = 32
+# Includes the exact-organization membership lookup performed before portal data is resolved.
+PORTAL_DOCUMENT_QUERY_BUDGET = 33
 P95_TARGET_SECONDS = 0.5
 
 

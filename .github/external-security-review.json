@@ -258,28 +258,28 @@
     {
       "id": "TD-LEGACY-HELPER-PUBLIC-EXECUTE",
       "severity": "informational",
-      "status": "open",
+      "status": "resolved",
       "title": "Legacy RLS helper functions retain PostgreSQL PUBLIC EXECUTE",
-      "disposition": "Scheduled in 0.8.10. Revoke PUBLIC EXECUTE and grant only the runtime role for the four legacy scope helpers, with migration reversal and unrelated-role denial evidence.",
+      "disposition": "Migration 0109 revokes PUBLIC EXECUTE from all four legacy scope helpers and grants EXECUTE only to the runtime role. A PostgreSQL migration-cycle regression proves the forward and reverse ACL states and executes each helper as an unrelated login role to verify denial after reapplication.",
       "evidence": [
-        "backend/apps/core/migrations/0004_rls_session_helpers.py",
-        "backend/apps/core/migrations/0019_activate_runtime_rls.py",
-        "backend/apps/core/migrations/0045_workspace_ownership.py",
-        "Private report: TekDocs-recheck-32c72c0.md section 6.1"
+        "backend/apps/core/migrations/0109_restrict_legacy_scope_helpers.py",
+        "backend/apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply",
+        "Makefile::test-runtime-authorization"
       ]
     },
     {
       "id": "TD-RUNTIME-ISOLATION-HYGIENE",
       "severity": "informational",
-      "status": "open",
+      "status": "resolved",
       "title": "Additional isolation modules still rely primarily on owner-role execution",
-      "disposition": "Scheduled in 0.8.10. Extend constrained-runtime evidence across workspace, client-portal, and scoping boundaries without replacing the existing granular owner-role regressions.",
+      "disposition": "Focused constrained-role regressions now cover assigned-client workspace entry and discovery, exact-organization client portal initialization, and scoped-manager composition with forced RLS. The portal regression also corrected request initialization so organization-bound users enter their exact database scope before protected relations are resolved. Existing granular owner-role regressions remain in place.",
       "evidence": [
         "backend/apps/conftest.py::django_runtime_role",
-        "backend/apps/core/tests/test_workspaces.py",
-        "backend/apps/accounts/tests/test_client_portal_boundary.py",
-        "backend/apps/core/tests/test_scoping.py",
-        "Private report: TekDocs-recheck-32c72c0.md sections 2 and 6.2"
+        "backend/apps/core/middleware.py::RLSRequestScopeMiddleware",
+        "backend/apps/core/tests/test_workspaces.py::test_runtime_role_workspace_routes_enforce_assigned_client_boundary",
+        "backend/apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_client_portal_context_is_exactly_organization_scoped",
+        "backend/apps/core/tests/test_scoping.py::test_runtime_role_scoped_queries_compose_with_database_workspace_isolation",
+        "Makefile::test-runtime-authorization"
       ]
     }
   ]

@@ -113,6 +113,8 @@ class RLSRequestScopeMiddleware:
                     .first()
                 )
                 if state is not None and state.tenant is not None:
+                    from apps.accounts.models import TenantMembership
+
                     request.rls_tenant = state.tenant  # type: ignore[attr-defined]
                     tenant_scope = DataScope.tenant(state.tenant)
                     bind_local_rls_scope(
@@ -121,6 +123,24 @@ class RLSRequestScopeMiddleware:
                         actor_user_id=request.user.pk,
                         principal_mode=RLSPrincipalMode.USER,
                     )
+                    organization_id = (
+                        TenantMembership.scoped.for_tenant(state.tenant)
+                        .filter(user=request.user)
+                        .values_list("organization_id", flat=True)
+                        .first()
+                    )
+                    organization = (
+                        Organization.objects.filter(tenant=state.tenant, id=organization_id).first()
+                        if organization_id is not None
+                        else None
+                    )
+                    if organization is not None:
+                        bind_local_rls_scope(
+                            DataScope.organization(state.tenant, organization),
+                            organization_mode=OrganizationRLSMode.ORGANIZATION,
+                            actor_user_id=request.user.pk,
+                            principal_mode=RLSPrincipalMode.USER,
+                        )
             return self.get_response(request)
 
     def process_view(

@@ -179,3 +179,54 @@ def test_client_membership_database_guard_rejects_scope_retargeting(installation
             invited_by=installation.owner,
             expires_at=timezone.now() + timedelta(days=1),
         )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_client_portal_context_is_exactly_organization_scoped(
+    installation,
+    django_runtime_role,  # type: ignore[no-untyped-def]
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role client-portal validation requires PostgreSQL")
+
+    organization = _client_organization(installation, "Runtime Portal Client")
+    sibling = _client_organization(installation, "Runtime Portal Sibling")
+    portal_user = User.objects.create_user(
+        email="runtime-portal-boundary@example.invalid",
+        display_name="Runtime Portal Boundary",
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=portal_user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=organization,
+    )
+    browser = Client()
+    browser.force_login(portal_user)
+
+    with django_runtime_role():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_user")
+            assert cursor.fetchone() == ("tekdocs_runtime",)
+        context = browser.get(reverse("client-portal-context"))
+        own_documents = browser.get(
+            reverse(
+                "organization-document-list-create",
+                kwargs={"organization_entity_id": organization.entity_id},
+            )
+        )
+        sibling_documents = browser.get(
+            reverse(
+                "organization-document-list-create",
+                kwargs={"organization_entity_id": sibling.entity_id},
+            )
+        )
+
+    assert context.status_code == 200
+    assert context.json()["surface"] == "client_portal"
+    assert context.json()["organization"] == {
+        "id": str(organization.entity_id),
+        "name": "Runtime Portal Client",
+    }
+    assert own_documents.status_code == 403
+    assert sibling_documents.status_code == 404

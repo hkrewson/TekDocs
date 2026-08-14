@@ -341,7 +341,7 @@ def test_invitation_creation_requires_csrf_for_browser_session(installation):
     assert Invitation.objects.count() == 0
 
 
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_duplicate_invitation_issuance_creates_one_pending_record(installation):
     if connection.vendor != "postgresql":
         pytest.skip("Invitation concurrency contract requires PostgreSQL")

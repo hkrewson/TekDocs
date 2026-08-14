@@ -1,9 +1,12 @@
 import secrets
+from importlib import import_module
 
+import psycopg
 import pytest
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
+from psycopg import sql
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
@@ -35,6 +38,11 @@ from apps.core.people import create_person
 from apps.core.rls_contract import RLS_TABLES
 from apps.core.scoping import DataScope
 from apps.core.sites import archive_site, create_location, create_site
+
+legacy_scope_helper_migration = import_module("apps.core.migrations.0109_restrict_legacy_scope_helpers")
+LEGACY_SCOPE_FUNCTIONS = legacy_scope_helper_migration.LEGACY_SCOPE_FUNCTIONS
+LEGACY_SCOPE_HELPERS_FORWARD_SQL = legacy_scope_helper_migration.FORWARD_SQL
+LEGACY_SCOPE_HELPERS_REVERSE_SQL = legacy_scope_helper_migration.REVERSE_SQL
 
 DOCUMENT_RLS_TABLES = {
     "core_webhookinboundreceipt",
@@ -303,7 +311,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0108", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0109", verbosity=0, interactive=False)
     call_command("migrate", "accounts", "0019", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids
@@ -334,3 +342,117 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
                 "UPDATE core_auditevent SET occurred_at = %s WHERE tenant_id = %s",
                 [timezone.now(), result.tenant.id],
             )
+
+
+def _legacy_scope_helper_privileges(role_name: str) -> tuple[dict[str, bool], dict[str, bool]]:
+    role_privileges: dict[str, bool] = {}
+    public_privileges: dict[str, bool] = {}
+    with connection.cursor() as cursor:
+        for signature in LEGACY_SCOPE_FUNCTIONS:
+            cursor.execute(
+                """
+                SELECT
+                    has_function_privilege(%s, %s, 'EXECUTE'),
+                    EXISTS (
+                        SELECT 1
+                        FROM pg_proc function_record
+                        CROSS JOIN LATERAL aclexplode(
+                            COALESCE(
+                                function_record.proacl,
+                                acldefault('f', function_record.proowner)
+                            )
+                        ) function_acl
+                        WHERE function_record.oid = to_regprocedure(%s)
+                          AND function_acl.grantee = 0
+                          AND function_acl.privilege_type = 'EXECUTE'
+                    )
+                """,
+                [role_name, signature, signature],
+            )
+            role_allowed, public_allowed = cursor.fetchone()
+            role_privileges[signature] = role_allowed
+            public_privileges[signature] = public_allowed
+    return role_privileges, public_privileges
+
+
+def _unrelated_role_connection(role_name: str, password: str):  # type: ignore[no-untyped-def]
+    return psycopg.connect(
+        dbname=connection.settings_dict["NAME"],
+        user=role_name,
+        password=password,
+        host=connection.settings_dict["HOST"],
+        port=connection.settings_dict["PORT"],
+        autocommit=True,
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legacy_scope_helper_privileges_reverse_and_reapply():
+    if connection.vendor != "postgresql":
+        pytest.skip("Scope-helper privilege validation requires PostgreSQL")
+
+    role_name = f"tekdocs_unrelated_{secrets.token_hex(6)}"
+    password = f"{secrets.token_urlsafe(32)}Aa7!"
+    calls = (
+        "SELECT tekdocs_current_tenant_id()",
+        "SELECT tekdocs_current_organization_id()",
+        "SELECT tekdocs_current_workspace_id()",
+        "SELECT tekdocs_scope_matches(NULL::uuid, NULL::uuid)",
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql.SQL(
+                "CREATE ROLE {} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+                "NOINHERIT NOBYPASSRLS PASSWORD %s"
+            ).format(sql.Identifier(role_name)),
+            [password],
+        )
+        cursor.execute(
+            sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
+                sql.Identifier(connection.settings_dict["NAME"]),
+                sql.Identifier(role_name),
+            )
+        )
+        cursor.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role_name)))
+
+    try:
+        runtime_privileges, public_privileges = _legacy_scope_helper_privileges("tekdocs_runtime")
+        unrelated_privileges, _ = _legacy_scope_helper_privileges(role_name)
+        assert all(runtime_privileges.values())
+        assert not any(public_privileges.values())
+        assert not any(unrelated_privileges.values())
+        with _unrelated_role_connection(role_name, password) as unrelated:
+            for statement in calls:
+                with unrelated.cursor() as cursor, pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    cursor.execute(statement)
+
+        with connection.cursor() as cursor:
+            cursor.execute(LEGACY_SCOPE_HELPERS_REVERSE_SQL)
+        runtime_privileges, public_privileges = _legacy_scope_helper_privileges("tekdocs_runtime")
+        unrelated_privileges, _ = _legacy_scope_helper_privileges(role_name)
+        assert all(runtime_privileges.values())
+        assert all(public_privileges.values())
+        assert all(unrelated_privileges.values())
+        with _unrelated_role_connection(role_name, password) as unrelated:
+            for statement in calls:
+                with unrelated.cursor() as cursor:
+                    cursor.execute(statement)
+                    cursor.fetchone()
+
+        with connection.cursor() as cursor:
+            cursor.execute(LEGACY_SCOPE_HELPERS_FORWARD_SQL)
+        runtime_privileges, public_privileges = _legacy_scope_helper_privileges("tekdocs_runtime")
+        unrelated_privileges, _ = _legacy_scope_helper_privileges(role_name)
+        assert all(runtime_privileges.values())
+        assert not any(public_privileges.values())
+        assert not any(unrelated_privileges.values())
+        with _unrelated_role_connection(role_name, password) as unrelated:
+            for statement in calls:
+                with unrelated.cursor() as cursor, pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    cursor.execute(statement)
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute(LEGACY_SCOPE_HELPERS_FORWARD_SQL)
+            cursor.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(role_name)))
+            cursor.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role_name)))

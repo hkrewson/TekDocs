@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.db import connection
 from django.test import Client
 from django.urls import reverse
 
@@ -265,3 +266,45 @@ def test_workspace_search_denies_anonymous_and_allows_read_only_member_without_m
 
     installation.owner.authenticator_set.filter(type="totp").delete()
     assert owner_client.get(url).status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_workspace_routes_enforce_assigned_client_boundary(installation, django_runtime_role):  # type: ignore[no-untyped-def]
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role workspace validation requires PostgreSQL")
+
+    assigned = create_organization(installation.tenant, name="Runtime Assigned", classifications=("client",))
+    restricted = create_organization(
+        installation.tenant,
+        name="Runtime Restricted",
+        classifications=("client",),
+    )
+    member = User.objects.create_user(email="runtime-workspace@example.invalid", display_name="Runtime Workspace")
+    membership = TenantMembership.objects.create(tenant=installation.tenant, user=member)
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    browser = Client()
+    browser.force_login(member)
+
+    with django_runtime_role():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_user")
+            assert cursor.fetchone() == ("tekdocs_runtime",)
+        msp = browser.get(reverse("workspace-msp"))
+        assigned_response = browser.get(
+            reverse("workspace-organization", kwargs={"entity_id": assigned.entity_id})
+        )
+        restricted_response = browser.get(
+            reverse("workspace-organization", kwargs={"entity_id": restricted.entity_id})
+        )
+        searched = browser.get(reverse("workspace-organization-search"), {"classification": "client"})
+
+    assert msp.status_code == 200
+    assert assigned_response.status_code == 200
+    assert assigned_response.json()["name"] == "Runtime Assigned"
+    assert restricted_response.status_code == 404
+    assert [item["name"] for item in searched.json()["results"]] == ["Runtime Assigned"]

@@ -13,6 +13,7 @@ from apps.accounts.models import (
     CustomRole,
     CustomRolePermission,
     CustomRoleScope,
+    OrganizationAccessAssignment,
     ScopedRoleAssignment,
     TenantMembership,
     User,
@@ -233,6 +234,13 @@ def test_organization_scoped_custom_grant_does_not_reach_sibling_or_bypass_manag
     )
     user = User.objects.create_user(email="reference-reader@example.invalid", display_name="Reference Reader")
     membership = TenantMembership.objects.create(tenant=result.tenant, user=user, role=BuiltInRole.READ_ONLY)
+    for organization in (first, second):
+        OrganizationAccessAssignment.objects.create(
+            tenant=result.tenant,
+            organization=organization,
+            membership=membership,
+            created_by=result.owner,
+        )
     role = CustomRole.objects.create(
         tenant=result.tenant,
         name="Client credential operator",
@@ -289,7 +297,14 @@ def test_collection_scoped_custom_grant_reaches_only_collection_organizations(in
         content_type="application/json",
     )
     user = User.objects.create_user(email="collection-reference-reader@example.invalid")
-    TenantMembership.objects.create(tenant=result.tenant, user=user, role=BuiltInRole.READ_ONLY)
+    membership = TenantMembership.objects.create(tenant=result.tenant, user=user, role=BuiltInRole.READ_ONLY)
+    for organization in (first, second):
+        OrganizationAccessAssignment.objects.create(
+            tenant=result.tenant,
+            organization=organization,
+            membership=membership,
+            created_by=result.owner,
+        )
     collection = owner_client.post(
         reverse("access-collection-list-create"),
         {"name": "Credential clients", "description": "", "organization_ids": [first.entity_id]},

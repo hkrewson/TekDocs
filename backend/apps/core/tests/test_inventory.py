@@ -15,7 +15,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.asset_csv import FIELDS, SCHEMA_VERSION
 from apps.core.models import (
     ClientAsset,
@@ -132,7 +132,17 @@ def _catalog(owner_client, supplier):  # type: ignore[no-untyped-def]
         password=f"{secrets.token_urlsafe(24)}Aa7!",
         display_name="Catalog Approver",
     )
-    TenantMembership.objects.create(tenant=supplier.tenant, user=approver, role=BuiltInRole.ADMINISTRATOR)
+    membership = TenantMembership.objects.create(
+        tenant=supplier.tenant,
+        user=approver,
+        role=BuiltInRole.ADMINISTRATOR,
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=supplier.tenant,
+        organization=supplier,
+        membership=membership,
+        created_by=supplier.tenant.installation_state.owner,
+    )
     TOTP.activate(approver, generate_totp_secret())
     approver_client = Client(enforce_csrf_checks=False)
     approver_client.force_login(approver)
@@ -1056,6 +1066,7 @@ def test_postgres_rejects_client_asset_provenance_mutation(owner_client, install
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(installation.tenant.id)])
+        cursor.execute("SELECT set_config('tekdocs.user_id', %s, true)", [str(installation.owner.id)])
         cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(client.id)])
         cursor.execute("SELECT set_config('tekdocs.organization_mode', 'organization', true)")
         cursor.execute("SELECT id FROM core_catalogmodel WHERE id = %s", [asset.model_id])

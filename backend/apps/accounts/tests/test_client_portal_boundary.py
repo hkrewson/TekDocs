@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, Invitation, TenantMembership, User
+from apps.accounts.models import BuiltInRole, Invitation, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import InstallationState
 from apps.core.organizations import create_organization
 
@@ -97,7 +97,7 @@ def test_client_invitation_binds_portal_session_to_exact_organization(owner_clie
         portal.get(
             reverse("organization-document-list-create", kwargs={"organization_entity_id": sibling.entity_id})
         ).status_code
-        == 403
+        == 404
     )
     assert portal.get(reverse("organization-list-create")).status_code == 403
 
@@ -108,7 +108,17 @@ def test_administrator_can_invite_a_client_user_without_managing_msp_staff(insta
     administrator = User.objects.create_user(
         email="portal-administrator@example.invalid", display_name="Portal Administrator"
     )
-    TenantMembership.objects.create(tenant=installation.tenant, user=administrator, role=BuiltInRole.ADMINISTRATOR)
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=administrator,
+        role=BuiltInRole.ADMINISTRATOR,
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        membership=membership,
+        created_by=installation.owner,
+    )
     TOTP.activate(administrator, generate_totp_secret())
     client = Client()
     client.force_login(administrator)

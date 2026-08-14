@@ -1413,7 +1413,7 @@ class Organization(TimestampedModel):
     access_mode = models.CharField(
         max_length=32,
         choices=OrganizationAccessMode.choices,
-        default=OrganizationAccessMode.ALL_AUTHORIZED,
+        default=OrganizationAccessMode.ASSIGNED_ONLY,
     )
 
     objects = models.Manager()

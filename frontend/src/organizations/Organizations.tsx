@@ -48,7 +48,7 @@ function OrganizationForm({ organization, saving, onCancel, onSave }: {
   return (
     <section className="content-section organization-form-section" aria-labelledby="organization-form-heading">
       <div className="section-heading">
-        <div><h2 id="organization-form-heading">{organization ? `Edit ${organization.name}` : 'Add organization'}</h2><p>Organizations may serve more than one business role.</p></div>
+        <div><h2 id="organization-form-heading">{organization ? `Edit ${organization.name}` : 'Add organization'}</h2><p>{organization ? 'Organizations may serve more than one business role.' : 'New organizations are restricted to explicitly assigned MSP staff. Owners retain access.'}</p></div>
       </div>
       <form className="organization-form" onSubmit={submit}>
         <label>Display name<input autoFocus value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} maxLength={240} required /></label>

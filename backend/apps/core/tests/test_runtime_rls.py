@@ -1,11 +1,17 @@
+import secrets
 import uuid
+from contextlib import contextmanager
 from hashlib import sha256
 
 import psycopg
 import pytest
 from django.conf import settings
 from django.db import DatabaseError, connection, transaction
+from django.test import Client
+from django.urls import reverse
 
+from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
     Block,
@@ -19,8 +25,12 @@ from apps.core.models import (
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
     Entity,
+    InstallationState,
     Organization,
+    OrganizationClassification,
     OutboxEvent,
+    Person,
+    PersonAssociation,
     Tenant,
 )
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
@@ -41,7 +51,7 @@ def _runtime_connection():
     )
 
 
-def _bind(cursor, tenant_id, mode, organization_id=None):
+def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None):
     cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(tenant_id)])
     cursor.execute(
         "SELECT id FROM core_workspace WHERE tenant_id = %s AND organization_id IS NOT DISTINCT FROM %s",
@@ -51,6 +61,22 @@ def _bind(cursor, tenant_id, mode, organization_id=None):
     cursor.execute("SELECT set_config('tekdocs.workspace_id', %s, true)", [str(workspace_id)])
     cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [str(organization_id or "")])
     cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [mode])
+    cursor.execute("SELECT set_config('tekdocs.user_id', %s, true)", [str(user_id or "")])
+
+
+@contextmanager
+def _django_runtime_role():
+    original_user = connection.settings_dict["USER"]
+    original_password = connection.settings_dict["PASSWORD"]
+    connection.close()
+    connection.settings_dict["USER"] = RUNTIME_ROLE
+    connection.settings_dict["PASSWORD"] = settings.TEKDOCS_DATABASE_RUNTIME_PASSWORD
+    try:
+        yield
+    finally:
+        connection.close()
+        connection.settings_dict["USER"] = original_user
+        connection.settings_dict["PASSWORD"] = original_password
 
 
 @pytest.mark.django_db(transaction=True)
@@ -96,7 +122,7 @@ def test_runtime_credential_references_are_forced_to_the_selected_workspace():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_runtime_organization_scope_can_create_tenant_person_identity():
+def test_runtime_organization_scope_can_stage_tenant_person_identity_until_associated():
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role certification requires PostgreSQL")
 
@@ -119,8 +145,77 @@ def test_runtime_organization_scope_can_create_tenant_person_identity():
             "'msp_private', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             [entity_id, tenant.id, msp_workspace_id],
         )
+        assert cursor.rowcount == 1
         cursor.execute("SELECT id FROM core_entity WHERE id = %s", [entity_id])
-        assert cursor.fetchone() == (entity_id,)
+        assert cursor.fetchone() is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role certification requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Runtime request MSP",
+        owner_email="runtime-request-owner@example.invalid",
+        owner_display_name="Runtime Request Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    assigned = _organization(installation.tenant, "Runtime Assigned Client")
+    restricted = _organization(installation.tenant, "Runtime Restricted Client")
+    reader = User.objects.create_user(email="runtime-reader@example.invalid", display_name="Runtime Reader")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=reader,
+        role=BuiltInRole.READ_ONLY,
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    for organization, name in (
+        (assigned, "Runtime Visible Contact"),
+        (restricted, "Runtime Hidden Contact"),
+    ):
+        entity = Entity.objects.create_owned(
+            tenant=installation.tenant,
+            entity_type="person",
+            display_name=name,
+        )
+        person = Person.objects.create(tenant=installation.tenant, entity=entity)
+        PersonAssociation.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            person=person,
+            kind="contact",
+        )
+    OrganizationClassification.objects.bulk_create(
+        [
+            OrganizationClassification(tenant=installation.tenant, organization=assigned, kind="client"),
+            OrganizationClassification(tenant=installation.tenant, organization=restricted, kind="client"),
+        ]
+    )
+    browser = Client()
+    browser.force_login(reader)
+
+    with _django_runtime_role():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_user")
+            assert cursor.fetchone() == (RUNTIME_ROLE,)
+        organizations = browser.get(reverse("msp-entity-search"), {"entity_type": "organization"})
+        people = browser.get(reverse("msp-entity-search"), {"entity_type": "person"})
+        mentions = browser.get(reverse("msp-document-mention-search"))
+
+    assert organizations.status_code == 200
+    assert [item["display_name"] for item in organizations.json()["results"]] == ["Runtime Assigned Client"]
+    assert people.status_code == 200
+    assert people.json()["results"] == []
+    mention_names = {item["display_name"] for item in mentions.json()["results"]}
+    assert "Runtime Restricted Client" not in mention_names
+    assert "Runtime Hidden Contact" not in mention_names
 
 
 @pytest.mark.django_db(transaction=True)

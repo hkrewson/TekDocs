@@ -10,7 +10,15 @@ from django.urls import reverse
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.accounts.policy import PERMISSION_CATALOG, ROLE_DEFINITIONS, PermissionKey
-from apps.core.models import AuditEvent, Entity, InstallationState, Organization, OrganizationClassification, Tenant
+from apps.core.models import (
+    AuditEvent,
+    CredentialReference,
+    Entity,
+    InstallationState,
+    Organization,
+    OrganizationClassification,
+    Tenant,
+)
 
 
 @pytest.fixture
@@ -194,6 +202,71 @@ def test_assigned_only_mode_is_additional_fail_closed_constraint_across_discover
     assert technician_client.get(restricted_people).status_code == 404
     assert technician_client.get(restricted_entities).status_code == 404
     assert owner_client.get(restricted_workspace).status_code == 200
+
+
+@pytest.mark.django_db
+def test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_types(
+    owner_client,
+    installation,
+):
+    assigned = organization(installation.tenant, "Assigned Search Client", access_mode="assigned_only")
+    restricted = organization(installation.tenant, "Restricted Search Client", access_mode="assigned_only")
+    _technician, membership, technician_client = member(installation, role=BuiltInRole.READ_ONLY)
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    assigned_contact = owner_client.post(
+        reverse(
+            "organization-people-list-create",
+            kwargs={"organization_entity_id": assigned.entity_id},
+        ),
+        {"full_name": "Visible Assigned Contact", "kind": "contact"},
+        content_type="application/json",
+    )
+    restricted_contact = owner_client.post(
+        reverse(
+            "organization-people-list-create",
+            kwargs={"organization_entity_id": restricted.entity_id},
+        ),
+        {"full_name": "Hidden Restricted Contact", "kind": "contact"},
+        content_type="application/json",
+    )
+    assert assigned_contact.status_code == 201
+    assert restricted_contact.status_code == 201
+
+    credential_entity = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=assigned,
+        entity_type="credential_reference",
+        display_name="Hidden Credential Reference Title",
+    )
+    CredentialReference.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        entity=credential_entity,
+        provider="onepassword",
+        reference_url=(
+            "https://start.1password.com/open/i?"
+            "a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&"
+            "i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com"
+        ),
+    )
+
+    people = technician_client.get(reverse("msp-entity-search"), {"entity_type": "person"})
+    organizations = technician_client.get(reverse("msp-entity-search"), {"entity_type": "organization"})
+    untyped = technician_client.get(reverse("msp-entity-search"))
+    mentions = technician_client.get(reverse("msp-document-mention-search"))
+
+    assert people.status_code == 200
+    assert [item["display_name"] for item in people.json()["results"]] == ["Visible Assigned Contact"]
+    assert [item["display_name"] for item in organizations.json()["results"]] == ["Assigned Search Client"]
+    assert "Restricted Search Client" not in {item["display_name"] for item in mentions.json()["results"]}
+    assert "Hidden Restricted Contact" not in {item["display_name"] for item in mentions.json()["results"]}
+    assert "Hidden Credential Reference Title" not in {item["display_name"] for item in untyped.json()["results"]}
+    assert "Hidden Credential Reference Title" not in {item["display_name"] for item in mentions.json()["results"]}
 
 
 @pytest.mark.django_db

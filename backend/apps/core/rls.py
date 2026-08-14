@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from enum import StrEnum
+from uuid import UUID
 
 from django.db import connection, transaction
 
@@ -15,7 +16,12 @@ class OrganizationRLSMode(StrEnum):
     ALL_AUTHORIZED = "all"
 
 
-def bind_local_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLSMode) -> None:
+def bind_local_rls_scope(
+    scope: DataScope,
+    *,
+    organization_mode: OrganizationRLSMode,
+    actor_user_id: UUID | None = None,
+) -> None:
     """Bind PostgreSQL RLS inputs to the current transaction only.
 
     Policy activation is intentionally staged. Calling this helper outside an atomic
@@ -34,10 +40,23 @@ def bind_local_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLS
 
     organization_id = "" if scope.organization_id is None else str(scope.organization_id)
     with connection.cursor() as cursor:
-        cursor.execute("SELECT set_config('tekdocs.tenant_id', %s, true)", [str(scope.tenant_id)])
-        cursor.execute("SELECT set_config('tekdocs.workspace_id', %s, true)", [str(scope.workspace_id)])
-        cursor.execute("SELECT set_config('tekdocs.organization_id', %s, true)", [organization_id])
-        cursor.execute("SELECT set_config('tekdocs.organization_mode', %s, true)", [organization_mode.value])
+        cursor.execute(
+            """
+            SELECT
+                set_config('tekdocs.tenant_id', %s, true),
+                set_config('tekdocs.workspace_id', %s, true),
+                set_config('tekdocs.organization_id', %s, true),
+                set_config('tekdocs.organization_mode', %s, true),
+                set_config('tekdocs.user_id', %s, true)
+            """,
+            [
+                str(scope.tenant_id),
+                str(scope.workspace_id),
+                organization_id,
+                organization_mode.value,
+                str(actor_user_id or ""),
+            ],
+        )
 
 
 def current_rls_tenant_id() -> str:

@@ -83,7 +83,7 @@ def approver_client(installation):
 
 def organization(tenant, name):  # type: ignore[no-untyped-def]
     entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name=name)
-    record = Organization.objects.create(tenant=tenant, entity=entity)
+    record = Organization.objects.create(tenant=tenant, entity=entity, access_mode="all_authorized")
     OrganizationClassification.objects.create(tenant=tenant, organization=record, kind="client")
     return record
 
@@ -1219,14 +1219,14 @@ def test_entity_mentions_search_and_render_are_workspace_scoped(owner_client, in
     acme_router = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=acme,
-        entity_type="hardware_asset",
+        entity_type="client_asset",
         display_name="Acme Core Router",
         visibility="client_visible",
     )
     beta_router = Entity.objects.create_owned(
         tenant=installation.tenant,
         organization=beta,
-        entity_type="hardware_asset",
+        entity_type="client_asset",
         display_name="Beta Core Router",
         visibility="client_visible",
     )
@@ -1246,7 +1246,7 @@ def test_entity_mentions_search_and_render_are_workspace_scoped(owner_client, in
         content_type="application/json",
     )
     assert preview.status_code == 200
-    assert "Acme Core Router · hardware asset · Acme" in preview.json()["html"]
+    assert "Acme Core Router · client asset · Acme" in preview.json()["html"]
     assert "Unavailable reference" in preview.json()["html"]
     assert "secret authored label" not in preview.json()["html"]
 

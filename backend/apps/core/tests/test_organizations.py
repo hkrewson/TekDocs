@@ -56,6 +56,7 @@ def test_owner_can_create_list_read_update_and_archive_organization(owner_client
     assert organization.tenant_id == installation.tenant.id
     assert organization.entity.entity_type == "organization"
     assert organization.entity.organization_id is None
+    assert organization.access_mode == "assigned_only"
     assert set(
         OrganizationClassification.scoped.for_tenant(installation.tenant)
         .filter(organization=organization)

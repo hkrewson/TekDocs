@@ -1,8 +1,113 @@
 {
-  "status": "not_started",
-  "reviewer": null,
-  "scope_commit": null,
+  "status": "remediation",
+  "reviewer": "Independent senior engineer (identity pending release record)",
+  "scope_commit": "01ed514777b4f67a6c5399f1f2a722a83db16342",
   "completed_at": null,
-  "report_reference": null,
-  "findings": []
+  "report_reference": "Private report: TekDocs-security-review-01ed514.md",
+  "findings": [
+    {
+      "id": "TD-ENTITY-SEARCH-SCOPE",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Entity search disclosed inaccessible organizations and client contacts",
+      "disposition": "Entity discovery now intersects supported record classes, governing view permissions, accessible organizations, person associations, and actor-bound RLS anchor policies.",
+      "evidence": [
+        "backend/apps/core/relationships.py",
+        "backend/apps/core/migrations/0106_entity_anchor_access_rls.py",
+        "backend/apps/accounts/tests/test_access_control.py::test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_types",
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions"
+      ]
+    },
+    {
+      "id": "TD-ORG-ACCESS-DEFAULT",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Organizations were open to all authorized staff by default",
+      "disposition": "New organizations now default to assigned-only access; the creation UI states the fail-closed behavior and owners retain break-glass access.",
+      "evidence": [
+        "backend/apps/core/migrations/0105_organization_access_fail_closed_default.py",
+        "backend/apps/core/tests/test_organizations.py::test_owner_can_create_list_read_update_and_archive_organization",
+        "frontend/src/organizations/Organizations.tsx"
+      ]
+    },
+    {
+      "id": "TD-ENTITY-SEARCH-TYPES",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Blank entity search bypassed record-class permissions",
+      "disposition": "All discovery paths are constrained server-side to the explicit searchable catalog and each type's governing read permission; mention filters use the same bounded choices.",
+      "evidence": [
+        "backend/apps/core/relationships.py",
+        "backend/apps/core/serializers.py",
+        "backend/apps/accounts/tests/test_access_control.py::test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_types"
+      ]
+    },
+    {
+      "id": "TD-RLS-TEST-BYPASS",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Authorization requests were not exercised through the runtime database role",
+      "disposition": "A dedicated Django request regression reconnects as the non-superuser runtime role and drives entity search and mention isolation through middleware, policy, ORM, and PostgreSQL RLS.",
+      "evidence": [
+        "backend/apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions",
+        "Makefile::test-runtime-authorization"
+      ]
+    },
+    {
+      "id": "TD-PUB-TRUST-ANCHOR",
+      "severity": "low",
+      "status": "open",
+      "title": "Publication verification lacks an operator trust anchor",
+      "disposition": "Assigned to 0.9.5 external-review remediation: pin current and retired publication-key fingerprints and reject self-asserted keys.",
+      "evidence": ["Milestone 0.9.5 owner: publication integrity"]
+    },
+    {
+      "id": "TD-WEBHOOK-TXN",
+      "severity": "low",
+      "status": "open",
+      "title": "Outbound webhook HTTP occurs inside a database transaction",
+      "disposition": "Assigned to 0.9.1 beta defect triage: commit the delivery lease before network I/O and record the outcome in a second short transaction.",
+      "evidence": ["Milestone 0.9.1 owner: integration runtime"]
+    },
+    {
+      "id": "TD-INBOUND-THROTTLE",
+      "severity": "low",
+      "status": "open",
+      "title": "Inbound webhook endpoint lacks anonymous throttling",
+      "disposition": "Assigned to 0.9.1 beta defect triage: add bounded endpoint/IP throttling and uniform authentication failure responses.",
+      "evidence": ["Milestone 0.9.1 owner: integration runtime"]
+    },
+    {
+      "id": "TD-SCANNER-CLAIM",
+      "severity": "low",
+      "status": "open",
+      "title": "Attachment quarantine is structural validation rather than antivirus",
+      "disposition": "Assigned to 0.9.5 security remediation: document the boundary and add a maintained antivirus provider behind the existing scanner interface.",
+      "evidence": ["Milestone 0.9.5 owner: attachment security"]
+    },
+    {
+      "id": "TD-COMPOSE-DEFAULT",
+      "severity": "low",
+      "status": "open",
+      "title": "Base Compose defaults can appear production-ready while remaining development-shaped",
+      "disposition": "Assigned to 0.9.2 and 0.9.4: make insecure development opt-ins explicit and certify only the production overlay/image combination.",
+      "evidence": ["Milestones 0.9.2 and 0.9.4 owner: production operations"]
+    },
+    {
+      "id": "TD-OIDC-EMAIL-AUTH",
+      "severity": "informational",
+      "status": "open",
+      "title": "OIDC verified-email auto-connect needs an explicit MFA regression",
+      "disposition": "Assigned to 0.9.1 authentication triage: document trusted issuer constraints and prove enrolled TOTP remains required after identity binding.",
+      "evidence": ["Milestone 0.9.1 owner: authentication"]
+    },
+    {
+      "id": "TD-GCM-STREAM-LIMIT",
+      "severity": "informational",
+      "status": "open",
+      "title": "Backup encryption uses one AES-GCM nonce per artifact stream",
+      "disposition": "Assigned to 0.9.3 recovery certification: enforce a supported artifact limit or adopt authenticated chunking with counter-derived nonces.",
+      "evidence": ["Milestone 0.9.3 owner: backup and recovery"]
+    }
+  ]
 }

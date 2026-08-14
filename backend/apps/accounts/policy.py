@@ -581,7 +581,11 @@ def accessible_organizations(
                 access_collection_edges__collection__archived_at__isnull=True,
             )
         )
-    if not context.is_owner:
+    if context.surface == "client_portal":
+        if context.organization is None:
+            return organizations.none()
+        organizations = organizations.filter(pk=context.organization.id)
+    elif not context.is_owner:
         organizations = organizations.filter(
             Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED) | Q(access_assignments__membership__user=context.user)
         ).distinct()

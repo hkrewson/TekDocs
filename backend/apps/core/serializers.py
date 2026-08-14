@@ -25,6 +25,7 @@ from .models import (
     PublicationRetention,
     Site,
 )
+from .relationships import SEARCHABLE_ENTITY_TYPES
 
 
 def _clean_name(value: str) -> str:
@@ -578,7 +579,12 @@ class ReuseImpactSerializer(serializers.Serializer):
 
 class EntityMentionSearchQuerySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
-    entity_type = serializers.CharField(max_length=80, required=False, allow_blank=True, default="")
+    entity_type = serializers.ChoiceField(
+        choices=SEARCHABLE_ENTITY_TYPES,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
     page = serializers.IntegerField(min_value=1, max_value=1000, required=False, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=20, required=False, default=15)
 

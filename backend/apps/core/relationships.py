@@ -8,6 +8,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
+from apps.accounts.policy import PermissionKey, accessible_organizations, context_has_permission
+
 from .models import AuditEvent, Entity, EntityLink, EntityLinkType, Organization
 from .workspaces import ResolvedWorkspace
 
@@ -31,6 +33,27 @@ SEARCHABLE_ENTITY_TYPES = (
     "network_circuit",
     "network_circuit_handoff",
 )
+
+ENTITY_TYPE_VIEW_PERMISSION = {
+    "organization": PermissionKey.ORGANIZATIONS_VIEW,
+    "person": PermissionKey.PEOPLE_VIEW,
+    "site": PermissionKey.SITES_VIEW,
+    "location": PermissionKey.SITES_VIEW,
+    "client_asset": PermissionKey.ASSETS_VIEW,
+    "network_rack": PermissionKey.NETWORKS_VIEW,
+    "network_device": PermissionKey.NETWORKS_VIEW,
+    "network_vrf": PermissionKey.NETWORKS_VIEW,
+    "network_vlan": PermissionKey.NETWORKS_VIEW,
+    "network_subnet": PermissionKey.NETWORKS_VIEW,
+    "network_interface": PermissionKey.NETWORKS_VIEW,
+    "network_ip_address": PermissionKey.NETWORKS_VIEW,
+    "network_mac_address": PermissionKey.NETWORKS_VIEW,
+    "wireless_network": PermissionKey.NETWORKS_VIEW,
+    "dns_zone": PermissionKey.NETWORKS_VIEW,
+    "dns_record": PermissionKey.NETWORKS_VIEW,
+    "network_circuit": PermissionKey.NETWORKS_VIEW,
+    "network_circuit_handoff": PermissionKey.NETWORKS_VIEW,
+}
 
 
 class EntityRelationshipError(ValueError):
@@ -105,20 +128,51 @@ def _visible_entities(
     include_reference_organizations: bool,
     include_archived: bool = False,
 ) -> QuerySet[Entity]:
+    member = workspace.member
+    allowed_entity_types = tuple(
+        entity_type
+        for entity_type, permission in ENTITY_TYPE_VIEW_PERMISSION.items()
+        if context_has_permission(member, permission, organization=workspace.organization)
+    )
     entities = Entity.scoped.for_tenant(workspace.member.tenant)
+    if not allowed_entity_types:
+        return entities.none()
+    entities = entities.filter(entity_type__in=allowed_entity_types)
+    accessible_organization_ids = accessible_organizations(
+        member,
+        PermissionKey.ORGANIZATIONS_VIEW,
+    ).values("id")
     if workspace.kind == "msp":
-        entities = entities.filter(organization__isnull=True)
+        visibility = Q(organization__isnull=True)
+        visibility &= ~Q(entity_type="organization") | Q(organization_record__id__in=accessible_organization_ids)
+        visibility &= ~Q(entity_type="person") | (
+            Q(person_record__associations__organization__isnull=True)
+            | Q(person_record__associations__organization_id__in=accessible_organization_ids)
+        )
+        entities = entities.filter(visibility)
     else:
         organization = workspace.organization
         if organization is None:
             return entities.none()
-        visibility = Q(organization_id=organization.id) | Q(id=organization.entity_id)
+        visibility = (
+            Q(organization_id=organization.id)
+            | Q(id=organization.entity_id)
+            | Q(
+                entity_type="person",
+                person_record__associations__organization_id=organization.id,
+                person_record__associations__archived_at__isnull=True,
+            )
+        )
         if include_reference_organizations:
-            visibility |= Q(entity_type="organization", organization__isnull=True, organization_record__isnull=False)
+            visibility |= Q(
+                entity_type="organization",
+                organization__isnull=True,
+                organization_record__id__in=accessible_organization_ids,
+            )
         entities = entities.filter(visibility)
     if not include_archived:
         entities = entities.filter(archived_at__isnull=True)
-    return entities.select_related(
+    return entities.distinct().select_related(
         "organization",
         "organization__entity",
         "organization_record",

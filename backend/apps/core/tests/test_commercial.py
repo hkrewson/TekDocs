@@ -33,7 +33,7 @@ def owner_client(installation):
 
 
 def organization(installation, name, classification):  # type: ignore[no-untyped-def]
-    return create_organization(
+    record = create_organization(
         tenant=installation.tenant,
         actor_id=installation.owner.id,
         name=name,
@@ -41,6 +41,9 @@ def organization(installation, name, classification):  # type: ignore[no-untyped
         website="https://example.invalid",
         classifications=[classification],
     )
+    record.access_mode = "all_authorized"
+    record.save(update_fields=("access_mode", "updated_at"))
+    return record
 
 
 def create_contract(owner_client, client, provider):  # type: ignore[no-untyped-def]

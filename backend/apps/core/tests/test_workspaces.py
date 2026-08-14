@@ -7,7 +7,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import TenantMembership, User
+from apps.accounts.models import OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import Entity, InstallationState, Organization, OrganizationClassification, Tenant
 from apps.core.scoping import DataScope
 from apps.core.workspaces import resolve_organization_workspace
@@ -122,7 +122,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
 
 
 @pytest.mark.django_db
-def test_workspace_context_denies_anonymous_and_allows_read_only_member_without_mfa(
+def test_workspace_context_denies_anonymous_and_requires_explicit_client_assignment(
     client,
     owner_client,
     installation,
@@ -134,9 +134,16 @@ def test_workspace_context_denies_anonymous_and_allows_read_only_member_without_
     assert client.get(organization_url).status_code == 403
 
     member = User.objects.create_user(email="member@example.com", display_name="Member")
-    TenantMembership.objects.create(tenant=installation.tenant, user=member)
+    membership = TenantMembership.objects.create(tenant=installation.tenant, user=member)
     client.force_login(member)
     assert client.get(reverse("workspace-msp")).status_code == 200
+    assert client.get(organization_url).status_code == 404
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        membership=membership,
+        created_by=installation.owner,
+    )
     assert client.get(organization_url).status_code == 200
 
     installation.owner.authenticator_set.filter(type="totp").delete()

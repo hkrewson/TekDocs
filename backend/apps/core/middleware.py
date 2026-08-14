@@ -115,7 +115,11 @@ class RLSRequestScopeMiddleware:
                 if state is not None and state.tenant is not None:
                     request.rls_tenant = state.tenant  # type: ignore[attr-defined]
                     tenant_scope = DataScope.tenant(state.tenant)
-                    bind_local_rls_scope(tenant_scope, organization_mode=OrganizationRLSMode.MSP_ONLY)
+                    bind_local_rls_scope(
+                        tenant_scope,
+                        organization_mode=OrganizationRLSMode.MSP_ONLY,
+                        actor_user_id=request.user.pk,
+                    )
             return self.get_response(request)
 
     def process_view(
@@ -139,5 +143,6 @@ class RLSRequestScopeMiddleware:
             bind_local_rls_scope(
                 DataScope.organization(tenant, organization),
                 organization_mode=OrganizationRLSMode.ORGANIZATION,
+                actor_user_id=request.user.pk,
             )
         return None

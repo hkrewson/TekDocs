@@ -1,12 +1,25 @@
 {
   "status": "complete",
-  "reviewer": "Independent senior engineer (identity pending release record)",
-  "scope_commit": "c16b3159b1905b464af6d4490d77ab13ac076b8c",
-  "completed_at": "2026-08-14T13:17:59-05:00",
-  "report_reference": "Private report: TekDocs-review-3-c16b315.md",
-  "prior_report_reference": "Private report: TekDocs-security-review-01ed514.md",
-  "validation_reference": "Private report: TekDocs-remediation-validation-2efbb8b.md",
-  "remediation_validation": "Implemented and locally validated after the reviewed commit; independent follow-up validation remains separate from this triage record.",
+  "reviewer": "Claude Opus 5 (High) — automated review commissioned and directed by the project maintainer",
+  "review_type": "Maintainer-directed automated source and security review; not an independent human assessment",
+  "scope_commit": "32c72c0e907e1880ebf763fc1b490cb9c39c42d5",
+  "completed_at": "2026-08-14T14:31:19-05:00",
+  "report_reference": "Private report: TekDocs-recheck-32c72c0.md",
+  "review_passes": [
+    {
+      "scope_commit": "01ed514777b4f67a6c5399f1f2a722a83db16342",
+      "report_reference": "Private report: TekDocs-security-review-01ed514.md"
+    },
+    {
+      "scope_commit": "2efbb8b2793f8681c6a9be9ad64137e7f7cb5de9",
+      "report_reference": "Private report: TekDocs-remediation-validation-2efbb8b.md"
+    },
+    {
+      "scope_commit": "32c72c0e907e1880ebf763fc1b490cb9c39c42d5",
+      "report_reference": "Private report: TekDocs-recheck-32c72c0.md"
+    }
+  ],
+  "remediation_validation": "Claude Opus 5 (High) performed three maintainer-directed automated review passes culminating in commit 32c72c0. Local Docker and PostgreSQL gates corroborate the remediation. A human third-party assessment remains required before 1.0.",
   "findings": [
     {
       "id": "TD-ENTITY-SEARCH-SCOPE",
@@ -240,6 +253,33 @@
         "backend/apps/core/webhooks.py::accept_inbound_webhook",
         "backend/apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration",
         "Makefile::test-runtime-authorization"
+      ]
+    },
+    {
+      "id": "TD-LEGACY-HELPER-PUBLIC-EXECUTE",
+      "severity": "informational",
+      "status": "open",
+      "title": "Legacy RLS helper functions retain PostgreSQL PUBLIC EXECUTE",
+      "disposition": "Scheduled in 0.8.10. Revoke PUBLIC EXECUTE and grant only the runtime role for the four legacy scope helpers, with migration reversal and unrelated-role denial evidence.",
+      "evidence": [
+        "backend/apps/core/migrations/0004_rls_session_helpers.py",
+        "backend/apps/core/migrations/0019_activate_runtime_rls.py",
+        "backend/apps/core/migrations/0045_workspace_ownership.py",
+        "Private report: TekDocs-recheck-32c72c0.md section 6.1"
+      ]
+    },
+    {
+      "id": "TD-RUNTIME-ISOLATION-HYGIENE",
+      "severity": "informational",
+      "status": "open",
+      "title": "Additional isolation modules still rely primarily on owner-role execution",
+      "disposition": "Scheduled in 0.8.10. Extend constrained-runtime evidence across workspace, client-portal, and scoping boundaries without replacing the existing granular owner-role regressions.",
+      "evidence": [
+        "backend/apps/conftest.py::django_runtime_role",
+        "backend/apps/core/tests/test_workspaces.py",
+        "backend/apps/accounts/tests/test_client_portal_boundary.py",
+        "backend/apps/core/tests/test_scoping.py",
+        "Private report: TekDocs-recheck-32c72c0.md sections 2 and 6.2"
       ]
     }
   ]

@@ -2,11 +2,11 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-certification-backup.XXXXXX")
+work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-validation-backup.XXXXXX")
 environment_file="$work_directory/recovery.env"
 backup_directory="$work_directory/backup"
-source_project="tekdocs_certification_backup_$$"
-restore_project="tekdocs_certification_restore_$$"
+source_project="tekdocs_validation_backup_$$"
+restore_project="tekdocs_validation_restore_$$"
 fixture_password=$(openssl rand -base64 36 | tr -d '\n')
 mkdir -p "$backup_directory"
 
@@ -32,7 +32,7 @@ trap cleanup EXIT HUP INT TERM
 echo "Creating an isolated compliance and monitoring recovery fixture"
 compose_for "$source_project" up -d --build --wait backend
 compose_for "$source_project" exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
-  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 compose_for "$source_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > "$backup_directory/postgres.dump"
 docker run --rm -v "${source_project}_media_data:/source:ro" -v "$backup_directory:/backup" \
@@ -42,7 +42,7 @@ test -s "$backup_directory/postgres.dump"
 test -s "$backup_directory/media.tar.gz"
 compose_for "$source_project" down --volumes --remove-orphans
 
-echo "Restoring certification evidence into independent database and media volumes"
+echo "Restoring validation evidence into independent database and media volumes"
 compose_for "$restore_project" up -d --wait db
 compose_for "$restore_project" run --rm migrate
 compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
@@ -53,6 +53,6 @@ docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_director
   tar -xzf /backup/media.tar.gz -C /restore
 compose_for "$restore_project" up -d --build --wait backend worker scheduler
 compose_for "$restore_project" exec -T -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
-  < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 compose_for "$restore_project" exec -T backend python manage.py check
 echo "Compliance and monitoring backup/restore rehearsal passed"

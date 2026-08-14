@@ -2,8 +2,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
-from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
+from apps.core.validation import CONTROL_PLANE_GUARD_TRIGGERS
 
 
 class Command(BaseCommand):

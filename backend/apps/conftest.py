@@ -19,7 +19,7 @@ def django_runtime_role():  # type: ignore[no-untyped-def]
     @contextmanager
     def switch() -> Iterator[None]:
         if connection.vendor != "postgresql":
-            pytest.skip("Runtime-role certification requires PostgreSQL")
+            pytest.skip("Runtime-role validation requires PostgreSQL")
         if connection.in_atomic_block:
             raise RuntimeError("Runtime-role tests require transaction=True database access")
         original_user = connection.settings_dict["USER"]

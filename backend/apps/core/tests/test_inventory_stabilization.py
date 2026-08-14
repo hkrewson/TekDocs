@@ -48,7 +48,7 @@ def _model(*, result, supplier, kind: str):  # type: ignore[no-untyped-def]
         actor_id=result.owner.id,
         name=f"Reference {kind} product",
         kind=kind,
-        description="Inventory certification fixture",
+        description="Inventory validation fixture",
     )
     return create_model(
         product=product,
@@ -77,7 +77,7 @@ def _p95_get(client: Client, url: str, params: dict[str, object]) -> float:
 @pytest.mark.django_db(transaction=True)
 def test_inventory_reference_pages_are_bounded_policy_scoped_and_fast():
     if connection.vendor != "postgresql":
-        pytest.skip("Inventory reference performance certification requires PostgreSQL")
+        pytest.skip("Inventory reference performance validation requires PostgreSQL")
 
     result, selected, _linked_entity, _document = _create_reference_fixture()
     supplier = create_organization(

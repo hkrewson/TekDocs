@@ -120,7 +120,7 @@ DOCUMENT_RLS_TABLES = {
 @pytest.mark.django_db(transaction=True)
 def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     if connection.vendor != "postgresql":
-        pytest.skip("Migration-cycle certification requires PostgreSQL")
+        pytest.skip("Migration-cycle validation requires PostgreSQL")
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     result = bootstrap_owner(

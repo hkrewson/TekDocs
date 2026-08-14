@@ -2,12 +2,12 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-baseline_ref=${TEKDOCS_CERTIFICATION_UPGRADE_FROM_REF:-8fdde2d}
-expected_baseline_version=${TEKDOCS_CERTIFICATION_UPGRADE_FROM_VERSION:-0.7.13}
-work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-certification-upgrade.XXXXXX")
+baseline_ref=${TEKDOCS_VALIDATION_UPGRADE_FROM_REF:-8fdde2d}
+expected_baseline_version=${TEKDOCS_VALIDATION_UPGRADE_FROM_VERSION:-0.7.13}
+work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-validation-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
-project_name="tekdocs_certification_upgrade_$$"
+project_name="tekdocs_validation_upgrade_$$"
 fixture_password=$(openssl rand -base64 36 | tr -d '\n')
 
 baseline_compose() {
@@ -43,14 +43,14 @@ current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
 echo "Creating retained compliance and monitoring evidence in TekDocs $baseline_version"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
-  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 baseline_compose down --remove-orphans
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
 echo "Applying TekDocs $current_version to retained $baseline_version evidence"
 current_compose up -d --build --wait backend worker scheduler
 current_compose exec -T -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
-  < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend python manage.py makemigrations --check --dry-run
 echo "Compliance and monitoring upgrade rehearsal passed: $baseline_version -> $current_version"

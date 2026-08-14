@@ -134,7 +134,7 @@ def _reference_fixture():  # type: ignore[no-untyped-def]
 @pytest.mark.django_db(transaction=True)
 def test_network_search_export_scale_and_isolation_stabilization():
     if connection.vendor != "postgresql":
-        pytest.skip("Network scale certification requires PostgreSQL")
+        pytest.skip("Network scale validation requires PostgreSQL")
 
     result, organizations = _reference_fixture()
     assert Entity.objects.filter(tenant=result.tenant, entity_type__startswith="network_").count() == 10_000

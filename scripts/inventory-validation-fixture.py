@@ -221,7 +221,7 @@ def create_fixture():
             actor_id=result.owner.id,
             upload=SimpleUploadedFile("inventory-recovery.txt", b"inventory recovery bytes\n", content_type="text/plain"),
         )
-    print("Inventory certification fixture created")
+    print("Inventory validation fixture created")
 
 
 def verify_fixture():

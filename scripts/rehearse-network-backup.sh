@@ -35,7 +35,7 @@ compose_for "$source_project" up -d --build --wait backend
 compose_for "$source_project" exec -T \
   -e TEKDOCS_FIXTURE_MODE=create \
   -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
-  backend python manage.py shell < "$repository_root/scripts/network-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/network-validation-fixture.py"
 
 echo "Capturing PostgreSQL and managed media as separate backup artifacts"
 compose_for "$source_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_directory/postgres.dump"
@@ -53,7 +53,7 @@ docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_director
 compose_for "$restore_project" up -d --build --wait backend
 compose_for "$restore_project" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify \
-  backend python manage.py shell < "$repository_root/scripts/network-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/network-validation-fixture.py"
 compose_for "$restore_project" exec -T backend python manage.py check
 
 echo "Network backup/restore rehearsal passed"

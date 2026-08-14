@@ -191,7 +191,7 @@ def test_netbox_reference_and_deterministic_preview_are_exact_workspace(owner_cl
 @pytest.mark.django_db(transaction=True)
 def test_database_rejects_forged_netbox_workspace_edge(installation):
     if connection.vendor != "postgresql":
-        pytest.skip("NetBox reference trigger certification requires PostgreSQL")
+        pytest.skip("NetBox reference trigger validation requires PostgreSQL")
     client = _organization(installation, "Database client")
     sibling = _organization(installation, "Database sibling")
     sibling_rack = _rack(installation, sibling, "Database sibling rack")

@@ -27,23 +27,23 @@ from apps.accounts.policy import (
     ROLE_DEFINITIONS,
     PermissionKey,
 )
-from apps.core.certification import (
+from apps.core.models import Entity, InstallationState, Organization, Tenant
+from apps.core.rls_contract import RLS_TABLES
+from apps.core.scoping import TenantScopedManager
+from apps.core.validation import (
     AUTHORIZATION_CONTROL_PLANE_TABLES,
     TENANT_MODEL_CONTRACTS,
     IsolationBoundary,
 )
-from apps.core.models import Entity, InstallationState, Organization, Tenant
-from apps.core.rls_contract import RLS_TABLES
-from apps.core.scoping import TenantScopedManager
 
 
 @pytest.fixture
 def installation(db):
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     return bootstrap_owner(
-        tenant_name="Certification MSP",
-        owner_email="certification-owner@example.invalid",
-        owner_display_name="Certification Owner",
+        tenant_name="Validation MSP",
+        owner_email="validation-owner@example.invalid",
+        owner_display_name="Validation Owner",
         password=f"{secrets.token_urlsafe(24)}Aa7!",
     )
 
@@ -95,12 +95,12 @@ def test_permission_and_role_catalogs_are_complete_unique_and_bounded():
 @pytest.mark.django_db(transaction=True)
 def test_postgres_control_plane_guards_reject_scope_retargeting_and_foreign_attribution(installation):
     if connection.vendor != "postgresql":
-        pytest.skip("Authorization control-plane certification requires PostgreSQL")
+        pytest.skip("Authorization control-plane validation requires PostgreSQL")
 
-    foreign_tenant = Tenant.objects.create(name="Foreign certification MSP", slug="foreign-certification")
+    foreign_tenant = Tenant.objects.create(name="Foreign validation MSP", slug="foreign-validation")
     foreign_user = User.objects.create_user(
-        email="foreign-certification@example.invalid",
-        display_name="Foreign Certification User",
+        email="foreign-validation@example.invalid",
+        display_name="Foreign Validation User",
     )
     TenantMembership.objects.create(
         tenant=foreign_tenant,
@@ -108,8 +108,8 @@ def test_postgres_control_plane_guards_reject_scope_retargeting_and_foreign_attr
         role=BuiltInRole.READ_ONLY,
     )
     member_user = User.objects.create_user(
-        email="member-certification@example.invalid",
-        display_name="Certification Member",
+        email="member-validation@example.invalid",
+        display_name="Validation Member",
     )
     membership = TenantMembership.objects.create(
         tenant=installation.tenant,
@@ -124,7 +124,7 @@ def test_postgres_control_plane_guards_reject_scope_retargeting_and_foreign_attr
 
     invitation = Invitation.objects.create(
         tenant=installation.tenant,
-        email="invited-certification@example.invalid",
+        email="invited-validation@example.invalid",
         token_digest=Invitation.digest_token(secrets.token_urlsafe(32)),
         invited_by=installation.owner,
         expires_at=timezone.now() + timedelta(days=1),
@@ -143,7 +143,7 @@ def test_postgres_control_plane_guards_reject_scope_retargeting_and_foreign_attr
     organization_entity = Entity.objects.create_owned(
         tenant=installation.tenant,
         entity_type="organization",
-        display_name="Certified client",
+        display_name="Validated client",
     )
     organization = Organization.objects.create(
         tenant=installation.tenant,

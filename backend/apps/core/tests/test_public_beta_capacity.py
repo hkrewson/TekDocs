@@ -197,7 +197,7 @@ def _concurrent_get(cookies, url: str, params: dict[str, object]) -> tuple[int, 
 @pytest.mark.django_db(transaction=True)
 def test_public_beta_reference_capacity_is_bounded_scoped_and_responsive():
     if connection.vendor != "postgresql":
-        pytest.skip("Public-beta capacity certification requires PostgreSQL")
+        pytest.skip("Public-beta capacity validation requires PostgreSQL")
 
     result, selected, _linked_entity, document = _create_reference_fixture()
     _grow_assets(result, selected)

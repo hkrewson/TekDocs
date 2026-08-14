@@ -254,7 +254,7 @@ def _create_reference_fixture():  # type: ignore[no-untyped-def]
 @pytest.mark.django_db(transaction=True)
 def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
     if connection.vendor != "postgresql":
-        pytest.skip("Reference performance certification requires PostgreSQL")
+        pytest.skip("Reference performance validation requires PostgreSQL")
 
     result, selected, linked_entity, document = _create_reference_fixture()
     assert Entity.objects.filter(tenant=result.tenant).count() >= REFERENCE_ENTITIES

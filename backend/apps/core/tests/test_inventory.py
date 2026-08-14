@@ -975,7 +975,7 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_license_seat_allocation_never_exceeds_limit(owner_client, installation):
     if connection.vendor != "postgresql":
-        pytest.skip("Seat-allocation concurrency certification requires PostgreSQL")
+        pytest.skip("Seat-allocation concurrency validation requires PostgreSQL")
     supplier = _organization(installation, "Concurrent License Supplier", "vendor")
     client = _organization(installation, "Concurrent License Client", "client")
     asset = _software_asset(owner_client, installation, supplier, client, name="Concurrent endpoint agent")

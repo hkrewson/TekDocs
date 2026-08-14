@@ -20,7 +20,7 @@ class TenantModelContract:
 
 
 # This inventory is deliberately explicit. A new model carrying a ``tenant``
-# foreign key must be assigned to one reviewed boundary before certification
+# foreign key must be assigned to one reviewed boundary before validation
 # can pass; model discovery tests reject unclassified additions.
 TENANT_MODEL_CONTRACTS = tuple(
     TenantModelContract(table, IsolationBoundary.FORCED_RLS, "Tenant-owned entity-domain data.")

@@ -2,23 +2,23 @@ SHELL := /bin/sh
 
 BACKEND_IMAGE_GATES := check security \
 	test test-localization test-api-contracts test-api-tokens test-webhooks test-integrations \
-	test-integration-stabilization test-integration-certification test-monitoring-stabilization \
-	test-compliance-catalogs test-compliance-monitoring-certification test-auth-abuse \
+	test-integration-stabilization test-integration-validation test-monitoring-stabilization \
+	test-compliance-catalogs test-compliance-monitoring-validation test-auth-abuse \
 	test-client-portal-boundary test-outbox test-notifications test-notification-email \
-	test-portal-notification-stabilization test-portal-notification-certification test-policy \
+	test-portal-notification-stabilization test-portal-notification-validation test-policy \
 	test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people \
 	test-sites test-custom-fields test-relationships test-recovery test-stabilization \
-	test-public-beta-performance test-certification test-documentation-certification \
+	test-public-beta-performance test-entity-rbac-validation test-documentation-validation \
 	test-publication-control test-credential-references test-catalogs test-inventory \
-	test-inventory-certification test-commercial test-networks test-network-stabilization \
-	test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all \
+	test-inventory-validation test-commercial test-networks test-network-stabilization \
+	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
 	test-browser-artifact-hygiene test-e2e-live
 
-.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-certification notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
-.PHONY: test-compliance-catalogs test-compliance-monitoring-certification compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check
+.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
+.PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
-.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-certification test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-networks test-network-stabilization test-network-certification test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-certification-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
+.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -88,7 +88,7 @@ test-integration-stabilization:
 	docker compose run --rm migrate pytest apps/core/tests/test_integration_stabilization.py apps/core/tests/test_integrations.py apps/core/tests/test_webhooks.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_api_contracts.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh check
 
-test-integration-certification:
+test-integration-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_api_contracts.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_webhooks.py apps/core/tests/test_integrations.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
@@ -97,11 +97,11 @@ test-monitoring-stabilization:
 	./scripts/frontend-gate.sh test
 
 test-compliance-catalogs:
-	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_certification.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
-test-compliance-monitoring-certification:
-	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_domains.py apps/core/tests/test_domain_monitoring_egress.py apps/core/tests/test_certificate_monitoring.py apps/core/tests/test_certificate_monitoring_egress.py apps/core/tests/test_monitoring_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_certification.py apps/core/tests/test_migration_stabilization.py -q
+test-compliance-monitoring-validation:
+	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_domains.py apps/core/tests/test_domain_monitoring_egress.py apps/core/tests/test_certificate_monitoring.py apps/core/tests/test_certificate_monitoring_egress.py apps/core/tests/test_monitoring_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
 test-auth-abuse:
@@ -130,7 +130,7 @@ test-portal-notification-stabilization:
 	docker compose run --rm migrate pytest apps/accounts/tests/test_client_portal_boundary.py apps/core/tests/test_portal_documents.py apps/core/tests/test_outbox.py apps/core/tests/test_notifications.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_portal_notification_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
-test-portal-notification-certification:
+test-portal-notification-validation:
 	docker compose run --rm migrate pytest apps/accounts/tests/test_client_portal_boundary.py apps/accounts/tests/test_invitations.py apps/accounts/tests/test_invitation_acceptance.py apps/accounts/tests/test_auth_session.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_documents.py apps/core/tests/test_portal_documents.py apps/core/tests/test_outbox.py apps/core/tests/test_notifications.py apps/core/tests/test_email.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_portal_notification_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
@@ -180,10 +180,10 @@ test-public-beta-performance:
 	./scripts/frontend-gate.sh check
 	./scripts/rehearse-browser-performance.sh
 
-test-certification:
-	docker compose run --rm migrate pytest apps/core/tests/test_entity_rbac_certification.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
+test-entity-rbac-validation:
+	docker compose run --rm migrate pytest apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
 
-test-documentation-certification:
+test-documentation-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
 
 test-publication-control:
@@ -199,7 +199,7 @@ test-catalogs:
 test-inventory:
 	docker compose run --rm migrate pytest apps/core/tests/test_inventory.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
-test-inventory-certification:
+test-inventory-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_catalogs.py apps/core/tests/test_inventory.py apps/core/tests/test_inventory_stabilization.py apps/core/tests/test_commercial.py apps/core/tests/test_credential_references.py apps/core/tests/test_attachment_security.py apps/core/tests/test_relationships.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-commercial:
@@ -211,7 +211,7 @@ test-networks:
 test-network-stabilization:
 	docker compose run --rm migrate pytest apps/core/tests/test_network_stabilization.py -q -s
 
-test-network-certification: test-networks test-network-stabilization
+test-network-validation: test-networks test-network-stabilization
 	./scripts/frontend-gate.sh test
 
 test-secret-files:
@@ -256,7 +256,7 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true ./scripts/rehearse-production-image.sh
 
-release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-certification test-monitoring-stabilization test-compliance-monitoring-certification test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-certification test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-certification test-documentation-certification test-publication-control test-credential-references test-catalogs test-inventory test-inventory-certification test-commercial test-network-certification test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-certification-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
+release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
 release-gate: test-compliance-catalogs
 
 compose-doctor:
@@ -313,7 +313,7 @@ network-upgrade-rehearsal:
 integration-upgrade-rehearsal:
 	./scripts/rehearse-integration-upgrade.sh
 
-integration-certification-upgrade-rehearsal:
+integration-validation-upgrade-rehearsal:
 	TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION=0.7.0 ./scripts/rehearse-integration-upgrade.sh
 
 integration-backup-rehearsal:

@@ -35,11 +35,11 @@ run_case 0.6.9 fc8aec7 env TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 \
   TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 \
   TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION="$current_version" \
   "$repository_root/scripts/rehearse-integration-upgrade.sh"
-run_case 0.7.13 8fdde2d env TEKDOCS_CERTIFICATION_UPGRADE_FROM_REF=8fdde2d \
-  TEKDOCS_CERTIFICATION_UPGRADE_FROM_VERSION=0.7.13 \
+run_case 0.7.13 8fdde2d env TEKDOCS_VALIDATION_UPGRADE_FROM_REF=8fdde2d \
+  TEKDOCS_VALIDATION_UPGRADE_FROM_VERSION=0.7.13 \
   "$repository_root/scripts/rehearse-compliance-monitoring-upgrade.sh"
-run_case 0.8.0 557a976 env TEKDOCS_CERTIFICATION_UPGRADE_FROM_REF=557a976 \
-  TEKDOCS_CERTIFICATION_UPGRADE_FROM_VERSION=0.8.0 \
+run_case 0.8.0 557a976 env TEKDOCS_VALIDATION_UPGRADE_FROM_REF=557a976 \
+  TEKDOCS_VALIDATION_UPGRADE_FROM_VERSION=0.8.0 \
   "$repository_root/scripts/rehearse-compliance-monitoring-upgrade.sh"
 
 echo "Supported-minor upgrade matrix passed through TekDocs $current_version"

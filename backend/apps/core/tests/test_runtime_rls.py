@@ -13,7 +13,6 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, Invitation, OrganizationAccessAssignment, TenantMembership, User
-from apps.core.certification import CONTROL_PLANE_GUARD_TRIGGERS
 from apps.core.models import (
     Block,
     BlockRevision,
@@ -46,6 +45,7 @@ from apps.core.rls import (
 )
 from apps.core.rls_contract import RLS_TABLES, RUNTIME_ROLE
 from apps.core.scoping import DataScope
+from apps.core.validation import CONTROL_PLANE_GUARD_TRIGGERS
 
 
 def _organization(tenant: Tenant, name: str) -> Organization:
@@ -83,7 +83,7 @@ def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None, principal
 @pytest.mark.django_db(transaction=True)
 def test_runtime_credential_references_are_forced_to_the_selected_workspace():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     tenant = Tenant.objects.create(name="Credential RLS tenant", slug=f"credential-{uuid.uuid4()}")
     first_org = _organization(tenant, "First credential client")
@@ -125,7 +125,7 @@ def test_runtime_credential_references_are_forced_to_the_selected_workspace():
 @pytest.mark.django_db(transaction=True)
 def test_runtime_organization_scope_can_stage_tenant_person_identity_until_associated():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     tenant = Tenant.objects.create(name="Person identity tenant", slug=f"person-{uuid.uuid4()}")
     organization = _organization(tenant, "Person identity client")
@@ -154,7 +154,7 @@ def test_runtime_organization_scope_can_stage_tenant_person_identity_until_assoc
 @pytest.mark.django_db(transaction=True)
 def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(django_runtime_role):  # type: ignore[no-untyped-def]
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     installation = bootstrap_owner(
@@ -222,7 +222,7 @@ def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(
 @pytest.mark.django_db(transaction=True)
 def test_runtime_role_preserves_request_actor_and_system_outbox_principal(django_runtime_role):  # type: ignore[no-untyped-def]
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     installation = bootstrap_owner(
@@ -276,7 +276,7 @@ def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scop
     django_runtime_role,  # type: ignore[no-untyped-def]
 ):
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     tenant = Tenant.objects.create(name="Runtime client tenant", slug=f"runtime-client-{uuid.uuid4()}")
     client = _organization(tenant, "Runtime Portal Client")
@@ -312,7 +312,7 @@ def test_runtime_client_member_sees_only_its_organization_anchor_and_system_scop
 @pytest.mark.django_db(transaction=True)
 def test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     installation = bootstrap_owner(
@@ -438,7 +438,7 @@ def test_runtime_entity_anchors_require_entitled_user_or_explicit_system_princip
 @pytest.mark.django_db(transaction=True)
 def test_runtime_role_is_constrained_and_forced_rls_inventory_is_complete():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
         cursor.execute(
@@ -467,7 +467,7 @@ def test_runtime_role_is_constrained_and_forced_rls_inventory_is_complete():
 @pytest.mark.django_db(transaction=True)
 def test_runtime_outbox_is_tenant_isolated_and_event_payload_is_immutable():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     first = Tenant.objects.create(name="First outbox tenant", slug=f"outbox-first-{uuid.uuid4()}")
     second = Tenant.objects.create(name="Second outbox tenant", slug=f"outbox-second-{uuid.uuid4()}")
@@ -514,7 +514,7 @@ def test_runtime_outbox_is_tenant_isolated_and_event_payload_is_immutable():
 @pytest.mark.django_db(transaction=True)
 def test_runtime_raw_sql_denies_missing_cross_tenant_sibling_write_and_all_mode():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     first = Tenant.objects.create(name="First runtime tenant", slug=f"first-{uuid.uuid4()}")
     second = Tenant.objects.create(name="Second runtime tenant", slug=f"second-{uuid.uuid4()}")
@@ -570,7 +570,7 @@ def test_runtime_raw_sql_denies_missing_cross_tenant_sibling_write_and_all_mode(
 @pytest.mark.django_db(transaction=True)
 def test_runtime_document_projection_exposes_only_the_referenced_client():
     if connection.vendor != "postgresql":
-        pytest.skip("Runtime-role certification requires PostgreSQL")
+        pytest.skip("Runtime-role validation requires PostgreSQL")
 
     tenant = Tenant.objects.create(name="Document RLS tenant", slug=f"documents-{uuid.uuid4()}")
     selected_org = _organization(tenant, "Selected client")

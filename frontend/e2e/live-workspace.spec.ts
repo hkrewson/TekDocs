@@ -672,7 +672,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'New framework' }).click()
   await page.getByLabel('Framework name').fill('Live monitoring baseline')
   await page.getByLabel('Version label').fill('2026.1')
-  await page.getByLabel('Version description').fill('Live composed certification evidence.')
+  await page.getByLabel('Version description').fill('Live composed validation evidence.')
   await page.getByLabel('Identifier').fill('MON-1')
   await page.getByLabel('Title').fill('Review managed domains')
   await page.getByLabel('Description (Markdown)').fill('Retain scoped domain and certificate evidence.')

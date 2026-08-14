@@ -27,11 +27,11 @@ from apps.core.scoping import DataScope
 from apps.core.workspaces import resolve_organization_workspace
 
 
-OWNER_EMAIL = "certification-recovery@example.invalid"
-ORGANIZATION_NAME = "Certification Recovery Client"
-DOMAIN_NAME = "certification-recovery.example"
-FRAMEWORK_NAME = "Certification Recovery Baseline"
-BUNDLE_TITLE = "Certification Recovery Evidence"
+OWNER_EMAIL = "validation-recovery@example.invalid"
+ORGANIZATION_NAME = "Validation Recovery Client"
+DOMAIN_NAME = "validation-recovery.example"
+FRAMEWORK_NAME = "Validation Recovery Baseline"
+BUNDLE_TITLE = "Validation Recovery Evidence"
 HEX_A = "a" * 64
 HEX_B = "b" * 64
 HEX_C = "c" * 64
@@ -40,9 +40,9 @@ HEX_C = "c" * 64
 def create_fixture():
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     result = bootstrap_owner(
-        tenant_name="Certification Recovery MSP",
+        tenant_name="Validation Recovery MSP",
         owner_email=OWNER_EMAIL,
-        owner_display_name="Certification Recovery Owner",
+        owner_display_name="Validation Recovery Owner",
         password=os.environ["TEKDOCS_FIXTURE_PASSWORD"],
     )
     with rls_scope(DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
@@ -65,7 +65,7 @@ def create_fixture():
             actor_id=result.owner.id,
             name=FRAMEWORK_NAME,
             version_label="2026.1",
-            description="Retained certification fixture.",
+            description="Retained validation fixture.",
             source_url="",
             controls=[
                 ControlInput(
@@ -94,7 +94,7 @@ def create_fixture():
             value=EvidenceInput(
                 title="Monitoring review record",
                 kind="note",
-                summary="Domain and certificate evidence reviewed for certification.",
+                summary="Domain and certificate evidence reviewed for validation.",
                 collection_start=now.date(),
                 collection_end=now.date(),
             ),
@@ -127,7 +127,7 @@ def create_fixture():
             workspace=workspace,
             actor_id=result.owner.id,
             title=BUNDLE_TITLE,
-            reason="Exact-prior upgrade and independent restore certification",
+            reason="Exact-prior upgrade and independent restore validation",
             audience="msp_internal",
         )
         assert verify_bundle(bundle)
@@ -162,7 +162,7 @@ def create_fixture():
             rdap_source="rdap.example",
             rdap_digest=HEX_A,
             observed_expiration_date=(now + timedelta(days=180)).date(),
-            observed_registrar="Certification Registrar",
+            observed_registrar="Validation Registrar",
             dns_source="resolver.example",
             dns_digest=HEX_B,
             dnssec_validated=True,
@@ -185,7 +185,7 @@ def create_fixture():
             chain_sha256=HEX_B,
             chain_length=2,
             subject_common_name=DOMAIN_NAME,
-            issuer_common_name="Certification CA",
+            issuer_common_name="Validation CA",
             serial_sha256=HEX_C,
             san_sha256=HEX_A,
             san_count=1,
@@ -197,7 +197,7 @@ def create_fixture():
             cipher_name="TLS_AES_256_GCM_SHA384",
             evidence_digest=HEX_C,
         )
-    print("compliance and monitoring certification fixture created")
+    print("compliance and monitoring validation fixture created")
 
 
 def verify_fixture():
@@ -223,7 +223,7 @@ def verify_fixture():
         assert certificate_run.hostname_valid is True
         assert certificate_run.trust_valid is True
         assert ReminderSchedule.objects.get(source_entity=domain_run.domain.entity).domain == "domain"
-    print("compliance and monitoring certification fixture verified")
+    print("compliance and monitoring validation fixture verified")
 
 
 if os.environ.get("TEKDOCS_FIXTURE_MODE") == "create":

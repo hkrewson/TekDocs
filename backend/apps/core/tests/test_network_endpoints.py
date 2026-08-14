@@ -273,7 +273,7 @@ def test_conflicts_canonical_forms_and_routing_namespaces(owner_client, installa
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_duplicate_ip_creation_serializes(installation):
     if connection.vendor != "postgresql":
-        pytest.skip("Advisory-lock concurrency certification requires PostgreSQL")
+        pytest.skip("Advisory-lock concurrency validation requires PostgreSQL")
     organization = _organization(installation, "Concurrent endpoints")
     subnet = _subnet(installation, organization)
     barrier = threading.Barrier(2)

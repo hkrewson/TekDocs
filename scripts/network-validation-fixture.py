@@ -264,7 +264,7 @@ def create_fixture():
             interface_entity_id=None,
             description="Retained network recovery fixture",
         )
-    print("Network certification fixture created")
+    print("Network validation fixture created")
 
 
 def verify_fixture():

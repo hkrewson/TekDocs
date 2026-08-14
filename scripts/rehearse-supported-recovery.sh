@@ -70,7 +70,7 @@ echo "Creating representative retained state in a production-target source stack
 compose_for "$source_environment" "$source_secrets" up -d --build --wait backend
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
-  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
@@ -111,7 +111,7 @@ echo "Restoring into independently named database, media, and secret custody"
   --secret-output "$restored_secrets" --confirm-destroy "$restore_project"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
-  < "$repository_root/scripts/compliance-monitoring-certification-fixture.py"
+  < "$repository_root/scripts/compliance-monitoring-validation-fixture.py"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done

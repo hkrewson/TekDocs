@@ -56,7 +56,7 @@ baseline_compose up -d --build --wait backend
 baseline_compose exec -T \
   -e TEKDOCS_FIXTURE_MODE=create \
   -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
-  backend python manage.py shell < "$repository_root/scripts/network-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/network-validation-fixture.py"
 baseline_compose down --remove-orphans
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
@@ -64,7 +64,7 @@ echo "Applying TekDocs $current_version to the retained $baseline_version networ
 current_compose up -d --build --wait backend
 current_compose exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify \
-  backend python manage.py shell < "$repository_root/scripts/network-certification-fixture.py"
+  backend python manage.py shell < "$repository_root/scripts/network-validation-fixture.py"
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend python manage.py makemigrations --check --dry-run
 

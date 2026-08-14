@@ -270,7 +270,7 @@ def test_overlap_helper_is_family_aware_and_rejects_host_bits():
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_overlapping_subnets_serialize_in_default_namespace(installation):
     if connection.vendor != "postgresql":
-        pytest.skip("Advisory-lock concurrency certification requires PostgreSQL")
+        pytest.skip("Advisory-lock concurrency validation requires PostgreSQL")
     organization = _organization(installation, "Concurrent prefixes")
     barrier = threading.Barrier(2)
 

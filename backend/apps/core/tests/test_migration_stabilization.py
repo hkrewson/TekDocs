@@ -56,6 +56,10 @@ DOCUMENT_RLS_TABLES = {
     "core_documentpublication",
     "core_documentpublicationartifact",
     "core_documentpublicationcontrolevent",
+    "core_documenttemplaterevision",
+    "core_documenttemplateenrollment",
+    "core_documentremotesource",
+    "core_documentremoteobservation",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",
@@ -300,8 +304,15 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
     preserved_revision = BlockRevision.objects.get(block_id=block.id)
     assert preserved_revision.markdown == "# Preserved revision\n"
     assert preserved_revision.checksum
-    block.refresh_from_db()
-    assert document.placements.get(parent__isnull=True, position=0).resolution_mode == "live"
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_revision_id FROM core_block WHERE id = %s", [block.id])
+        assert cursor.fetchone() == (preserved_revision.id,)
+        cursor.execute(
+            "SELECT resolution_mode FROM core_documentplacement "
+            "WHERE document_id = %s AND parent_id IS NULL AND position = 0",
+            [document.id],
+        )
+        assert cursor.fetchone() == ("live",)
 
     call_command("migrate", "core", "0019", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
@@ -311,7 +322,7 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    call_command("migrate", "core", "0110", verbosity=0, interactive=False)
+    call_command("migrate", "core", "0114", verbosity=0, interactive=False)
     call_command("migrate", "accounts", "0019", verbosity=0, interactive=False)
 
     assert set(Entity.objects.filter(id__in=stable_entity_ids).values_list("id", flat=True)) == stable_entity_ids

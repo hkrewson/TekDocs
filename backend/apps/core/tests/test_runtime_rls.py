@@ -26,6 +26,8 @@ from apps.core.models import (
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
+    DocumentRemoteObservation,
+    DocumentRemoteSource,
     DocumentTemplateEnrollment,
     DocumentTemplateRevision,
     Entity,
@@ -135,6 +137,59 @@ def test_runtime_template_revisions_are_published_but_enrollments_remain_client_
         cursor.execute("SELECT id FROM core_documenttemplaterevision")
         assert cursor.fetchall() == [(revision.id,)]
         cursor.execute("SELECT count(*) FROM core_documenttemplateenrollment")
+        assert cursor.fetchone() == (0,)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_remote_document_sources_and_observations_are_client_scoped():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Remote source RLS tenant",
+        owner_email=f"remote-source-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Remote source owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    first_org = _organization(installation.tenant, "First monitored client")
+    sibling_org = _organization(installation.tenant, "Sibling monitored client")
+    document = create_document(
+        tenant=installation.tenant,
+        organization=first_org,
+        actor_id=installation.owner.id,
+        title="Monitored guide",
+        markdown="Original",
+    )
+    source = DocumentRemoteSource.objects.create(
+        tenant=installation.tenant,
+        organization=first_org,
+        document=document,
+        created_by=installation.owner,
+        url="https://docs.example.invalid/guide",
+    )
+    observation = DocumentRemoteObservation.objects.create(
+        tenant=installation.tenant,
+        organization=first_org,
+        source=source,
+        state="changed",
+        content_type="text/markdown",
+        content_digest=sha256(b"Updated\n").hexdigest(),
+        canonical_markdown="Updated\n",
+    )
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, installation.tenant.id, "organization", first_org.id, installation.owner.id)
+        cursor.execute("SELECT id FROM core_documentremotesource")
+        assert cursor.fetchall() == [(source.id,)]
+        cursor.execute("SELECT id FROM core_documentremoteobservation")
+        assert cursor.fetchall() == [(observation.id,)]
+        runtime.commit()
+
+        _bind(cursor, installation.tenant.id, "organization", sibling_org.id, installation.owner.id)
+        cursor.execute("SELECT count(*) FROM core_documentremotesource")
+        assert cursor.fetchone() == (0,)
+        cursor.execute("SELECT count(*) FROM core_documentremoteobservation")
         assert cursor.fetchone() == (0,)
 
 

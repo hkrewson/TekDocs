@@ -16,6 +16,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_documentpublicationartifact",
     "core_documentpublicationcontrolevent",
     "core_documenttemplateenrollment",
+    "core_documentremotesource",
+    "core_documentremoteobservation",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",

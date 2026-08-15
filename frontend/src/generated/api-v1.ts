@@ -740,6 +740,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/remote-source": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_remote_source_retrieve"];
+        readonly put: operations["documents_remote_source_update"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documents/{document_entity_id}/remote-source/observations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_remote_source_observations_retrieve"];
+        readonly put?: never;
+        readonly post: operations["documents_remote_source_observations_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documents/{document_entity_id}/remote-source/observations/{observation_id}/apply": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documents_remote_source_observations_apply_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/revisions": {
         readonly parameters: {
             readonly query?: never;
@@ -4078,6 +4126,54 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["document_publications_organization_withdraw"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_documents_remote_source_retrieve"];
+        readonly put: operations["workspaces_organizations_documents_remote_source_update"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source/observations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_documents_remote_source_observations_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_documents_remote_source_observations_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source/observations/{observation_id}/apply": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_documents_remote_source_observations_apply_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -9502,6 +9598,54 @@ export interface components {
             /** Format: uuid */
             readonly owner_id?: string | null;
         };
+        readonly RemoteObservation: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly state: string;
+            readonly status_code: number | null;
+            readonly content_type: string;
+            readonly content_digest: string;
+            readonly error_code: string;
+            /** Format: date-time */
+            readonly fetched_at: string;
+            readonly canonical_markdown: string;
+            readonly diff: string;
+        };
+        readonly RemoteObservationList: {
+            readonly results: readonly components["schemas"]["RemoteObservation"][];
+            readonly count: number;
+        };
+        readonly RemoteSourceResult: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uri */
+            readonly url: string;
+            readonly source_kind: string;
+            readonly enabled: boolean;
+            readonly check_interval_minutes: number;
+            /** Format: date-time */
+            readonly next_check_at: string;
+            /** Format: date-time */
+            readonly last_checked_at: string | null;
+            /** Format: uuid */
+            readonly last_applied_observation_id: string | null;
+        };
+        readonly RemoteSourceWrite: {
+            /** Format: uri */
+            readonly url: string;
+            /**
+             * @description * `markdown` - markdown
+             *     * `html` - html
+             *     * `auto` - auto
+             * @default auto
+             * @enum {string}
+             */
+            readonly source_kind: "markdown" | "html" | "auto";
+            /** @default true */
+            readonly enabled: boolean;
+            /** @default 1440 */
+            readonly check_interval_minutes: number;
+        };
         readonly ReuseAudience: {
             /** Format: uuid */
             readonly document_id: string;
@@ -12014,6 +12158,137 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly documents_remote_source_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteSourceResult"];
+                };
+            };
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly documents_remote_source_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RemoteSourceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RemoteSourceWrite"];
+                readonly "multipart/form-data": components["schemas"]["RemoteSourceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteSourceResult"];
+                };
+            };
+        };
+    };
+    readonly documents_remote_source_observations_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservationList"];
+                };
+            };
+        };
+    };
+    readonly documents_remote_source_observations_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservation"];
+                };
+            };
+        };
+    };
+    readonly documents_remote_source_observations_apply_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly observation_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservation"];
                 };
             };
         };
@@ -20804,6 +21079,142 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_documents_remote_source_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteSourceResult"];
+                };
+            };
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly workspaces_organizations_documents_remote_source_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RemoteSourceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RemoteSourceWrite"];
+                readonly "multipart/form-data": components["schemas"]["RemoteSourceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteSourceResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_documents_remote_source_observations_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservationList"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_documents_remote_source_observations_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservation"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_documents_remote_source_observations_apply_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly observation_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RemoteObservation"];
                 };
             };
         };

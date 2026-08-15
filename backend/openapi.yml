@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.14
+  version: 0.8.15
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2428,6 +2428,170 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/documents/{document_entity_id}/remote-source:
+    get:
+      operationId: documents_remote_source_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: documents_remote_source_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/{document_entity_id}/remote-source/observations:
+    get:
+      operationId: documents_remote_source_observations_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservationList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: documents_remote_source_observations_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/{document_entity_id}/remote-source/observations/{observation_id}/apply:
+    post:
+      operationId: documents_remote_source_observations_apply_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: observation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_msp_list
@@ -14033,6 +14197,200 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source:
+    get:
+      operationId: workspaces_organizations_documents_remote_source_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_organizations_documents_remote_source_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source/observations:
+    get:
+      operationId: workspaces_organizations_documents_remote_source_observations_retrieve
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservationList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_documents_remote_source_observations_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/remote-source/observations/{observation_id}/apply
+  : post:
+      operationId: workspaces_organizations_documents_remote_source_observations_apply_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: observation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -29105,6 +29463,117 @@ components:
       - kind
       - source_entity_id
       - title
+    RemoteObservation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          type: string
+        status_code:
+          type: integer
+          nullable: true
+        content_type:
+          type: string
+        content_digest:
+          type: string
+        error_code:
+          type: string
+        fetched_at:
+          type: string
+          format: date-time
+        canonical_markdown:
+          type: string
+        diff:
+          type: string
+          readOnly: true
+      required:
+      - canonical_markdown
+      - content_digest
+      - content_type
+      - diff
+      - error_code
+      - fetched_at
+      - id
+      - state
+      - status_code
+    RemoteObservationList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemoteObservation'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    RemoteSourceResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        source_kind:
+          type: string
+        enabled:
+          type: boolean
+        check_interval_minutes:
+          type: integer
+        next_check_at:
+          type: string
+          format: date-time
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_applied_observation_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - check_interval_minutes
+      - enabled
+      - id
+      - last_applied_observation_id
+      - last_checked_at
+      - next_check_at
+      - source_kind
+      - url
+    RemoteSourceWrite:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 500
+        source_kind:
+          enum:
+          - markdown
+          - html
+          - auto
+          type: string
+          description: |-
+            * `markdown` - markdown
+            * `html` - html
+            * `auto` - auto
+          x-spec-enum-id: 1455ca43a4341aeb
+          default: auto
+        enabled:
+          type: boolean
+          default: true
+        check_interval_minutes:
+          type: integer
+          maximum: 10080
+          minimum: 15
+          default: 1440
+      required:
+      - url
     ReuseAudience:
       type: object
       properties:

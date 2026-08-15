@@ -31,7 +31,7 @@ def test_public_api_root_describes_versioned_conventions(client):
     assert response.status_code == 200
     assert response.json() == {
         "name": "TekDocs API",
-        "version": "0.8.14",
+        "version": "0.8.15",
         "status": "pre-alpha",
         "api_version": "v1",
         "schema_url": "/api/v1/schema/",

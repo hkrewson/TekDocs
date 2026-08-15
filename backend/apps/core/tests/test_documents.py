@@ -27,7 +27,9 @@ from apps.accounts.models import (
     TenantMembership,
     User,
 )
-from apps.core.documents import update_shared_block
+from apps.core.approved_egress import ApprovedTarget
+from apps.core.document_sources import apply_remote_observation, fetch_remote_document, html_to_markdown
+from apps.core.documents import PlacementConflict, update_shared_block
 from apps.core.models import (
     Block,
     BlockKind,
@@ -39,6 +41,7 @@ from apps.core.models import (
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
+    DocumentRemoteSource,
     DocumentTemplateEnrollment,
     Entity,
     InstallationState,
@@ -118,7 +121,6 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert Document.objects.count() == 2
     assert Block.objects.count() == 2
     assert DocumentPlacement.objects.values_list("position", flat=True).order_by("position").first() == 0
-
     detail = reverse("msp-document-detail", kwargs={"document_entity_id": msp_created.json()["id"]})
     updated = owner_client.put(
         detail,
@@ -139,6 +141,105 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert [item.markdown for item in revisions] == ["# Firewall\n\nUse **MFA**.", "Updated from the browser."]
     assert revisions[1].parent == revisions[0]
     assert revisions[1].checksum == sha256(b"Updated from the browser.").hexdigest()
+
+
+@pytest.mark.django_db
+def test_remote_document_source_retains_reviewable_change_before_explicit_apply(
+    owner_client, installation, monkeypatch
+):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Published setup", "markdown": "Original\n"},
+        content_type="application/json",
+    )
+    document_id = created.json()["id"]
+    source_response = owner_client.put(
+        reverse("msp-document-remote-source", kwargs={"document_entity_id": document_id}),
+        {"url": "https://docs.example.invalid/setup", "source_kind": "html", "check_interval_minutes": 60},
+        content_type="application/json",
+    )
+    assert source_response.status_code == 201
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "text/html", "ETag": "private-upstream-value"}
+
+        def read(self, _size):  # type: ignore[no-untyped-def]
+            return b"<article><h1>Setup</h1><p>Use MFA.</p><script>ignore()</script></article>"
+
+        def close(self):
+            return None
+
+    class Pool:
+        def urlopen(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return Response()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        "apps.core.document_sources.resolve_public_https_target",
+        lambda *_args, **_kwargs: ApprovedTarget(
+            "https://docs.example.invalid/setup", "docs.example.invalid", "203.0.113.10", "/setup"
+        ),
+    )
+    monkeypatch.setattr("apps.core.document_sources.pinned_https_pool", lambda *_args, **_kwargs: Pool())
+    checked = owner_client.post(
+        reverse("msp-document-remote-observations", kwargs={"document_entity_id": document_id}),
+        {},
+        content_type="application/json",
+    )
+    assert checked.status_code == 201
+    assert checked.json()["state"] == "changed"
+    assert "Use MFA." in checked.json()["canonical_markdown"]
+    assert "ignore" not in checked.json()["canonical_markdown"]
+    assert "private-upstream-value" not in str(checked.json())
+    assert created.json()["markdown"] == "Original\n"
+
+    applied = owner_client.post(
+        reverse(
+            "msp-document-remote-observation-apply",
+            kwargs={"document_entity_id": document_id, "observation_id": checked.json()["id"]},
+        ),
+        {},
+        content_type="application/json",
+    )
+    assert applied.status_code == 200
+    reopened = owner_client.get(reverse("msp-document-detail", kwargs={"document_entity_id": document_id}))
+    assert reopened.json()["markdown"].startswith("# Setup")
+
+
+@pytest.mark.django_db
+def test_remote_document_source_rejects_non_https_and_retains_value_free_fetch_failures(
+    owner_client, installation, monkeypatch
+):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Remote source", "markdown": "Safe"},
+        content_type="application/json",
+    )
+    source_url = reverse("msp-document-remote-source", kwargs={"document_entity_id": created.json()["id"]})
+    rejected = owner_client.put(source_url, {"url": "http://127.0.0.1/private"}, content_type="application/json")
+    assert rejected.status_code == 400
+    accepted = owner_client.put(
+        source_url, {"url": "https://public.example.invalid/doc"}, content_type="application/json"
+    )
+    assert accepted.status_code == 201
+    monkeypatch.setattr(
+        "apps.core.document_sources.resolve_public_https_target",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValidationError("Document source destination denied")),
+    )
+    observation = fetch_remote_document(DocumentRemoteSource.objects.get(id=accepted.json()["id"]))
+    assert observation.state == "failed"
+    assert observation.error_code == "remote_connection_failed"
+    assert observation.canonical_markdown == ""
+    with pytest.raises(PlacementConflict):
+        apply_remote_observation(observation=observation, actor_id=installation.owner.id)
+
+
+def test_remote_html_conversion_is_semantic_and_drops_executable_content():
+    markdown = html_to_markdown("<h2>Network</h2><ul><li>LAN</li></ul><style>hidden</style>")
+    assert markdown == "## Network\n- LAN\n"
 
 
 @pytest.mark.django_db
@@ -735,16 +836,19 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
         stored_name = attachment.file.name
         attachment.file.storage.delete(stored_name)
         assert attachment.file.storage.save(stored_name, ContentFile(b"tampered bytes")) == stored_name
-        assert owner_client.get(
-            reverse(
-                "organization-document-attachment-download",
-                kwargs={
-                    "organization_entity_id": acme.entity_id,
-                    "document_entity_id": created["id"],
-                    "attachment_entity_id": attachment.entity_id,
-                },
-            )
-        ).status_code == 400
+        assert (
+            owner_client.get(
+                reverse(
+                    "organization-document-attachment-download",
+                    kwargs={
+                        "organization_entity_id": acme.entity_id,
+                        "document_entity_id": created["id"],
+                        "attachment_entity_id": attachment.entity_id,
+                    },
+                )
+            ).status_code
+            == 400
+        )
         sibling = reverse(
             "organization-document-attachment-download",
             kwargs={
@@ -1314,16 +1418,22 @@ def test_client_block_library_requires_explicit_msp_opt_in_and_never_exposes_sib
     )
     assert visibility_update.status_code == 409
     assert "Detach client block reuse" in visibility_update.json()["detail"]
-    assert owner_client.post(
-        placement_url,
-        {"operation": "reuse_block", "source_block_id": private_secondary["block_id"], "resolution_mode": "live"},
-        content_type="application/json",
-    ).status_code == 404
-    assert owner_client.post(
-        placement_url,
-        {"operation": "reuse_block", "source_block_id": beta_source["block_id"], "resolution_mode": "live"},
-        content_type="application/json",
-    ).status_code == 404
+    assert (
+        owner_client.post(
+            placement_url,
+            {"operation": "reuse_block", "source_block_id": private_secondary["block_id"], "resolution_mode": "live"},
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
+    assert (
+        owner_client.post(
+            placement_url,
+            {"operation": "reuse_block", "source_block_id": beta_source["block_id"], "resolution_mode": "live"},
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db
@@ -1423,11 +1533,18 @@ def test_versioned_client_template_rollout_preserves_copy_and_updates_only_expli
     ).json()
     assert destination["placement_count"] == 3
     assert "Printers and media devices belong on IoT." in destination["resolved_markdown"]
-    assert owner_client.post(
-        reverse("organization-document-template-rollout-preview", kwargs={"organization_entity_id": beta.entity_id}),
-        {"enrollment_id": str(enrollment.id)},
-        content_type="application/json",
-    ).status_code == 404
+    assert (
+        owner_client.post(
+            reverse(
+                "organization-document-template-rollout-preview", kwargs={"organization_entity_id": beta.entity_id}
+            ),
+            {"enrollment_id": str(enrollment.id)},
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
+
+
 @pytest.mark.django_db
 def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(owner_client, installation):
     acme = organization(installation.tenant, "Acme")
@@ -1813,11 +1930,14 @@ def test_publication_approval_role_is_exact_client_scoped_and_does_not_grant_wit
     )
     assert approved.status_code == 200
     assert approved.json()["lifecycle_state"] == "published"
-    assert browser.post(
-        reverse("organization-document-publication-withdraw", kwargs=acme_kwargs),
-        {"reason": "Not granted"},
-        content_type="application/json",
-    ).status_code == 403
+    assert (
+        browser.post(
+            reverse("organization-document-publication-withdraw", kwargs=acme_kwargs),
+            {"reason": "Not granted"},
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
 
     beta_response = browser.post(
         reverse(

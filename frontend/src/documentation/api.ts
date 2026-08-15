@@ -207,6 +207,8 @@ export type TemplateRollout = {
   removed: TemplateRolloutItem[]
   conflicts: TemplateRolloutItem[]
 }
+export type DocumentRemoteSource = { id: string; url: string; source_kind: 'auto' | 'markdown' | 'html'; enabled: boolean; check_interval_minutes: number; next_check_at: string; last_checked_at: string | null; last_applied_observation_id: string | null }
+export type DocumentRemoteObservation = { id: string; state: 'changed' | 'unchanged' | 'failed'; status_code: number | null; content_type: string; content_digest: string; error_code: string; fetched_at: string; canonical_markdown: string; diff: string }
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -233,6 +235,11 @@ export interface DocumentsClient {
   instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory, placementRules?: Record<string, TemplatePlacementMode>): Promise<DocumentRecord>
   previewTemplateRollout(scope: DocumentScope, enrollmentId: string): Promise<TemplateRollout>
   applyTemplateRollout(scope: DocumentScope, enrollmentId: string, expectedRevisionId: string, placementRules?: Record<string, TemplatePlacementMode>): Promise<TemplateRollout>
+  getRemoteSource(scope: DocumentScope, id: string): Promise<DocumentRemoteSource | undefined>
+  saveRemoteSource(scope: DocumentScope, id: string, input: Pick<DocumentRemoteSource, 'url' | 'source_kind' | 'enabled' | 'check_interval_minutes'>): Promise<DocumentRemoteSource>
+  listRemoteObservations(scope: DocumentScope, id: string): Promise<{ results: DocumentRemoteObservation[]; count: number }>
+  checkRemoteSource(scope: DocumentScope, id: string): Promise<DocumentRemoteObservation>
+  applyRemoteObservation(scope: DocumentScope, id: string, observationId: string): Promise<DocumentRemoteObservation>
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
@@ -345,6 +352,15 @@ export const browserDocumentsClient: DocumentsClient = {
   instantiateTemplate: (scope, sourceDocumentId, title, category, placementRules = {}) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category, placement_rules: placementRules }),
   previewTemplateRollout: (scope, enrollmentId) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/preview`, 'POST', { enrollment_id: enrollmentId }),
   applyTemplateRollout: (scope, enrollmentId, expectedRevisionId, placementRules = {}) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/apply`, 'POST', { enrollment_id: enrollmentId, expected_applied_revision_id: expectedRevisionId, placement_rules: placementRules }),
+  async getRemoteSource(scope, id) {
+    return parse<DocumentRemoteSource | undefined>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  saveRemoteSource: (scope, id, input) => mutate<DocumentRemoteSource>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source`, 'PUT', input),
+  async listRemoteObservations(scope, id) {
+    return parse<{ results: DocumentRemoteObservation[]; count: number }>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  checkRemoteSource: (scope, id) => mutate<DocumentRemoteObservation>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations`, 'POST'),
+  applyRemoteObservation: (scope, id, observationId) => mutate<DocumentRemoteObservation>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations/${encodeURIComponent(observationId)}/apply`, 'POST'),
   async importMarkdown(scope, file, title, category, isTemplate) {
     const form = new FormData()
     form.set('file', file)

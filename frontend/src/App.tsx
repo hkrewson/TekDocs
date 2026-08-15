@@ -332,9 +332,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.14" />
+      <PageHeader title="Overview" description="TekDocs 0.8.15" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.14</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.8.15</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],

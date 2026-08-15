@@ -96,6 +96,14 @@ from apps.core.custom_field_views import (
     OrganizationEntityCustomFieldDetailView,
     OrganizationEntityCustomFieldListView,
 )
+from apps.core.document_source_views import (
+    MSPDocumentRemoteObservationApplyView,
+    MSPDocumentRemoteObservationView,
+    MSPDocumentRemoteSourceView,
+    OrganizationDocumentRemoteObservationApplyView,
+    OrganizationDocumentRemoteObservationView,
+    OrganizationDocumentRemoteSourceView,
+)
 from apps.core.document_views import (
     MSPDocumentAttachmentDetailView,
     MSPDocumentAttachmentDownloadView,
@@ -483,6 +491,21 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/export",
         MSPDocumentExportView.as_view(),
         name="msp-document-export",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/remote-source",
+        MSPDocumentRemoteSourceView.as_view(),
+        name="msp-document-remote-source",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/remote-source/observations",
+        MSPDocumentRemoteObservationView.as_view(),
+        name="msp-document-remote-observations",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/remote-source/observations/<uuid:observation_id>/apply",
+        MSPDocumentRemoteObservationApplyView.as_view(),
+        name="msp-document-remote-observation-apply",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/attachments",
@@ -1540,6 +1563,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/export",
         OrganizationDocumentExportView.as_view(),
         name="organization-document-export",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/remote-source",
+        OrganizationDocumentRemoteSourceView.as_view(),
+        name="organization-document-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/remote-source/observations",
+        OrganizationDocumentRemoteObservationView.as_view(),
+        name="organization-document-remote-observations",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/remote-source/observations/<uuid:observation_id>/apply",
+        OrganizationDocumentRemoteObservationApplyView.as_view(),
+        name="organization-document-remote-observation-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments",

@@ -306,6 +306,13 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-edit-heading input, .document-share input { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .document-actions { display: flex; gap: 8px; }
 .document-actions button, .document-actions a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.remote-source { margin-top: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); }
+.remote-source > label { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.remote-source > label input { min-height: 40px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.remote-observations { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.remote-observations li { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.remote-observations header { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.remote-observations pre { max-height: 280px; overflow: auto; padding: 10px; border-radius: 6px; background: #20211f; color: #f5f2eb; font-size: 12px; white-space: pre-wrap; }
 .static-publication .document-edit-heading { align-items: center; justify-content: space-between; }
 .static-publication .document-edit-heading h2, .static-publication .document-edit-heading p { margin: 0; }
 .static-publication .document-edit-heading p { margin-top: 3px; color: var(--muted); font-size: 12px; }

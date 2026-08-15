@@ -38,6 +38,9 @@ function clients() {
   const approvePublication = vi.fn().mockResolvedValue(publication)
   const withdrawPublication = vi.fn().mockResolvedValue({ ...publication, lifecycle_state: 'withdrawn' as const })
   const getPublication = vi.fn().mockResolvedValue(publication)
+  const saveRemoteSource = vi.fn().mockResolvedValue({ id: 'source-1', url: 'https://docs.example.invalid/setup', source_kind: 'auto', enabled: true, check_interval_minutes: 1440, next_check_at: '2026-08-16T00:00:00Z', last_checked_at: null, last_applied_observation_id: null })
+  const checkRemoteSource = vi.fn().mockResolvedValue({ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-08-15T00:00:00Z', canonical_markdown: '# Setup\n', diff: '+# Setup' })
+  const applyRemoteObservation = vi.fn().mockResolvedValue({ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-08-15T00:00:00Z', canonical_markdown: '# Setup\n', diff: '+# Setup' })
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
@@ -56,6 +59,11 @@ function clients() {
     instantiateTemplate,
     previewTemplateRollout: vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 1, up_to_date: true, added: [], changed: [], removed: [], conflicts: [] }),
     applyTemplateRollout: vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 1, up_to_date: true, added: [], changed: [], removed: [], conflicts: [] }),
+    getRemoteSource: vi.fn().mockResolvedValue(undefined),
+    saveRemoteSource,
+    listRemoteObservations: vi.fn().mockResolvedValue({ results: [], count: 0 }),
+    checkRemoteSource,
+    applyRemoteObservation,
     importMarkdown,
     uploadAttachment,
     archiveAttachment,
@@ -75,7 +83,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, publication }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -250,6 +258,26 @@ it('previews and applies a conflict-free client template rollout', async () => {
     { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', { 'block-new': 'copy' },
   ))
   expect(screen.getByRole('status')).toHaveTextContent('Template revision 2 applied.')
+})
+
+it('reviews a monitored public source before applying its Markdown', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, saveRemoteSource, checkRemoteSource, applyRemoteObservation } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Remote source' }))
+  await user.type(screen.getByLabelText('Public document URL'), 'https://docs.example.invalid/setup')
+  await user.click(screen.getByRole('button', { name: 'Save source' }))
+  await waitFor(() => expect(saveRemoteSource).toHaveBeenCalledWith({}, 'doc-1', expect.objectContaining({
+    url: 'https://docs.example.invalid/setup', enabled: true,
+  })))
+  await user.click(screen.getByRole('button', { name: 'Check now' }))
+  expect(await screen.findByText('Change detected')).toBeVisible()
+  expect(screen.getByText('+# Setup')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Apply reviewed change' }))
+  await waitFor(() => expect(checkRemoteSource).toHaveBeenCalledWith({}, 'doc-1'))
+  expect(applyRemoteObservation).toHaveBeenCalledWith({}, 'doc-1', 'observation-1')
+  expect(screen.getByRole('status')).toHaveTextContent('Reviewed source change applied as a new block revision.')
 })
 
 it('reviews shared audiences and detaches a reused block', async () => {

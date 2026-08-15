@@ -5,10 +5,12 @@ from celery import shared_task
 from django.utils import timezone
 
 from .certificate_monitoring import process_certificate_monitoring_run, schedule_due_certificate_monitoring
+from .document_sources import fetch_remote_document
 from .domain_monitoring import process_domain_monitoring_run, schedule_due_domain_monitoring
 from .integrations import process_sync_job, purge_integration_logs, schedule_due_connections
 from .models import (
     CertificateMonitorRun,
+    DocumentRemoteSource,
     DomainMonitorRun,
     DomainMonitorRunState,
     InstallationState,
@@ -23,6 +25,46 @@ from .scoping import DataScope
 from .webhooks import dispatch_due_webhooks
 
 INTEGRATION_DISPATCH_LEASE = timedelta(minutes=2)
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def process_remote_document_source(
+    source_id: str, tenant_id: str, workspace_id: str, organization_id: str | None
+) -> None:
+    scope = DataScope(UUID(tenant_id), UUID(workspace_id), UUID(organization_id) if organization_id else None)
+    mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
+    with system_rls_scope(scope, organization_mode=mode):
+        fetch_remote_document(DocumentRemoteSource.scoped.for_scope(scope).get(id=UUID(source_id), enabled=True))
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def schedule_remote_document_sources() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with system_rls_scope(scope, organization_mode=mode):
+            source_ids = list(
+                DocumentRemoteSource.scoped.for_scope(scope)
+                .filter(enabled=True, archived_at__isnull=True, next_check_at__lte=timezone.now())
+                .order_by("next_check_at", "id")
+                .values_list("id", flat=True)[:25]
+            )
+            DocumentRemoteSource.scoped.for_scope(scope).filter(id__in=source_ids).update(
+                next_check_at=timezone.now() + INTEGRATION_DISPATCH_LEASE
+            )
+            for source_id in source_ids:
+                process_remote_document_source.delay(
+                    str(source_id),
+                    str(scope.tenant_id),
+                    str(scope.workspace_id),
+                    str(scope.organization_id) if scope.organization_id else None,
+                )
+                total += 1
+    return total
 
 
 @shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
@@ -190,9 +232,7 @@ def schedule_certificate_monitoring() -> int:
 
 
 @shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
-def process_certificate_monitoring(
-    run_id: str, tenant_id: str, workspace_id: str, organization_id: str | None
-) -> None:
+def process_certificate_monitoring(run_id: str, tenant_id: str, workspace_id: str, organization_id: str | None) -> None:
     scope = DataScope(UUID(tenant_id), UUID(workspace_id), UUID(organization_id) if organization_id else None)
     mode = OrganizationRLSMode.ORGANIZATION if scope.organization_id else OrganizationRLSMode.MSP_ONLY
     with system_rls_scope(scope, organization_mode=mode):

@@ -124,32 +124,45 @@ def test_runtime_credential_references_are_forced_to_the_selected_workspace():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_runtime_organization_scope_can_stage_tenant_person_identity_until_associated():
+def test_runtime_organization_scope_requires_system_principal_to_stage_tenant_person_identity():
     if connection.vendor != "postgresql":
         pytest.skip("Runtime-role validation requires PostgreSQL")
 
     tenant = Tenant.objects.create(name="Person identity tenant", slug=f"person-{uuid.uuid4()}")
     organization = _organization(tenant, "Person identity client")
-    entity_id = uuid.uuid4()
-
     with _runtime_connection() as runtime, runtime.cursor() as cursor:
-        _bind(cursor, tenant.id, "organization", organization.id)
+        _bind(cursor, tenant.id, "organization", organization.id, principal_mode="")
         cursor.execute(
             "SELECT id FROM core_workspace WHERE tenant_id = %s AND kind = 'msp'",
             [tenant.id],
         )
         msp_workspace_id = cursor.fetchone()[0]
+        untrusted_entity_id = uuid.uuid4()
         cursor.execute(
             "INSERT INTO core_entity "
             "(id, tenant_id, workspace_id, organization_id, entity_type, display_name, custom_fields, "
             "visibility, archived_at, created_at, updated_at) "
             "VALUES (%s, %s, %s, NULL, 'person', 'Runtime person', '{}'::jsonb, "
             "'msp_private', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-            [entity_id, tenant.id, msp_workspace_id],
+            [untrusted_entity_id, tenant.id, msp_workspace_id],
         )
         assert cursor.rowcount == 1
-        cursor.execute("SELECT id FROM core_entity WHERE id = %s", [entity_id])
+        cursor.execute("SELECT id FROM core_entity WHERE id = %s", [untrusted_entity_id])
         assert cursor.fetchone() is None
+        runtime.rollback()
+
+        _bind(cursor, tenant.id, "organization", organization.id, principal_mode="system")
+        trusted_entity_id = uuid.uuid4()
+        cursor.execute(
+            "INSERT INTO core_entity "
+            "(id, tenant_id, workspace_id, organization_id, entity_type, display_name, custom_fields, "
+            "visibility, archived_at, created_at, updated_at) "
+            "VALUES (%s, %s, %s, NULL, 'person', 'Runtime system person', '{}'::jsonb, "
+            "'msp_private', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            [trusted_entity_id, tenant.id, msp_workspace_id],
+        )
+        cursor.execute("SELECT id FROM core_entity WHERE id = %s", [trusted_entity_id])
+        assert cursor.fetchone() == (trusted_entity_id,)
 
 
 @pytest.mark.django_db(transaction=True)

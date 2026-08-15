@@ -150,6 +150,7 @@ test-runtime-authorization:
 		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_client_portal_context_is_exactly_organization_scoped \
 		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_can_accept_client_invitation \
 		apps/core/tests/test_scoping.py::test_runtime_role_scoped_queries_compose_with_database_workspace_isolation \
+		apps/core/tests/test_runtime_rls.py::test_runtime_organization_scope_requires_system_principal_to_stage_tenant_person_identity \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_administrator_can_create_and_reopen_fail_closed_organization \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal \

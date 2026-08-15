@@ -39,9 +39,9 @@ jobs:
           {
             echo "## TekDocs validation path"
             echo
-            echo "1. Backend, frontend, security policy, Chromium, and the live browser-to-Django-to-PostgreSQL journey start in parallel."
-            echo "2. The full backend suite is exercised against PostgreSQL with runtime RLS enabled."
-            echo "3. Browser failures are reported without waiting for the full PostgreSQL suite."
+            echo "1. Static checks, browser journeys, the focused runtime/RLS gate, and four isolated PostgreSQL shards start in parallel."
+            echo "2. PostgreSQL shard coverage is merged and enforced after every shard passes."
+            echo "3. Browser and authorization failures are reported without waiting for the complete backend suite."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
             echo
             echo "CodeQL and scheduled extended browser/performance/DAST checks remain separate workflows."
@@ -137,28 +137,47 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  postgres-runtime:
-    name: PostgreSQL backend tests, runtime, and isolation
-    needs: [backend, frontend, security]
+  runtime-authorization:
+    name: Focused PostgreSQL runtime and RLS boundary
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Generate ephemeral environment
-        run: ./scripts/bootstrap-env.sh .env
-      - name: Production-shaped Compose test gate
-        run: make test-compose
-      - name: Collect failure logs
-        if: failure()
-        run: docker compose -f compose.yml -f compose.test.yml logs --no-color > compose.log
+      - name: Exercise the constrained runtime database role
+        run: ./scripts/rehearse-postgres-test-shard.sh runtime
+
+  postgres-shards:
+    name: PostgreSQL shard (${{ matrix.shard }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [route-access, route-methods, route-session, remaining]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run isolated PostgreSQL shard
+        run: ./scripts/rehearse-postgres-test-shard.sh "${{ matrix.shard }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
         with:
-          name: postgres-runtime-logs
-          path: compose.log
+          name: postgres-coverage-${{ matrix.shard }}
+          path: artifacts/postgres-coverage/${{ matrix.shard }}/coverage.${{ matrix.shard }}
           retention-days: 7
-      - name: Stop runtime stack
-        if: always()
-        run: docker compose -f compose.yml -f compose.test.yml down --volumes --remove-orphans
+          if-no-files-found: error
+
+  postgres-coverage:
+    name: Combined PostgreSQL coverage
+    needs: postgres-shards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: postgres-coverage-*
+          path: artifacts/postgres-coverage/combined
+          merge-multiple: true
+      - name: Merge and enforce backend coverage
+        run: ./scripts/combine-postgres-coverage.sh artifacts/postgres-coverage/combined
 
   browser:
     name: Chromium regression
@@ -187,7 +206,7 @@ jobs:
 
   production-containers:
     name: Production containers, SBOMs, and vulnerability scan
-    needs: [prepare, postgres-runtime, browser, live-workspace]
+    needs: [prepare, backend, frontend, security, runtime-authorization, postgres-coverage, browser, live-workspace]
     runs-on: ubuntu-latest
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}

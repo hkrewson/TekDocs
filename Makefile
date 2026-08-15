@@ -6,7 +6,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-compliance-catalogs test-compliance-monitoring-validation test-auth-abuse \
 	test-client-portal-boundary test-outbox test-notifications test-notification-email \
 	test-portal-notification-stabilization test-portal-notification-validation test-policy \
-	test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people \
+	test-isolation test-rls test-organizations test-workspaces test-people \
 	test-sites test-custom-fields test-relationships test-recovery test-stabilization \
 	test-public-beta-performance test-entity-rbac-validation test-documentation-validation \
 	test-publication-control test-credential-references test-catalogs test-inventory \
@@ -144,19 +144,7 @@ test-rls:
 	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
 
 test-runtime-authorization:
-	docker compose run --rm migrate pytest \
-		apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply \
-		apps/core/tests/test_workspaces.py::test_runtime_role_workspace_routes_enforce_assigned_client_boundary \
-		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_client_portal_context_is_exactly_organization_scoped \
-		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_can_accept_client_invitation \
-		apps/core/tests/test_scoping.py::test_runtime_role_scoped_queries_compose_with_database_workspace_isolation \
-		apps/core/tests/test_runtime_rls.py::test_runtime_organization_scope_requires_system_principal_to_stage_tenant_person_identity \
-		apps/core/tests/test_runtime_rls.py::test_runtime_role_administrator_can_create_and_reopen_fail_closed_organization \
-		apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions \
-		apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal \
-		apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor \
-		apps/core/tests/test_runtime_rls.py::test_runtime_entity_anchors_require_entitled_user_or_explicit_system_principal \
-		apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration -q
+	./scripts/rehearse-postgres-test-shard.sh runtime
 
 test-organizations:
 	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q

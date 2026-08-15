@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .models import (
+    Block,
     BlockKind,
     BlockRevision,
     Document,
@@ -300,6 +301,7 @@ class DocumentCreateSerializer(serializers.Serializer):
         default=DocumentCategory.GENERAL,
     )
     is_template = serializers.BooleanField(required=False, default=False)
+    library_visible = serializers.BooleanField(required=False, default=False)
 
 
 class DocumentUpdateSerializer(DocumentCreateSerializer):
@@ -536,8 +538,11 @@ class DocumentPublicationResultSerializer(serializers.Serializer):
 
 
 class DocumentPlacementWriteSerializer(serializers.Serializer):
-    operation = serializers.ChoiceField(choices=("reuse_document", "create_block"), default="reuse_document")
+    operation = serializers.ChoiceField(
+        choices=("reuse_document", "reuse_block", "create_block"), default="reuse_document"
+    )
     source_document_id = serializers.UUIDField(required=False)
+    source_block_id = serializers.UUIDField(required=False)
     resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices, default="live")
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
     parent_id = serializers.UUIDField(required=False, allow_null=True)
@@ -558,22 +563,41 @@ class DocumentPlacementWriteSerializer(serializers.Serializer):
         trim_whitespace=False,
         default="",
     )
+    library_visible = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         operation = attrs["operation"]
         source_document_id = attrs.get("source_document_id")
+        source_block_id = attrs.get("source_block_id")
         if operation == "reuse_document":
             if source_document_id is None:
                 raise serializers.ValidationError({"source_document_id": "Choose a source document to reuse."})
+            if source_block_id is not None:
+                raise serializers.ValidationError({"source_block_id": "Choose either a document or a block."})
+            if (
+                "block_name" in self.initial_data
+                or "block_kind" in self.initial_data
+                or "markdown" in self.initial_data
+                or "library_visible" in self.initial_data
+            ):
+                raise serializers.ValidationError("New-block fields cannot be supplied when reusing a document.")
+            return attrs
+        if operation == "reuse_block":
+            if source_block_id is None:
+                raise serializers.ValidationError({"source_block_id": "Choose a library block to reuse."})
+            if source_document_id is not None:
+                raise serializers.ValidationError({"source_document_id": "Choose either a document or a block."})
             if (
                 "block_name" in self.initial_data
                 or "block_kind" in self.initial_data
                 or "markdown" in self.initial_data
             ):
-                raise serializers.ValidationError("New-block fields cannot be supplied when reusing a document.")
+                raise serializers.ValidationError("New-block fields cannot be supplied when reusing a library block.")
             return attrs
         if source_document_id is not None:
             raise serializers.ValidationError({"source_document_id": "New blocks cannot identify a source document."})
+        if source_block_id is not None:
+            raise serializers.ValidationError({"source_block_id": "New blocks cannot identify a source block."})
         if attrs["resolution_mode"] != PlacementResolutionMode.LIVE or attrs.get("pinned_revision_id") is not None:
             raise serializers.ValidationError("New blocks must begin as live local blocks.")
         return attrs
@@ -582,6 +606,32 @@ class DocumentPlacementWriteSerializer(serializers.Serializer):
 class DocumentPlacementUpdateSerializer(serializers.Serializer):
     resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class BlockLibraryQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
+    page_size = serializers.IntegerField(min_value=1, max_value=50, required=False, default=20)
+
+
+class BlockLibraryItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    name = serializers.CharField(source="entity.display_name")
+    kind = serializers.ChoiceField(choices=BlockKind.choices)
+    markdown = serializers.CharField(source="current_revision.markdown", allow_blank=True)
+    revision_id = serializers.UUIDField(source="current_revision_id")
+    revision_number = serializers.IntegerField(source="current_revision.revision_number")
+    source_document_id = serializers.UUIDField(source="source_document.entity_id")
+    source_document_title = serializers.CharField(source="source_document.entity.display_name")
+    owner_kind = serializers.SerializerMethodField()
+    owner_organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)
+
+    def get_owner_kind(self, obj: Block) -> str:
+        return "organization" if obj.organization_id else "msp"
+
+
+class BlockLibraryResultSerializer(serializers.Serializer):
+    results = BlockLibraryItemSerializer(many=True)
+    count = serializers.IntegerField()
 
 
 class SharedBlockUpdateSerializer(serializers.Serializer):
@@ -720,6 +770,7 @@ class DocumentSerializer(serializers.Serializer):
     is_reference = serializers.SerializerMethodField()
     category = serializers.ChoiceField(choices=DocumentCategory.choices)
     is_template = serializers.BooleanField()
+    library_visible = serializers.BooleanField()
     attachments = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
     publications = serializers.SerializerMethodField()

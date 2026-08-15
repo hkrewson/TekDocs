@@ -393,6 +393,22 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .new-block-fields label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .new-block-fields label span { font-weight: 400; }
 .new-block-fields input, .new-block-fields select { min-height: 38px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.block-library { display: grid; gap: 10px; border-top: 1px solid var(--border); padding-top: 16px; }
+.block-library > label { display: grid; gap: 5px; max-width: 620px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.block-library > label input { min-height: 40px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.block-library ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.document-composition .block-library li { align-items: center; border: 1px solid var(--border); border-radius: 8px; display: flex; gap: 16px; justify-content: space-between; min-height: 0; padding: 10px 12px; }
+.block-library li > span { display: grid; gap: 3px; min-width: 0; }
+.block-library li small { color: var(--muted); }
+.document-relationship-rail { display: grid; gap: 12px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.document-relationship-rail h2 { margin: 0; font-size: 15px; }
+.document-relationship-rail p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.document-relationship-rail > label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.document-relationship-candidates, .document-relationship-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.document-relationship-candidates button { width: 100%; padding: 9px 10px; text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 7px; }
+.document-relationship-candidates button, .document-relationship-list span { display: grid; gap: 2px; }
+.document-relationship-candidates small, .document-relationship-list small { color: var(--muted); }
+.document-relationship-list li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .document-composition .section-heading > div { min-width: 0; }
 .document-composition .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
 .document-composition ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }

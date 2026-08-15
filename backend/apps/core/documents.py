@@ -143,6 +143,36 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
     )
 
 
+def blocks_for_library(scope: DataScope) -> QuerySet[Block]:
+    """Return local blocks plus explicitly published MSP library blocks."""
+
+    records = Block.objects.filter(
+        tenant_id=scope.tenant_id,
+        archived_at__isnull=True,
+        current_revision__isnull=False,
+        source_document__archived_at__isnull=True,
+    )
+    if scope.organization_id is None:
+        records = records.filter(organization__isnull=True)
+    else:
+        records = records.filter(
+            Q(organization_id=scope.organization_id)
+            | Q(
+                organization__isnull=True,
+                library_visible=True,
+                source_document__library_visible=True,
+            )
+        )
+    return records.select_related(
+        "entity",
+        "organization",
+        "organization__entity",
+        "source_document",
+        "source_document__entity",
+        "current_revision",
+    ).distinct()
+
+
 def resolve_document(document: Document) -> ResolvedDocument:
     placements = list(getattr(document, "active_placements", ()))
     if not placements:
@@ -211,6 +241,7 @@ def create_document(
     markdown: str,
     category: str = DocumentCategory.GENERAL,
     is_template: bool = False,
+    library_visible: bool = False,
 ) -> Document:
     document_entity = Entity.objects.create(
         tenant=tenant,
@@ -225,6 +256,7 @@ def create_document(
         entity=document_entity,
         category=category,
         is_template=is_template,
+        library_visible=library_visible,
     )
     block_entity = Entity.objects.create(
         tenant=tenant,
@@ -238,6 +270,7 @@ def create_document(
         organization=organization,
         entity=block_entity,
         source_document=document,
+        library_visible=library_visible,
     )
     revision = BlockRevision.objects.create(
         tenant=tenant,
@@ -269,10 +302,21 @@ def update_document(
     base_revision_id: UUID,
     category: str = DocumentCategory.GENERAL,
     is_template: bool = False,
+    library_visible: bool = False,
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
     placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
     block = Block.objects.select_for_update().get(pk=placement.block_id)
+    if (
+        locked_document.organization_id is None
+        and locked_document.library_visible
+        and not library_visible
+        and DocumentPlacement.objects.filter(
+            block__source_document=locked_document,
+            document__organization__isnull=False,
+        ).exists()
+    ):
+        raise PlacementConflict("Detach client block reuse before removing this document from the block library.")
     resulting_revision = _append_block_revision(
         block=block,
         actor_id=actor_id,
@@ -286,7 +330,11 @@ def update_document(
     block.entity.save(update_fields=("display_name", "updated_at"))
     locked_document.category = category
     locked_document.is_template = is_template
-    locked_document.save(update_fields=("category", "is_template", "updated_at"))
+    locked_document.library_visible = library_visible
+    locked_document.save(update_fields=("category", "is_template", "library_visible", "updated_at"))
+    if placement.parent_id is None and placement.position == 0 and block.library_visible != library_visible:
+        block.library_visible = library_visible
+        block.save(update_fields=("library_visible", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked_document.tenant,
         actor_id=actor_id,
@@ -495,6 +543,7 @@ def create_document_block(
     name: str,
     parent_id: UUID | None,
     position: int | None,
+    library_visible: bool = False,
 ) -> DocumentPlacement:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
     if locked_document.placements.count() >= 500:
@@ -521,6 +570,7 @@ def create_document_block(
         entity=entity,
         kind=kind,
         source_document=locked_document,
+        library_visible=library_visible,
     )
     revision = BlockRevision.objects.create(
         tenant=locked_document.tenant,
@@ -563,13 +613,40 @@ def add_document_placement(
     parent_id: UUID | None,
     position: int | None = None,
 ) -> DocumentPlacement:
-    locked_document = Document.objects.select_for_update().get(pk=document.pk)
-    if locked_document.placements.count() >= 500:
-        raise PlacementConflict("Document composition cannot exceed 500 blocks.")
-    if source_document.pk == locked_document.pk:
+    if source_document.pk == document.pk:
         raise PlacementConflict("A document cannot transclude its own primary block.")
     source = primary_placement(source_document)
     block = Block.objects.select_related("current_revision").get(pk=source.block_id)
+    return add_block_placement(
+        document=document,
+        block=block,
+        actor_id=actor_id,
+        resolution_mode=resolution_mode,
+        pinned_revision_id=pinned_revision_id,
+        parent_id=parent_id,
+        position=position,
+    )
+
+
+@transaction.atomic
+def add_block_placement(
+    *,
+    document: Document,
+    block: Block,
+    actor_id: UUID,
+    resolution_mode: str,
+    pinned_revision_id: UUID | None,
+    parent_id: UUID | None,
+    position: int | None = None,
+) -> DocumentPlacement:
+    locked_document = Document.objects.select_for_update().get(pk=document.pk)
+    if locked_document.placements.count() >= 500:
+        raise PlacementConflict("Document composition cannot exceed 500 blocks.")
+    block = Block.objects.select_related("current_revision").get(pk=block.pk)
+    if block.tenant_id != locked_document.tenant_id or block.archived_at is not None:
+        raise PlacementConflict("The selected block is unavailable in this installation.")
+    if block.source_document_id == locked_document.id:
+        raise PlacementConflict("A document cannot transclude one of its own blocks.")
     parent = _placement_parent(document=locked_document, parent_id=parent_id)
     if parent is not None:
         ancestor: DocumentPlacement | None = parent

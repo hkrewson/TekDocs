@@ -1,6 +1,7 @@
 from typing import cast
 from uuid import UUID
 
+from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
@@ -23,9 +24,11 @@ from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
     RevisionConflict,
+    add_block_placement,
     add_document_placement,
     add_listing_reference,
     archive_document,
+    blocks_for_library,
     create_document,
     create_document_block,
     detach_document_placement,
@@ -58,6 +61,8 @@ from .publications import (
 from .relationships import search_entities
 from .scoping import DataScope
 from .serializers import (
+    BlockLibraryQuerySerializer,
+    BlockLibraryResultSerializer,
     BlockRevisionDetailSerializer,
     BlockRevisionListQuerySerializer,
     BlockRevisionResultSerializer,
@@ -139,6 +144,7 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         markdown=serializer.validated_data.get("markdown", ""),
         category=serializer.validated_data["category"],
         is_template=serializer.validated_data["is_template"],
+        library_visible=serializer.validated_data["library_visible"],
     )
     return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
 
@@ -162,6 +168,8 @@ def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> 
         update_document(document=document, actor_id=request.user.pk, **serializer.validated_data)
     except RevisionConflict as conflict:
         return _revision_conflict_response(conflict)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
     return _retrieve(workspace, document_entity_id)
 
 
@@ -578,6 +586,21 @@ def _mention_search(workspace: ResolvedWorkspace, request: Request) -> Response:
     )
 
 
+def _block_library(workspace: ResolvedWorkspace, request: Request) -> Response:
+    query = BlockLibraryQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    queryset = blocks_for_library(workspace.data_scope)
+    if values["q"]:
+        queryset = queryset.filter(
+            Q(entity__display_name__icontains=values["q"])
+            | Q(source_document__entity__display_name__icontains=values["q"])
+            | Q(current_revision__markdown__icontains=values["q"])
+        )
+    records = list(queryset.order_by("entity__display_name", "entity_id")[: values["page_size"]])
+    return Response(BlockLibraryResultSerializer({"results": records, "count": len(records)}).data)
+
+
 def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
     document = _document(workspace, document_entity_id)
     _mutate_workspace(request, workspace, document)
@@ -591,6 +614,20 @@ def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
                 markdown=serializer.validated_data["markdown"],
                 kind=serializer.validated_data["block_kind"],
                 name=serializer.validated_data["block_name"],
+                parent_id=serializer.validated_data.get("parent_id"),
+                position=serializer.validated_data.get("position"),
+                library_visible=serializer.validated_data["library_visible"],
+            )
+        elif serializer.validated_data["operation"] == "reuse_block":
+            block = get_object_or_404(
+                blocks_for_library(workspace.data_scope), entity_id=serializer.validated_data["source_block_id"]
+            )
+            add_block_placement(
+                document=document,
+                block=block,
+                actor_id=request.user.pk,
+                resolution_mode=serializer.validated_data["resolution_mode"],
+                pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
                 parent_id=serializer.validated_data.get("parent_id"),
                 position=serializer.validated_data.get("position"),
             )
@@ -890,6 +927,12 @@ class MSPDocumentMentionSearchView(APIView):
     )
     def get(self, request):  # type: ignore[no-untyped-def]
         return _mention_search(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
+
+
+class MSPDocumentBlockLibraryView(APIView):
+    @extend_schema(operation_id="document_blocks_msp_library", responses={200: BlockLibraryResultSerializer})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _block_library(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
 
 
 class OrganizationDocumentListCreateView(APIView):
@@ -1219,6 +1262,14 @@ class OrganizationDocumentMentionSearchView(APIView):
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _mention_search(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        )
+
+
+class OrganizationDocumentBlockLibraryView(APIView):
+    @extend_schema(operation_id="document_blocks_organization_library", responses={200: BlockLibraryResultSerializer})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _block_library(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
         )
 

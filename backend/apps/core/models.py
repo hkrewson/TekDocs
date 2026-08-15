@@ -2884,6 +2884,7 @@ class Document(TimestampedModel):
         default=DocumentCategory.GENERAL,
     )
     is_template = models.BooleanField(default=False)
+    library_visible = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
@@ -3380,6 +3381,7 @@ class Block(TimestampedModel):
         blank=True,
     )
     kind = models.CharField(max_length=32, choices=BlockKind.choices, default=BlockKind.RICH_TEXT)
+    library_visible = models.BooleanField(default=False)
     current_revision = models.ForeignKey(
         "BlockRevision",
         on_delete=models.PROTECT,

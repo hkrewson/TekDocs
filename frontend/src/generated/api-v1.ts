@@ -772,6 +772,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/block-library": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_blocks_msp_library"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/from-template": {
         readonly parameters: {
             readonly query?: never;
@@ -4100,6 +4116,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/block-library": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_blocks_organization_library"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/from-template": {
         readonly parameters: {
             readonly query?: never;
@@ -5675,6 +5707,36 @@ export interface components {
             readonly email: string;
             readonly display_name: string;
         };
+        readonly BlockLibraryItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            /**
+             * @description * `rich_text` - Rich text
+             *     * `heading` - Heading
+             *     * `code` - Code
+             *     * `url` - URL
+             *     * `document_link` - Document link
+             *     * `entity_reference` - Entity reference
+             *     * `file_reference` - File reference
+             * @enum {string}
+             */
+            readonly kind: "rich_text" | "heading" | "code" | "url" | "document_link" | "entity_reference" | "file_reference";
+            readonly markdown: string;
+            /** Format: uuid */
+            readonly revision_id: string;
+            readonly revision_number: number;
+            /** Format: uuid */
+            readonly source_document_id: string;
+            readonly source_document_title: string;
+            readonly owner_kind: string;
+            /** Format: uuid */
+            readonly owner_organization_id: string | null;
+        };
+        readonly BlockLibraryResult: {
+            readonly results: readonly components["schemas"]["BlockLibraryItem"][];
+            readonly count: number;
+        };
         readonly BlockRevision: {
             /** Format: uuid */
             readonly id: string;
@@ -6770,6 +6832,7 @@ export interface components {
              */
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             readonly is_template: boolean;
+            readonly library_visible: boolean;
             readonly attachments: readonly components["schemas"]["DocumentAttachment"][];
             readonly attachment_count: number;
             readonly publications: readonly components["schemas"]["DocumentPublication"][];
@@ -6822,6 +6885,8 @@ export interface components {
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             /** @default false */
             readonly is_template: boolean;
+            /** @default false */
+            readonly library_visible: boolean;
         };
         readonly DocumentPlacement: {
             /** Format: uuid */
@@ -6862,13 +6927,16 @@ export interface components {
         readonly DocumentPlacementWrite: {
             /**
              * @description * `reuse_document` - reuse_document
+             *     * `reuse_block` - reuse_block
              *     * `create_block` - create_block
              * @default reuse_document
              * @enum {string}
              */
-            readonly operation: "reuse_document" | "create_block";
+            readonly operation: "reuse_document" | "reuse_block" | "create_block";
             /** Format: uuid */
             readonly source_document_id?: string;
+            /** Format: uuid */
+            readonly source_block_id?: string;
             /**
              * @description * `live` - Live
              *     * `pinned` - Pinned
@@ -6897,6 +6965,8 @@ export interface components {
             readonly block_name: string;
             /** @default  */
             readonly markdown: string;
+            /** @default false */
+            readonly library_visible: boolean;
         };
         readonly DocumentPublication: {
             /** Format: uuid */
@@ -7076,6 +7146,8 @@ export interface components {
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             /** @default false */
             readonly is_template: boolean;
+            /** @default false */
+            readonly library_visible: boolean;
             /** Format: uuid */
             readonly base_revision_id: string;
         };
@@ -7277,7 +7349,16 @@ export interface components {
              *     * `person` - person
              *     * `site` - site
              *     * `location` - location
+             *     * `document` - document
+             *     * `document_attachment` - document_attachment
              *     * `client_asset` - client_asset
+             *     * `catalog_product` - catalog_product
+             *     * `catalog_model` - catalog_model
+             *     * `software_license` - software_license
+             *     * `commercial_contract` - commercial_contract
+             *     * `credential_reference` - credential_reference
+             *     * `registered_domain` - registered_domain
+             *     * `certificate_endpoint` - certificate_endpoint
              *     * `network_rack` - network_rack
              *     * `network_device` - network_device
              *     * `network_vrf` - network_vrf
@@ -7293,7 +7374,7 @@ export interface components {
              *     * `network_circuit_handoff` - network_circuit_handoff
              * @enum {string}
              */
-            readonly entity_type: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff";
+            readonly entity_type: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff";
             /**
              * @description * `msp_private` - MSP private
              *     * `client_visible` - Client visible
@@ -11896,6 +11977,27 @@ export interface operations {
             };
         };
     };
+    readonly document_blocks_msp_library: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["BlockLibraryResult"];
+                };
+            };
+        };
+    };
     readonly document_templates_msp_instantiate: {
         readonly parameters: {
             readonly query?: never;
@@ -11968,7 +12070,16 @@ export interface operations {
                  *     * `person` - person
                  *     * `site` - site
                  *     * `location` - location
+                 *     * `document` - document
+                 *     * `document_attachment` - document_attachment
                  *     * `client_asset` - client_asset
+                 *     * `catalog_product` - catalog_product
+                 *     * `catalog_model` - catalog_model
+                 *     * `software_license` - software_license
+                 *     * `commercial_contract` - commercial_contract
+                 *     * `credential_reference` - credential_reference
+                 *     * `registered_domain` - registered_domain
+                 *     * `certificate_endpoint` - certificate_endpoint
                  *     * `network_rack` - network_rack
                  *     * `network_device` - network_device
                  *     * `network_vrf` - network_vrf
@@ -11983,7 +12094,7 @@ export interface operations {
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -12242,7 +12353,16 @@ export interface operations {
                  *     * `person` - person
                  *     * `site` - site
                  *     * `location` - location
+                 *     * `document` - document
+                 *     * `document_attachment` - document_attachment
                  *     * `client_asset` - client_asset
+                 *     * `catalog_product` - catalog_product
+                 *     * `catalog_model` - catalog_model
+                 *     * `software_license` - software_license
+                 *     * `commercial_contract` - commercial_contract
+                 *     * `credential_reference` - credential_reference
+                 *     * `registered_domain` - registered_domain
+                 *     * `certificate_endpoint` - certificate_endpoint
                  *     * `network_rack` - network_rack
                  *     * `network_device` - network_device
                  *     * `network_vrf` - network_vrf
@@ -12257,7 +12377,7 @@ export interface operations {
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -20649,6 +20769,29 @@ export interface operations {
             };
         };
     };
+    readonly document_blocks_organization_library: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["BlockLibraryResult"];
+                };
+            };
+        };
+    };
     readonly document_templates_organization_instantiate: {
         readonly parameters: {
             readonly query?: never;
@@ -20725,7 +20868,16 @@ export interface operations {
                  *     * `person` - person
                  *     * `site` - site
                  *     * `location` - location
+                 *     * `document` - document
+                 *     * `document_attachment` - document_attachment
                  *     * `client_asset` - client_asset
+                 *     * `catalog_product` - catalog_product
+                 *     * `catalog_model` - catalog_model
+                 *     * `software_license` - software_license
+                 *     * `commercial_contract` - commercial_contract
+                 *     * `credential_reference` - credential_reference
+                 *     * `registered_domain` - registered_domain
+                 *     * `certificate_endpoint` - certificate_endpoint
                  *     * `network_rack` - network_rack
                  *     * `network_device` - network_device
                  *     * `network_vrf` - network_vrf
@@ -20740,7 +20892,7 @@ export interface operations {
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -21299,7 +21451,16 @@ export interface operations {
                  *     * `person` - person
                  *     * `site` - site
                  *     * `location` - location
+                 *     * `document` - document
+                 *     * `document_attachment` - document_attachment
                  *     * `client_asset` - client_asset
+                 *     * `catalog_product` - catalog_product
+                 *     * `catalog_model` - catalog_model
+                 *     * `software_license` - software_license
+                 *     * `commercial_contract` - commercial_contract
+                 *     * `credential_reference` - credential_reference
+                 *     * `registered_domain` - registered_domain
+                 *     * `certificate_endpoint` - certificate_endpoint
                  *     * `network_rack` - network_rack
                  *     * `network_device` - network_device
                  *     * `network_vrf` - network_vrf
@@ -21314,7 +21475,7 @@ export interface operations {
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "client_asset" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.12
+  version: 0.8.13
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2503,6 +2503,27 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/block-library:
+    get:
+      operationId: document_blocks_msp_library
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockLibraryResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/from-template:
     post:
       operationId: document_templates_msp_instantiate
@@ -2590,7 +2611,16 @@ paths:
           - person
           - site
           - location
+          - document
+          - document_attachment
           - client_asset
+          - catalog_product
+          - catalog_model
+          - software_license
+          - commercial_contract
+          - credential_reference
+          - registered_domain
+          - certificate_endpoint
           - network_rack
           - network_device
           - network_vrf
@@ -2606,14 +2636,23 @@ paths:
           - network_circuit_handoff
           - ''
           type: string
-          x-spec-enum-id: 5564163d3f234e72
+          x-spec-enum-id: dba9bff246645ca2
           default: ''
         description: |-
           * `organization` - organization
           * `person` - person
           * `site` - site
           * `location` - location
+          * `document` - document
+          * `document_attachment` - document_attachment
           * `client_asset` - client_asset
+          * `catalog_product` - catalog_product
+          * `catalog_model` - catalog_model
+          * `software_license` - software_license
+          * `commercial_contract` - commercial_contract
+          * `credential_reference` - credential_reference
+          * `registered_domain` - registered_domain
+          * `certificate_endpoint` - certificate_endpoint
           * `network_rack` - network_rack
           * `network_device` - network_device
           * `network_vrf` - network_vrf
@@ -2960,7 +2999,16 @@ paths:
           - person
           - site
           - location
+          - document
+          - document_attachment
           - client_asset
+          - catalog_product
+          - catalog_model
+          - software_license
+          - commercial_contract
+          - credential_reference
+          - registered_domain
+          - certificate_endpoint
           - network_rack
           - network_device
           - network_vrf
@@ -2976,14 +3024,23 @@ paths:
           - network_circuit_handoff
           - ''
           type: string
-          x-spec-enum-id: 5564163d3f234e72
+          x-spec-enum-id: dba9bff246645ca2
           default: ''
         description: |-
           * `organization` - organization
           * `person` - person
           * `site` - site
           * `location` - location
+          * `document` - document
+          * `document_attachment` - document_attachment
           * `client_asset` - client_asset
+          * `catalog_product` - catalog_product
+          * `catalog_model` - catalog_model
+          * `software_license` - software_license
+          * `commercial_contract` - commercial_contract
+          * `credential_reference` - credential_reference
+          * `registered_domain` - registered_domain
+          * `certificate_endpoint` - certificate_endpoint
           * `network_rack` - network_rack
           * `network_device` - network_device
           * `network_vrf` - network_vrf
@@ -14063,6 +14120,34 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/block-library:
+    get:
+      operationId: document_blocks_organization_library
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockLibraryResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/from-template:
     post:
       operationId: document_templates_organization_instantiate
@@ -14164,7 +14249,16 @@ paths:
           - person
           - site
           - location
+          - document
+          - document_attachment
           - client_asset
+          - catalog_product
+          - catalog_model
+          - software_license
+          - commercial_contract
+          - credential_reference
+          - registered_domain
+          - certificate_endpoint
           - network_rack
           - network_device
           - network_vrf
@@ -14180,14 +14274,23 @@ paths:
           - network_circuit_handoff
           - ''
           type: string
-          x-spec-enum-id: 5564163d3f234e72
+          x-spec-enum-id: dba9bff246645ca2
           default: ''
         description: |-
           * `organization` - organization
           * `person` - person
           * `site` - site
           * `location` - location
+          * `document` - document
+          * `document_attachment` - document_attachment
           * `client_asset` - client_asset
+          * `catalog_product` - catalog_product
+          * `catalog_model` - catalog_model
+          * `software_license` - software_license
+          * `commercial_contract` - commercial_contract
+          * `credential_reference` - credential_reference
+          * `registered_domain` - registered_domain
+          * `certificate_endpoint` - certificate_endpoint
           * `network_rack` - network_rack
           * `network_device` - network_device
           * `network_vrf` - network_vrf
@@ -15001,7 +15104,16 @@ paths:
           - person
           - site
           - location
+          - document
+          - document_attachment
           - client_asset
+          - catalog_product
+          - catalog_model
+          - software_license
+          - commercial_contract
+          - credential_reference
+          - registered_domain
+          - certificate_endpoint
           - network_rack
           - network_device
           - network_vrf
@@ -15017,14 +15129,23 @@ paths:
           - network_circuit_handoff
           - ''
           type: string
-          x-spec-enum-id: 5564163d3f234e72
+          x-spec-enum-id: dba9bff246645ca2
           default: ''
         description: |-
           * `organization` - organization
           * `person` - person
           * `site` - site
           * `location` - location
+          * `document` - document
+          * `document_attachment` - document_attachment
           * `client_asset` - client_asset
+          * `catalog_product` - catalog_product
+          * `catalog_model` - catalog_model
+          * `software_license` - software_license
+          * `commercial_contract` - commercial_contract
+          * `credential_reference` - credential_reference
+          * `registered_domain` - registered_domain
+          * `certificate_endpoint` - certificate_endpoint
           * `network_rack` - network_rack
           * `network_device` - network_device
           * `network_vrf` - network_vrf
@@ -20149,6 +20270,75 @@ components:
       - display_name
       - email
       - id
+    BlockLibraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          enum:
+          - rich_text
+          - heading
+          - code
+          - url
+          - document_link
+          - entity_reference
+          - file_reference
+          type: string
+          description: |-
+            * `rich_text` - Rich text
+            * `heading` - Heading
+            * `code` - Code
+            * `url` - URL
+            * `document_link` - Document link
+            * `entity_reference` - Entity reference
+            * `file_reference` - File reference
+          x-spec-enum-id: ec9cab9f2400346f
+        markdown:
+          type: string
+        revision_id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+        source_document_id:
+          type: string
+          format: uuid
+        source_document_title:
+          type: string
+        owner_kind:
+          type: string
+          readOnly: true
+        owner_organization_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - id
+      - kind
+      - markdown
+      - name
+      - owner_kind
+      - owner_organization_id
+      - revision_id
+      - revision_number
+      - source_document_id
+      - source_document_title
+    BlockLibraryResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockLibraryItem'
+        count:
+          type: integer
+      required:
+      - count
+      - results
     BlockRevision:
       type: object
       properties:
@@ -22797,6 +22987,8 @@ components:
           x-spec-enum-id: 5c27c16eb333c7c1
         is_template:
           type: boolean
+        library_visible:
+          type: boolean
         attachments:
           type: array
           items:
@@ -22861,6 +23053,7 @@ components:
       - id
       - is_reference
       - is_template
+      - library_visible
       - markdown
       - owner_kind
       - owner_organization_id
@@ -22942,6 +23135,9 @@ components:
           x-spec-enum-id: 5c27c16eb333c7c1
           default: general
         is_template:
+          type: boolean
+          default: false
+        library_visible:
           type: boolean
           default: false
       required:
@@ -23041,14 +23237,19 @@ components:
         operation:
           enum:
           - reuse_document
+          - reuse_block
           - create_block
           type: string
           description: |-
             * `reuse_document` - reuse_document
+            * `reuse_block` - reuse_block
             * `create_block` - create_block
-          x-spec-enum-id: 0b702dd5452f93f6
+          x-spec-enum-id: d014977e106d78a4
           default: reuse_document
         source_document_id:
+          type: string
+          format: uuid
+        source_block_id:
           type: string
           format: uuid
         resolution_mode:
@@ -23101,6 +23302,9 @@ components:
           type: string
           default: ''
           maxLength: 1000000
+        library_visible:
+          type: boolean
+          default: false
     DocumentPublication:
       type: object
       properties:
@@ -23522,6 +23726,9 @@ components:
           x-spec-enum-id: 5c27c16eb333c7c1
           default: general
         is_template:
+          type: boolean
+          default: false
+        library_visible:
           type: boolean
           default: false
         base_revision_id:
@@ -23983,7 +24190,16 @@ components:
           - person
           - site
           - location
+          - document
+          - document_attachment
           - client_asset
+          - catalog_product
+          - catalog_model
+          - software_license
+          - commercial_contract
+          - credential_reference
+          - registered_domain
+          - certificate_endpoint
           - network_rack
           - network_device
           - network_vrf
@@ -24003,7 +24219,16 @@ components:
             * `person` - person
             * `site` - site
             * `location` - location
+            * `document` - document
+            * `document_attachment` - document_attachment
             * `client_asset` - client_asset
+            * `catalog_product` - catalog_product
+            * `catalog_model` - catalog_model
+            * `software_license` - software_license
+            * `commercial_contract` - commercial_contract
+            * `credential_reference` - credential_reference
+            * `registered_domain` - registered_domain
+            * `certificate_endpoint` - certificate_endpoint
             * `network_rack` - network_rack
             * `network_device` - network_device
             * `network_vrf` - network_vrf
@@ -24017,7 +24242,7 @@ components:
             * `dns_record` - dns_record
             * `network_circuit` - network_circuit
             * `network_circuit_handoff` - network_circuit_handoff
-          x-spec-enum-id: 5564163d3f234e72
+          x-spec-enum-id: dba9bff246645ca2
         visibility:
           enum:
           - msp_private

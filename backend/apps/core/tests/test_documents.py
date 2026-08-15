@@ -1228,6 +1228,103 @@ def test_transclusion_source_must_be_visible_in_destination_workspace(owner_clie
 
 
 @pytest.mark.django_db
+def test_client_block_library_requires_explicit_msp_opt_in_and_never_exposes_sibling_clients(
+    owner_client, installation
+):
+    acme = organization(installation.tenant, "Acme Library")
+    beta = organization(installation.tenant, "Beta Library")
+    msp_collection = reverse("msp-document-list-create")
+    public_source = owner_client.post(
+        msp_collection,
+        {
+            "title": "Published MSP standard",
+            "markdown": "Public primary guidance",
+            "library_visible": True,
+        },
+        content_type="application/json",
+    ).json()
+    private_source = owner_client.post(
+        msp_collection,
+        {"title": "Private MSP notes", "markdown": "Never disclose"},
+        content_type="application/json",
+    ).json()
+    public_secondary = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": public_source["id"]}),
+        {
+            "operation": "create_block",
+            "block_name": "Printer isolation rationale",
+            "markdown": "Printers belong on IoT.",
+            "library_visible": True,
+        },
+        content_type="application/json",
+    ).json()["placements"][1]
+    private_secondary = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": public_source["id"]}),
+        {"operation": "create_block", "block_name": "Internal exception", "markdown": "Private"},
+        content_type="application/json",
+    ).json()["placements"][2]
+    beta_source = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}),
+        {"title": "Beta-only runbook", "markdown": "Sibling secret", "library_visible": True},
+        content_type="application/json",
+    ).json()
+    destination = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme runbook", "markdown": "Local introduction"},
+        content_type="application/json",
+    ).json()
+
+    library_url = reverse("organization-document-block-library", kwargs={"organization_entity_id": acme.entity_id})
+    library = owner_client.get(library_url)
+    assert library.status_code == 200
+    ids = {item["id"] for item in library.json()["results"]}
+    assert public_source["block_id"] in ids
+    assert public_secondary["block_id"] in ids
+    assert destination["block_id"] in ids
+    assert private_source["block_id"] not in ids
+    assert private_secondary["block_id"] not in ids
+    assert beta_source["block_id"] not in ids
+    assert "Never disclose" not in library.content.decode()
+    assert "Sibling secret" not in library.content.decode()
+
+    placement_url = reverse(
+        "organization-document-placement-list-create",
+        kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+    )
+    reused = owner_client.post(
+        placement_url,
+        {"operation": "reuse_block", "source_block_id": public_secondary["block_id"], "resolution_mode": "live"},
+        content_type="application/json",
+    )
+    assert reused.status_code == 200
+    assert reused.json()["placements"][-1]["resolved_markdown"] == "Printers belong on IoT."
+    visibility_update = owner_client.put(
+        reverse("msp-document-detail", kwargs={"document_entity_id": public_source["id"]}),
+        {
+            "title": public_source["title"],
+            "markdown": public_source["markdown"],
+            "base_revision_id": public_source["current_revision_id"],
+            "category": public_source["category"],
+            "is_template": False,
+            "library_visible": False,
+        },
+        content_type="application/json",
+    )
+    assert visibility_update.status_code == 409
+    assert "Detach client block reuse" in visibility_update.json()["detail"]
+    assert owner_client.post(
+        placement_url,
+        {"operation": "reuse_block", "source_block_id": private_secondary["block_id"], "resolution_mode": "live"},
+        content_type="application/json",
+    ).status_code == 404
+    assert owner_client.post(
+        placement_url,
+        {"operation": "reuse_block", "source_block_id": beta_source["block_id"], "resolution_mode": "live"},
+        content_type="application/json",
+    ).status_code == 404
+
+
+@pytest.mark.django_db
 def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(owner_client, installation):
     acme = organization(installation.tenant, "Acme")
     source = owner_client.post(

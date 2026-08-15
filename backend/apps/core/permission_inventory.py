@@ -71,6 +71,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-document-placement-detach", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-mention-search", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-block-library", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-template-instantiate", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-import", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1075,6 +1076,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-document-mention-search",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-block-library",
         ("GET",),
         PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,

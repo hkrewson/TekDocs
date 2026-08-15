@@ -15,7 +15,7 @@ export type EntityLinkType =
 export type EntityReference = {
   id: string
   display_name: string
-  entity_type: 'organization' | 'person' | 'site' | 'location' | 'client_asset' | 'network_rack' | 'network_device'
+  entity_type: string
   visibility: 'msp_private' | 'client_visible'
   workspace_label: string
   eligible_link_types: EntityLinkType[]
@@ -45,7 +45,7 @@ export type EntitySearchResult = { results: EntityReference[]; page: number; pag
 
 export interface RelationshipsClient {
   linkTypes(signal?: AbortSignal): Promise<LinkTypeDefinition[]>
-  search(scope: RelationshipScope, query: string, entityType?: EntityReference['entity_type'], signal?: AbortSignal): Promise<EntitySearchResult>
+  search(scope: RelationshipScope, query: string, entityType?: string, signal?: AbortSignal): Promise<EntitySearchResult>
   list(scope: RelationshipScope, entityId: string, signal?: AbortSignal): Promise<EntityRelationship[]>
   create(scope: RelationshipScope, entityId: string, targetId: string, linkType: EntityLinkType): Promise<EntityRelationship>
   archive(scope: RelationshipScope, entityId: string, linkId: string): Promise<void>

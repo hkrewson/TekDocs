@@ -30,6 +30,7 @@ export type DocumentRecord = {
   is_reference: boolean
   category: DocumentCategory
   is_template: boolean
+  library_visible: boolean
   attachments: DocumentAttachment[]
   attachment_count: number
   publications: DocumentPublication[]
@@ -83,7 +84,7 @@ export type DocumentPublicationDetail = DocumentPublication & {
   sanitized_html: string
   manifest: Record<string, unknown>
 }
-export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'>
+export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'> & { library_visible?: boolean }
 export type DocumentUpdateInput = DocumentInput & { base_revision_id: string }
 export type DocumentResult = { results: DocumentRecord[]; count: number }
 export type BlockRevision = {
@@ -114,6 +115,14 @@ export type ReusedPlacementInput = {
   parent_id?: string | null
   position?: number | null
 }
+export type ReusedBlockInput = {
+  operation: 'reuse_block'
+  source_block_id: string
+  resolution_mode: PlacementResolutionMode
+  pinned_revision_id?: string | null
+  parent_id?: string | null
+  position?: number | null
+}
 export type NewBlockInput = {
   operation: 'create_block'
   block_kind: BlockKind
@@ -121,8 +130,9 @@ export type NewBlockInput = {
   markdown: string
   parent_id?: string | null
   position?: number | null
+  library_visible?: boolean
 }
-export type PlacementInput = ReusedPlacementInput | NewBlockInput
+export type PlacementInput = ReusedPlacementInput | ReusedBlockInput | NewBlockInput
 export type PlacementUpdateInput = {
   resolution_mode: PlacementResolutionMode
   pinned_revision_id?: string | null
@@ -159,6 +169,19 @@ export type EntityMentionOption = {
   workspace_label: string
 }
 export type EntityMentionResult = { results: EntityMentionOption[]; count: number; has_more: boolean }
+export type BlockLibraryItem = {
+  id: string
+  name: string
+  kind: BlockKind
+  markdown: string
+  revision_id: string
+  revision_number: number
+  source_document_id: string
+  source_document_title: string
+  owner_kind: 'msp' | 'organization'
+  owner_organization_id: string | null
+}
+export type BlockLibraryResult = { results: BlockLibraryItem[]; count: number }
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -180,6 +203,7 @@ export interface DocumentsClient {
   updateSharedBlock(scope: DocumentScope, id: string, placementId: string, markdown: string, baseRevisionId: string): Promise<DocumentRecord>
   detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
+  searchBlockLibrary(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<BlockLibraryResult>
   instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory): Promise<DocumentRecord>
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
@@ -277,6 +301,12 @@ export const browserDocumentsClient: DocumentsClient = {
   detachPlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/detach`, 'POST'),
   async searchMentionEntities(scope, query, signal) {
     return parse<EntityMentionResult>(await fetch(`${collectionPath(scope)}/mention-entities?q=${encodeURIComponent(query)}&page_size=20`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async searchBlockLibrary(scope, query, signal) {
+    const parameters = new URLSearchParams({ q: query, page_size: '20' })
+    return parse<BlockLibraryResult>(await fetch(`${collectionPath(scope)}/block-library?${parameters}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
   },
   instantiateTemplate: (scope, sourceDocumentId, title, category) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category }),
   async importMarkdown(scope, file, title, category, isTemplate) {

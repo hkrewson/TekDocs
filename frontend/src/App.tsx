@@ -332,9 +332,9 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.12" />
+      <PageHeader title="Overview" description="TekDocs 0.8.13" />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.12</span></div>
+        <div className="section-heading"><h2>Foundation status</h2><span>0.8.13</span></div>
         <div className="status-table" role="table" aria-label="Foundation status">
           {[
             ['Application shell', 'Available'],
@@ -420,7 +420,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
-  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} /></Suspense>
+  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} /></Suspense>
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
@@ -533,7 +533,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <Suspense fallback={<section className="content-section" role="status"><h1>Loading workspace</h1><p>Please wait…</p></section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
-            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} /></Suspense>} />
+            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />

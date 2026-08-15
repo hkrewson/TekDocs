@@ -100,6 +100,7 @@ from apps.core.document_views import (
     MSPDocumentAttachmentDetailView,
     MSPDocumentAttachmentDownloadView,
     MSPDocumentAttachmentListCreateView,
+    MSPDocumentBlockLibraryView,
     MSPDocumentDetailView,
     MSPDocumentExportView,
     MSPDocumentListCreateView,
@@ -124,6 +125,7 @@ from apps.core.document_views import (
     OrganizationDocumentAttachmentDetailView,
     OrganizationDocumentAttachmentDownloadView,
     OrganizationDocumentAttachmentListCreateView,
+    OrganizationDocumentBlockLibraryView,
     OrganizationDocumentDetailView,
     OrganizationDocumentExportView,
     OrganizationDocumentListCreateView,
@@ -468,6 +470,7 @@ urlpatterns = [
     path(
         "api/v1/documents/mention-entities", MSPDocumentMentionSearchView.as_view(), name="msp-document-mention-search"
     ),
+    path("api/v1/documents/block-library", MSPDocumentBlockLibraryView.as_view(), name="msp-document-block-library"),
     path(
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
@@ -1504,6 +1507,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/mention-entities",
         OrganizationDocumentMentionSearchView.as_view(),
         name="organization-document-mention-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/block-library",
+        OrganizationDocumentBlockLibraryView.as_view(),
+        name="organization-document-block-library",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",

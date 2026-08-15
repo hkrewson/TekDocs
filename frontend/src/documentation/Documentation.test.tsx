@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -28,6 +28,7 @@ function clients() {
   const updateSharedBlock = vi.fn().mockResolvedValue(document)
   const detachPlacement = vi.fn().mockResolvedValue(document)
   const searchMentionEntities = vi.fn().mockResolvedValue({ results: [], count: 0, has_more: false })
+  const searchBlockLibrary = vi.fn().mockResolvedValue({ results: [], count: 0 })
   const instantiateTemplate = vi.fn().mockResolvedValue({ ...document, id: 'doc-from-template', title: 'New from Firewall standard', is_template: false })
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
   const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', scan_status: 'clean', scan_engine: 'test-scanner', scanned_at: '2026-08-09T00:00:00Z', created_at: '2026-08-09T00:00:00Z' })
@@ -50,6 +51,7 @@ function clients() {
     updateSharedBlock,
     detachPlacement,
     searchMentionEntities,
+    searchBlockLibrary,
     instantiateTemplate,
     importMarkdown,
     uploadAttachment,
@@ -70,7 +72,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, publication }
+  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, publication }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -141,7 +143,7 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.type(screen.getByLabelText('Document title'), 'New guide')
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), 'Portable Markdown')
   await user.click(screen.getByRole('button', { name: 'Save document' }))
-  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', is_template: false }))
+  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', is_template: false, library_visible: false }))
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
@@ -177,6 +179,23 @@ it('creates a typed local block at an explicit document position', async () => {
     block_name: 'Network assumptions',
     markdown: '## Addressing',
     position: 1,
+    library_visible: false,
+  }))
+})
+
+it('discovers and reuses an explicitly available MSP block from a client workspace', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, searchBlockLibrary, addPlacement } = clients()
+  searchBlockLibrary.mockResolvedValue({
+    count: 1,
+    results: [{ id: 'block-shared', name: 'Printer isolation rationale', kind: 'rich_text', markdown: 'Printers belong on IoT.', revision_id: 'revision-shared', revision_number: 3, source_document_id: 'doc-source', source_document_title: 'Network design standard', owner_kind: 'msp', owner_organization_id: null }],
+  })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(await screen.findByText('Printer isolation rationale')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Reuse live' }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', {
+    operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null,
   }))
 })
 

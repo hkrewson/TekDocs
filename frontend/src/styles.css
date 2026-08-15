@@ -621,6 +621,14 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .milkdown-host blockquote.callout-warning, .markdown-preview blockquote.callout-warning { border-left-color: #a26218; }
 .milkdown-host blockquote.callout-caution, .markdown-preview blockquote.callout-caution { border-left-color: #9b4033; }
 .markdown-preview { min-height: 480px; padding: 24px 30px; color: var(--text); background: #fff; line-height: 1.6; }
+.mermaid-diagram { margin: 18px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
+.mermaid-diagram figcaption { margin-bottom: 10px; font-weight: 650; }
+.mermaid-diagram > p { color: var(--muted); }
+.mermaid-graphic { overflow: auto; padding: 12px; background: var(--surface); border-radius: 6px; }
+.mermaid-graphic svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.mermaid-diagram details { margin-top: 10px; }
+.mermaid-diagram summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.mermaid-diagram pre { max-height: 280px; overflow: auto; white-space: pre-wrap; }
 .markdown-preview-state { min-height: 220px; display: grid; place-items: center; padding: 30px; color: var(--muted); background: #fff; }
 .markdown-preview-state[role='alert'] { color: #6f2d22; }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4 { line-height: 1.3; }

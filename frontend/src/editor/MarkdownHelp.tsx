@@ -15,6 +15,7 @@ const blockSyntax = [
   ['Quote', '> Original vendor guidance'],
   ['Callout', '> [!WARNING]\n> Rebooting disconnects the site.'],
   ['Code block', '```powershell\nGet-NetAdapter\n```'],
+  ['Mermaid diagram', '```mermaid\nflowchart LR\naccTitle: Network path\nA[User] --> B[Firewall]\n```'],
   ['Table', '| Port | Purpose |\n| --- | --- |\n| 1 | WAN |'],
   ['Divider', '---'],
   ['Footnote', 'Documented exception.[^1]\n\n[^1]: Approval details.'],
@@ -45,7 +46,7 @@ export function MarkdownHelp() {
       </section>
       <section className="markdown-help-safety" aria-labelledby="safe-markdown-heading">
         <h3 id="safe-markdown-heading">Portable and safe by design</h3>
-        <p>Raw HTML, MDX, scripts, inline styles, and author-supplied CSS are not supported. TekDocs controls colors and presentation so documents remain readable in dark mode, print, PDF, and other Markdown tools.</p>
+        <p>Raw HTML, MDX, scripts, inline styles, and author-supplied CSS are not supported. Mermaid diagrams use strict local rendering and retain their source as an accessible fallback. TekDocs controls colors and presentation so documents remain readable in dark mode, print, PDF, and other Markdown tools.</p>
       </section>
     </div>
   )

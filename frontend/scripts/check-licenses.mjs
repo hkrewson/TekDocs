@@ -2,6 +2,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const denied = /AGPL-1|SSPL|BUSL|Commons Clause|proprietary/i
+const reviewedMissingDeclarations = new Map([
+  ['khroma@2.1.0', { license: 'MIT', evidence: /The MIT License|Permission is hereby granted/ }],
+])
 const seen = new Set()
 const failures = []
 
@@ -26,7 +29,17 @@ function inspectModules(directory) {
     if (!seen.has(identity)) {
       seen.add(identity)
       const license = typeof manifest.license === 'string' ? manifest.license : ''
-      if (!license) failures.push(`${identity}: missing license declaration`)
+      if (!license) {
+        const reviewed = reviewedMissingDeclarations.get(identity)
+        let licenseText = ''
+        for (const fileName of ['LICENSE', 'license']) {
+          try {
+            licenseText = readFileSync(join(path, fileName), 'utf8')
+            break
+          } catch { /* handled below */ }
+        }
+        if (!reviewed || !reviewed.evidence.test(licenseText)) failures.push(`${identity}: missing license declaration`)
+      }
       else if (denied.test(license)) failures.push(`${identity}: prohibited license declaration`)
     }
     const nested = join(path, 'node_modules')

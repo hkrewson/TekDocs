@@ -57,6 +57,14 @@ async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/documents*', documentsRoute)
 }
 
+async function openPrimaryBlockEditor(page: Page) {
+  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
+  const blockButton = page.getByRole('button', { name: /Edit block/ })
+  const markdownTab = page.getByRole('tab', { name: 'Markdown' })
+  await expect(blockButton.or(markdownTab)).toBeVisible()
+  if (await blockButton.isVisible()) await blockButton.click()
+}
+
 test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }) => {
   const health = await request.get('/api/v1/health/ready')
   expect(health.ok()).toBeTruthy()
@@ -80,7 +88,7 @@ test('authenticated application shell exposes primary navigation and backend hea
 test('raw Markdown remains the editable canonical representation', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/documentation')
-  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
+  await openPrimaryBlockEditor(page)
   const markdownTab = page.getByRole('tab', { name: 'Markdown' })
   await markdownTab.click()
   await expect(markdownTab).toBeFocused()
@@ -110,7 +118,7 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   })
 
   await page.goto('/documentation')
-  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
+  await openPrimaryBlockEditor(page)
   await page.getByRole('tab', { name: 'Markdown' }).click()
   await page.getByLabel('Markdown source').fill('Verify ==VLAN 10==.')
   await page.getByRole('tab', { name: 'Editor' }).click()
@@ -133,6 +141,27 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await expect(page.getByRole('heading', { name: 'TekDocs Markdown' })).toBeVisible()
   await expect(page.getByText('==verify this==')).toBeVisible()
   await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
+})
+
+test('Mermaid preview renders locally with an accessible source fallback', async ({ page, baseURL }) => {
+  await mockAuthenticated(page)
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
+    json: {
+      html: '<pre><code class="language-mermaid">flowchart LR\naccTitle: Client path\naccDescr: User traffic crosses the firewall\nUser--&gt;Firewall</code></pre>',
+    },
+  }))
+
+  await page.goto('/documentation')
+  await openPrimaryBlockEditor(page)
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await page.getByLabel('Markdown source').fill('```mermaid\nflowchart LR\naccTitle: Client path\naccDescr: User traffic crosses the firewall\nUser-->Firewall\n```')
+  await page.getByRole('tab', { name: 'Preview' }).click()
+
+  const diagram = page.getByRole('figure', { name: 'Client path' })
+  await expect(diagram.getByRole('img', { name: 'Client path' })).toBeVisible()
+  await expect(diagram.locator(':scope > p').first()).toHaveText('User traffic crosses the firewall')
+  await expect(page.getByText('Accessible diagram source')).toBeVisible()
 })
 
 test('revision history pagination and diffs remain keyboard-accessible', async ({ page }) => {

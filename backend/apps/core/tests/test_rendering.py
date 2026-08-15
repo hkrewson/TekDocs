@@ -146,6 +146,22 @@ def test_pdf_renderer_produces_a_pdf_document() -> None:
     )
 
 
+def test_mermaid_fences_remain_inert_and_deterministic_for_static_and_pdf_output() -> None:
+    markdown = (
+        "```mermaid\nflowchart LR\naccTitle: Client data flow\n"
+        "A[User] --> B[Firewall <script>alert(1)</script>]\n```\n"
+    )
+
+    rendered = render_markdown(markdown)
+    first_pdf = render_pdf(markdown, title="Network path")
+    second_pdf = render_pdf(markdown, title="Network path")
+
+    assert '<code class="language-mermaid">' in rendered
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in rendered
+    assert "<script>" not in rendered
+    assert first_pdf.startswith(b"%PDF-")
+    assert first_pdf == second_pdf
+
 @pytest.mark.django_db
 def test_authenticated_document_reader_can_request_a_sanitized_preview(client) -> None:  # type: ignore[no-untyped-def]
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)

@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.production.example
+/.tekdocs-update.env
 .venv/
 __pycache__/
 *.py[cod]

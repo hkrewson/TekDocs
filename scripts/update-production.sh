@@ -4,8 +4,19 @@ set -Eeuo pipefail
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 invocation_directory=$PWD
 environment_file="$repository_root/.env"
-backup_root=${TEKDOCS_BACKUP_ROOT:-}
-recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-}
+operator_config_file="$repository_root/.tekdocs-update.env"
+saved_backup_root=
+saved_recovery_key=
+if [[ -e "$operator_config_file" ]]; then
+  [[ -f "$operator_config_file" && -r "$operator_config_file" ]] || {
+    echo "TekDocs production update refused: operator configuration is not a readable file: $operator_config_file" >&2
+    exit 1
+  }
+  saved_backup_root=$(sed -n 's/^TEKDOCS_UPDATE_BACKUP_ROOT=//p' "$operator_config_file" | tail -n 1)
+  saved_recovery_key=$(sed -n 's/^TEKDOCS_UPDATE_RECOVERY_KEY_FILE=//p' "$operator_config_file" | tail -n 1)
+fi
+backup_root=${TEKDOCS_BACKUP_ROOT:-$saved_backup_root}
+recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-$saved_recovery_key}
 secret_directory=
 use_traefik=true
 use_bootstrap_secret=false
@@ -44,6 +55,7 @@ Optional arguments:
 
 Traefik is enabled by default. SMTP and OIDC overlays are detected from secret files.
 TEKDOCS_BACKUP_ROOT and TEKDOCS_RECOVERY_KEY_FILE may supply the two backup paths.
+The first complete backup configuration is saved in the ignored .tekdocs-update.env file.
 EOF
 }
 
@@ -139,6 +151,27 @@ fi
 [[ -d "$secret_directory" ]] || fail "secret directory not found: $secret_directory"
 secret_directory=$(CDPATH= cd -- "$secret_directory" && pwd -P)
 
+if [[ "$skip_backup" != true ]]; then
+  [[ -r "$recovery_key" ]] || fail "recovery key is not readable: $recovery_key"
+  mkdir -p "$backup_root"
+  backup_root=$(CDPATH= cd -- "$backup_root" && pwd -P)
+  recovery_key=$(CDPATH= cd -- "$(dirname -- "$recovery_key")" && pwd -P)/$(basename -- "$recovery_key")
+
+  operator_config_existed=false
+  [[ -e "$operator_config_file" ]] && operator_config_existed=true
+  umask 077
+  operator_config_temporary=$(mktemp "$repository_root/.tekdocs-update.env.XXXXXX")
+  {
+    printf 'TEKDOCS_UPDATE_BACKUP_ROOT=%s\n' "$backup_root"
+    printf 'TEKDOCS_UPDATE_RECOVERY_KEY_FILE=%s\n' "$recovery_key"
+  } > "$operator_config_temporary"
+  chmod 0600 "$operator_config_temporary"
+  mv "$operator_config_temporary" "$operator_config_file"
+  if [[ "$operator_config_existed" != true ]]; then
+    echo "Saved production-update paths in $operator_config_file"
+  fi
+fi
+
 compose=(
   docker compose
   --env-file "$environment_file"
@@ -186,10 +219,6 @@ backup_output=
 if [[ "$skip_backup" == true ]]; then
   echo "Skipping TekDocs backup because --skip-backup was explicitly supplied."
 else
-  [[ -n "$backup_root" ]] || fail "--backup-root is required"
-  [[ -n "$recovery_key" && -r "$recovery_key" ]] || fail "--recovery-key must identify a readable file"
-  mkdir -p "$backup_root"
-  backup_root=$(CDPATH= cd -- "$backup_root" && pwd -P)
   timestamp=$(date -u '+%Y%m%d-%H%M%S')
   backup_output="$backup_root/tekdocs-${previous_version}-${timestamp}"
   "$repository_root/scripts/tekdocs-backup.sh" \

@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, BookOpenText, Copy, Download, ExternalLink, FileCheck2, FileUp, History, Link2, Paperclip, Pin, Plus, Search, Share2, ShieldCheck, Trash2, Unlink, X } from 'lucide-react'
+import { Archive, BookOpenText, Code2, Copy, Download, ExternalLink, FileCheck2, FileUp, Heading, History, Link2, Paperclip, Pencil, Pin, Plus, Search, Share2, ShieldCheck, Trash2, Type, Unlink, X } from 'lucide-react'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
 import { browserWorkspaceClient } from '../workspaces/api'
 import { browserDocumentsClient, RevisionConflictError } from './api'
-import type { BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentsClient, EntityMentionOption, PublicationAudience, PublicationRetention, ReuseImpact } from './api'
+import type { BlockKind, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentPlacement, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentsClient, EntityMentionOption, PublicationAudience, PublicationRetention, ReuseImpact } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 const categories: { value: DocumentCategory; label: string }[] = [
@@ -12,6 +12,22 @@ const categories: { value: DocumentCategory; label: string }[] = [
   { value: 'procedure', label: 'Procedure' }, { value: 'guide', label: 'Guide' },
   { value: 'reference', label: 'Reference' },
 ]
+const blockKinds: { value: BlockKind; label: string; description: string }[] = [
+  { value: 'rich_text', label: 'Text', description: 'Paragraphs, lists, tables, and callouts' },
+  { value: 'heading', label: 'Section heading', description: 'A named section boundary' },
+  { value: 'code', label: 'Code', description: 'Commands, configuration, or source' },
+  { value: 'url', label: 'URL', description: 'A described external reference' },
+  { value: 'document_link', label: 'Document link', description: 'A stable link to another document' },
+  { value: 'entity_reference', label: 'TekDocs record', description: 'A person, asset, site, network, or other record' },
+  { value: 'file_reference', label: 'File', description: 'A managed attachment reference' },
+]
+
+function BlockKindIcon({ kind }: { kind: BlockKind }) {
+  if (kind === 'heading') return <Heading size={15} />
+  if (kind === 'code') return <Code2 size={15} />
+  if (kind === 'rich_text') return <Type size={15} />
+  return <Link2 size={15} />
+}
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Documentation could not be loaded.'
@@ -46,6 +62,12 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [conflict, setConflict] = useState<RevisionConflictError | null>(null)
   const [sourceDocumentId, setSourceDocumentId] = useState('')
   const [placementMode, setPlacementMode] = useState<'live' | 'pinned'>('live')
+  const [newBlockOpen, setNewBlockOpen] = useState(false)
+  const [newBlockKind, setNewBlockKind] = useState<BlockKind>('rich_text')
+  const [newBlockName, setNewBlockName] = useState('')
+  const [newBlockMarkdown, setNewBlockMarkdown] = useState('')
+  const [newBlockPosition, setNewBlockPosition] = useState<number | null>(null)
+  const [editingBlock, setEditingBlock] = useState<{ placement: DocumentPlacement; draft: string } | null>(null)
   const [reuseReview, setReuseReview] = useState<{ placementId: string; impact: ReuseImpact; draft: string } | null>(null)
   const [approvedRevisionId, setApprovedRevisionId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState('')
@@ -89,7 +111,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
-  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]) }
+  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null) }
   const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
   const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setMessage(null); setError(null) }
   const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
@@ -159,7 +181,51 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setMessage('Conflict acknowledged. Reconcile the draft with the shown server changes before saving.')
   }
   const applyCompositionRecord = (record: DocumentRecord, status: string) => {
-    setSelected(record); setMessage(status); setError(null); setRevision((value) => value + 1)
+    setSelected(record); setMarkdown(record.markdown); setMessage(status); setError(null); setRevision((value) => value + 1)
+  }
+  const createLocalBlock = async () => {
+    if (!selected || selected === 'new') return
+    setSaving(true); setError(null)
+    try {
+      const record = await client.addPlacement(scope, selected.id, {
+        operation: 'create_block',
+        block_kind: newBlockKind,
+        block_name: newBlockName.trim(),
+        markdown: newBlockMarkdown,
+        position: newBlockPosition,
+      })
+      applyCompositionRecord(record, `${blockKinds.find((item) => item.value === newBlockKind)?.label ?? 'Block'} added.`)
+      setNewBlockOpen(false); setNewBlockKind('rich_text'); setNewBlockName(''); setNewBlockMarkdown(''); setNewBlockPosition(null)
+    } catch (blockError) { setError(errorMessage(blockError)) } finally { setSaving(false) }
+  }
+  const beginBlockEdit = (placement: DocumentPlacement) => {
+    setEditingBlock({ placement, draft: placement.resolved_markdown })
+    setReuseReview(null); setError(null); setMessage(null)
+  }
+  const saveBlockEdit = async () => {
+    if (!selected || selected === 'new' || !editingBlock) return
+    setSaving(true); setError(null)
+    try {
+      const impact = await client.getReuseImpact(scope, selected.id, editingBlock.placement.id)
+      if (impact.live_audience_count > 1) {
+        setReuseReview({ placementId: editingBlock.placement.id, impact, draft: editingBlock.draft })
+        setEditingBlock(null)
+        setMessage('Review the affected audiences before saving this shared block.')
+        return
+      }
+      const record = await client.updateSharedBlock(
+        scope,
+        selected.id,
+        editingBlock.placement.id,
+        editingBlock.draft,
+        editingBlock.placement.resolved_revision_id,
+      )
+      applyCompositionRecord(record, 'Block revision saved.')
+      setEditingBlock(null)
+    } catch (blockError) {
+      if (blockError instanceof RevisionConflictError) setConflict(blockError)
+      else setError(errorMessage(blockError))
+    } finally { setSaving(false) }
   }
   const addPlacement = async () => {
     if (!selected || selected === 'new' || !sourceDocumentId) return
@@ -220,7 +286,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
   const insertMention = (entity: EntityMentionOption) => {
     const label = entity.display_name.replace(/[\\[\]]/g, '\\$&')
-    setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://entity/${entity.id})`)
+    const append = (current: string) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://entity/${entity.id})`
+    if (editingBlock) setEditingBlock({ ...editingBlock, draft: append(editingBlock.draft) })
+    else if (newBlockOpen) setNewBlockMarkdown(append(newBlockMarkdown))
+    else setMarkdown(append)
     setMentionQuery(''); setMentionOptions([]); setEditorGeneration((value) => value + 1)
   }
   const importMarkdown = async (file: File) => {
@@ -258,7 +327,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
   const insertAttachment = (attachmentId: string, filename: string) => {
     const label = filename.replaceAll('[', '\\[').replaceAll(']', '\\]')
-    setMarkdown((current) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://attachment/${attachmentId})`)
+    const append = (current: string) => `${current}${current && !current.endsWith('\n') ? '\n\n' : ''}[${label}](tekdocs://attachment/${attachmentId})`
+    if (editingBlock) setEditingBlock({ ...editingBlock, draft: append(editingBlock.draft) })
+    else if (newBlockOpen) setNewBlockMarkdown(append(newBlockMarkdown))
+    else setMarkdown(append)
     setEditorGeneration((value) => value + 1)
   }
   const beginPublication = (source: DocumentRecord, supersedes: DocumentPublication | null = null) => {
@@ -346,16 +418,23 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     </section>}
     {selected && <section className="document-workspace" aria-label={selected === 'new' ? 'New document' : `Edit ${selected.title}`}>
       <div className="document-edit-heading"><label>Document title<input autoFocus={selected === 'new'} maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
-      <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`${selected === 'new' ? 'new' : selected.id}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="Canonical Markdown · changes save to PostgreSQL" organizationId={workspace?.id} documentId={selected === 'new' ? undefined : selected.id} onMarkdownChange={setMarkdown} /></Suspense>
+      {selected === 'new' ? <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`new-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="The first Markdown block" organizationId={workspace?.id} onMarkdownChange={setMarkdown} /></Suspense> : <section className="document-block-canvas" aria-labelledby="document-block-canvas-heading">
+        <div className="section-heading"><div><h2 id="document-block-canvas-heading">Document blocks</h2><p>Select a block to edit it. Each block keeps its own identity and revision history.</p></div><button className="secondary-button" type="button" disabled={saving} onClick={() => { setNewBlockPosition(null); setNewBlockOpen(true) }}><Plus size={15} />New block</button></div>
+        <ol>{selected.placements.map((placement) => <li className={editingBlock?.placement.id === placement.id ? 'editing' : ''} key={placement.id} style={{ marginInlineStart: `${placement.depth * 18}px` }}>
+          <header><span className="block-kind"><BlockKindIcon kind={placement.block_kind} />{blockKinds.find((item) => item.value === placement.block_kind)?.label ?? placement.block_kind}</span><span>{placement.resolution_mode === 'pinned' ? `Pinned at revision ${placement.resolved_revision_number}` : `Revision ${placement.resolved_revision_number}`}</span></header>
+          {editingBlock?.placement.id === placement.id ? <div className="block-editor"><Suspense fallback={<p role="status">Loading block editor…</p>}><Editor key={`${placement.id}-${placement.resolved_revision_id}-${editorGeneration}`} initialMarkdown={editingBlock.draft} title={placement.block_name} description="Canonical Markdown block" organizationId={workspace?.id} documentId={selected.id} onMarkdownChange={(draft) => setEditingBlock({ placement, draft })} /></Suspense><div className="document-actions"><button className="primary-button" type="button" disabled={saving || editingBlock.draft === placement.resolved_markdown} onClick={() => { void saveBlockEdit() }}>{saving ? 'Saving…' : 'Save block'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setEditingBlock(null)}>Cancel</button></div></div> : <button className="block-preview" type="button" onClick={() => beginBlockEdit(placement)}><span>{placement.block_name.replace(/ — content$/, '')}</span><pre>{placement.resolved_markdown || 'Empty block'}</pre><span className="block-edit-label"><Pencil size={14} />Edit block</span></button>}
+          <footer><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reviewPlacement(placement.id) }}><Share2 size={14} />Reuse impact</button>{!placement.is_primary && <>{placement.resolution_mode === 'live' ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'pinned', placement.resolved_revision_id) }}><Pin size={14} />Pin</button> : <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'live', placement.resolved_revision_id) }}><Link2 size={14} />Follow latest</button>}<button className="icon-button" type="button" disabled={saving} aria-label={`Remove ${placement.block_name.replace(/ — content$/, '')}`} onClick={() => { void removePlacement(placement.id) }}><Unlink size={15} /></button></>}</footer>
+        </li>)}</ol>
+      </section>}
       <div className="entity-mention-picker"><label><Search size={15} /><span>Reference an entity</span><input type="search" placeholder="Search people, sites, organizations…" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionQuery.trim() && mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div>
       {conflict && <div className="revision-conflict" role="alert"><strong>Newer revision detected</strong><p>Your draft remains in the editor. Review the server changes below and reconcile them into your draft.</p>{conflict.payload.diff && <pre>{conflict.payload.diff}</pre>}<button className="secondary-button" type="button" onClick={acknowledgeConflict}>I reconciled with revision {conflict.payload.current_revision.revision_number}</button></div>}
       <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" disabled={saving} onClick={() => beginPublication(selected)}><FileCheck2 size={15} />Publish STATIC</button>}{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
       {selected !== 'new' && <section className="document-attachments" aria-labelledby="document-attachments-heading"><div className="section-heading"><div><h2 id="document-attachments-heading">Attachments</h2><p>Private managed files referenced by stable Markdown links.</p></div><div><input ref={attachmentInput} aria-label="Attachment file" className="sr-only" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => attachmentInput.current?.click()}><Paperclip size={15} />Add attachment</button></div></div>{selected.attachments.length === 0 ? <p className="empty-state">No files attached.</p> : <ul>{selected.attachments.map((attachment) => <li key={attachment.id}><a href={client.attachmentDownloadUrl(scope, selected.id, attachment.id)}><strong>{attachment.filename}</strong><small>{attachment.media_type} · {attachment.size.toLocaleString()} bytes · scanned</small></a><div><button className="secondary-button" type="button" onClick={() => insertAttachment(attachment.id, attachment.filename)}>Insert link</button><button className="icon-button" type="button" aria-label={`Remove ${attachment.filename}`} disabled={saving} onClick={() => { void removeAttachment(attachment.id) }}><Trash2 size={15} /></button></div></li>)}</ul>}</section>}
       {selected !== 'new' && <section className="document-composition" aria-labelledby="document-composition-heading">
-        <div className="section-heading"><div><h2 id="document-composition-heading">Reusable blocks</h2><p>Live blocks follow new revisions. Pinned blocks retain the selected revision.</p></div><span>{selected.placement_count} block{selected.placement_count === 1 ? '' : 's'}</span></div>
-        <ol>{selected.placements.map((placement) => <li key={placement.id} style={{ paddingInlineStart: `${placement.depth * 18}px` }}><div><Link2 size={15} /><span><strong>{placement.is_primary ? title || selected.title : placement.block_name.replace(/ — content$/, '')}</strong><small>{placement.is_primary ? 'Primary block' : `${placement.resolution_mode === 'live' ? 'Live' : 'Pinned'} · revision ${placement.resolved_revision_number} · ${placement.resolved_checksum.slice(0, 12)}`}</small></span></div><div className="composition-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reviewPlacement(placement.id) }}><Share2 size={14} />Review reuse</button>{!placement.is_primary && <>{placement.resolution_mode === 'live' ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'pinned', placement.resolved_revision_id) }}><Pin size={14} />Pin revision</button> : <button className="secondary-button" type="button" disabled={saving} onClick={() => { void changePlacementMode(placement.id, 'live', placement.resolved_revision_id) }}><Link2 size={14} />Follow latest</button>}<button className="icon-button" type="button" disabled={saving} aria-label={`Remove ${placement.block_name.replace(/ — content$/, '')}`} onClick={() => { void removePlacement(placement.id) }}><Unlink size={15} /></button></>}</div></li>)}</ol>
-        {reuseReview && <section className="reuse-impact" aria-labelledby="reuse-impact-heading"><div className="section-heading"><div><h3 id="reuse-impact-heading">Reuse impact</h3><p>{reuseReview.impact.live_audience_count} live audience{reuseReview.impact.live_audience_count === 1 ? '' : 's'} will update; {reuseReview.impact.pinned_audience_count} pinned audience{reuseReview.impact.pinned_audience_count === 1 ? '' : 's'} will stay unchanged.</p></div><button className="icon-button" type="button" aria-label="Close reuse impact" onClick={() => setReuseReview(null)}><X size={16} /></button></div><ul>{reuseReview.impact.audiences.map((audience, index) => <li key={`${audience.relationship}-${audience.document_id}-${audience.workspace_id}-${index}`}><span><strong>{audience.document_title}</strong><small>{audience.workspace_name} · {audience.relationship.replace('_', ' ')}</small></span><span className={audience.will_update ? 'impact-live' : 'impact-pinned'}>{audience.will_update ? 'Will update' : 'Unchanged'}</span></li>)}</ul>{reuseReview.impact.truncated && <p>Additional authorized audiences are not shown.</p>}{reuseReview.impact.can_edit_shared && <><label>Shared block Markdown<textarea value={reuseReview.draft} onChange={(event) => setReuseReview({ ...reuseReview, draft: event.target.value })} /></label><button className="primary-button" type="button" disabled={saving} onClick={() => { if (reuseReview.placementId === selected.placements.find((placement) => placement.is_primary)?.id) { setApprovedRevisionId(selected.current_revision_id); setReuseReview(null); void save(true) } else void saveSharedBlock() }}>{reuseReview.placementId === selected.placements.find((placement) => placement.is_primary)?.id ? 'Approve impact and save' : 'Save shared revision'}</button></>}{reuseReview.impact.can_detach && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void detachPlacement() }}><Copy size={14} />Detach into this workspace</button>}{!reuseReview.impact.can_edit_shared && !reuseReview.impact.can_detach && <p>You can view this block but cannot edit or detach it.</p>}</section>}
-        <div className="composition-add"><label>Document block<select value={sourceDocumentId} onChange={(event) => setSourceDocumentId(event.target.value)}><option value="">Choose a visible document</option>{results.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.title}{item.is_reference ? ' — MSP reference' : ''}</option>)}</select></label><label>Resolution<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">Live</option><option value="pinned">Pinned at current revision</option></select></label><button className="secondary-button" type="button" disabled={saving || !sourceDocumentId} onClick={() => { void addPlacement() }}><Plus size={15} />Add block</button></div>
+        <div className="section-heading"><div><h2 id="document-composition-heading">Block sources</h2><p>Create a local block or reuse content from a visible document.</p></div><span>{selected.placement_count} block{selected.placement_count === 1 ? '' : 's'}</span></div>
+        {reuseReview && <section className="reuse-impact" aria-labelledby="reuse-impact-heading"><div className="section-heading"><div><h3 id="reuse-impact-heading">Reuse impact</h3><p>{reuseReview.impact.live_audience_count} live audience{reuseReview.impact.live_audience_count === 1 ? '' : 's'} will update; {reuseReview.impact.pinned_audience_count} pinned audience{reuseReview.impact.pinned_audience_count === 1 ? '' : 's'} will stay unchanged.</p></div><button className="icon-button" type="button" aria-label="Close reuse impact" onClick={() => setReuseReview(null)}><X size={16} /></button></div><ul>{reuseReview.impact.audiences.map((audience, index) => <li key={`${audience.relationship}-${audience.document_id}-${audience.workspace_id}-${index}`}><span><strong>{audience.document_title}</strong><small>{audience.workspace_name} · {audience.relationship.replace('_', ' ')}</small></span><span className={audience.will_update ? 'impact-live' : 'impact-pinned'}>{audience.will_update ? 'Will update' : 'Unchanged'}</span></li>)}</ul>{reuseReview.impact.truncated && <p>Additional authorized audiences are not shown.</p>}{reuseReview.impact.can_edit_shared && <><label>Shared block Markdown<textarea value={reuseReview.draft} onChange={(event) => setReuseReview({ ...reuseReview, draft: event.target.value })} /></label><button className="primary-button" type="button" disabled={saving} onClick={() => { void saveSharedBlock() }}>Save shared revision</button></>}{reuseReview.impact.can_detach && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void detachPlacement() }}><Copy size={14} />Detach into this workspace</button>}{!reuseReview.impact.can_edit_shared && !reuseReview.impact.can_detach && <p>You can view this block but cannot edit or detach it.</p>}</section>}
+        {newBlockOpen && <section className="new-document-block" aria-labelledby="new-document-block-heading"><div className="section-heading"><div><h3 id="new-document-block-heading">New local block</h3><p>This block begins with its own stable identity and revision.</p></div><button className="icon-button" type="button" aria-label="Cancel new block" onClick={() => setNewBlockOpen(false)}><X size={16} /></button></div><div className="new-block-fields"><label>Block type<select value={newBlockKind} onChange={(event) => setNewBlockKind(event.target.value as BlockKind)}>{blockKinds.map((kind) => <option key={kind.value} value={kind.value}>{kind.label} — {kind.description}</option>)}</select></label><label>Block name <span>optional</span><input maxLength={240} value={newBlockName} onChange={(event) => setNewBlockName(event.target.value)} /></label><label>Insert after<select value={newBlockPosition ?? ''} onChange={(event) => setNewBlockPosition(event.target.value ? Number(event.target.value) : null)}><option value="">End of document</option>{selected.placements.filter((placement) => placement.depth === 0).map((placement) => <option key={placement.id} value={placement.position + 1}>{placement.block_name.replace(/ — content$/, '')}</option>)}</select></label></div><Suspense fallback={<p role="status">Loading block editor…</p>}><Editor key={`new-block-${newBlockKind}-${editorGeneration}`} initialMarkdown={newBlockMarkdown} title={newBlockName || blockKinds.find((item) => item.value === newBlockKind)?.label || 'New block'} description="Canonical Markdown block" organizationId={workspace?.id} documentId={selected.id} onMarkdownChange={setNewBlockMarkdown} /></Suspense><div className="document-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void createLocalBlock() }}>{saving ? 'Adding…' : 'Add block'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setNewBlockOpen(false)}>Cancel</button></div></section>}
+        <div className="composition-add"><label>Document block<select value={sourceDocumentId} onChange={(event) => setSourceDocumentId(event.target.value)}><option value="">Choose a visible document</option>{results.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.title}{item.is_reference ? ' — MSP reference' : ''}</option>)}</select></label><label>Resolution<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">Live</option><option value="pinned">Pinned at current revision</option></select></label><button className="secondary-button" type="button" disabled={saving || !sourceDocumentId} onClick={() => { void addPlacement() }}><Plus size={15} />Reuse document block</button></div>
         {selected.placement_count > 1 && <details className="resolved-markdown"><summary>View assembled Markdown</summary><pre>{selected.resolved_markdown}</pre></details>}
       </section>}
       {historyOpen && selected !== 'new' && <section className="revision-history" aria-labelledby="revision-history-heading">

@@ -371,6 +371,28 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .revision-diff h3 { margin: 0 0 8px; font-size: 14px; }
 @media (max-width: 700px) { .revision-history-body { grid-template-columns: 1fr; } .history-pagination { flex-wrap: wrap; } .history-pagination span { order: -1; width: 100%; } }
 .document-composition { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.document-block-canvas { display: grid; gap: 12px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.document-block-canvas .section-heading { margin: 0; }
+.document-block-canvas .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.document-block-canvas > ol { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.document-block-canvas > ol > li { overflow: hidden; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.document-block-canvas > ol > li.editing { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent); }
+.document-block-canvas header, .document-block-canvas footer { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; color: var(--muted); background: var(--surface-subtle); font-size: 11px; }
+.document-block-canvas footer { justify-content: flex-end; border-top: 1px solid var(--border); }
+.document-block-canvas footer .secondary-button { min-height: 29px; padding: 4px 8px; font-size: 11px; }
+.block-kind { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 650; }
+.block-preview { width: 100%; display: grid; gap: 8px; padding: 13px; color: var(--text); text-align: left; background: transparent; border: 0; cursor: text; }
+.block-preview > span:first-child { font-size: 12px; font-weight: 650; }
+.block-preview pre { max-height: 190px; overflow: hidden; margin: 0; color: var(--text); font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.block-preview pre::after { content: ''; }
+.block-edit-label { display: inline-flex; align-items: center; justify-self: end; gap: 5px; color: var(--muted); font-size: 11px; }
+.block-editor { padding: 10px; }
+.block-editor .document-actions { margin-top: 9px; }
+.new-document-block { display: grid; gap: 12px; margin-top: 12px; padding: 12px; background: #fff; border: 1px solid var(--border-strong); border-radius: 8px; }
+.new-block-fields { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .7fr) minmax(170px, .55fr); gap: 10px; }
+.new-block-fields label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.new-block-fields label span { font-weight: 400; }
+.new-block-fields input, .new-block-fields select { min-height: 38px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .document-composition .section-heading > div { min-width: 0; }
 .document-composition .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
 .document-composition ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
@@ -388,7 +410,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .resolved-markdown { margin-top: 12px; border-top: 1px solid var(--border); }
 .resolved-markdown summary { padding: 11px 2px 0; color: var(--muted); font-size: 12px; cursor: pointer; }
 .resolved-markdown pre { max-height: 280px; overflow: auto; margin: 10px 0 0; padding: 10px; color: #292722; background: #f5f3ed; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
-@media (max-width: 700px) { .document-composition li { align-items: flex-start; flex-direction: column; padding-block: 10px; } .composition-add { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .document-composition li { align-items: flex-start; flex-direction: column; padding-block: 10px; } .composition-add, .new-block-fields { grid-template-columns: 1fr; } .document-block-canvas header { align-items: flex-start; flex-direction: column; } }
 .entity-mention-picker { position: relative; padding: 11px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .entity-mention-picker label { display: grid; grid-template-columns: auto auto minmax(180px, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .entity-mention-picker input { min-height: 36px; }

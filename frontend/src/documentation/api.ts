@@ -4,11 +4,13 @@ export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
 export type DocumentFilters = { q?: string; category?: DocumentCategory | ''; template?: 'all' | 'documents' | 'templates' }
 export type PlacementResolutionMode = 'live' | 'pinned'
+export type BlockKind = 'rich_text' | 'heading' | 'code' | 'url' | 'document_link' | 'entity_reference' | 'file_reference'
 export type DocumentPlacement = {
   id: string
   parent_id: string | null
   block_id: string
   block_name: string
+  block_kind: BlockKind
   position: number
   depth: number
   resolution_mode: PlacementResolutionMode
@@ -16,6 +18,7 @@ export type DocumentPlacement = {
   resolved_revision_id: string
   resolved_revision_number: number
   resolved_checksum: string
+  resolved_markdown: string
   is_primary: boolean
 }
 export type DocumentRecord = {
@@ -103,12 +106,23 @@ export type RevisionConflictPayload = {
 }
 export type PlacementConflictPayload = { code: 'placement_conflict'; detail: string }
 export type PublicationConflictPayload = { code: 'publication_conflict'; detail: string }
-export type PlacementInput = {
+export type ReusedPlacementInput = {
+  operation?: 'reuse_document'
   source_document_id: string
   resolution_mode: PlacementResolutionMode
   pinned_revision_id?: string | null
   parent_id?: string | null
+  position?: number | null
 }
+export type NewBlockInput = {
+  operation: 'create_block'
+  block_kind: BlockKind
+  block_name?: string
+  markdown: string
+  parent_id?: string | null
+  position?: number | null
+}
+export type PlacementInput = ReusedPlacementInput | NewBlockInput
 export type PlacementUpdateInput = {
   resolution_mode: PlacementResolutionMode
   pinned_revision_id?: string | null

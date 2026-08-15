@@ -11,7 +11,7 @@ import { RevisionConflictError } from './api'
 import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClient } from './api'
 import type { WorkspaceClient } from '../workspaces/api'
 
-const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', is_primary: true }
+const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', is_primary: true }
 const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
@@ -73,16 +73,17 @@ function clients() {
   return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, publication }
 }
 
-it('lists titles and persists edited Markdown', async () => {
+it('lists titles and persists an independently edited block', async () => {
   const user = userEvent.setup()
-  const { documents, workspaces, updateDocument } = clients()
+  const { documents, workspaces, updateSharedBlock } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
   await user.clear(await screen.findByRole('textbox', { name: 'Document Markdown' }))
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '# Updated')
-  await user.click(screen.getByRole('button', { name: 'Save document' }))
-  await waitFor(() => expect(updateDocument).toHaveBeenCalledWith({}, 'doc-1', { title: 'Firewall standard', markdown: '# Updated', category: 'policy', is_template: false, base_revision_id: 'revision-1' }))
-  expect(screen.getByRole('status')).toHaveTextContent('Document saved as revision 2.')
+  await user.click(screen.getByRole('button', { name: 'Save block' }))
+  await waitFor(() => expect(updateSharedBlock).toHaveBeenCalledWith({}, 'doc-1', 'placement-1', '# Updated', 'revision-1'))
+  expect(screen.getByRole('status')).toHaveTextContent('Block revision saved.')
 })
 
 it('loads revision history and a selected diff', async () => {
@@ -114,16 +115,17 @@ it('navigates large revision histories without loading every revision', async ()
 it('keeps the draft visible when a stale revision is rejected', async () => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()
-  documents.update = vi.fn().mockRejectedValue(new RevisionConflictError({
+  documents.updateSharedBlock = vi.fn().mockRejectedValue(new RevisionConflictError({
     code: 'revision_conflict', detail: 'Changed', submitted_base_revision_id: 'revision-1',
     current_revision: { id: 'revision-2', parent_id: 'revision-1', revision_number: 2, checksum: 'def456', created_by: 'Other editor', created_at: '2026-08-09T01:00:00Z', is_current: true, markdown: '# Server edit', diff_from_parent: '-# Firewall\n+# Server edit' },
     diff: '-# Firewall\n+# Server edit',
   }))
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
   const editor = await screen.findByRole('textbox', { name: 'Document Markdown' })
   await user.clear(editor); await user.type(editor, '# My unsaved draft')
-  await user.click(screen.getByRole('button', { name: 'Save document' }))
+  await user.click(screen.getByRole('button', { name: 'Save block' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Newer revision detected')
   expect(editor).toHaveValue('# My unsaved draft')
   expect(screen.getByText(/Server edit/)).toBeInTheDocument()
@@ -151,11 +153,31 @@ it('adds a visible document block live and can pin its resolved revision', async
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.selectOptions(screen.getByLabelText('Document block'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Add block' }))
+  await user.click(screen.getByRole('button', { name: 'Reuse document block' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null }))
-  expect(await screen.findByText(/Live · revision 1/)).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Pin revision' }))
+  expect((await screen.findAllByText('Revision 1')).length).toBeGreaterThanOrEqual(2)
+  await user.click(screen.getAllByRole('button', { name: 'Pin' })[0])
   expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused', { resolution_mode: 'pinned', pinned_revision_id: 'revision-source' })
+})
+
+it('creates a typed local block at an explicit document position', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, addPlacement } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'New block' }))
+  await user.selectOptions(screen.getByLabelText('Block type'), 'heading')
+  await user.type(screen.getByLabelText(/Block name/), 'Network assumptions')
+  await user.selectOptions(screen.getByLabelText('Insert after'), '1')
+  await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '## Addressing')
+  await user.click(screen.getByRole('button', { name: 'Add block' }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', {
+    operation: 'create_block',
+    block_kind: 'heading',
+    block_name: 'Network assumptions',
+    markdown: '## Addressing',
+    position: 1,
+  }))
 })
 
 it('reviews shared audiences and detaches a reused block', async () => {
@@ -166,9 +188,9 @@ it('reviews shared audiences and detaches a reused block', async () => {
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.selectOptions(screen.getByLabelText('Document block'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Add block' }))
+  await user.click(screen.getByRole('button', { name: 'Reuse document block' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalled())
-  await user.click(screen.getAllByRole('button', { name: 'Review reuse' })[1])
+  await user.click(screen.getAllByRole('button', { name: 'Reuse impact' })[1])
   expect(await screen.findByRole('heading', { name: 'Reuse impact' })).toBeVisible()
   expect(screen.getByText('Will update')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Detach into this workspace' }))
@@ -184,6 +206,7 @@ it('imports Markdown and manages a private attachment link', async () => {
   await waitFor(() => expect(importMarkdown).toHaveBeenCalledWith({}, expect.any(File), 'imported', 'general', false))
   await user.upload(screen.getByLabelText('Attachment file'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
   await waitFor(() => expect(uploadAttachment).toHaveBeenCalledWith({}, 'doc-imported', expect.any(File)))
+  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
   await user.click(await screen.findByRole('button', { name: 'Insert link' }))
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
   await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }))

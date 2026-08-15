@@ -180,7 +180,7 @@ test-stabilization:
 	docker compose run --rm migrate pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_audit_immutability.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py apps/core/tests/test_stabilization_performance.py -q
 
 test-public-beta-performance:
-	docker compose run --rm migrate pytest apps/core/tests/test_public_beta_capacity.py -q -s
+	docker compose run --rm migrate pytest apps/core/tests/test_public_beta_capacity.py -m performance -q -s
 	./scripts/frontend-gate.sh check
 	./scripts/rehearse-browser-performance.sh
 

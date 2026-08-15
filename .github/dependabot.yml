@@ -3,6 +3,7 @@ updates:
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly, day: monday, time: "09:00", timezone: America/Chicago }
+    rebase-strategy: disabled
     groups:
       python-production: { dependency-type: production }
       python-development: { dependency-type: development }
@@ -11,6 +12,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday, time: "09:10", timezone: America/Chicago }
+    rebase-strategy: disabled
     groups:
       frontend-production: { dependency-type: production }
       frontend-development: { dependency-type: development }
@@ -19,14 +21,21 @@ updates:
   - package-ecosystem: docker
     directory: /backend
     schedule: { interval: weekly, day: monday, time: "09:20", timezone: America/Chicago }
+    rebase-strategy: disabled
+    ignore:
+      # TekDocs 0.8.x is intentionally constrained to Python 3.13.
+      - dependency-name: python
+        versions: [">=3.14"]
     labels: [dependencies, containers]
   - package-ecosystem: docker
     directory: /frontend
     schedule: { interval: weekly, day: monday, time: "09:25", timezone: America/Chicago }
+    rebase-strategy: disabled
     labels: [dependencies, containers]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, time: "09:30", timezone: America/Chicago }
+    rebase-strategy: disabled
     groups:
       github-actions: { patterns: ["*"] }
     labels: [dependencies, ci]

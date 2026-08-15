@@ -47,8 +47,11 @@ include = ["apps*", "tekdocs*"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tekdocs.settings.test"
 python_files = ["test_*.py", "*_test.py"]
-addopts = "--strict-markers --strict-config --disable-warnings -q"
+addopts = "--strict-markers --strict-config --disable-warnings -q -m 'not performance'"
 testpaths = ["apps"]
+markers = [
+  "performance: resource-intensive reference-dataset performance tests run by the dedicated performance gate",
+]
 
 [tool.ruff]
 target-version = "py313"

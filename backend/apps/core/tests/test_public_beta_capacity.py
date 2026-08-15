@@ -194,6 +194,7 @@ def _concurrent_get(cookies, url: str, params: dict[str, object]) -> tuple[int, 
         close_old_connections()
 
 
+@pytest.mark.performance
 @pytest.mark.django_db(transaction=True)
 def test_public_beta_reference_capacity_is_bounded_scoped_and_responsive():
     if connection.vendor != "postgresql":

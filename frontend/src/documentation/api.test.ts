@@ -92,7 +92,7 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBeInstanceOf(FormData)
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/attachments')
     expect(fetchMock.mock.calls[3]?.[1]?.method).toBe('DELETE')
-    expect(browserDocumentsClient.exportUrl(scope, 'doc').endsWith('/documents/doc/export')).toBe(true)
+    expect(browserDocumentsClient.exportUrl(scope, 'doc')).toContain('/documents/doc/export?export_format=md')
     expect(browserDocumentsClient.attachmentDownloadUrl(scope, 'doc', 'attachment').endsWith('/attachments/attachment/download')).toBe(true)
   })
 
@@ -116,5 +116,6 @@ describe('documentation placement API client', () => {
     expect(browserDocumentsClient.publicationMarkdownUrl(scope, 'doc', 'publication')).toContain('/publications/publication/markdown')
     expect(browserDocumentsClient.publicationManifestUrl(scope, 'doc', 'publication')).toContain('/publications/publication/manifest')
     expect(browserDocumentsClient.publicationArtifactUrl(scope, 'doc', 'publication', 'artifact')).toContain('/publications/publication/artifacts/artifact/download')
+    expect(browserDocumentsClient.publicationExportUrl(scope, 'doc', 'publication', 'docx')).toContain('/publications/publication/export?export_format=docx')
   })
 })

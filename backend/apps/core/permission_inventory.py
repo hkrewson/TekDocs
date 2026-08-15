@@ -96,6 +96,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-document-publication-approve", ("POST",), mutations=(PermissionKey.DOCUMENTS_APPROVE,)),
     route("msp-document-publication-withdraw", ("POST",), mutations=(PermissionKey.DOCUMENTS_WITHDRAW,)),
     route("msp-document-publication-markdown", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-publication-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-publication-manifest", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-publication-artifact-download", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-integration-provider-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
@@ -1060,6 +1061,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-document-publication-markdown",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-publication-export",
         ("GET",),
         PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,

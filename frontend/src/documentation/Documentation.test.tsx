@@ -74,7 +74,8 @@ function clients() {
     publicationMarkdownUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/markdown`,
     publicationManifestUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/manifest`,
     publicationArtifactUrl: (_scope, id, publicationId, artifactId) => `/documents/${id}/publications/${publicationId}/artifacts/${artifactId}/download`,
-    exportUrl: (_scope, id) => `/documents/${id}/export`,
+    publicationExportUrl: (_scope, id, publicationId, format) => `/documents/${id}/publications/${publicationId}/export?export_format=${format}`,
+    exportUrl: (_scope, id, format = 'md') => `/documents/${id}/export?export_format=${format}`,
     attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
     addReference,
@@ -337,9 +338,10 @@ it('publishes and opens an immutable verified STATIC version', async () => {
   await user.click(screen.getByRole('button', { name: 'Publish immutable version' }))
   await waitFor(() => expect(publish).toHaveBeenCalledWith({}, 'doc-1', { reason: 'Approved for operations', audience: 'msp_internal', retention: 'permanent', retention_review_on: null, supersedes_id: null }))
   expect(await screen.findByText('Signature verified')).toBeVisible()
-  expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/artifacts/pdf-1/download')
+  expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/export?export_format=pdf')
   expect(screen.getByText(`SHA-256 ${'a'.repeat(64)}`)).toBeVisible()
-  expect(screen.getByRole('link', { name: 'Download Markdown' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/markdown')
+  expect(screen.getByRole('link', { name: 'Download Markdown' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/export?export_format=md')
+  expect(screen.getByRole('link', { name: 'Download DOCX' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/export?export_format=docx')
   expect(screen.queryByRole('textbox', { name: 'Document Markdown' })).not.toBeInTheDocument()
 })
 

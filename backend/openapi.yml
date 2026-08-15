@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.15
+  version: 0.4.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1668,6 +1668,23 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: export_format
+        schema:
+          enum:
+          - docx
+          - html
+          - md
+          - pdf
+          type: string
+          x-spec-enum-id: dd5c88f82d29a651
+          default: md
+          minLength: 1
+        description: |-
+          * `docx` - docx
+          * `html` - html
+          * `md` - md
+          * `pdf` - pdf
       tags:
       - documents
       security:
@@ -1676,7 +1693,7 @@ paths:
       responses:
         '200':
           content:
-            text/markdown:
+            application/json:
               schema:
                 type: string
                 format: binary
@@ -2179,6 +2196,58 @@ paths:
         '200':
           content:
             application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/export:
+    get:
+      operationId: document_publications_msp_export
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: export_format
+        schema:
+          enum:
+          - docx
+          - html
+          - md
+          - pdf
+          type: string
+          x-spec-enum-id: dd5c88f82d29a651
+          default: md
+          minLength: 1
+        description: |-
+          * `docx` - docx
+          * `html` - html
+          * `md` - md
+          * `pdf` - pdf
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
               schema:
                 type: string
                 format: binary
@@ -13458,6 +13527,23 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: export_format
+        schema:
+          enum:
+          - docx
+          - html
+          - md
+          - pdf
+          type: string
+          x-spec-enum-id: dd5c88f82d29a651
+          default: md
+          minLength: 1
+        description: |-
+          * `docx` - docx
+          * `html` - html
+          * `md` - md
+          * `pdf` - pdf
       - in: path
         name: organization_entity_id
         schema:
@@ -13472,7 +13558,7 @@ paths:
       responses:
         '200':
           content:
-            text/markdown:
+            application/json:
               schema:
                 type: string
                 format: binary
@@ -14041,6 +14127,64 @@ paths:
         '200':
           content:
             application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/export
+  : get:
+      operationId: document_publications_organization_export
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: export_format
+        schema:
+          enum:
+          - docx
+          - html
+          - md
+          - pdf
+          type: string
+          x-spec-enum-id: dd5c88f82d29a651
+          default: md
+          minLength: 1
+        description: |-
+          * `docx` - docx
+          * `html` - html
+          * `md` - md
+          * `pdf` - pdf
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
               schema:
                 type: string
                 format: binary

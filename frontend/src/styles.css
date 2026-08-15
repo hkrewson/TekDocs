@@ -306,6 +306,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-edit-heading input, .document-share input { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .document-actions { display: flex; gap: 8px; }
 .document-actions button, .document-actions a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.document-export-menu { position: relative; }
+.document-export-menu summary { cursor: pointer; list-style: none; }
+.document-export-menu summary::-webkit-details-marker { display: none; }
+.document-export-menu > div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(35 36 31 / 14%); display: grid; gap: 2px; left: 0; min-width: 150px; padding: 6px; position: absolute; top: calc(100% + 4px); z-index: 8; }
+.document-export-menu > div a { border-radius: 5px; color: var(--text); padding: 7px 9px; }
+.document-export-menu > div a:hover, .document-export-menu > div a:focus-visible { background: var(--surface-subtle); }
 .remote-source { margin-top: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); }
 .remote-source > label { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .remote-source > label input { min-height: 40px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }

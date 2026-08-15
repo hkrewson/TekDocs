@@ -2,6 +2,8 @@ import base64
 import secrets
 import uuid
 from hashlib import sha256
+from io import BytesIO
+from zipfile import ZipFile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
@@ -31,6 +33,7 @@ from apps.core.approved_egress import ApprovedTarget
 from apps.core.document_sources import apply_remote_observation, fetch_remote_document, html_to_markdown
 from apps.core.documents import PlacementConflict, update_shared_block
 from apps.core.models import (
+    AuditEvent,
     Block,
     BlockKind,
     BlockRevision,
@@ -1953,3 +1956,108 @@ def test_publication_approval_role_is_exact_client_scoped_and_does_not_grant_wit
     )
     assert beta_response.status_code == 403
     assert DocumentPublication.objects.get(entity_id=beta_publication["id"]).lifecycle_state == "pending_approval"
+
+
+@pytest.mark.django_db
+def test_live_document_exports_supported_sanitized_and_deterministic_formats(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-import"),
+        {
+            "title": "Router & switch guide",
+            "file": SimpleUploadedFile(
+                "guide.md", b"# Setup\n\n<script>alert(1)</script>\n\n- Connect uplink", content_type="text/markdown"
+            ),
+            "category": "guide",
+            "is_template": "false",
+        },
+    ).json()
+    route = reverse("msp-document-export", kwargs={"document_entity_id": created["id"]})
+
+    markdown = owner_client.get(route, {"export_format": "md"})
+    html = owner_client.get(route, {"export_format": "html"})
+    pdf = owner_client.get(route, {"export_format": "pdf"})
+    docx = owner_client.get(route, {"export_format": "docx"})
+    repeated_docx = owner_client.get(route, {"export_format": "docx"})
+
+    assert markdown.status_code == 200
+    assert markdown.content == b"# Setup\n\n<script>alert(1)</script>\n\n- Connect uplink\n"
+    assert b"<script>" not in html.content
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in html.content
+    assert pdf.content.startswith(b"%PDF-")
+    assert docx.content.startswith(b"PK")
+    assert docx.content == repeated_docx.content
+    with ZipFile(BytesIO(docx.content)) as archive:
+        document_xml = archive.read("word/document.xml")
+    assert b"Router &amp; switch guide" in document_xml
+    assert b'<w:pStyle w:val="Heading1"' in document_xml
+    assert b"Connect uplink" in document_xml
+    assert docx["Cache-Control"] == "private, no-store"
+    assert docx["X-Content-Type-Options"] == "nosniff"
+    metadata = list(AuditEvent.objects.filter(action="document.exported").values_list("metadata", flat=True))
+    assert sorted(item["format"] for item in metadata) == ["docx", "docx", "html", "md", "pdf"]
+
+
+@pytest.mark.django_db
+def test_static_exports_use_retained_snapshot_and_pdf_artifact(owner_client, installation, tmp_path):
+    created = owner_client.post(
+        reverse("msp-document-import"),
+        {
+            "title": "Frozen guide",
+            "file": SimpleUploadedFile("guide.md", b"# Original\n\nRetained content"),
+            "category": "guide",
+            "is_template": "false",
+        },
+    ).json()
+    publication_route = reverse(
+        "msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        publication = owner_client.post(
+            publication_route,
+            {"reason": "Release baseline", "audience": "msp_internal", "retention": "permanent"},
+            content_type="application/json",
+        ).json()
+        owner_client.put(
+            reverse("msp-document-detail", kwargs={"document_entity_id": created["id"]}),
+            {
+                "title": "Changed guide",
+                "markdown": "Replacement content",
+                "base_revision_id": created["current_revision_id"],
+                "category": "guide",
+            },
+            content_type="application/json",
+        )
+        route = reverse(
+            "msp-document-publication-export",
+            kwargs={"document_entity_id": created["id"], "publication_entity_id": publication["id"]},
+        )
+        markdown = owner_client.get(route, {"export_format": "md"})
+        html = owner_client.get(route, {"export_format": "html"})
+        pdf = owner_client.get(route, {"export_format": "pdf"})
+        docx = owner_client.get(route, {"export_format": "docx"})
+        retained = DocumentPublication.objects.get(entity_id=publication["id"])
+        pdf_artifact = retained.artifacts.get(kind="pdf")
+
+        assert markdown.content == retained.canonical_markdown.encode()
+        assert retained.sanitized_html.encode() in html.content
+        assert pdf.content == pdf_artifact.file.read()
+        with ZipFile(BytesIO(docx.content)) as archive:
+            document_xml = archive.read("word/document.xml")
+        assert b"Retained content" in document_xml
+        assert b"Replacement content" not in document_xml
+        assert AuditEvent.objects.filter(
+            action="document.publication_exported", metadata={"format": "docx"}
+        ).exists()
+
+
+@pytest.mark.django_db
+def test_document_export_rejects_unknown_format(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-import"),
+        {"title": "Guide", "file": SimpleUploadedFile("guide.md", b"Body"), "is_template": "false"},
+    ).json()
+    route = reverse("msp-document-export", kwargs={"document_entity_id": created["id"]})
+
+    response = owner_client.get(route, {"export_format": "gdoc"})
+
+    assert response.status_code == 400

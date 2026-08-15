@@ -120,6 +120,7 @@ from apps.core.document_views import (
     MSPDocumentPublicationApproveView,
     MSPDocumentPublicationArtifactDownloadView,
     MSPDocumentPublicationDetailView,
+    MSPDocumentPublicationExportView,
     MSPDocumentPublicationListCreateView,
     MSPDocumentPublicationManifestView,
     MSPDocumentPublicationMarkdownView,
@@ -145,6 +146,7 @@ from apps.core.document_views import (
     OrganizationDocumentPublicationApproveView,
     OrganizationDocumentPublicationArtifactDownloadView,
     OrganizationDocumentPublicationDetailView,
+    OrganizationDocumentPublicationExportView,
     OrganizationDocumentPublicationListCreateView,
     OrganizationDocumentPublicationManifestView,
     OrganizationDocumentPublicationMarkdownView,
@@ -546,6 +548,11 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/markdown",
         MSPDocumentPublicationMarkdownView.as_view(),
         name="msp-document-publication-markdown",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/export",
+        MSPDocumentPublicationExportView.as_view(),
+        name="msp-document-publication-export",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/manifest",
@@ -1618,6 +1625,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/markdown",
         OrganizationDocumentPublicationMarkdownView.as_view(),
         name="organization-document-publication-markdown",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/export",
+        OrganizationDocumentPublicationExportView.as_view(),
+        name="organization-document-publication-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/publications/<uuid:publication_entity_id>/manifest",

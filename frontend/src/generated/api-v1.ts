@@ -660,6 +660,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/export": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_publications_msp_export"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/publications/{publication_entity_id}/manifest": {
         readonly parameters: {
             readonly query?: never;
@@ -4076,6 +4092,22 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["document_publication_artifacts_organization_download"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications/{publication_entity_id}/export": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_publications_organization_export"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -11598,7 +11630,15 @@ export interface operations {
     };
     readonly documents_msp_export: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `docx` - docx
+                 *     * `html` - html
+                 *     * `md` - md
+                 *     * `pdf` - pdf
+                 */
+                readonly export_format?: "docx" | "html" | "md" | "pdf";
+            };
             readonly header?: never;
             readonly path: {
                 readonly document_entity_id: string;
@@ -11614,7 +11654,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "text/markdown": string;
+                    readonly "application/json": string;
                 };
             };
         };
@@ -11983,6 +12023,38 @@ export interface operations {
                 };
                 content: {
                     readonly "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    readonly document_publications_msp_export: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `docx` - docx
+                 *     * `html` - html
+                 *     * `md` - md
+                 *     * `pdf` - pdf
+                 */
+                readonly export_format?: "docx" | "html" | "md" | "pdf";
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly publication_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": string;
                 };
             };
         };
@@ -20590,7 +20662,15 @@ export interface operations {
     };
     readonly documents_organization_export: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `docx` - docx
+                 *     * `html` - html
+                 *     * `md` - md
+                 *     * `pdf` - pdf
+                 */
+                readonly export_format?: "docx" | "html" | "md" | "pdf";
+            };
             readonly header?: never;
             readonly path: {
                 readonly document_entity_id: string;
@@ -20607,7 +20687,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "text/markdown": string;
+                    readonly "application/json": string;
                 };
             };
         };
@@ -20987,6 +21067,39 @@ export interface operations {
                 };
                 content: {
                     readonly "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    readonly document_publications_organization_export: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `docx` - docx
+                 *     * `html` - html
+                 *     * `md` - md
+                 *     * `pdf` - pdf
+                 */
+                readonly export_format?: "docx" | "html" | "md" | "pdf";
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+                readonly publication_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": string;
                 };
             };
         };

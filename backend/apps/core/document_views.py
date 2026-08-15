@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
 from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import serializers
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -20,6 +21,7 @@ from .document_attachments import (
     create_document_attachment,
     open_document_attachment,
 )
+from .document_exports import EXPORT_FORMATS, export_docx, export_html, export_pdf
 from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
@@ -46,6 +48,7 @@ from .documents import (
     update_shared_block,
 )
 from .models import (
+    AuditEvent,
     Document,
     DocumentationListingReference,
     DocumentAttachment,
@@ -297,16 +300,47 @@ def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response
     return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
 
 
-def _export_markdown(workspace: ResolvedWorkspace, document_entity_id: UUID) -> HttpResponse:
-    document = _document(workspace, document_entity_id)
-    filename = f"{slugify(document.entity.display_name) or 'document'}.md"
-    response = HttpResponse(
-        resolve_document(document).markdown.encode("utf-8"), content_type="text/markdown; charset=utf-8"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+class DocumentExportQuerySerializer(serializers.Serializer):
+    export_format = serializers.ChoiceField(choices=sorted(EXPORT_FORMATS), default="md")
+
+
+def _export_response(*, title: str, markdown: str, format_name: str, retained_html: str | None = None) -> HttpResponse:
+    stem = slugify(title) or "document"
+    if format_name == "md":
+        content, media_type, extension = markdown.encode("utf-8"), "text/markdown; charset=utf-8", "md"
+    elif format_name == "html":
+        content = export_html(title=title, markdown=markdown, retained_html=retained_html)
+        media_type, extension = "text/html; charset=utf-8", "html"
+    elif format_name == "pdf":
+        content, media_type, extension = export_pdf(title=title, markdown=markdown), "application/pdf", "pdf"
+    else:
+        content = export_docx(title=title, markdown=markdown)
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        extension = "docx"
+    response = HttpResponse(content, content_type=media_type)
+    response["Content-Disposition"] = f'attachment; filename="{stem}.{extension}"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+def _export_document(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> HttpResponse:
+    document = _document(workspace, document_entity_id)
+    query = DocumentExportQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    format_name = query.validated_data["export_format"]
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="document.exported",
+        entity_id=document.entity_id,
+        metadata={"format": format_name},
+    )
+    return _export_response(
+        title=document.entity.display_name,
+        markdown=resolve_document(document).markdown,
+        format_name=format_name,
+    )
 
 
 def _attachment(
@@ -500,6 +534,43 @@ def _publication_markdown(
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+def _publication_export(
+    workspace: ResolvedWorkspace,
+    document_entity_id: UUID,
+    publication_entity_id: UUID,
+    request: Request,
+) -> HttpResponse:
+    publication = _publication(workspace, document_entity_id, publication_entity_id)
+    query = DocumentExportQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    format_name = query.validated_data["export_format"]
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="document.publication_exported",
+        entity_id=publication.entity_id,
+        metadata={"format": format_name},
+    )
+    if format_name == "pdf":
+        artifact = get_object_or_404(publication.artifacts.filter(kind="pdf"))
+        try:
+            content = read_publication_artifact(artifact)
+        except PublicationConflict as conflict:
+            return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+        response = HttpResponse(content, content_type="application/pdf")
+        filename = f"{slugify(publication.title) or 'publication'}-static.pdf"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+    return _export_response(
+        title=f"{publication.title} STATIC",
+        markdown=publication.canonical_markdown,
+        format_name=format_name,
+        retained_html=publication.sanitized_html if format_name == "html" else None,
+    )
 
 
 def _publication_manifest(
@@ -816,9 +887,13 @@ class MSPDocumentDetailView(APIView):
 
 
 class MSPDocumentExportView(APIView):
-    @extend_schema(operation_id="documents_msp_export", responses={(200, "text/markdown"): bytes})
+    @extend_schema(
+        operation_id="documents_msp_export",
+        parameters=[DocumentExportQuerySerializer],
+        responses={200: bytes},
+    )
     def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
-        return _export_markdown(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id)
+        return _export_document(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, request)
 
 
 class MSPDocumentAttachmentListCreateView(APIView):
@@ -913,6 +988,21 @@ class MSPDocumentPublicationMarkdownView(APIView):
     def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
         return _publication_markdown(
             _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, publication_entity_id
+        )
+
+
+class MSPDocumentPublicationExportView(APIView):
+    @extend_schema(
+        operation_id="document_publications_msp_export",
+        parameters=[DocumentExportQuerySerializer],
+        responses={200: bytes},
+    )
+    def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_export(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+            request,
         )
 
 
@@ -1122,11 +1212,14 @@ class OrganizationDocumentDetailView(APIView):
 
 
 class OrganizationDocumentExportView(APIView):
-    @extend_schema(operation_id="documents_organization_export", responses={(200, "text/markdown"): bytes})
+    @extend_schema(
+        operation_id="documents_organization_export", parameters=[DocumentExportQuerySerializer], responses={200: bytes}
+    )
     def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
-        return _export_markdown(
+        return _export_document(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
+            request,
         )
 
 
@@ -1249,6 +1342,21 @@ class OrganizationDocumentPublicationMarkdownView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
             publication_entity_id,
+        )
+
+
+class OrganizationDocumentPublicationExportView(APIView):
+    @extend_schema(
+        operation_id="document_publications_organization_export",
+        parameters=[DocumentExportQuerySerializer],
+        responses={200: bytes},
+    )
+    def get(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
+        return _publication_export(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            publication_entity_id,
+            request,
         )
 
 

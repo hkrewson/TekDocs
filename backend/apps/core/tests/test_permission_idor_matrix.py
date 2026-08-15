@@ -99,6 +99,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-document-publication-approve": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-withdraw": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-markdown": ("document_entity_id", "publication_entity_id"),
+        "msp-document-publication-export": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-manifest": ("document_entity_id", "publication_entity_id"),
         "msp-document-publication-artifact-download": (
             "document_entity_id",
@@ -375,6 +376,11 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "publication_entity_id",
         ),
         "organization-document-publication-withdraw": (
+            "organization_entity_id",
+            "document_entity_id",
+            "publication_entity_id",
+        ),
+        "organization-document-publication-export": (
             "organization_entity_id",
             "document_entity_id",
             "publication_entity_id",

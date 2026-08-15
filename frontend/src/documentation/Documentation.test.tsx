@@ -313,6 +313,19 @@ it('imports Markdown and manages a private attachment link', async () => {
   expect(archiveAttachment).toHaveBeenCalledWith({}, 'doc-imported', 'attachment-1')
 })
 
+it('offers inline viewing only for clean PDF files', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, attachments: [
+    { id: 'pdf-attachment', filename: 'setup.pdf', media_type: 'application/pdf', size: 512, checksum: 'a'.repeat(64), scan_status: 'clean', scan_engine: 'scanner', scanned_at: '2026-08-15T00:00:00Z', created_at: '2026-08-15T00:00:00Z' },
+    { id: 'text-attachment', filename: 'notes.txt', media_type: 'text/plain', size: 12, checksum: 'b'.repeat(64), scan_status: 'clean', scan_engine: 'scanner', scanned_at: '2026-08-15T00:00:00Z', created_at: '2026-08-15T00:00:00Z' },
+  ], attachment_count: 2 }], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(screen.getByRole('button', { name: 'View PDF' })).toBeVisible()
+  expect(screen.getAllByRole('button', { name: 'Insert link' })).toHaveLength(2)
+})
+
 it('publishes and opens an immutable verified STATIC version', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, publish } = clients()

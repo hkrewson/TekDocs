@@ -2,7 +2,7 @@
   "name": "tekdocs-frontend",
   "private": true,
   "license": "AGPL-3.0-only",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -26,6 +26,7 @@
     "dompurify": "3.4.13",
     "lucide-react": "^1.29.0",
     "openapi-fetch": "^0.17.0",
+    "pdfjs-dist": "^6.2.108",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

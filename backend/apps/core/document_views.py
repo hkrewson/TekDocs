@@ -188,17 +188,26 @@ def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Res
     if workspace.organization is None:
         source = _document(workspace, serializer.validated_data["source_document_id"])
     else:
-        source = get_object_or_404(
-            Document.objects.select_related("entity").prefetch_related(
-                "placements__block__entity", "placements__block__current_revision", "placements__pinned_revision"
-            ),
+        source_queryset = Document.objects.select_related("entity").prefetch_related(
+            "placements__block__entity", "placements__block__current_revision", "placements__pinned_revision"
+        )
+        source = source_queryset.filter(
             tenant=workspace.member.tenant,
-            organization__isnull=True,
+            organization=workspace.organization,
             entity_id=serializer.validated_data["source_document_id"],
             is_template=True,
-            library_visible=True,
             archived_at__isnull=True,
-        )
+        ).first()
+        if source is None:
+            source = get_object_or_404(
+                source_queryset,
+                tenant=workspace.member.tenant,
+                organization__isnull=True,
+                entity_id=serializer.validated_data["source_document_id"],
+                is_template=True,
+                library_visible=True,
+                archived_at__isnull=True,
+            )
     try:
         document = instantiate_document_template(
             source=source,

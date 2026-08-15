@@ -793,6 +793,47 @@ def test_template_instantiation_copies_owned_attachments_and_rewrites_markdown(o
 
 
 @pytest.mark.django_db
+def test_client_template_creates_independent_copy_only_within_its_workspace(owner_client, installation):
+    acme = organization(installation.tenant, "Acme local templates")
+    beta = organization(installation.tenant, "Beta local templates")
+    template = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {
+            "title": "Acme incident template",
+            "markdown": "Client-owned response steps.",
+            "category": "procedure",
+            "is_template": True,
+        },
+        content_type="application/json",
+    ).json()
+
+    created = owner_client.post(
+        reverse("organization-document-template-instantiate", kwargs={"organization_entity_id": acme.entity_id}),
+        {
+            "source_document_id": template["id"],
+            "title": "Acme incident response",
+            "category": "procedure",
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["markdown"] == "Client-owned response steps."
+    assert created.json()["is_template"] is False
+    assert created.json()["template_enrollment_id"] is None
+
+    cross_client = owner_client.post(
+        reverse("organization-document-template-instantiate", kwargs={"organization_entity_id": beta.entity_id}),
+        {
+            "source_document_id": template["id"],
+            "title": "Leaked incident response",
+            "category": "procedure",
+        },
+        content_type="application/json",
+    )
+    assert cross_client.status_code == 404
+
+
+@pytest.mark.django_db
 def test_managed_attachment_download_is_private_and_scope_bound(owner_client, installation, tmp_path):
     acme = organization(installation.tenant, "Acme attachments")
     beta = organization(installation.tenant, "Beta attachments")

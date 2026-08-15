@@ -441,7 +441,9 @@ def instantiate_document_template(
             if not resolved.placements:
                 raise PlacementConflict("The template has no resolvable blocks.")
             rules = placement_rules or {}
-            template_revision = ensure_template_revision(source=source, actor_id=actor_id)
+            template_revision = (
+                ensure_template_revision(source=source, actor_id=actor_id) if source.organization_id is None else None
+            )
             attachment_ids = attachment_ids_in_markdown(resolved.markdown)
             source_attachments = list(
                 DocumentAttachment.objects.filter(
@@ -539,10 +541,10 @@ def instantiate_document_template(
                 entity_id=destination.entity_id,
                 metadata={
                     "source_document_id": str(source.entity_id),
-                    "template_revision": template_revision.revision_number,
+                    "template_revision": template_revision.revision_number if template_revision is not None else None,
                 },
             )
-            if organization is not None:
+            if organization is not None and template_revision is not None:
                 DocumentTemplateEnrollment.objects.create(
                     tenant=tenant,
                     organization=organization,

@@ -4,8 +4,8 @@ set -Eeuo pipefail
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 invocation_directory=$PWD
 environment_file="$repository_root/.env"
-backup_root=
-recovery_key=
+backup_root=${TEKDOCS_BACKUP_ROOT:-}
+recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-}
 secret_directory=
 use_traefik=true
 use_bootstrap_secret=false
@@ -14,18 +14,36 @@ application_stopped=false
 
 usage() {
   cat <<'EOF'
-Usage:
+Safely update a running TekDocs production installation.
+
+Normal update:
   scripts/update-production.sh \
     --backup-root DIRECTORY \
-    --recovery-key FILE \
+    --recovery-key FILE
+
+  --backup-root is a parent directory for a new timestamped encrypted backup.
+  --recovery-key is an existing TekDocs recovery-key file kept separately from
+  both the backup directory and the deployment secret directory.
+
+Example:
+  scripts/update-production.sh \
+    --backup-root /path/to/tekdocs-backups \
+    --recovery-key /separate/path/tekdocs-recovery.key
+
+If no recovery key exists, create one once and retain a separate copy:
+  scripts/generate-recovery-key.sh /separate/path/tekdocs-recovery.key
+
+Update after creating a verified external VM or volume snapshot:
+  scripts/update-production.sh --skip-backup
+
+Optional arguments:
     [--env-file FILE] \
     [--secret-directory DIRECTORY] \
     [--without-traefik] \
-    [--with-bootstrap-secret] \
-    [--skip-backup]
+    [--with-bootstrap-secret]
 
-Use --skip-backup only when a separate verified snapshot already exists.
 Traefik is enabled by default. SMTP and OIDC overlays are detected from secret files.
+TEKDOCS_BACKUP_ROOT and TEKDOCS_RECOVERY_KEY_FILE may supply the two backup paths.
 EOF
 }
 
@@ -34,25 +52,32 @@ fail() {
   exit 1
 }
 
+argument_error() {
+  echo "TekDocs production update needs more information: $*" >&2
+  echo >&2
+  usage >&2
+  exit 2
+}
+
 while (($#)); do
   case "$1" in
     --backup-root)
-      (($# >= 2)) || fail "--backup-root requires a value"
+      (($# >= 2)) || argument_error "--backup-root must be followed by a directory path"
       backup_root=${2:-}
       shift 2
       ;;
     --recovery-key)
-      (($# >= 2)) || fail "--recovery-key requires a value"
+      (($# >= 2)) || argument_error "--recovery-key must be followed by a recovery-key file path"
       recovery_key=${2:-}
       shift 2
       ;;
     --env-file)
-      (($# >= 2)) || fail "--env-file requires a value"
+      (($# >= 2)) || argument_error "--env-file must be followed by an environment-file path"
       environment_file=${2:-}
       shift 2
       ;;
     --secret-directory)
-      (($# >= 2)) || fail "--secret-directory requires a value"
+      (($# >= 2)) || argument_error "--secret-directory must be followed by a directory path"
       secret_directory=${2:-}
       shift 2
       ;;
@@ -73,11 +98,18 @@ while (($#)); do
       exit 0
       ;;
     *)
-      usage >&2
-      fail "unknown argument: $1"
+      argument_error "unknown argument: $1"
       ;;
   esac
 done
+
+if [[ "$skip_backup" != true ]]; then
+  if [[ -z "$backup_root" && -z "$recovery_key" ]]; then
+    argument_error "provide both backup paths, or use --skip-backup after a verified external snapshot"
+  fi
+  [[ -n "$backup_root" ]] || argument_error "--backup-root identifies where the encrypted backup will be created"
+  [[ -n "$recovery_key" ]] || argument_error "--recovery-key identifies the existing key required to restore that backup"
+fi
 
 if [[ "$environment_file" != /* ]]; then
   environment_file="$invocation_directory/$environment_file"

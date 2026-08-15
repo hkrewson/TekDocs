@@ -31,7 +31,7 @@ services:
     networks: [internal]
 
   mailpit:
-    image: axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+    image: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
     environment:
       MP_DATABASE: /data/mailpit.db
       MP_MAX_MESSAGES: "500"

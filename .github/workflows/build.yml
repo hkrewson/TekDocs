@@ -39,9 +39,9 @@ jobs:
           {
             echo "## TekDocs validation path"
             echo
-            echo "1. Backend, frontend, and security policy run in parallel."
-            echo "2. The application is exercised against PostgreSQL with runtime RLS enabled."
-            echo "3. Chromium and the live browser-to-Django-to-PostgreSQL journey run after that boundary passes."
+            echo "1. Backend, frontend, security policy, Chromium, and the live browser-to-Django-to-PostgreSQL journey start in parallel."
+            echo "2. The full backend suite is exercised against PostgreSQL with runtime RLS enabled."
+            echo "3. Browser failures are reported without waiting for the full PostgreSQL suite."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
             echo
             echo "CodeQL and scheduled extended browser/performance/DAST checks remain separate workflows."
@@ -162,7 +162,7 @@ jobs:
 
   browser:
     name: Chromium regression
-    needs: postgres-runtime
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -178,7 +178,7 @@ jobs:
 
   live-workspace:
     name: Live browser-to-PostgreSQL journey
-    needs: postgres-runtime
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -187,11 +187,11 @@ jobs:
 
   production-containers:
     name: Production containers, SBOMs, and vulnerability scan
-    needs: [prepare, browser, live-workspace]
+    needs: [prepare, postgres-runtime, browser, live-workspace]
     runs-on: ubuntu-latest
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
-      MAILPIT_IMAGE: axllent/mailpit:edge@sha256:bccf2e68cfe67695cd6ed4d73e9def6100ea48a262901b1945befbed91cceec7
+      MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build production images

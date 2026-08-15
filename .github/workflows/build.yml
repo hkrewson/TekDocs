@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -43,6 +44,7 @@ jobs:
             echo "2. PostgreSQL shard coverage is merged and enforced after every shard passes."
             echo "3. Browser and authorization failures are reported without waiting for the complete backend suite."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
+            echo "5. Trusted main or version-tag pushes publish those exact tested images to GHCR."
             echo
             echo "CodeQL and scheduled extended browser/performance/DAST checks remain separate workflows."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -210,6 +212,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
+      BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
+      FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
+      COMMIT_TAG: sha-${{ github.sha }}
       MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
       TRIVY_IMAGE: aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
       TRIVY_CACHE_DIR: /tmp/tekdocs-trivy-cache
@@ -217,19 +222,27 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build production images
         run: |
-          docker build --target production --tag "tekdocs-backend:${TEKDOCS_VERSION}" ./backend
-          docker build --target production --tag "tekdocs-frontend:${TEKDOCS_VERSION}" ./frontend
+          docker build --target production \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
+            --tag "${BACKEND_IMAGE}:${COMMIT_TAG}" ./backend
+          docker build --target production \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
+            --tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" ./frontend
           docker pull "$MAILPIT_IMAGE"
       - name: Validate Python production licenses
-        run: docker run --rm -v "$PWD/scripts/check-python-licenses.py:/check-python-licenses.py:ro" "tekdocs-backend:${TEKDOCS_VERSION}" python /check-python-licenses.py
+        run: docker run --rm -v "$PWD/scripts/check-python-licenses.py:/check-python-licenses.py:ro" "${BACKEND_IMAGE}:${COMMIT_TAG}" python /check-python-licenses.py
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          image: tekdocs-backend:${{ env.TEKDOCS_VERSION }}
+          image: ${{ env.BACKEND_IMAGE }}:${{ env.COMMIT_TAG }}
           format: cyclonedx-json
           output-file: backend-sbom.cdx.json
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          image: tekdocs-frontend:${{ env.TEKDOCS_VERSION }}
+          image: ${{ env.FRONTEND_IMAGE }}:${{ env.COMMIT_TAG }}
           format: cyclonedx-json
           output-file: frontend-sbom.cdx.json
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
@@ -248,14 +261,14 @@ jobs:
           -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
           --severity HIGH,CRITICAL --exit-code 1
-          "tekdocs-backend:${TEKDOCS_VERSION}"
+          "${BACKEND_IMAGE}:${COMMIT_TAG}"
       - name: Scan frontend image
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
           --severity HIGH,CRITICAL --exit-code 1
-          "tekdocs-frontend:${TEKDOCS_VERSION}"
+          "${FRONTEND_IMAGE}:${COMMIT_TAG}"
       - name: Scan Mailpit image
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
@@ -263,3 +276,113 @@ jobs:
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
           --severity HIGH,CRITICAL --exit-code 1
           "$MAILPIT_IMAGE"
+      - name: Preserve tested application images for publication
+        if: github.event_name == 'push'
+        run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}"
+      - name: Upload tested application images
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-images-${{ github.sha }}
+          path: production-images.tar
+          retention-days: 1
+          compression-level: 0
+
+  publish-containers:
+    name: Publish tested production images
+    if: github.event_name == 'push'
+    needs: [prepare, production-containers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
+      BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
+      FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
+      COMMIT_TAG: sha-${{ github.sha }}
+    steps:
+      - name: Download tested application images
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: production-images-${{ github.sha }}
+      - name: Download generated SBOMs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: production-image-sboms-${{ env.TEKDOCS_VERSION }}
+      - name: Load tested application images
+        run: docker load --input production-images.tar
+      - name: Validate release tag
+        if: github.ref_type == 'tag'
+        run: |
+          if [[ "$GITHUB_REF_NAME" != "v${TEKDOCS_VERSION}" ]]; then
+            echo "Release tag must equal v${TEKDOCS_VERSION}; received ${GITHUB_REF_NAME}." >&2
+            exit 1
+          fi
+      - name: Authenticate to GitHub Container Registry
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: publish
+        name: Publish commit-addressed production images
+        run: |
+          docker push "${BACKEND_IMAGE}:${COMMIT_TAG}"
+          docker push "${FRONTEND_IMAGE}:${COMMIT_TAG}"
+
+          if [[ "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == "main" ]]; then
+            docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:main"
+            docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:main"
+            docker push "${BACKEND_IMAGE}:main"
+            docker push "${FRONTEND_IMAGE}:main"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
+            docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
+            docker push "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
+            docker push "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
+          fi
+
+          backend_digest=$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          frontend_digest=$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          [[ "$backend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid backend registry digest" >&2; exit 1; }
+          [[ "$frontend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid frontend registry digest" >&2; exit 1; }
+          echo "backend-digest=$backend_digest" >> "$GITHUB_OUTPUT"
+          echo "frontend-digest=$frontend_digest" >> "$GITHUB_OUTPUT"
+      - name: Attest backend build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.BACKEND_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.backend-digest }}
+          push-to-registry: true
+      - name: Attest frontend build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.FRONTEND_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.frontend-digest }}
+          push-to-registry: true
+      - name: Attest backend SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.BACKEND_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.backend-digest }}
+          sbom-path: backend-sbom.cdx.json
+          push-to-registry: true
+      - name: Attest frontend SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.FRONTEND_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.frontend-digest }}
+          sbom-path: frontend-sbom.cdx.json
+          push-to-registry: true
+      - name: Summarize published images
+        run: |
+          {
+            echo "## Published production images"
+            echo
+            echo "- \`${BACKEND_IMAGE}:${COMMIT_TAG}\`"
+            echo "- \`${FRONTEND_IMAGE}:${COMMIT_TAG}\`"
+            echo
+            echo "Production deployments resolve these commit tags to immutable registry digests."
+            echo "The package visibility must be Public in GitHub Packages for unauthenticated production pulls."
+          } >> "$GITHUB_STEP_SUMMARY"

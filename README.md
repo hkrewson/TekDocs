@@ -150,11 +150,13 @@ TekDocs uses session and CSRF authentication for the browser application. Person
 
 The repository uses three primary workflows:
 
-- **Build, test, and secure** validates backend and frontend code, PostgreSQL behavior, permissions, isolation, dependencies, licenses, repository secrets, browser journeys, and production container builds.
+- **Build, test, and secure** validates backend and frontend code, PostgreSQL behavior, permissions, isolation, dependencies, licenses, repository secrets, browser journeys, and production containers. Successful trusted pushes publish the exact tested backend and frontend images to GHCR with commit-addressed tags, SBOM attestations, and build-provenance attestations.
 - **Extended validation** runs the full browser matrix, reference performance dataset, backup and upgrade rehearsals, and DAST.
 - **CodeQL** publishes Python and JavaScript/TypeScript findings through GitHub code scanning.
 
 Dependabot submits grouped weekly updates for Python, npm, Docker, and GitHub Actions dependencies.
+
+Production updates pull the image pair for the checked-out Git commit, verify their embedded revision labels, resolve them to immutable registry digests, and persist the deployed digests only after the public readiness check passes.
 
 ## Documentation
 

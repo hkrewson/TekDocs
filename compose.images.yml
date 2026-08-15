@@ -1,0 +1,16 @@
+services:
+  migrate:
+    image: ${TEKDOCS_BACKEND_IMAGE:?Set TEKDOCS_BACKEND_IMAGE to the published GHCR digest}
+    build: !reset null
+  backend:
+    image: ${TEKDOCS_BACKEND_IMAGE:?Set TEKDOCS_BACKEND_IMAGE to the published GHCR digest}
+    build: !reset null
+  worker:
+    image: ${TEKDOCS_BACKEND_IMAGE:?Set TEKDOCS_BACKEND_IMAGE to the published GHCR digest}
+    build: !reset null
+  scheduler:
+    image: ${TEKDOCS_BACKEND_IMAGE:?Set TEKDOCS_BACKEND_IMAGE to the published GHCR digest}
+    build: !reset null
+  frontend:
+    image: ${TEKDOCS_FRONTEND_IMAGE:?Set TEKDOCS_FRONTEND_IMAGE to the published GHCR digest}
+    build: !reset null

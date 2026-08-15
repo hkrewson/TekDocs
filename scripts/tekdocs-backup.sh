@@ -51,7 +51,8 @@ db_id=$(docker compose --env-file "$environment_file" ps -q db)
   echo "TekDocs backend and database services must already be running." >&2
   exit 1
 }
-backend_image=$(docker build --quiet "$repository_root/backend")
+backend_image=$(docker inspect --format '{{.Image}}' "$backend_id")
+[ -n "$backend_image" ] || { echo "The running backend image could not be resolved." >&2; exit 1; }
 media_volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/media"}}{{.Name}}{{end}}{{end}}' "$backend_id")
 [ -n "$media_volume" ] || { echo "The managed media volume could not be resolved." >&2; exit 1; }
 

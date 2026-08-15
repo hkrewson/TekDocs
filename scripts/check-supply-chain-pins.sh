@@ -19,9 +19,9 @@ if [ -n "$unpinned_actions" ]; then
   exit 1
 fi
 
-if awk '/^[[:space:]]*image:/ && $0 !~ /@sha256:/{print FILENAME ":" FNR ":" $0; found=1} END{exit !found}' \
+if awk '/^[[:space:]]*image:/ && $0 !~ /@sha256:/ && $0 !~ /\$\{TEKDOCS_(BACKEND|FRONTEND)_IMAGE:/{print FILENAME ":" FNR ":" $0; found=1} END{exit !found}' \
   compose.yml compose.test.yml compose.production.yml compose.secret-files.yml compose.smtp-secret.yml compose.traefik.yml \
-  compose.oidc-secret.yml compose.bootstrap-secret.yml; then
+  compose.oidc-secret.yml compose.bootstrap-secret.yml compose.images.yml; then
   echo "Compose images must include an immutable sha256 digest." >&2
   exit 1
 fi

@@ -30,13 +30,22 @@ TekDocs stores provider-neutral credential references. It does not store or retr
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.
 
+The production setup command creates the environment and file-backed secrets, pins the tested GHCR images for the current commit, validates Traefik and Compose, starts TekDocs, and prints the one-time deployment token:
+
+```bash
+scripts/setup-production.sh \
+  --domain docs.example.com \
+  --secret-directory /absolute/path/to/tekdocs-secrets \
+  --timezone America/Chicago
+```
+
 The first owner must complete these steps in order:
 
 1. Create the MSP workspace with the deployment token.
 2. Enroll a TOTP authenticator using the displayed QR code.
 3. Save and acknowledge the recovery codes.
 4. Confirm the owner can sign in.
-5. Remove the bootstrap Compose overlay and bootstrap-token file.
+5. Run `scripts/setup-production.sh --finalize`; it verifies bootstrap completion, removes the bootstrap boundary, and deletes the bootstrap-token file.
 
 Owners and administrators must enroll TOTP before TekDocs permits privileged actions.
 
@@ -69,6 +78,8 @@ http://127.0.0.1:8025
 ```
 
 `make bootstrap` creates an ignored `.env`, generates local-only secrets, installs frontend dependencies, and builds the images. Existing environment values are not replaced.
+
+Operator, maintenance, and validation commands live in `scripts/`. Regression fixtures and Docker/browser/upgrade rehearsals live in `tests/rehearsals/` and remain available through their existing `make` targets.
 
 ## Runtime
 

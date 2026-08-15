@@ -9,7 +9,8 @@ for lock_file in backend/build-requirements.lock backend/requirements.lock backe
   grep -q -- '--hash=sha256:' "$lock_file"
 done
 
-grep -q 'zaproxy/zap-stable@sha256:[0-9a-f]\{64\}' scripts/rehearse-production-image.sh
+grep -q 'zaproxy/zap-stable@sha256:[0-9a-f]\{64\}' tests/rehearsals/rehearse-production-image.sh
+grep -q 'permission_image=postgres:17-alpine@sha256:[0-9a-f]\{64\}' scripts/setup-production.sh
 
 unpinned_actions=$(rg -n 'uses:[[:space:]]+[^[:space:]]+@' .github/workflows \
   | grep -Ev '@[0-9a-f]{40}([[:space:]]|$)' || true)

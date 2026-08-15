@@ -22,7 +22,7 @@ jobs:
         project: [chromium, firefox, webkit, mobile-chromium, mobile-webkit]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: ./scripts/rehearse-browser-e2e.sh ${{ matrix.project }}
+      - run: ./tests/rehearsals/rehearse-browser-e2e.sh ${{ matrix.project }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

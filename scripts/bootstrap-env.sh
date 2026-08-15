@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  echo "Usage: $0 [DEVELOPMENT_ENV_FILE]"
+  echo "Creates or completes a local-development environment. Use scripts/setup-production.sh for production."
+  exit 0
+fi
+
 target="${1:-.env}"
 target_directory=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
 
@@ -9,8 +15,24 @@ generate_url_safe_32_byte_key() {
 }
 
 if [ -e "$target" ]; then
+  if grep -q '^TEKDOCS_ALLOW_DEVELOPMENT_IMAGE=false$' "$target"; then
+    echo "Refusing to add development secrets to a production environment. Use scripts/setup-production.sh." >&2
+    exit 1
+  fi
   umask 077
   changed=false
+  if ! grep -q '^TEKDOCS_DOMAIN=' "$target"; then
+    echo "TEKDOCS_DOMAIN=localhost" >> "$target"
+    changed=true
+  fi
+  if ! grep -q '^TEKDOCS_PROXY_NETWORK=' "$target"; then
+    echo "TEKDOCS_PROXY_NETWORK=proxy" >> "$target"
+    changed=true
+  fi
+  if ! grep -q '^TEKDOCS_TRAEFIK_ENTRYPOINT=' "$target"; then
+    echo "TEKDOCS_TRAEFIK_ENTRYPOINT=http" >> "$target"
+    changed=true
+  fi
   if ! grep -q '^TEKDOCS_SECRET_DIRECTORY=' "$target"; then
     echo "TEKDOCS_SECRET_DIRECTORY=$target_directory/secrets" >> "$target"
     changed=true
@@ -48,7 +70,7 @@ if [ -e "$target" ]; then
     changed=true
   fi
   if [ "$changed" = true ]; then
-    echo "Added missing database-role or bootstrap settings to $target without changing existing values"
+    echo "Added missing local-development settings to $target without changing existing values"
   else
     echo "$target already contains the required generated secrets; leaving it unchanged"
   fi
@@ -100,4 +122,4 @@ bootstrap_token="$(openssl rand -base64 32 | tr -d '\n')"
   echo "TZ=America/Chicago"
 } > "$target"
 
-echo "Created $target with generated local-only secrets"
+echo "Created $target with generated local-development secrets"

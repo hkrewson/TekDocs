@@ -146,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Exercise the constrained runtime database role
-        run: ./scripts/rehearse-postgres-test-shard.sh runtime
+        run: ./tests/rehearsals/rehearse-postgres-test-shard.sh runtime
 
   postgres-shards:
     name: PostgreSQL shard (${{ matrix.shard }})
@@ -159,7 +159,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Run isolated PostgreSQL shard
-        run: ./scripts/rehearse-postgres-test-shard.sh "${{ matrix.shard }}"
+        run: ./tests/rehearsals/rehearse-postgres-test-shard.sh "${{ matrix.shard }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: postgres-coverage-${{ matrix.shard }}
@@ -188,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Run Chromium regression
-        run: ./scripts/rehearse-browser-e2e.sh chromium
+        run: ./tests/rehearsals/rehearse-browser-e2e.sh chromium
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -204,7 +204,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Exercise the real application boundary
-        run: ./scripts/rehearse-live-workspace-e2e.sh
+        run: ./tests/rehearsals/rehearse-live-workspace-e2e.sh
 
   production-containers:
     name: Production containers, SBOMs, and vulnerability scan

@@ -144,7 +144,7 @@ test-rls:
 	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
 
 test-runtime-authorization:
-	./scripts/rehearse-postgres-test-shard.sh runtime
+	./tests/rehearsals/rehearse-postgres-test-shard.sh runtime
 
 test-organizations:
 	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q
@@ -173,7 +173,7 @@ test-stabilization:
 test-public-beta-performance:
 	docker compose run --rm migrate pytest apps/core/tests/test_public_beta_capacity.py -m performance -q -s
 	./scripts/frontend-gate.sh check
-	./scripts/rehearse-browser-performance.sh
+	./tests/rehearsals/rehearse-browser-performance.sh
 
 test-entity-rbac-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
@@ -226,16 +226,19 @@ test-compose:
 	./scripts/check-compose-provenance.sh
 
 test-e2e:
-	./scripts/rehearse-browser-e2e.sh chromium
+	./tests/rehearsals/rehearse-browser-e2e.sh chromium
 
 test-e2e-all:
-	./scripts/rehearse-browser-e2e.sh all
+	./tests/rehearsals/rehearse-browser-e2e.sh all
 
 test-browser-artifact-hygiene:
-	./scripts/test-browser-artifact-hygiene.sh
+	./tests/rehearsals/test-browser-artifact-hygiene.sh
+
+test-production-setup:
+	./tests/rehearsals/test-production-setup.sh
 
 test-e2e-live:
-	./scripts/rehearse-live-workspace-e2e.sh
+	./tests/rehearsals/rehearse-live-workspace-e2e.sh
 
 security:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend pip-audit
@@ -249,7 +252,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
 
 dast:
-	TEKDOCS_RUN_DAST=true ./scripts/rehearse-production-image.sh
+	TEKDOCS_RUN_DAST=true ./tests/rehearsals/rehearse-production-image.sh
 
 release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
 release-gate: test-compliance-catalogs
@@ -258,79 +261,79 @@ compose-doctor:
 	./scripts/check-compose-provenance.sh
 
 production-image-rehearsal:
-	./scripts/rehearse-production-image.sh
+	./tests/rehearsals/rehearse-production-image.sh
 
 clean-install-rehearsal:
-	./scripts/rehearse-clean-install.sh
+	./tests/rehearsals/rehearse-clean-install.sh
 
 upgrade-rehearsal:
-	./scripts/rehearse-upgrade.sh
+	./tests/rehearsals/rehearse-upgrade.sh
 
 client-portal-upgrade-rehearsal:
-	./scripts/rehearse-client-portal-upgrade.sh
+	./tests/rehearsals/rehearse-client-portal-upgrade.sh
 
 outbox-upgrade-rehearsal:
-	./scripts/rehearse-outbox-upgrade.sh
+	./tests/rehearsals/rehearse-outbox-upgrade.sh
 
 notification-upgrade-rehearsal:
-	./scripts/rehearse-notification-upgrade.sh
+	./tests/rehearsals/rehearse-notification-upgrade.sh
 
 notification-mail-outage-rehearsal:
-	./scripts/rehearse-notification-mail-outage.sh
+	./tests/rehearsals/rehearse-notification-mail-outage.sh
 
 portal-notification-upgrade-rehearsal:
-	./scripts/rehearse-portal-notification-upgrade.sh
+	./tests/rehearsals/rehearse-portal-notification-upgrade.sh
 
 portal-notification-backup-rehearsal:
-	./scripts/rehearse-portal-notification-backup.sh
+	./tests/rehearsals/rehearse-portal-notification-backup.sh
 
 documentation-backup-rehearsal:
-	./scripts/rehearse-documentation-backup.sh
+	./tests/rehearsals/rehearse-documentation-backup.sh
 
 documentation-upgrade-rehearsal:
-	./scripts/rehearse-documentation-upgrade.sh
+	./tests/rehearsals/rehearse-documentation-upgrade.sh
 
 publication-control-upgrade-rehearsal:
-	./scripts/rehearse-publication-control-upgrade.sh
+	./tests/rehearsals/rehearse-publication-control-upgrade.sh
 
 inventory-backup-rehearsal:
-	./scripts/rehearse-inventory-backup.sh
+	./tests/rehearsals/rehearse-inventory-backup.sh
 
 inventory-upgrade-rehearsal:
-	./scripts/rehearse-inventory-upgrade.sh
+	./tests/rehearsals/rehearse-inventory-upgrade.sh
 
 network-backup-rehearsal:
-	./scripts/rehearse-network-backup.sh
+	./tests/rehearsals/rehearse-network-backup.sh
 
 network-upgrade-rehearsal:
-	./scripts/rehearse-network-upgrade.sh
+	./tests/rehearsals/rehearse-network-upgrade.sh
 
 integration-upgrade-rehearsal:
-	./scripts/rehearse-integration-upgrade.sh
+	./tests/rehearsals/rehearse-integration-upgrade.sh
 
 integration-validation-upgrade-rehearsal:
-	TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION=0.7.0 ./scripts/rehearse-integration-upgrade.sh
+	TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION=0.7.0 ./tests/rehearsals/rehearse-integration-upgrade.sh
 
 integration-backup-rehearsal:
-	./scripts/rehearse-integration-backup.sh
+	./tests/rehearsals/rehearse-integration-backup.sh
 
 monitoring-upgrade-rehearsal:
-	./scripts/rehearse-monitoring-upgrade.sh
+	./tests/rehearsals/rehearse-monitoring-upgrade.sh
 
 monitoring-backup-rehearsal:
-	./scripts/rehearse-monitoring-backup.sh
+	./tests/rehearsals/rehearse-monitoring-backup.sh
 
 compliance-monitoring-upgrade-rehearsal:
-	./scripts/rehearse-compliance-monitoring-upgrade.sh
+	./tests/rehearsals/rehearse-compliance-monitoring-upgrade.sh
 
 compliance-monitoring-backup-rehearsal:
-	./scripts/rehearse-compliance-monitoring-backup.sh
+	./tests/rehearsals/rehearse-compliance-monitoring-backup.sh
 
 supported-recovery-rehearsal:
-	./scripts/rehearse-supported-recovery.sh
+	./tests/rehearsals/rehearse-supported-recovery.sh
 
 supported-upgrade-matrix:
-	./scripts/rehearse-supported-upgrade-matrix.sh
+	./tests/rehearsals/rehearse-supported-upgrade-matrix.sh
 
 schema:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py spectacular --validate > backend/openapi.yml

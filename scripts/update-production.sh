@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+# shellcheck source=scripts/lib/production-images.sh
+source "$repository_root/scripts/lib/production-images.sh"
 invocation_directory=$PWD
 environment_file="$repository_root/.env"
 operator_config_file="$repository_root/.tekdocs-update.env"
@@ -22,8 +24,6 @@ use_traefik=true
 use_bootstrap_secret=false
 skip_backup=false
 application_stopped=false
-backend_repository=ghcr.io/hkrewson/tekdocs-backend
-frontend_repository=ghcr.io/hkrewson/tekdocs-frontend
 
 usage() {
   cat <<'EOF'
@@ -66,35 +66,6 @@ EOF
 fail() {
   echo "TekDocs production update refused: $*" >&2
   exit 1
-}
-
-resolve_digest_reference() {
-  repository=$1
-  tagged_reference=$2
-  digest_reference=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tagged_reference" \
-    | awk -v prefix="$repository@sha256:" 'index($0, prefix) == 1 {print; exit}')
-  [[ "$digest_reference" == "$repository@sha256:"* ]] || fail "the registry digest could not be resolved for $tagged_reference"
-  digest=${digest_reference#*@sha256:}
-  [[ ${#digest} -eq 64 && "$digest" != *[!0-9a-f]* ]] || fail "the registry returned an invalid digest for $tagged_reference"
-  printf '%s\n' "$digest_reference"
-}
-
-persist_environment_value() {
-  name=$1
-  value=$2
-  temporary=$(mktemp "$environment_directory/.tekdocs-env.XXXXXX")
-  awk -v name="$name" -v value="$value" '
-    BEGIN { replaced = 0 }
-    index($0, name "=") == 1 {
-      if (!replaced) print name "=" value
-      replaced = 1
-      next
-    }
-    { print }
-    END { if (!replaced) print name "=" value }
-  ' "$environment_file" > "$temporary"
-  chmod 0600 "$temporary"
-  mv "$temporary" "$environment_file"
 }
 
 argument_error() {
@@ -266,21 +237,9 @@ git fetch --prune
 git merge --ff-only '@{upstream}'
 
 current_commit=$(git rev-parse HEAD)
-commit_tag="sha-$current_commit"
-backend_tagged_reference="$backend_repository:$commit_tag"
-frontend_tagged_reference="$frontend_repository:$commit_tag"
-
-echo "Pulling validated production images for commit $current_commit"
-docker pull "$backend_tagged_reference"
-docker pull "$frontend_tagged_reference"
-
-backend_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$backend_tagged_reference")
-frontend_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$frontend_tagged_reference")
-[[ "$backend_revision" == "$current_commit" ]] || fail "the backend image revision does not match the checked-out commit"
-[[ "$frontend_revision" == "$current_commit" ]] || fail "the frontend image revision does not match the checked-out commit"
-
-TEKDOCS_BACKEND_IMAGE=$(resolve_digest_reference "$backend_repository" "$backend_tagged_reference")
-TEKDOCS_FRONTEND_IMAGE=$(resolve_digest_reference "$frontend_repository" "$frontend_tagged_reference")
+tekdocs_resolve_production_images "$current_commit"
+TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
+TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
 export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE
 compose+=(-f "$repository_root/compose.images.yml")
 
@@ -323,8 +282,8 @@ fi
 "${compose[@]}" ps
 current_version=$(tr -d '[:space:]' < VERSION)
 application_stopped=false
-persist_environment_value TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
-persist_environment_value TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
+tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
+tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
 trap - ERR
 
 echo "TekDocs production update passed: $previous_version ($previous_commit) -> $current_version ($current_commit)"

@@ -3,6 +3,14 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 
+bash -n \
+  "$repository_root/scripts/setup-production.sh" \
+  "$repository_root/scripts/update-production.sh" \
+  "$repository_root/scripts/lib/production-images.sh"
+"$repository_root/scripts/bootstrap-env.sh" --help >/dev/null
+"$repository_root/scripts/setup-production.sh" --help >/dev/null
+"$repository_root/tests/rehearsals/test-production-setup.sh"
+
 TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 docker compose \

@@ -133,7 +133,7 @@
         "compose.production.yml",
         "backend/Dockerfile",
         "backend/tekdocs/settings/production.py",
-        "scripts/rehearse-production-image.sh"
+        "tests/rehearsals/rehearse-production-image.sh"
       ]
     },
     {
@@ -182,7 +182,7 @@
         "backend/apps/core/attachment_security.py::_resolve_private_scanner_address",
         "backend/apps/core/tests/test_attachment_security.py::test_clamav_provider_rejects_public_and_mixed_resolution",
         "compose.production.yml",
-        "scripts/rehearse-production-image.sh"
+        "tests/rehearsals/rehearse-production-image.sh"
       ]
     },
     {

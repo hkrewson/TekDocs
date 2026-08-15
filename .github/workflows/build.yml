@@ -211,6 +211,8 @@ jobs:
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
       MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
+      TRIVY_IMAGE: aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
+      TRIVY_CACHE_DIR: /tmp/tekdocs-trivy-cache
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build production images
@@ -241,23 +243,23 @@ jobs:
           path: "*-sbom.cdx.json"
           retention-days: 14
       - name: Scan backend image
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
-        with:
-          image-ref: tekdocs-backend:${{ env.TEKDOCS_VERSION }}
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: "1"
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
+          --severity HIGH,CRITICAL --exit-code 1
+          "tekdocs-backend:${TEKDOCS_VERSION}"
       - name: Scan frontend image
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
-        with:
-          image-ref: tekdocs-frontend:${{ env.TEKDOCS_VERSION }}
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: "1"
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
+          --severity HIGH,CRITICAL --exit-code 1
+          "tekdocs-frontend:${TEKDOCS_VERSION}"
       - name: Scan Mailpit image
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
-        with:
-          image-ref: ${{ env.MAILPIT_IMAGE }}
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: "1"
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
+          --severity HIGH,CRITICAL --exit-code 1
+          "$MAILPIT_IMAGE"

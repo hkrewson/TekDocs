@@ -13,6 +13,7 @@ from django.utils import timezone
 from .models import (
     AuditEvent,
     Block,
+    BlockKind,
     BlockRevision,
     Document,
     DocumentationListingReference,
@@ -232,7 +233,12 @@ def create_document(
         entity_type="document_block",
         display_name=f"{title} — content",
     )
-    block = Block.objects.create(tenant=tenant, organization=organization, entity=block_entity)
+    block = Block.objects.create(
+        tenant=tenant,
+        organization=organization,
+        entity=block_entity,
+        source_document=document,
+    )
     revision = BlockRevision.objects.create(
         tenant=tenant,
         organization=organization,
@@ -414,6 +420,7 @@ def detach_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -
         tenant=locked.tenant,
         organization=locked.document.organization,
         entity=entity,
+        source_document=locked.document,
     )
     detached_revision = BlockRevision.objects.create(
         tenant=locked.tenant,
@@ -452,6 +459,99 @@ def revision_for_document(*, document: Document, revision_id: UUID) -> BlockRevi
     return revisions_for_document(document).get(id=revision_id)
 
 
+def _placement_parent(*, document: Document, parent_id: UUID | None) -> DocumentPlacement | None:
+    if parent_id is None:
+        return None
+    parent = document.placements.select_for_update().filter(id=parent_id).first()
+    if parent is None:
+        raise PlacementConflict("The parent placement is not part of this document.")
+    return parent
+
+
+def _placement_position(
+    *, document: Document, parent: DocumentPlacement | None, requested_position: int | None
+) -> int:
+    siblings = document.placements.select_for_update().filter(parent=parent)
+    last_position = siblings.aggregate(value=Max("position"))["value"]
+    minimum = 1 if parent is None else 0
+    appended = minimum if last_position is None else last_position + 1
+    if requested_position is None:
+        return appended
+    if requested_position < minimum or requested_position > appended:
+        raise PlacementConflict(f"Block position must be between {minimum} and {appended}.")
+    for sibling in siblings.filter(position__gte=requested_position).order_by("-position", "-id"):
+        sibling.position += 1
+        sibling.save(update_fields=("position", "updated_at"))
+    return requested_position
+
+
+@transaction.atomic
+def create_document_block(
+    *,
+    document: Document,
+    actor_id: UUID,
+    markdown: str,
+    kind: str,
+    name: str,
+    parent_id: UUID | None,
+    position: int | None,
+) -> DocumentPlacement:
+    locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
+    if locked_document.placements.count() >= 500:
+        raise PlacementConflict("Document composition cannot exceed 500 blocks.")
+    if kind not in BlockKind.values:
+        raise PlacementConflict("The selected block type is not supported.")
+    parent = _placement_parent(document=locked_document, parent_id=parent_id)
+    resolved_position = _placement_position(
+        document=locked_document,
+        parent=parent,
+        requested_position=position,
+    )
+    label = name.strip() or f"{locked_document.entity.display_name} — block {locked_document.placements.count() + 1}"
+    entity = Entity.objects.create(
+        tenant=locked_document.tenant,
+        workspace=locked_document.entity.workspace,
+        organization=locked_document.organization,
+        entity_type="document_block",
+        display_name=label,
+    )
+    block = Block.objects.create(
+        tenant=locked_document.tenant,
+        organization=locked_document.organization,
+        entity=entity,
+        kind=kind,
+        source_document=locked_document,
+    )
+    revision = BlockRevision.objects.create(
+        tenant=locked_document.tenant,
+        organization=locked_document.organization,
+        block=block,
+        revision_number=1,
+        markdown=markdown,
+        checksum=markdown_checksum(markdown),
+        created_by_id=actor_id,
+    )
+    block.current_revision = revision
+    block.save(update_fields=("current_revision", "updated_at"))
+    placement = DocumentPlacement.objects.create(
+        tenant=locked_document.tenant,
+        organization=locked_document.organization,
+        document=locked_document,
+        block=block,
+        parent=parent,
+        position=resolved_position,
+        resolution_mode=PlacementResolutionMode.LIVE,
+    )
+    AuditEvent.objects.create(
+        tenant=locked_document.tenant,
+        actor_id=actor_id,
+        action="document.block_created",
+        entity_id=locked_document.entity_id,
+        metadata={},
+    )
+    return placement
+
+
 @transaction.atomic
 def add_document_placement(
     *,
@@ -461,17 +561,17 @@ def add_document_placement(
     resolution_mode: str,
     pinned_revision_id: UUID | None,
     parent_id: UUID | None,
+    position: int | None = None,
 ) -> DocumentPlacement:
     locked_document = Document.objects.select_for_update().get(pk=document.pk)
+    if locked_document.placements.count() >= 500:
+        raise PlacementConflict("Document composition cannot exceed 500 blocks.")
     if source_document.pk == locked_document.pk:
         raise PlacementConflict("A document cannot transclude its own primary block.")
     source = primary_placement(source_document)
     block = Block.objects.select_related("current_revision").get(pk=source.block_id)
-    parent = None
-    if parent_id is not None:
-        parent = locked_document.placements.select_for_update().filter(id=parent_id).first()
-        if parent is None:
-            raise PlacementConflict("The parent placement is not part of this document.")
+    parent = _placement_parent(document=locked_document, parent_id=parent_id)
+    if parent is not None:
         ancestor: DocumentPlacement | None = parent
         seen: set[UUID] = set()
         while ancestor is not None:
@@ -493,16 +593,18 @@ def add_document_placement(
     elif resolution_mode != PlacementResolutionMode.LIVE or pinned_revision_id is not None:
         raise PlacementConflict("Live placements cannot specify a pinned revision.")
 
-    siblings = locked_document.placements.filter(parent=parent)
-    last_position = siblings.aggregate(value=Max("position"))["value"]
-    position = 0 if last_position is None else last_position + 1
+    resolved_position = _placement_position(
+        document=locked_document,
+        parent=parent,
+        requested_position=position,
+    )
     placement = DocumentPlacement.objects.create(
         tenant=locked_document.tenant,
         organization=locked_document.organization,
         document=locked_document,
         block=block,
         parent=parent,
-        position=position,
+        position=resolved_position,
         resolution_mode=resolution_mode,
         pinned_revision=pinned_revision,
     )
@@ -547,14 +649,23 @@ def update_document_placement(
 
 @transaction.atomic
 def remove_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -> None:
-    locked = DocumentPlacement.objects.select_for_update().get(pk=placement.pk)
+    locked = DocumentPlacement.objects.select_for_update().select_related("block", "block__entity").get(pk=placement.pk)
     if locked.parent_id is None and locked.position == 0:
         raise PlacementConflict("The primary document block cannot be removed.")
     if locked.children.exists():
         raise PlacementConflict("Remove nested placements before removing their parent.")
     tenant = locked.tenant
     document_entity_id = locked.document.entity_id
+    owned_block = locked.block if locked.block.source_document_id == locked.document_id else None
+    if owned_block is not None and DocumentPlacement.objects.filter(block=owned_block).exclude(pk=locked.pk).exists():
+        raise PlacementConflict("Remove block transclusions before removing their source placement.")
     locked.delete()
+    if owned_block is not None:
+        archived_at = timezone.now()
+        owned_block.archived_at = archived_at
+        owned_block.save(update_fields=("archived_at", "updated_at"))
+        owned_block.entity.archived_at = archived_at
+        owned_block.entity.save(update_fields=("archived_at", "updated_at"))
     AuditEvent.objects.create(
         tenant=tenant,
         actor_id=actor_id,
@@ -567,13 +678,12 @@ def remove_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -
 @transaction.atomic
 def archive_document(*, document: Document, actor_id: UUID) -> None:
     archived_at = timezone.now()
-    placement = primary_placement(document)
-    if DocumentPlacement.objects.filter(block_id=placement.block_id).exclude(document=document).exists():
+    owned_blocks = Block.objects.select_for_update().filter(source_document=document, archived_at__isnull=True)
+    if DocumentPlacement.objects.filter(block__in=owned_blocks).exclude(document=document).exists():
         raise PlacementConflict("Remove document transclusions before archiving their source document.")
-    placement.block.archived_at = archived_at
-    placement.block.save(update_fields=("archived_at", "updated_at"))
-    placement.block.entity.archived_at = archived_at
-    placement.block.entity.save(update_fields=("archived_at", "updated_at"))
+    owned_block_ids = list(owned_blocks.values_list("id", flat=True))
+    Block.objects.filter(id__in=owned_block_ids).update(archived_at=archived_at, updated_at=archived_at)
+    Entity.objects.filter(block_record__id__in=owned_block_ids).update(archived_at=archived_at, updated_at=archived_at)
     document.listing_references.filter(archived_at__isnull=True).update(archived_at=archived_at, updated_at=archived_at)
     document.archived_at = archived_at
     document.save(update_fields=("archived_at", "updated_at"))
@@ -611,11 +721,11 @@ def add_listing_reference(
 
 @transaction.atomic
 def remove_listing_reference(*, reference: DocumentationListingReference, actor_id: UUID) -> None:
-    source_block_id = primary_placement(reference.document).block_id
+    source_block_ids = reference.document.owned_blocks.values_list("id", flat=True)
     if DocumentPlacement.objects.filter(
         tenant=reference.tenant,
         organization=reference.organization,
-        block_id=source_block_id,
+        block_id__in=source_block_ids,
     ).exists():
         raise PlacementConflict("Remove client document transclusions before removing this listing reference.")
     reference.archived_at = timezone.now()

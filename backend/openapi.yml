@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.8
+  version: 0.8.11
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1710,7 +1710,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/DocumentPlacementWrite'
-        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -13292,7 +13291,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/DocumentPlacementWrite'
-        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -22967,6 +22965,26 @@ components:
         block_name:
           type: string
           readOnly: true
+        block_kind:
+          enum:
+          - rich_text
+          - heading
+          - code
+          - url
+          - document_link
+          - entity_reference
+          - file_reference
+          type: string
+          description: |-
+            * `rich_text` - Rich text
+            * `heading` - Heading
+            * `code` - Code
+            * `url` - URL
+            * `document_link` - Document link
+            * `entity_reference` - Entity reference
+            * `file_reference` - File reference
+          x-spec-enum-id: ec9cab9f2400346f
+          readOnly: true
         position:
           type: integer
           readOnly: true
@@ -22997,11 +23015,14 @@ components:
         resolved_checksum:
           type: string
           readOnly: true
+        resolved_markdown:
+          type: string
         is_primary:
           type: boolean
           readOnly: true
       required:
       - block_id
+      - block_kind
       - block_name
       - depth
       - id
@@ -23011,11 +23032,22 @@ components:
       - position
       - resolution_mode
       - resolved_checksum
+      - resolved_markdown
       - resolved_revision_id
       - resolved_revision_number
     DocumentPlacementWrite:
       type: object
       properties:
+        operation:
+          enum:
+          - reuse_document
+          - create_block
+          type: string
+          description: |-
+            * `reuse_document` - reuse_document
+            * `create_block` - create_block
+          x-spec-enum-id: 0b702dd5452f93f6
+          default: reuse_document
         source_document_id:
           type: string
           format: uuid
@@ -23028,6 +23060,7 @@ components:
             * `live` - Live
             * `pinned` - Pinned
           x-spec-enum-id: 64514791a3b82619
+          default: live
         pinned_revision_id:
           type: string
           format: uuid
@@ -23036,9 +23069,38 @@ components:
           type: string
           format: uuid
           nullable: true
-      required:
-      - resolution_mode
-      - source_document_id
+        position:
+          type: integer
+          minimum: 0
+          nullable: true
+        block_kind:
+          enum:
+          - rich_text
+          - heading
+          - code
+          - url
+          - document_link
+          - entity_reference
+          - file_reference
+          type: string
+          description: |-
+            * `rich_text` - Rich text
+            * `heading` - Heading
+            * `code` - Code
+            * `url` - URL
+            * `document_link` - Document link
+            * `entity_reference` - Entity reference
+            * `file_reference` - File reference
+          x-spec-enum-id: ec9cab9f2400346f
+          default: rich_text
+        block_name:
+          type: string
+          default: ''
+          maxLength: 240
+        markdown:
+          type: string
+          default: ''
+          maxLength: 1000000
     DocumentPublication:
       type: object
       properties:

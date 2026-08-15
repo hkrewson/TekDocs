@@ -3353,6 +3353,16 @@ class DocumentPublicationArtifact(models.Model):
             raise ValidationError("Retained attachment must belong to the source document")
 
 
+class BlockKind(models.TextChoices):
+    RICH_TEXT = "rich_text", "Rich text"
+    HEADING = "heading", "Heading"
+    CODE = "code", "Code"
+    URL = "url", "URL"
+    DOCUMENT_LINK = "document_link", "Document link"
+    ENTITY_REFERENCE = "entity_reference", "Entity reference"
+    FILE_REFERENCE = "file_reference", "File reference"
+
+
 class Block(TimestampedModel):
     """A stable addressable content block whose content is an immutable revision chain."""
 
@@ -3362,6 +3372,14 @@ class Block(TimestampedModel):
         Organization, on_delete=models.PROTECT, related_name="blocks", null=True, blank=True
     )
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="block_record")
+    source_document = models.ForeignKey(
+        Document,
+        on_delete=models.PROTECT,
+        related_name="owned_blocks",
+        null=True,
+        blank=True,
+    )
+    kind = models.CharField(max_length=32, choices=BlockKind.choices, default=BlockKind.RICH_TEXT)
     current_revision = models.ForeignKey(
         "BlockRevision",
         on_delete=models.PROTECT,
@@ -3375,10 +3393,30 @@ class Block(TimestampedModel):
     scoped = OrganizationScopedManager()
 
     class Meta:
-        indexes = [models.Index(fields=["tenant", "organization", "archived_at"])]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(kind__in=BlockKind.values), name="document_block_kind_valid")
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "organization", "archived_at"]),
+            models.Index(fields=["tenant", "organization", "kind", "archived_at"], name="core_block_kind_scope_idx"),
+        ]
 
     def __str__(self) -> str:
         return str(self.entity_id)
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "document_block"
+        ):
+            raise ValidationError("Block entity scope or type is invalid")
+        source_document = self.source_document if self.source_document_id else None
+        if source_document is not None and (
+            source_document.tenant_id != self.tenant_id
+            or source_document.organization_id != self.organization_id
+        ):
+            raise ValidationError("Block source document must use the block workspace scope")
 
 
 class BlockRevision(models.Model):

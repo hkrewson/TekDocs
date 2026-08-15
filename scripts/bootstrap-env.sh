@@ -29,6 +29,10 @@ if [ -e "$target" ]; then
     echo "TEKDOCS_PROXY_NETWORK=proxy" >> "$target"
     changed=true
   fi
+  if ! grep -q '^TEKDOCS_ALLOW_DEVELOPMENT_IMAGE=' "$target"; then
+    echo "TEKDOCS_ALLOW_DEVELOPMENT_IMAGE=true" >> "$target"
+    changed=true
+  fi
   if ! grep -q '^TEKDOCS_TRAEFIK_ENTRYPOINT=' "$target"; then
     echo "TEKDOCS_TRAEFIK_ENTRYPOINT=http" >> "$target"
     changed=true

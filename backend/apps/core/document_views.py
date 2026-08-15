@@ -27,6 +27,7 @@ from .documents import (
     add_listing_reference,
     archive_document,
     create_document,
+    create_document_block,
     detach_document_placement,
     documents_for_scope,
     instantiate_document_template,
@@ -582,16 +583,28 @@ def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
     _mutate_workspace(request, workspace, document)
     serializer = DocumentPlacementWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    source_document = _document(workspace, serializer.validated_data["source_document_id"])
     try:
-        add_document_placement(
-            document=document,
-            source_document=source_document,
-            actor_id=request.user.pk,
-            resolution_mode=serializer.validated_data["resolution_mode"],
-            pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
-            parent_id=serializer.validated_data.get("parent_id"),
-        )
+        if serializer.validated_data["operation"] == "create_block":
+            create_document_block(
+                document=document,
+                actor_id=request.user.pk,
+                markdown=serializer.validated_data["markdown"],
+                kind=serializer.validated_data["block_kind"],
+                name=serializer.validated_data["block_name"],
+                parent_id=serializer.validated_data.get("parent_id"),
+                position=serializer.validated_data.get("position"),
+            )
+        else:
+            source_document = _document(workspace, serializer.validated_data["source_document_id"])
+            add_document_placement(
+                document=document,
+                source_document=source_document,
+                actor_id=request.user.pk,
+                resolution_mode=serializer.validated_data["resolution_mode"],
+                pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
+                parent_id=serializer.validated_data.get("parent_id"),
+                position=serializer.validated_data.get("position"),
+            )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
     return _retrieve(workspace, document_entity_id)

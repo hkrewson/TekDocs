@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .models import (
+    BlockKind,
     BlockRevision,
     Document,
     DocumentCategory,
@@ -535,10 +536,47 @@ class DocumentPublicationResultSerializer(serializers.Serializer):
 
 
 class DocumentPlacementWriteSerializer(serializers.Serializer):
-    source_document_id = serializers.UUIDField()
-    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
+    operation = serializers.ChoiceField(choices=("reuse_document", "create_block"), default="reuse_document")
+    source_document_id = serializers.UUIDField(required=False)
+    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices, default="live")
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
     parent_id = serializers.UUIDField(required=False, allow_null=True)
+    position = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    block_kind = serializers.ChoiceField(choices=BlockKind.choices, required=False, default=BlockKind.RICH_TEXT)
+    block_name = serializers.CharField(
+        max_length=240,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        validators=[_clean_name],
+        default="",
+    )
+    markdown = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1_000_000,
+        trim_whitespace=False,
+        default="",
+    )
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        operation = attrs["operation"]
+        source_document_id = attrs.get("source_document_id")
+        if operation == "reuse_document":
+            if source_document_id is None:
+                raise serializers.ValidationError({"source_document_id": "Choose a source document to reuse."})
+            if (
+                "block_name" in self.initial_data
+                or "block_kind" in self.initial_data
+                or "markdown" in self.initial_data
+            ):
+                raise serializers.ValidationError("New-block fields cannot be supplied when reusing a document.")
+            return attrs
+        if source_document_id is not None:
+            raise serializers.ValidationError({"source_document_id": "New blocks cannot identify a source document."})
+        if attrs["resolution_mode"] != PlacementResolutionMode.LIVE or attrs.get("pinned_revision_id") is not None:
+            raise serializers.ValidationError("New blocks must begin as live local blocks.")
+        return attrs
 
 
 class DocumentPlacementUpdateSerializer(serializers.Serializer):
@@ -610,6 +648,7 @@ class DocumentPlacementSerializer(serializers.Serializer):
     parent_id = serializers.SerializerMethodField()
     block_id = serializers.SerializerMethodField()
     block_name = serializers.SerializerMethodField()
+    block_kind = serializers.SerializerMethodField()
     position = serializers.SerializerMethodField()
     depth = serializers.IntegerField()
     resolution_mode = serializers.SerializerMethodField()
@@ -617,6 +656,7 @@ class DocumentPlacementSerializer(serializers.Serializer):
     resolved_revision_id = serializers.SerializerMethodField()
     resolved_revision_number = serializers.SerializerMethodField()
     resolved_checksum = serializers.SerializerMethodField()
+    resolved_markdown = serializers.CharField(source="revision.markdown", allow_blank=True)
     is_primary = serializers.SerializerMethodField()
 
     def _placement(self, obj: ResolvedPlacement) -> DocumentPlacement:
@@ -637,6 +677,10 @@ class DocumentPlacementSerializer(serializers.Serializer):
     @extend_schema_field(serializers.CharField())
     def get_block_name(self, obj: ResolvedPlacement) -> str:
         return self._placement(obj).block.entity.display_name
+
+    @extend_schema_field(serializers.ChoiceField(choices=BlockKind.choices))
+    def get_block_kind(self, obj: ResolvedPlacement) -> str:
+        return self._placement(obj).block.kind
 
     @extend_schema_field(serializers.IntegerField())
     def get_position(self, obj: ResolvedPlacement) -> int:

@@ -6831,6 +6831,17 @@ export interface components {
             /** Format: uuid */
             readonly block_id: string;
             readonly block_name: string;
+            /**
+             * @description * `rich_text` - Rich text
+             *     * `heading` - Heading
+             *     * `code` - Code
+             *     * `url` - URL
+             *     * `document_link` - Document link
+             *     * `entity_reference` - Entity reference
+             *     * `file_reference` - File reference
+             * @enum {string}
+             */
+            readonly block_kind: "rich_text" | "heading" | "code" | "url" | "document_link" | "entity_reference" | "file_reference";
             readonly position: number;
             readonly depth: number;
             /**
@@ -6845,14 +6856,23 @@ export interface components {
             readonly resolved_revision_id: string;
             readonly resolved_revision_number: number;
             readonly resolved_checksum: string;
+            readonly resolved_markdown: string;
             readonly is_primary: boolean;
         };
         readonly DocumentPlacementWrite: {
+            /**
+             * @description * `reuse_document` - reuse_document
+             *     * `create_block` - create_block
+             * @default reuse_document
+             * @enum {string}
+             */
+            readonly operation: "reuse_document" | "create_block";
             /** Format: uuid */
-            readonly source_document_id: string;
+            readonly source_document_id?: string;
             /**
              * @description * `live` - Live
              *     * `pinned` - Pinned
+             * @default live
              * @enum {string}
              */
             readonly resolution_mode: "live" | "pinned";
@@ -6860,6 +6880,23 @@ export interface components {
             readonly pinned_revision_id?: string | null;
             /** Format: uuid */
             readonly parent_id?: string | null;
+            readonly position?: number | null;
+            /**
+             * @description * `rich_text` - Rich text
+             *     * `heading` - Heading
+             *     * `code` - Code
+             *     * `url` - URL
+             *     * `document_link` - Document link
+             *     * `entity_reference` - Entity reference
+             *     * `file_reference` - File reference
+             * @default rich_text
+             * @enum {string}
+             */
+            readonly block_kind: "rich_text" | "heading" | "code" | "url" | "document_link" | "entity_reference" | "file_reference";
+            /** @default  */
+            readonly block_name: string;
+            /** @default  */
+            readonly markdown: string;
         };
         readonly DocumentPublication: {
             /** Format: uuid */
@@ -11275,7 +11312,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody: {
+        readonly requestBody?: {
             readonly content: {
                 readonly "application/json": components["schemas"]["DocumentPlacementWrite"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentPlacementWrite"];
@@ -20099,7 +20136,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody: {
+        readonly requestBody?: {
             readonly content: {
                 readonly "application/json": components["schemas"]["DocumentPlacementWrite"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentPlacementWrite"];

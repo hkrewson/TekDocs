@@ -29,6 +29,7 @@ from apps.accounts.models import (
 )
 from apps.core.models import (
     Block,
+    BlockKind,
     BlockRevision,
     Document,
     DocumentationListingReference,
@@ -109,6 +110,8 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert msp_created.status_code == 201
     assert org_created.status_code == 201
     assert msp_created.json()["block_id"]
+    assert msp_created.json()["placements"][0]["block_kind"] == BlockKind.RICH_TEXT
+    assert msp_created.json()["placements"][0]["resolved_markdown"] == "# Firewall\n\nUse **MFA**."
     assert org_created.json()["owner_organization_id"] == str(client_org.entity_id)
     assert Document.objects.count() == 2
     assert Block.objects.count() == 2
@@ -997,6 +1000,169 @@ def test_live_and_pinned_transclusions_resolve_deterministically(owner_client, i
 
 
 @pytest.mark.django_db
+def test_document_composition_creates_independent_typed_blocks_at_exact_positions(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Block-native guide", "markdown": "Introduction"},
+        content_type="application/json",
+    ).json()
+    placements_url = reverse("msp-document-placement-list-create", kwargs={"document_entity_id": created["id"]})
+
+    code = owner_client.post(
+        placements_url,
+        {
+            "operation": "create_block",
+            "block_kind": "code",
+            "block_name": "Validation command",
+            "markdown": "```shell\nmake check\n```",
+        },
+        content_type="application/json",
+    )
+    heading = owner_client.post(
+        placements_url,
+        {
+            "operation": "create_block",
+            "block_kind": "heading",
+            "block_name": "Preparation heading",
+            "markdown": "## Preparation",
+            "position": 1,
+        },
+        content_type="application/json",
+    )
+
+    assert code.status_code == 200
+    assert heading.status_code == 200
+    payload = heading.json()
+    assert payload["markdown"] == "Introduction"
+    assert payload["resolved_markdown"] == "Introduction\n\n## Preparation\n\n```shell\nmake check\n```\n"
+    assert [(item["position"], item["block_kind"]) for item in payload["placements"]] == [
+        (0, "rich_text"),
+        (1, "heading"),
+        (2, "code"),
+    ]
+    assert payload["placements"][1]["resolved_markdown"] == "## Preparation"
+    assert payload["placements"][2]["resolved_markdown"] == "```shell\nmake check\n```"
+    blocks = list(Block.objects.filter(tenant=installation.tenant).order_by("created_at"))
+    assert [block.kind for block in blocks] == ["rich_text", "code", "heading"]
+    assert all(block.entity.entity_type == "document_block" for block in blocks)
+    document = Document.objects.get(entity_id=created["id"])
+    assert all(block.source_document_id == document.id for block in blocks)
+    assert BlockRevision.objects.filter(block__in=blocks, revision_number=1).count() == 3
+
+
+@pytest.mark.django_db
+def test_removing_owned_block_archives_its_identity_without_orphaning_content(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Lifecycle", "markdown": "Primary"},
+        content_type="application/json",
+    ).json()
+    placements_url = reverse("msp-document-placement-list-create", kwargs={"document_entity_id": created["id"]})
+    added = owner_client.post(
+        placements_url,
+        {"operation": "create_block", "block_kind": "rich_text", "markdown": "Temporary"},
+        content_type="application/json",
+    ).json()
+    secondary = added["placements"][1]
+
+    removed = owner_client.delete(
+        reverse(
+            "msp-document-placement-detail",
+            kwargs={"document_entity_id": created["id"], "placement_id": secondary["id"]},
+        )
+    )
+
+    assert removed.status_code == 200
+    block = Block.objects.get(entity_id=secondary["block_id"])
+    assert block.archived_at is not None
+    assert block.entity.archived_at is not None
+    assert not block.placements.exists()
+
+
+@pytest.mark.django_db
+def test_archiving_document_archives_every_owned_block(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Archive composition", "markdown": "Primary"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": created["id"]}),
+        {"operation": "create_block", "block_kind": "code", "markdown": "```shell\ntrue\n```"},
+        content_type="application/json",
+    )
+    document = Document.objects.get(entity_id=created["id"])
+    assert document.owned_blocks.count() == 2
+
+    archived = owner_client.delete(reverse("msp-document-detail", kwargs={"document_entity_id": created["id"]}))
+
+    assert archived.status_code == 204
+    assert not document.owned_blocks.filter(archived_at__isnull=True).exists()
+    assert not Entity.objects.filter(block_record__source_document=document, archived_at__isnull=True).exists()
+
+
+@pytest.mark.django_db
+def test_new_document_block_contract_rejects_source_and_pinned_semantics(owner_client, installation):
+    source = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Source", "markdown": "Source body"},
+        content_type="application/json",
+    ).json()
+    destination = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Destination", "markdown": "Destination body"},
+        content_type="application/json",
+    ).json()
+    placements_url = reverse(
+        "msp-document-placement-list-create",
+        kwargs={"document_entity_id": destination["id"]},
+    )
+
+    mixed = owner_client.post(
+        placements_url,
+        {
+            "operation": "create_block",
+            "source_document_id": source["id"],
+            "markdown": "Not allowed",
+        },
+        content_type="application/json",
+    )
+    pinned = owner_client.post(
+        placements_url,
+        {
+            "operation": "create_block",
+            "markdown": "Not allowed",
+            "resolution_mode": "pinned",
+            "pinned_revision_id": source["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+    invalid_position = owner_client.post(
+        placements_url,
+        {"operation": "create_block", "markdown": "Not allowed", "position": 99},
+        content_type="application/json",
+    )
+
+    assert mixed.status_code == 400
+    assert pinned.status_code == 400
+    assert invalid_position.status_code == 409
+    assert Document.objects.get(entity_id=destination["id"]).placements.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_database_rejects_unknown_document_block_kind(owner_client, installation):
+    if connection.vendor != "postgresql":
+        pytest.skip("Block-kind database constraint requires PostgreSQL")
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Kind guard", "markdown": "Guarded"},
+        content_type="application/json",
+    ).json()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        Block.objects.filter(entity_id=created["block_id"]).update(kind="script")
+
+
+@pytest.mark.django_db
 def test_nested_transclusion_is_depth_first_and_rejects_ancestor_cycle(owner_client, installation):
     collection = reverse("msp-document-list-create")
     destination = owner_client.post(
@@ -1350,6 +1516,33 @@ def test_client_editor_cannot_change_msp_shared_block_but_can_detach(owner_clien
     assert denied.status_code == 403
     assert BlockRevision.objects.filter(block__entity_id=source["block_id"]).count() == 1
     assert editor_client.post(reverse("organization-document-placement-detach", kwargs=route_kwargs)).status_code == 200
+
+    local_block = editor_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
+        ),
+        {"operation": "create_block", "block_kind": "heading", "markdown": "## Client-owned"},
+        content_type="application/json",
+    )
+    assert local_block.status_code == 200
+    assert local_block.json()["placements"][-1]["block_kind"] == "heading"
+
+    beta = organization(installation.tenant, "Beta")
+    beta_document = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}),
+        {"title": "Beta private", "markdown": "Primary"},
+        content_type="application/json",
+    ).json()
+    cross_client = editor_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": beta_document["id"]},
+        ),
+        {"operation": "create_block", "block_kind": "rich_text", "markdown": "Unauthorized"},
+        content_type="application/json",
+    )
+    assert cross_client.status_code == 403
 
 
 @pytest.mark.django_db

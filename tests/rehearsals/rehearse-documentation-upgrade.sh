@@ -73,7 +73,10 @@ baseline_compose down --remove-orphans
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
 echo "Applying TekDocs $current_version to the retained $baseline_version database and media"
-current_compose up -d --build --wait backend
+if ! current_compose up -d --build --wait backend; then
+  current_compose logs --no-color migrate >&2 || true
+  exit 1
+fi
 current_compose exec -T backend python manage.py shell -c '
 from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, InstallationState
 from apps.core.publications import verify_publication

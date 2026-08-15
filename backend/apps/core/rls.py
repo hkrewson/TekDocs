@@ -130,3 +130,18 @@ def system_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLSMode
                     "set_config('tekdocs.principal_mode', %s, true)",
                     [previous_actor, previous_principal],
                 )
+
+
+@contextmanager
+def system_rls_scope_if_postgresql(
+    scope: DataScope,
+    *,
+    organization_mode: OrganizationRLSMode,
+) -> Iterator[None]:
+    """Use a trusted system scope on PostgreSQL and remain portable in unit tests."""
+
+    if connection.vendor != "postgresql":
+        yield
+        return
+    with system_rls_scope(scope, organization_mode=organization_mode):
+        yield

@@ -230,3 +230,42 @@ def test_runtime_role_client_portal_context_is_exactly_organization_scoped(
     }
     assert own_documents.status_code == 403
     assert sibling_documents.status_code == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_can_accept_client_invitation(
+    owner_client,
+    installation,
+    django_runtime_role,  # type: ignore[no-untyped-def]
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role invitation validation requires PostgreSQL")
+
+    organization = _client_organization(installation, "Runtime Invitation Client")
+    issued = owner_client.post(
+        reverse("client-invitation-list-create", kwargs={"organization_entity_id": organization.entity_id}),
+        {"email": "runtime-invited-client@example.invalid"},
+        content_type="application/json",
+    )
+    assert issued.status_code == 201
+    match = re.search(r"#token=([A-Za-z0-9_-]+)", mail.outbox[-1].body)
+    assert match is not None
+    portal, csrf = _acceptance_client()
+
+    with django_runtime_role():
+        accepted = portal.post(
+            reverse("invitation-accept"),
+            {
+                "token": match.group(1),
+                "display_name": "Runtime Invited Client",
+                "password": f"{secrets.token_urlsafe(24)}Aa7!",
+            },
+            content_type="application/json",
+            headers={"X-CSRFToken": csrf},
+        )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["surface"] == "client_portal"
+    membership = TenantMembership.objects.get(user__email="runtime-invited-client@example.invalid")
+    assert membership.role == BuiltInRole.CLIENT_USER
+    assert membership.organization == organization

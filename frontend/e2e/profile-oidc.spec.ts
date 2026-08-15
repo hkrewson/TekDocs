@@ -20,6 +20,7 @@ test('profile settings update the visible shell identity', async ({ page, baseUR
   })
 
   await page.goto('/settings')
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
   await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
   await page.getByLabel('Display name').fill('Operations Lead')
   await page.getByRole('button', { name: 'Save profile' }).click()

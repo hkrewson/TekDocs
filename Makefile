@@ -148,7 +148,9 @@ test-runtime-authorization:
 		apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply \
 		apps/core/tests/test_workspaces.py::test_runtime_role_workspace_routes_enforce_assigned_client_boundary \
 		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_client_portal_context_is_exactly_organization_scoped \
+		apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_can_accept_client_invitation \
 		apps/core/tests/test_scoping.py::test_runtime_role_scoped_queries_compose_with_database_workspace_isolation \
+		apps/core/tests/test_runtime_rls.py::test_runtime_role_administrator_can_create_and_reopen_fail_closed_organization \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions \
 		apps/core/tests/test_runtime_rls.py::test_runtime_role_preserves_request_actor_and_system_outbox_principal \
 		apps/core/tests/test_runtime_rls.py::test_runtime_client_member_sees_only_its_organization_anchor_and_system_scope_restores_actor \

@@ -5,6 +5,7 @@ from hashlib import sha256
 
 import psycopg
 import pytest
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.conf import settings
 from django.db import DatabaseError, connection, transaction
 from django.test import Client
@@ -217,6 +218,80 @@ def test_runtime_role_request_enforces_assigned_only_entity_search_and_mentions(
     mention_names = {item["display_name"] for item in mentions.json()["results"]}
     assert "Runtime Restricted Client" not in mention_names
     assert "Runtime Hidden Contact" not in mention_names
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_role_administrator_can_create_and_reopen_fail_closed_organization(
+    django_runtime_role,  # type: ignore[no-untyped-def]
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Runtime organization creation MSP",
+        owner_email="runtime-organization-owner@example.invalid",
+        owner_display_name="Runtime Organization Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    administrator = User.objects.create_user(
+        email="runtime-organization-administrator@example.invalid",
+        display_name="Runtime Organization Administrator",
+    )
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=administrator,
+        role=BuiltInRole.ADMINISTRATOR,
+    )
+    TOTP.activate(administrator, generate_totp_secret())
+    browser = Client()
+    browser.force_login(administrator)
+
+    with django_runtime_role():
+        created = browser.post(
+            reverse("organization-list-create"),
+            {
+                "name": "Runtime Created Client",
+                "legal_name": "Runtime Created Client, LLC",
+                "website": "https://runtime-created.example.invalid",
+                "classifications": ["client"],
+            },
+            content_type="application/json",
+        )
+        listed = browser.get(reverse("organization-list-create"))
+        person_created = browser.post(
+            reverse(
+                "organization-people-list-create",
+                kwargs={"organization_entity_id": created.json()["id"]},
+            ),
+            {
+                "full_name": "Runtime Created Contact",
+                "preferred_name": "Runtime Contact",
+                "kind": "contact",
+                "role": "Technical contact",
+                "responsibility": "Runtime RLS regression",
+                "location": "",
+                "office": "",
+                "phone": "",
+                "email": "runtime-created-contact@example.invalid",
+            },
+            content_type="application/json",
+        )
+
+    assert created.status_code == 201
+    assert person_created.status_code == 201
+    assert created.json()["access_mode"] == OrganizationAccessMode.ASSIGNED_ONLY
+    assert [item["name"] for item in listed.json()] == ["Runtime Created Client"]
+    organization = Organization.objects.get(entity_id=created.json()["id"])
+    assert organization.entity.organization_id is None
+    assert OrganizationAccessAssignment.objects.filter(
+        tenant=installation.tenant,
+        organization=organization,
+        membership=membership,
+        created_by=administrator,
+    ).exists()
+    association = PersonAssociation.objects.get(person__entity_id=person_created.json()["id"])
+    assert association.organization == organization
 
 
 @pytest.mark.django_db(transaction=True)

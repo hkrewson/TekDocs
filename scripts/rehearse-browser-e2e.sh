@@ -61,7 +61,10 @@ docker run --rm \
   -e "PLAYWRIGHT_SAFE_SUMMARY=/app/quarantine/$browser_scope.json" \
   -e PLAYWRIGHT_OUTPUT_DIR=/tmp/tekdocs-playwright-results \
   -v "$quarantine_directory:/app/quarantine" \
-  "$playwright_image" sh -c "npx playwright test --config=playwright.compose.config.ts $project_argument" || test_status=$?
+  "$playwright_image" sh -c \
+  "npx playwright test --config=playwright.compose.config.ts $project_argument; status=\$?; \
+  if [ -f \"\$PLAYWRIGHT_SAFE_SUMMARY\" ]; then chmod 0644 \"\$PLAYWRIGHT_SAFE_SUMMARY\"; fi; \
+  exit \"\$status\"" || test_status=$?
 "$repository_root/scripts/check-browser-artifacts.sh" "$quarantine_summary"
 mv "$quarantine_summary" "$safe_summary"
 [ "$test_status" -eq 0 ] || exit "$test_status"

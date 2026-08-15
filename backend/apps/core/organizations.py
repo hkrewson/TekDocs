@@ -12,12 +12,14 @@ from .models import (
     CatalogProduct,
     CatalogSpecificationDefinition,
     Entity,
+    InstallationState,
     Organization,
     OrganizationClassification,
     OrganizationKind,
     Tenant,
     workspace_for_owner,
 )
+from .rls import OrganizationRLSMode, system_rls_scope_if_postgresql
 from .scoping import DataScope
 
 SUPPLIER_KINDS = {OrganizationKind.VENDOR, OrganizationKind.MANUFACTURER}
@@ -66,27 +68,48 @@ def create_organization(
     website: str,
     classifications: Iterable[OrganizationKind],
 ) -> Organization:
-    entity = Entity.objects.create(
-        tenant=tenant,
-        workspace=workspace_for_owner(tenant=tenant, organization=None),
-        entity_type="organization",
-        display_name=name,
-    )
-    organization = Organization.objects.create(
-        tenant=tenant,
-        entity=entity,
-        legal_name=legal_name,
-        website=website,
-    )
-    _replace_classifications(organization=organization, classifications=classifications)
-    AuditEvent.objects.create(
-        tenant=tenant,
-        actor_id=actor_id,
-        action="organization.created",
-        entity_id=entity.id,
-        metadata={},
-    )
-    return organization
+    with system_rls_scope_if_postgresql(
+        DataScope.tenant(tenant),
+        organization_mode=OrganizationRLSMode.MSP_ONLY,
+    ):
+        entity = Entity.objects.create(
+            tenant=tenant,
+            workspace=workspace_for_owner(tenant=tenant, organization=None),
+            entity_type="organization",
+            display_name=name,
+        )
+        organization = Organization.objects.create(
+            tenant=tenant,
+            entity=entity,
+            legal_name=legal_name,
+            website=website,
+        )
+        # New organizations fail closed. Give an authorized MSP creator explicit
+        # access so administrators do not create a workspace they cannot reopen.
+        from apps.accounts.models import OrganizationAccessAssignment, TenantMembership
+
+        creator_membership = TenantMembership.objects.filter(
+            tenant=tenant,
+            user_id=actor_id,
+            organization__isnull=True,
+        ).first()
+        creator_is_owner = InstallationState.objects.filter(tenant=tenant, owner_id=actor_id).exists()
+        if creator_membership is not None and not creator_is_owner:
+            OrganizationAccessAssignment.objects.get_or_create(
+                tenant=tenant,
+                organization=organization,
+                membership=creator_membership,
+                defaults={"created_by_id": actor_id},
+            )
+        _replace_classifications(organization=organization, classifications=classifications)
+        AuditEvent.objects.create(
+            tenant=tenant,
+            actor_id=actor_id,
+            action="organization.created",
+            entity_id=entity.id,
+            metadata={},
+        )
+        return organization
 
 
 @transaction.atomic

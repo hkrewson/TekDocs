@@ -17,7 +17,8 @@ from rest_framework.exceptions import APIException, ValidationError
 from apps.core.email import send_invitation_email
 from apps.core.models import AuditEvent, Organization, Tenant
 from apps.core.outbox import OutboxTopic, enqueue_outbox_event
-from apps.core.rls import bind_tenant_scope_if_postgresql
+from apps.core.rls import OrganizationRLSMode, system_rls_scope_if_postgresql
+from apps.core.scoping import DataScope
 
 from .models import EMPTY_DIGEST, BuiltInRole, Invitation, InvitationState, TenantMembership, User
 
@@ -220,47 +221,55 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
             if invitation is None or invitation.state != InvitationState.PENDING:
                 pass
             elif invitation.expires_at <= timezone.now():
-                bind_tenant_scope_if_postgresql(invitation.tenant)
-                _mark_expired(invitation, actor=None)
+                with system_rls_scope_if_postgresql(
+                    DataScope.tenant(invitation.tenant),
+                    organization_mode=OrganizationRLSMode.MSP_ONLY,
+                ):
+                    _mark_expired(invitation, actor=None)
             elif not invitation.matches_active_token(token):
                 pass
             elif User.objects.filter(email__iexact=invitation.email).exists():
                 pass
             else:
-                bind_tenant_scope_if_postgresql(invitation.tenant)
-                candidate = User(email=invitation.email, display_name=display_name.strip())
-                try:
-                    password_validation.validate_password(password, candidate)
-                except DjangoValidationError as exc:
-                    raise ValidationError({"password": list(exc.messages)}) from exc
-                user = User.objects.create_user(
-                    email=invitation.email,
-                    password=password,
-                    display_name=display_name.strip(),
-                )
-                EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
-                TenantMembership.objects.create(
-                    tenant=invitation.tenant,
-                    user=user,
-                    role=invitation.role,
-                    organization=invitation.organization,
-                )
-                invitation.state = InvitationState.ACCEPTED
-                invitation.accepted_by = user
-                invitation.accepted_at = timezone.now()
-                invitation.token_digest = EMPTY_DIGEST
-                invitation.save(update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at"))
-                _audit(invitation=invitation, actor=user, action="invitation.accepted")
-                if invitation.organization is not None:
-                    enqueue_outbox_event(
-                        tenant=invitation.tenant,
-                        organization=invitation.organization,
-                        topic=OutboxTopic.INVITATION_ACCEPTED,
-                        subject_id=invitation.id,
-                        idempotency_key=f"invitation-accepted:{invitation.id}",
-                        payload={"role": invitation.role},
+                with system_rls_scope_if_postgresql(
+                    DataScope.tenant(invitation.tenant),
+                    organization_mode=OrganizationRLSMode.MSP_ONLY,
+                ):
+                    candidate = User(email=invitation.email, display_name=display_name.strip())
+                    try:
+                        password_validation.validate_password(password, candidate)
+                    except DjangoValidationError as exc:
+                        raise ValidationError({"password": list(exc.messages)}) from exc
+                    user = User.objects.create_user(
+                        email=invitation.email,
+                        password=password,
+                        display_name=display_name.strip(),
                     )
-                accepted = AcceptedInvitation(invitation=invitation, user=user)
+                    EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
+                    TenantMembership.objects.create(
+                        tenant=invitation.tenant,
+                        user=user,
+                        role=invitation.role,
+                        organization=invitation.organization,
+                    )
+                    invitation.state = InvitationState.ACCEPTED
+                    invitation.accepted_by = user
+                    invitation.accepted_at = timezone.now()
+                    invitation.token_digest = EMPTY_DIGEST
+                    invitation.save(
+                        update_fields=("state", "accepted_by", "accepted_at", "token_digest", "updated_at")
+                    )
+                    _audit(invitation=invitation, actor=user, action="invitation.accepted")
+                    if invitation.organization is not None:
+                        enqueue_outbox_event(
+                            tenant=invitation.tenant,
+                            organization=invitation.organization,
+                            topic=OutboxTopic.INVITATION_ACCEPTED,
+                            subject_id=invitation.id,
+                            idempotency_key=f"invitation-accepted:{invitation.id}",
+                            payload={"role": invitation.role},
+                        )
+                    accepted = AcceptedInvitation(invitation=invitation, user=user)
     except IntegrityError as exc:
         raise InvitationUnavailable() from exc
 

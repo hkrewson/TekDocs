@@ -17,6 +17,7 @@ from .models import (
     Tenant,
     workspace_for_owner,
 )
+from .rls import OrganizationRLSMode, system_rls_scope_if_postgresql
 from .scoping import DataScope
 
 FILTER_LOOKUPS = {
@@ -114,43 +115,46 @@ def create_person(
     phone: str,
     email: str,
 ) -> PersonAssociation:
-    if site is not None:
-        location = site.entity.display_name
-    if structured_location is not None:
-        office = structured_location.entity.display_name
-    entity = Entity.objects.create(
-        tenant=tenant,
-        workspace=workspace_for_owner(tenant=tenant, organization=None),
-        entity_type="person",
-        display_name=full_name,
-    )
-    person = Person.objects.create(
-        tenant=tenant,
-        entity=entity,
-        preferred_name=preferred_name,
-        phone=phone,
-        email=email,
-    )
-    association = PersonAssociation.objects.create(
-        tenant=tenant,
-        organization=organization,
-        person=person,
-        kind=kind,
-        role=role,
-        responsibility=responsibility,
-        location=location,
-        office=office,
-        site=site,
-        structured_location=structured_location,
-    )
-    AuditEvent.objects.create(
-        tenant=tenant,
-        actor_id=actor_id,
-        action="person.created",
-        entity_id=entity.id,
-        metadata={},
-    )
-    return association
+    scope = DataScope.organization(tenant, organization) if organization is not None else DataScope.tenant(tenant)
+    mode = OrganizationRLSMode.ORGANIZATION if organization is not None else OrganizationRLSMode.MSP_ONLY
+    with system_rls_scope_if_postgresql(scope, organization_mode=mode):
+        if site is not None:
+            location = site.entity.display_name
+        if structured_location is not None:
+            office = structured_location.entity.display_name
+        entity = Entity.objects.create(
+            tenant=tenant,
+            workspace=workspace_for_owner(tenant=tenant, organization=None),
+            entity_type="person",
+            display_name=full_name,
+        )
+        person = Person.objects.create(
+            tenant=tenant,
+            entity=entity,
+            preferred_name=preferred_name,
+            phone=phone,
+            email=email,
+        )
+        association = PersonAssociation.objects.create(
+            tenant=tenant,
+            organization=organization,
+            person=person,
+            kind=kind,
+            role=role,
+            responsibility=responsibility,
+            location=location,
+            office=office,
+            site=site,
+            structured_location=structured_location,
+        )
+        AuditEvent.objects.create(
+            tenant=tenant,
+            actor_id=actor_id,
+            action="person.created",
+            entity_id=entity.id,
+            metadata={},
+        )
+        return association
 
 
 @transaction.atomic

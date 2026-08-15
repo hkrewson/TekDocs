@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -52,7 +52,10 @@ function clients() {
     detachPlacement,
     searchMentionEntities,
     searchBlockLibrary,
+    listTemplateLibrary: vi.fn().mockResolvedValue({ results: [], count: 0 }),
     instantiateTemplate,
+    previewTemplateRollout: vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 1, up_to_date: true, added: [], changed: [], removed: [], conflicts: [] }),
+    applyTemplateRollout: vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 1, up_to_date: true, added: [], changed: [], removed: [], conflicts: [] }),
     importMarkdown,
     uploadAttachment,
     archiveAttachment,
@@ -197,6 +200,56 @@ it('discovers and reuses an explicitly available MSP block from a client workspa
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', {
     operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null,
   }))
+})
+
+it('creates a client document from a published template with per-block behavior', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, instantiateTemplate } = clients()
+  const template = {
+    ...sourceDocument,
+    is_template: true,
+    library_visible: true,
+    placements: [
+      sourceDocument.placements[0],
+      { ...sourceDocument.placements[0], id: 'placement-template-2', block_id: 'block-template-2', block_name: 'Printer rationale — content', is_primary: false, position: 1 },
+    ],
+    placement_count: 2,
+  }
+  documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [template], count: 1 })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: 'Use template' }))
+  await user.selectOptions(screen.getByLabelText('Printer rationale'), 'live')
+  await user.click(screen.getByRole('button', { name: 'Create client document' }))
+  await waitFor(() => expect(instantiateTemplate).toHaveBeenCalledWith(
+    { organizationId: 'org-1' },
+    'doc-source',
+    'Acme — Shared checklist',
+    'policy',
+    { 'block-template-2': 'live' },
+  ))
+  expect(screen.getByRole('status')).toHaveTextContent('Client document created from a retained template revision.')
+})
+
+it('previews and applies a conflict-free client template rollout', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const enrolled = { ...document, template_enrollment_id: 'enrollment-1', template_applied_revision_id: 'template-revision-1', template_source_id: 'doc-source' }
+  documents.list = vi.fn().mockResolvedValue({ results: [enrolled], count: 1 })
+  documents.previewTemplateRollout = vi.fn().mockResolvedValue({
+    enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 2, up_to_date: false,
+    added: [{ source_block_id: 'block-new', source_revision_id: 'revision-new', name: 'New standard', kind: 'rich_text', position: 1 }], changed: [], removed: [], conflicts: [],
+  })
+  const applyTemplateRollout = vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-2', current_revision: 2, available_revision: 2, up_to_date: true, added: [], changed: [], removed: [], conflicts: [] })
+  documents.applyTemplateRollout = applyTemplateRollout
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Check template updates' }))
+  expect(await screen.findByText('Applied revision 1; available revision 2.')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Apply safe changes' }))
+  await waitFor(() => expect(applyTemplateRollout).toHaveBeenCalledWith(
+    { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', { 'block-new': 'copy' },
+  ))
+  expect(screen.getByRole('status')).toHaveTextContent('Template revision 2 applied.')
 })
 
 it('reviews shared audiences and detaches a reused block', async () => {

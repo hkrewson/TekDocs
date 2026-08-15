@@ -15,6 +15,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_documentpublication",
     "core_documentpublicationartifact",
     "core_documentpublicationcontrolevent",
+    "core_documenttemplateenrollment",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",
@@ -90,6 +91,7 @@ TENANT_SCOPED_TABLES = (
     "core_inboxnotification",
     "core_notificationpreference",
     "core_notificationemaildelivery",
+    "core_documenttemplaterevision",
     "core_webhookoutbounddelivery",
     "core_webhookinboundreceipt",
 )

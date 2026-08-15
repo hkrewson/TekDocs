@@ -144,6 +144,9 @@ from apps.core.document_views import (
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
     OrganizationDocumentTemplateInstantiateView,
+    OrganizationDocumentTemplateLibraryView,
+    OrganizationDocumentTemplateRolloutApplyView,
+    OrganizationDocumentTemplateRolloutPreviewView,
     OrganizationMarkdownImportView,
 )
 from apps.core.domain_hierarchy_views import (
@@ -1497,6 +1500,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/from-template",
         OrganizationDocumentTemplateInstantiateView.as_view(),
         name="organization-document-template-instantiate",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/template-library",
+        OrganizationDocumentTemplateLibraryView.as_view(),
+        name="organization-document-template-library",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/template-rollouts/preview",
+        OrganizationDocumentTemplateRolloutPreviewView.as_view(),
+        name="organization-document-template-rollout-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/template-rollouts/apply",
+        OrganizationDocumentTemplateRolloutApplyView.as_view(),
+        name="organization-document-template-rollout-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/import",

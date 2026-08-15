@@ -31,6 +31,9 @@ export type DocumentRecord = {
   category: DocumentCategory
   is_template: boolean
   library_visible: boolean
+  template_enrollment_id: string | null
+  template_applied_revision_id: string | null
+  template_source_id: string | null
   attachments: DocumentAttachment[]
   attachment_count: number
   publications: DocumentPublication[]
@@ -182,6 +185,28 @@ export type BlockLibraryItem = {
   owner_organization_id: string | null
 }
 export type BlockLibraryResult = { results: BlockLibraryItem[]; count: number }
+export type TemplatePlacementMode = 'copy' | 'live' | 'pinned'
+export type TemplateRolloutItem = {
+  source_block_id: string
+  source_revision_id: string
+  checksum: string
+  kind: BlockKind
+  name: string
+  depth: number
+  mode?: TemplatePlacementMode
+  reason?: string
+}
+export type TemplateRollout = {
+  enrollment_id: string
+  applied_revision_id: string
+  current_revision: number
+  available_revision: number
+  up_to_date: boolean
+  added: TemplateRolloutItem[]
+  changed: TemplateRolloutItem[]
+  removed: TemplateRolloutItem[]
+  conflicts: TemplateRolloutItem[]
+}
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -204,7 +229,10 @@ export interface DocumentsClient {
   detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
   searchBlockLibrary(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<BlockLibraryResult>
-  instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory): Promise<DocumentRecord>
+  listTemplateLibrary(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentResult>
+  instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory, placementRules?: Record<string, TemplatePlacementMode>): Promise<DocumentRecord>
+  previewTemplateRollout(scope: DocumentScope, enrollmentId: string): Promise<TemplateRollout>
+  applyTemplateRollout(scope: DocumentScope, enrollmentId: string, expectedRevisionId: string, placementRules?: Record<string, TemplatePlacementMode>): Promise<TemplateRollout>
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
@@ -308,7 +336,15 @@ export const browserDocumentsClient: DocumentsClient = {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
     }))
   },
-  instantiateTemplate: (scope, sourceDocumentId, title, category) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category }),
+  async listTemplateLibrary(scope, signal) {
+    if (!scope.organizationId) return { results: [], count: 0 }
+    return parse<DocumentResult>(await fetch(`${collectionPath(scope)}/template-library`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
+  },
+  instantiateTemplate: (scope, sourceDocumentId, title, category, placementRules = {}) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category, placement_rules: placementRules }),
+  previewTemplateRollout: (scope, enrollmentId) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/preview`, 'POST', { enrollment_id: enrollmentId }),
+  applyTemplateRollout: (scope, enrollmentId, expectedRevisionId, placementRules = {}) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/apply`, 'POST', { enrollment_id: enrollmentId, expected_applied_revision_id: expectedRevisionId, placement_rules: placementRules }),
   async importMarkdown(scope, file, title, category, isTemplate) {
     const form = new FormData()
     form.set('file', file)

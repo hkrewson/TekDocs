@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from difflib import unified_diff
 from typing import cast
@@ -21,6 +22,8 @@ from .models import (
     DocumentCategory,
     DocumentPlacement,
     DocumentPublication,
+    DocumentTemplateEnrollment,
+    DocumentTemplateRevision,
     Entity,
     Organization,
     PlacementResolutionMode,
@@ -64,6 +67,11 @@ class ResolvedDocument:
 
 def markdown_checksum(markdown: str) -> str:
     return hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+
+
+def _canonical_checksum(value: object) -> str:
+    encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _append_block_revision(*, block: Block, actor_id: UUID, markdown: str, base_revision_id: UUID) -> BlockRevision:
@@ -135,7 +143,14 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
             )
         )
     return (
-        records.select_related("entity", "organization", "organization__entity")
+        records.select_related(
+            "entity",
+            "organization",
+            "organization__entity",
+            "template_enrollment",
+            "template_enrollment__source_template__entity",
+            "template_enrollment__applied_revision",
+        )
         .prefetch_related(Prefetch("placements", queryset=placements, to_attr="active_placements"))
         .prefetch_related(Prefetch("attachments", queryset=attachments, to_attr="active_attachments"))
         .prefetch_related(Prefetch("publications", queryset=publications, to_attr="retained_publications"))
@@ -289,6 +304,8 @@ def create_document(
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="document.created", entity_id=document_entity.id, metadata={}
     )
+    if is_template and organization is None:
+        ensure_template_revision(source=document, actor_id=actor_id)
     return document
 
 
@@ -342,12 +359,67 @@ def update_document(
         entity_id=locked_document.entity_id,
         metadata={},
     )
+    if locked_document.is_template and locked_document.organization_id is None:
+        ensure_template_revision(source=locked_document, actor_id=actor_id)
     return resulting_revision
 
 
 _ATTACHMENT_TARGET = "tekdocs://attachment/"
 
 
+def _template_manifest(source: Document) -> dict[str, object]:
+    if not source.is_template or source.organization_id is not None:
+        raise PlacementConflict("Client rollout requires an MSP-owned reusable template.")
+    resolved = resolve_document(source)
+    return {
+        "template_document_id": str(source.entity_id),
+        "title": source.entity.display_name,
+        "blocks": [
+            {
+                "source_block_id": str(item.placement.block.entity_id),
+                "source_revision_id": str(item.revision.id),
+                "checksum": item.revision.checksum,
+                "kind": item.placement.block.kind,
+                "name": item.placement.block.entity.display_name,
+                "depth": item.depth,
+                "attachment_ids": sorted(
+                    str(value) for value in attachment_ids_in_markdown(item.revision.markdown)
+                ),
+            }
+            for item in resolved.placements
+        ],
+    }
+
+
+def ensure_template_revision(*, source: Document, actor_id: UUID) -> DocumentTemplateRevision:
+    manifest = _template_manifest(source)
+    checksum = _canonical_checksum(manifest)
+    existing = DocumentTemplateRevision.objects.filter(template=source, checksum=checksum).first()
+    if existing is not None:
+        return existing
+    revision_number = (
+        DocumentTemplateRevision.objects.filter(template=source).aggregate(value=Max("revision_number"))["value"] or 0
+    ) + 1
+    return DocumentTemplateRevision.objects.create(
+        tenant=source.tenant,
+        template=source,
+        revision_number=revision_number,
+        manifest=manifest,
+        checksum=checksum,
+        created_by_id=actor_id,
+    )
+
+
+def _template_rule(rules: dict[str, str], source_block_id: UUID, *, primary: bool) -> str:
+    rule = rules.get(str(source_block_id), "copy")
+    if rule not in {"copy", "live", "pinned"}:
+        raise PlacementConflict("Template placement rules must be copy, live, or pinned.")
+    if primary and rule != "copy":
+        raise PlacementConflict("A client document's primary block must be an independent copy.")
+    return rule
+
+
+@transaction.atomic
 def instantiate_document_template(
     *,
     source: Document,
@@ -356,6 +428,7 @@ def instantiate_document_template(
     actor_id: UUID,
     title: str,
     category: str,
+    placement_rules: dict[str, str] | None = None,
 ) -> Document:
     from .document_attachments import copy_document_attachment
 
@@ -365,6 +438,10 @@ def instantiate_document_template(
             if not source.is_template:
                 raise PlacementConflict("The selected document is not a template.")
             resolved = resolve_document(source)
+            if not resolved.placements:
+                raise PlacementConflict("The template has no resolvable blocks.")
+            rules = placement_rules or {}
+            template_revision = ensure_template_revision(source=source, actor_id=actor_id)
             attachment_ids = attachment_ids_in_markdown(resolved.markdown)
             source_attachments = list(
                 DocumentAttachment.objects.filter(
@@ -378,21 +455,74 @@ def instantiate_document_template(
                 raise PlacementConflict("The template contains an unavailable managed attachment reference.")
 
             replacements = {item.entity_id: uuid4() for item in source_attachments}
-            markdown = resolved.markdown
-            for source_id, destination_id in replacements.items():
-                markdown = markdown.replace(
-                    f"{_ATTACHMENT_TARGET}{source_id}",
-                    f"{_ATTACHMENT_TARGET}{destination_id}",
-                )
+            def copied_markdown(markdown: str) -> str:
+                for source_id, destination_id in replacements.items():
+                    markdown = markdown.replace(
+                        f"{_ATTACHMENT_TARGET}{source_id}",
+                        f"{_ATTACHMENT_TARGET}{destination_id}",
+                    )
+                return markdown
+
+            primary = resolved.placements[0]
+            _template_rule(rules, primary.placement.block.entity_id, primary=True)
             destination = create_document(
                 tenant=tenant,
                 organization=organization,
                 actor_id=actor_id,
                 title=title,
-                markdown=markdown,
+                markdown=copied_markdown(primary.revision.markdown),
                 category=category,
                 is_template=False,
             )
+            destination_primary = primary_placement(destination)
+            placement_map: list[dict[str, object]] = [
+                {
+                    "source_block_id": str(primary.placement.block.entity_id),
+                    "destination_block_id": str(destination_primary.block.entity_id),
+                    "destination_placement_id": str(destination_primary.id),
+                    "mode": "copy",
+                    "applied_revision_id": str(primary.revision.id),
+                }
+            ]
+            for item in resolved.placements[1:]:
+                source_block = item.placement.block
+                mode = _template_rule(rules, source_block.entity_id, primary=False)
+                if mode in {"live", "pinned"}:
+                    if not source.library_visible or not source_block.library_visible:
+                        raise PlacementConflict(
+                            "Live and pinned template blocks must be published to the client library."
+                        )
+                    if attachment_ids_in_markdown(item.revision.markdown):
+                        raise PlacementConflict("Live and pinned template blocks cannot contain managed attachments.")
+                    created_placement = add_block_placement(
+                        document=destination,
+                        block=source_block,
+                        actor_id=actor_id,
+                        resolution_mode=mode,
+                        pinned_revision_id=item.revision.id if mode == "pinned" else None,
+                        parent_id=None,
+                    )
+                    destination_block_id = source_block.entity_id
+                else:
+                    created_placement = create_document_block(
+                        document=destination,
+                        actor_id=actor_id,
+                        markdown=copied_markdown(item.revision.markdown),
+                        kind=source_block.kind,
+                        name=source_block.entity.display_name,
+                        parent_id=None,
+                        position=None,
+                    )
+                    destination_block_id = created_placement.block.entity_id
+                placement_map.append(
+                    {
+                        "source_block_id": str(source_block.entity_id),
+                        "destination_block_id": str(destination_block_id),
+                        "destination_placement_id": str(created_placement.id),
+                        "mode": mode,
+                        "applied_revision_id": str(item.revision.id),
+                    }
+                )
             for attachment in source_attachments:
                 copied_attachments.append(
                     copy_document_attachment(
@@ -407,13 +537,161 @@ def instantiate_document_template(
                 actor_id=actor_id,
                 action="document.template_instantiated",
                 entity_id=destination.entity_id,
-                metadata={"source_document_id": str(source.entity_id)},
+                metadata={
+                    "source_document_id": str(source.entity_id),
+                    "template_revision": template_revision.revision_number,
+                },
             )
+            if organization is not None:
+                DocumentTemplateEnrollment.objects.create(
+                    tenant=tenant,
+                    organization=organization,
+                    source_template=source,
+                    destination_document=destination,
+                    applied_revision=template_revision,
+                    placement_map=placement_map,
+                    created_by_id=actor_id,
+                    last_applied_by_id=actor_id,
+                )
     except Exception:
         for copied in copied_attachments:
             copied.file.storage.delete(copied.file.name)
         raise
     return destination
+
+
+def template_rollout_preview(
+    *, enrollment: DocumentTemplateEnrollment, actor_id: UUID
+) -> tuple[DocumentTemplateRevision, dict[str, object]]:
+    latest = ensure_template_revision(source=enrollment.source_template, actor_id=actor_id)
+    applied_blocks = {
+        str(item["source_block_id"]): item
+        for item in cast(list[dict[str, object]], enrollment.applied_revision.manifest.get("blocks", []))
+    }
+    latest_blocks = {
+        str(item["source_block_id"]): item
+        for item in cast(list[dict[str, object]], latest.manifest.get("blocks", []))
+    }
+    placement_modes = {
+        str(item["source_block_id"]): str(item["mode"])
+        for item in cast(list[dict[str, object]], enrollment.placement_map)
+    }
+    added = [value for key, value in latest_blocks.items() if key not in applied_blocks]
+    removed = [value for key, value in applied_blocks.items() if key not in latest_blocks]
+    changed = [
+        {**latest_blocks[key], "mode": placement_modes.get(key, "copy")}
+        for key in latest_blocks.keys() & applied_blocks.keys()
+        if latest_blocks[key]["source_revision_id"] != applied_blocks[key]["source_revision_id"]
+    ]
+    conflicts = [
+        {**item, "reason": "Copied client content is never overwritten automatically."}
+        for item in changed
+        if item["mode"] == "copy"
+    ] + [
+        {**item, "reason": "New template blocks with managed attachments require document re-instantiation."}
+        for item in added
+        if item.get("attachment_ids")
+    ] + [{**item, "reason": "Template removal requires explicit client-document editing."} for item in removed]
+    return latest, {
+        "current_revision": enrollment.applied_revision.revision_number,
+        "available_revision": latest.revision_number,
+        "up_to_date": latest.id == enrollment.applied_revision_id,
+        "added": added,
+        "changed": changed,
+        "removed": removed,
+        "conflicts": conflicts,
+    }
+
+
+@transaction.atomic
+def apply_template_rollout(
+    *,
+    enrollment: DocumentTemplateEnrollment,
+    actor_id: UUID,
+    expected_applied_revision_id: UUID,
+    placement_rules: dict[str, str] | None = None,
+) -> dict[str, object]:
+    locked = DocumentTemplateEnrollment.objects.select_for_update().select_related(
+        "source_template", "destination_document", "applied_revision"
+    ).get(pk=enrollment.pk)
+    if locked.applied_revision_id != expected_applied_revision_id:
+        raise PlacementConflict("The client template enrollment changed after this preview loaded.")
+    latest, preview = template_rollout_preview(enrollment=locked, actor_id=actor_id)
+    if preview["conflicts"]:
+        raise PlacementConflict("Resolve copied-block or removal conflicts before applying this rollout.")
+    rules = placement_rules or {}
+    placement_map = cast(list[dict[str, object]], list(locked.placement_map))
+    map_by_source = {str(item["source_block_id"]): item for item in placement_map}
+    latest_blocks = cast(list[dict[str, object]], latest.manifest["blocks"])
+    for item in latest_blocks:
+        source_id = str(item["source_block_id"])
+        source_block = Block.objects.select_related("entity", "current_revision").get(
+            tenant=locked.tenant, entity_id=source_id, archived_at__isnull=True
+        )
+        mapped = map_by_source.get(source_id)
+        if mapped is None:
+            mode = _template_rule(rules, source_block.entity_id, primary=False)
+            if mode in {"live", "pinned"}:
+                if not locked.source_template.library_visible or not source_block.library_visible:
+                    raise PlacementConflict("Live and pinned template blocks must be published to the client library.")
+                placement = add_block_placement(
+                    document=locked.destination_document,
+                    block=source_block,
+                    actor_id=actor_id,
+                    resolution_mode=mode,
+                    pinned_revision_id=UUID(str(item["source_revision_id"])) if mode == "pinned" else None,
+                    parent_id=None,
+                )
+                destination_block_id = source_block.entity_id
+            else:
+                revision = BlockRevision.objects.get(
+                    id=UUID(str(item["source_revision_id"])), block=source_block
+                )
+                placement = create_document_block(
+                    document=locked.destination_document,
+                    actor_id=actor_id,
+                    markdown=revision.markdown,
+                    kind=source_block.kind,
+                    name=source_block.entity.display_name,
+                    parent_id=None,
+                    position=None,
+                )
+                destination_block_id = placement.block.entity_id
+            mapped = {
+                "source_block_id": source_id,
+                "destination_block_id": str(destination_block_id),
+                "destination_placement_id": str(placement.id),
+                "mode": mode,
+                "applied_revision_id": str(item["source_revision_id"]),
+            }
+            placement_map.append(mapped)
+            map_by_source[source_id] = mapped
+        elif mapped["mode"] == "pinned" and mapped["applied_revision_id"] != item["source_revision_id"]:
+            placement = DocumentPlacement.objects.get(id=UUID(str(mapped["destination_placement_id"])))
+            update_document_placement(
+                placement=placement,
+                actor_id=actor_id,
+                resolution_mode="pinned",
+                pinned_revision_id=UUID(str(item["source_revision_id"])),
+            )
+            mapped["applied_revision_id"] = str(item["source_revision_id"])
+        elif mapped["mode"] == "live":
+            mapped["applied_revision_id"] = str(item["source_revision_id"])
+    locked.applied_revision = latest
+    locked.placement_map = placement_map
+    locked.last_applied_by_id = actor_id
+    locked.last_applied_at = timezone.now()
+    locked.save(update_fields=("applied_revision", "placement_map", "last_applied_by", "last_applied_at", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.template_rollout_applied",
+        entity_id=locked.destination_document.entity_id,
+        metadata={"template_revision": latest.revision_number},
+    )
+    locked.refresh_from_db()
+    _, applied_preview = template_rollout_preview(enrollment=locked, actor_id=actor_id)
+    return applied_preview
 
 
 @transaction.atomic

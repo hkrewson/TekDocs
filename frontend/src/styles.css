@@ -400,6 +400,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-composition .block-library li { align-items: center; border: 1px solid var(--border); border-radius: 8px; display: flex; gap: 16px; justify-content: space-between; min-height: 0; padding: 10px 12px; }
 .block-library li > span { display: grid; gap: 3px; min-width: 0; }
 .block-library li small { color: var(--muted); }
+.client-template-library > ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.client-template-library > ul > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.client-template-library > ul span { display: grid; gap: 3px; }
+.client-template-library small { color: var(--muted); }
+.template-draft, .template-rollout { display: grid; gap: 16px; margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
+.template-draft > label { display: grid; gap: 5px; }
+.template-rollout dl { display: flex; flex-wrap: wrap; gap: 24px; margin: 0; }
+.template-rollout dl div { display: grid; gap: 3px; }
+.template-rollout dt { color: var(--muted); font-size: 12px; }
+.template-rollout dd { margin: 0; font-weight: 700; }
 .document-relationship-rail { display: grid; gap: 12px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .document-relationship-rail h2 { margin: 0; font-size: 15px; }
 .document-relationship-rail p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }

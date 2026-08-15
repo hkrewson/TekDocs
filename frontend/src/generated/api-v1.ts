@@ -4180,6 +4180,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/template-library": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_templates_organization_library"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/template-rollouts/apply": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["document_templates_organization_rollout_apply"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/template-rollouts/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["document_templates_organization_rollout_preview"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/domains": {
         readonly parameters: {
             readonly query?: never;
@@ -6833,6 +6881,12 @@ export interface components {
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             readonly is_template: boolean;
             readonly library_visible: boolean;
+            /** Format: uuid */
+            readonly template_enrollment_id: string | null;
+            /** Format: uuid */
+            readonly template_applied_revision_id: string | null;
+            /** Format: uuid */
+            readonly template_source_id: string | null;
             readonly attachments: readonly components["schemas"]["DocumentAttachment"][];
             readonly attachment_count: number;
             readonly publications: readonly components["schemas"]["DocumentPublication"][];
@@ -7130,6 +7184,43 @@ export interface components {
              * @enum {string}
              */
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
+            readonly placement_rules?: {
+                readonly [key: string]: "copy" | "live" | "pinned";
+            };
+        };
+        readonly DocumentTemplateRolloutApply: {
+            /** Format: uuid */
+            readonly enrollment_id: string;
+            /** Format: uuid */
+            readonly expected_applied_revision_id: string;
+            readonly placement_rules?: {
+                readonly [key: string]: "copy" | "live" | "pinned";
+            };
+        };
+        readonly DocumentTemplateRolloutPreview: {
+            /** Format: uuid */
+            readonly enrollment_id: string;
+        };
+        readonly DocumentTemplateRolloutResult: {
+            /** Format: uuid */
+            readonly enrollment_id: string;
+            /** Format: uuid */
+            readonly applied_revision_id: string;
+            readonly current_revision: number;
+            readonly available_revision: number;
+            readonly up_to_date: boolean;
+            readonly added: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly changed: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly removed: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly conflicts: readonly {
+                readonly [key: string]: unknown;
+            }[];
         };
         readonly DocumentUpdate: {
             readonly title: string;
@@ -20913,6 +21004,98 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["EntityMentionResult"];
+                };
+            };
+        };
+    };
+    readonly document_templates_organization_library: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentResult"];
+                };
+            };
+        };
+    };
+    readonly document_templates_organization_rollout_apply: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTemplateRolloutApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTemplateRolloutApply"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTemplateRolloutApply"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentTemplateRolloutResult"];
+                };
+            };
+            /** @description Template rollout conflict */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly document_templates_organization_rollout_preview: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTemplateRolloutPreview"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTemplateRolloutPreview"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTemplateRolloutPreview"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentTemplateRolloutResult"];
                 };
             };
         };

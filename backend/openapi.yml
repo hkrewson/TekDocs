@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.13
+  version: 0.8.14
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -14348,6 +14348,126 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/template-library:
+    get:
+      operationId: document_templates_organization_library
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/template-rollouts/apply:
+    post:
+      operationId: document_templates_organization_rollout_apply
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutApply'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTemplateRolloutResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Template rollout conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/template-rollouts/preview:
+    post:
+      operationId: document_templates_organization_rollout_preview
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutPreview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutPreview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateRolloutPreview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTemplateRolloutResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/domains:
     get:
       operationId: organization_domain_list
@@ -22989,6 +23109,21 @@ components:
           type: boolean
         library_visible:
           type: boolean
+        template_enrollment_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        template_applied_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        template_source_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
         attachments:
           type: array
           items:
@@ -23064,6 +23199,9 @@ components:
       - publications
       - resolved_markdown
       - revision_number
+      - template_applied_revision_id
+      - template_enrollment_id
+      - template_source_id
       - title
       - updated_at
     DocumentAttachment:
@@ -23695,10 +23833,101 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+        placement_rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+            x-spec-enum-id: e159dafe529a6480
       required:
       - category
       - source_document_id
       - title
+    DocumentTemplateRolloutApply:
+      type: object
+      properties:
+        enrollment_id:
+          type: string
+          format: uuid
+        expected_applied_revision_id:
+          type: string
+          format: uuid
+        placement_rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+            x-spec-enum-id: e159dafe529a6480
+      required:
+      - enrollment_id
+      - expected_applied_revision_id
+    DocumentTemplateRolloutPreview:
+      type: object
+      properties:
+        enrollment_id:
+          type: string
+          format: uuid
+      required:
+      - enrollment_id
+    DocumentTemplateRolloutResult:
+      type: object
+      properties:
+        enrollment_id:
+          type: string
+          format: uuid
+        applied_revision_id:
+          type: string
+          format: uuid
+        current_revision:
+          type: integer
+        available_revision:
+          type: integer
+        up_to_date:
+          type: boolean
+        added:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        changed:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        removed:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        conflicts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - added
+      - applied_revision_id
+      - available_revision
+      - changed
+      - conflicts
+      - current_revision
+      - enrollment_id
+      - removed
+      - up_to_date
     DocumentUpdate:
       type: object
       properties:

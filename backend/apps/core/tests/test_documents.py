@@ -27,6 +27,7 @@ from apps.accounts.models import (
     TenantMembership,
     User,
 )
+from apps.core.documents import update_shared_block
 from apps.core.models import (
     Block,
     BlockKind,
@@ -38,6 +39,7 @@ from apps.core.models import (
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
+    DocumentTemplateEnrollment,
     Entity,
     InstallationState,
     Organization,
@@ -1324,6 +1326,108 @@ def test_client_block_library_requires_explicit_msp_opt_in_and_never_exposes_sib
     ).status_code == 404
 
 
+@pytest.mark.django_db
+def test_versioned_client_template_rollout_preserves_copy_and_updates_only_explicit_safe_changes(
+    owner_client, installation
+):
+    acme = organization(installation.tenant, "Acme Template")
+    beta = organization(installation.tenant, "Beta Template")
+    template = owner_client.post(
+        reverse("msp-document-list-create"),
+        {
+            "title": "Client network baseline",
+            "markdown": "Client-specific introduction",
+            "category": "guide",
+            "is_template": True,
+            "library_visible": True,
+        },
+        content_type="application/json",
+    ).json()
+    second = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": template["id"]}),
+        {
+            "operation": "create_block",
+            "block_name": "Printer rationale",
+            "markdown": "Printers belong on IoT.",
+            "library_visible": True,
+        },
+        content_type="application/json",
+    ).json()["placements"][1]
+
+    library = owner_client.get(
+        reverse("organization-document-template-library", kwargs={"organization_entity_id": acme.entity_id})
+    )
+    assert library.status_code == 200
+    assert [record["id"] for record in library.json()["results"]] == [template["id"]]
+
+    created = owner_client.post(
+        reverse("organization-document-template-instantiate", kwargs={"organization_entity_id": acme.entity_id}),
+        {
+            "source_document_id": template["id"],
+            "title": "Acme network baseline",
+            "category": "guide",
+            "placement_rules": {second["block_id"]: "live"},
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["placements"][0]["block_id"] != template["block_id"]
+    assert created.json()["placements"][1]["block_id"] == second["block_id"]
+    enrollment = DocumentTemplateEnrollment.objects.get(destination_document__entity_id=created.json()["id"])
+
+    source_placement = DocumentPlacement.objects.get(id=second["id"])
+    update_shared_block(
+        placement=source_placement,
+        actor_id=installation.owner.id,
+        markdown="Printers and media devices belong on IoT.",
+        base_revision_id=uuid.UUID(second["resolved_revision_id"]),
+    )
+    added = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": template["id"]}),
+        {
+            "operation": "create_block",
+            "block_name": "Firewall zones",
+            "markdown": "Document the allowed flows.",
+            "library_visible": True,
+        },
+        content_type="application/json",
+    ).json()["placements"][2]
+
+    preview_url = reverse(
+        "organization-document-template-rollout-preview", kwargs={"organization_entity_id": acme.entity_id}
+    )
+    preview = owner_client.post(preview_url, {"enrollment_id": str(enrollment.id)}, content_type="application/json")
+    assert preview.status_code == 200
+    assert preview.json()["up_to_date"] is False
+    assert [item["source_block_id"] for item in preview.json()["added"]] == [added["block_id"]]
+    assert preview.json()["changed"][0]["mode"] == "live"
+    assert preview.json()["conflicts"] == []
+
+    applied = owner_client.post(
+        reverse("organization-document-template-rollout-apply", kwargs={"organization_entity_id": acme.entity_id}),
+        {
+            "enrollment_id": str(enrollment.id),
+            "expected_applied_revision_id": preview.json()["applied_revision_id"],
+            "placement_rules": {added["block_id"]: "copy"},
+        },
+        content_type="application/json",
+    )
+    assert applied.status_code == 200
+    enrollment.refresh_from_db()
+    assert enrollment.applied_revision_id == uuid.UUID(applied.json()["applied_revision_id"])
+    destination = owner_client.get(
+        reverse(
+            "organization-document-detail",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": created.json()["id"]},
+        )
+    ).json()
+    assert destination["placement_count"] == 3
+    assert "Printers and media devices belong on IoT." in destination["resolved_markdown"]
+    assert owner_client.post(
+        reverse("organization-document-template-rollout-preview", kwargs={"organization_entity_id": beta.entity_id}),
+        {"enrollment_id": str(enrollment.id)},
+        content_type="application/json",
+    ).status_code == 404
 @pytest.mark.django_db
 def test_referenced_msp_block_can_be_transcluded_but_reference_cannot_be_revoked_while_used(owner_client, installation):
     acme = organization(installation.tenant, "Acme")

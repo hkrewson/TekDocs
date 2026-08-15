@@ -958,6 +958,24 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-document-template-library",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-template-rollout-preview",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-template-rollout-apply",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-document-import",
         ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),

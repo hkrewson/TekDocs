@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, Invitation, OrganizationAccessAssignment, TenantMembership, User
+from apps.core.documents import create_document, instantiate_document_template
 from apps.core.models import (
     Block,
     BlockRevision,
@@ -25,6 +26,8 @@ from apps.core.models import (
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
+    DocumentTemplateEnrollment,
+    DocumentTemplateRevision,
     Entity,
     InboxNotification,
     InstallationState,
@@ -79,6 +82,60 @@ def _bind(cursor, tenant_id, mode, organization_id=None, user_id=None, principal
         "SELECT set_config('tekdocs.principal_mode', %s, true)",
         [principal_mode if principal_mode is not None else ("user" if user_id else "system")],
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_template_revisions_are_published_but_enrollments_remain_client_scoped():
+    if connection.vendor != "postgresql":
+        pytest.skip("Runtime-role validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Template RLS tenant",
+        owner_email=f"template-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Template owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    first_org = _organization(installation.tenant, "First template client")
+    sibling_org = _organization(installation.tenant, "Sibling template client")
+    template = create_document(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        title="Published client baseline",
+        markdown="Baseline",
+        is_template=True,
+        library_visible=True,
+    )
+    destination = instantiate_document_template(
+        source=template,
+        tenant=installation.tenant,
+        organization=first_org,
+        actor_id=installation.owner.id,
+        title="First client baseline",
+        category="guide",
+    )
+    revision = DocumentTemplateRevision.objects.get(template=template)
+    enrollment = DocumentTemplateEnrollment.objects.get(destination_document=destination)
+    template_block_id = DocumentPlacement.objects.get(document=template, position=0).block_id
+
+    with _runtime_connection() as runtime, runtime.cursor() as cursor:
+        _bind(cursor, installation.tenant.id, "organization", first_org.id, installation.owner.id)
+        cursor.execute("SELECT id FROM core_documenttemplaterevision")
+        assert cursor.fetchall() == [(revision.id,)]
+        cursor.execute("SELECT id FROM core_document WHERE id = %s", [template.id])
+        assert cursor.fetchall() == [(template.id,)]
+        cursor.execute("SELECT id FROM core_block WHERE source_document_id = %s", [template.id])
+        assert cursor.fetchall() == [(template_block_id,)]
+        cursor.execute("SELECT id FROM core_documenttemplateenrollment")
+        assert cursor.fetchall() == [(enrollment.id,)]
+        runtime.commit()
+
+        _bind(cursor, installation.tenant.id, "organization", sibling_org.id, installation.owner.id)
+        cursor.execute("SELECT id FROM core_documenttemplaterevision")
+        assert cursor.fetchall() == [(revision.id,)]
+        cursor.execute("SELECT count(*) FROM core_documenttemplateenrollment")
+        assert cursor.fetchone() == (0,)
 
 
 @pytest.mark.django_db(transaction=True)

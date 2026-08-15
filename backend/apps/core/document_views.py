@@ -27,6 +27,7 @@ from .documents import (
     add_block_placement,
     add_document_placement,
     add_listing_reference,
+    apply_template_rollout,
     archive_document,
     blocks_for_library,
     create_document,
@@ -39,6 +40,7 @@ from .documents import (
     resolve_document,
     revision_diff,
     revisions_for_document,
+    template_rollout_preview,
     update_document,
     update_document_placement,
     update_shared_block,
@@ -49,6 +51,7 @@ from .models import (
     DocumentAttachment,
     DocumentPublication,
     DocumentPublicationArtifact,
+    DocumentTemplateEnrollment,
 )
 from .publications import (
     PublicationConflict,
@@ -81,6 +84,9 @@ from .serializers import (
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentTemplateInstantiateSerializer,
+    DocumentTemplateRolloutApplySerializer,
+    DocumentTemplateRolloutPreviewSerializer,
+    DocumentTemplateRolloutResultSerializer,
     DocumentUpdateSerializer,
     EntityMentionResultSerializer,
     EntityMentionSearchQuerySerializer,
@@ -176,7 +182,20 @@ def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> 
 def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = DocumentTemplateInstantiateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    source = _document(workspace, serializer.validated_data["source_document_id"])
+    if workspace.organization is None:
+        source = _document(workspace, serializer.validated_data["source_document_id"])
+    else:
+        source = get_object_or_404(
+            Document.objects.select_related("entity").prefetch_related(
+                "placements__block__entity", "placements__block__current_revision", "placements__pinned_revision"
+            ),
+            tenant=workspace.member.tenant,
+            organization__isnull=True,
+            entity_id=serializer.validated_data["source_document_id"],
+            is_template=True,
+            library_visible=True,
+            archived_at__isnull=True,
+        )
     try:
         document = instantiate_document_template(
             source=source,
@@ -185,10 +204,70 @@ def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Res
             actor_id=request.user.pk,
             title=serializer.validated_data["title"],
             category=serializer.validated_data["category"],
+            placement_rules=serializer.validated_data["placement_rules"],
         )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
     return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+
+
+def _template_library(workspace: ResolvedWorkspace) -> Response:
+    records = list(
+        documents_for_scope(DataScope.tenant(workspace.member.tenant))
+        .filter(is_template=True, library_visible=True)
+        .order_by("entity__display_name", "entity_id")[:200]
+    )
+    return Response(DocumentResultSerializer({"results": records, "count": len(records)}).data)
+
+
+def _template_enrollment(workspace: ResolvedWorkspace, enrollment_id: UUID) -> DocumentTemplateEnrollment:
+    if workspace.organization is None:
+        raise Http404
+    return get_object_or_404(
+        DocumentTemplateEnrollment.objects.select_related(
+            "source_template__entity", "destination_document__entity", "applied_revision"
+        ),
+        id=enrollment_id,
+        tenant=workspace.member.tenant,
+        organization=workspace.organization,
+        archived_at__isnull=True,
+    )
+
+
+def _template_rollout_response(
+    enrollment: DocumentTemplateEnrollment, preview: dict[str, object]
+) -> Response:
+    payload = {
+        "enrollment_id": enrollment.id,
+        "applied_revision_id": enrollment.applied_revision_id,
+        **preview,
+    }
+    return Response(DocumentTemplateRolloutResultSerializer(payload).data)
+
+
+def _preview_template_rollout(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentTemplateRolloutPreviewSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    enrollment = _template_enrollment(workspace, serializer.validated_data["enrollment_id"])
+    _, preview = template_rollout_preview(enrollment=enrollment, actor_id=request.user.pk)
+    return _template_rollout_response(enrollment, preview)
+
+
+def _apply_template_rollout(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentTemplateRolloutApplySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    enrollment = _template_enrollment(workspace, serializer.validated_data["enrollment_id"])
+    try:
+        preview = apply_template_rollout(
+            enrollment=enrollment,
+            actor_id=request.user.pk,
+            expected_applied_revision_id=serializer.validated_data["expected_applied_revision_id"],
+            placement_rules=serializer.validated_data["placement_rules"],
+        )
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    enrollment.refresh_from_db()
+    return _template_rollout_response(enrollment, preview)
 
 
 def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response:
@@ -957,6 +1036,41 @@ class OrganizationDocumentTemplateInstantiateView(APIView):
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _instantiate_template(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
+        )
+
+
+class OrganizationDocumentTemplateLibraryView(APIView):
+    @extend_schema(operation_id="document_templates_organization_library", responses={200: DocumentResultSerializer})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _template_library(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+        )
+
+
+class OrganizationDocumentTemplateRolloutPreviewView(APIView):
+    @extend_schema(
+        operation_id="document_templates_organization_rollout_preview",
+        request=DocumentTemplateRolloutPreviewSerializer,
+        responses={200: DocumentTemplateRolloutResultSerializer},
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _preview_template_rollout(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
+        )
+
+
+class OrganizationDocumentTemplateRolloutApplyView(APIView):
+    @extend_schema(
+        operation_id="document_templates_organization_rollout_apply",
+        request=DocumentTemplateRolloutApplySerializer,
+        responses={
+            200: DocumentTemplateRolloutResultSerializer,
+            409: OpenApiResponse(description="Template rollout conflict"),
+        },
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _apply_template_rollout(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
         )
 

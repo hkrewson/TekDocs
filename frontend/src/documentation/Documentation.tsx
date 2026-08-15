@@ -6,7 +6,7 @@ import { browserWorkspaceClient } from '../workspaces/api'
 import type { RelationshipsClient } from '../relationships/api'
 import { DocumentRelationshipRail } from './DocumentRelationshipRail'
 import { browserDocumentsClient, RevisionConflictError } from './api'
-import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentPlacement, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentsClient, EntityMentionOption, PublicationAudience, PublicationRetention, ReuseImpact } from './api'
+import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentInput, DocumentPlacement, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentsClient, EntityMentionOption, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 const categories: { value: DocumentCategory; label: string }[] = [
@@ -73,6 +73,9 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [newBlockLibraryVisible, setNewBlockLibraryVisible] = useState(false)
   const [blockLibraryQuery, setBlockLibraryQuery] = useState('')
   const [blockLibrary, setBlockLibrary] = useState<BlockLibraryItem[]>([])
+  const [templateLibrary, setTemplateLibrary] = useState<DocumentRecord[]>([])
+  const [templateDraft, setTemplateDraft] = useState<{ source: DocumentRecord; title: string; rules: Record<string, TemplatePlacementMode> } | null>(null)
+  const [templateRollout, setTemplateRollout] = useState<TemplateRollout | null>(null)
   const [editingBlock, setEditingBlock] = useState<{ placement: DocumentPlacement; draft: string } | null>(null)
   const [reuseReview, setReuseReview] = useState<{ placementId: string; impact: ReuseImpact; draft: string } | null>(null)
   const [approvedRevisionId, setApprovedRevisionId] = useState<string | null>(null)
@@ -92,6 +95,15 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
   }, [categoryFilter, client, documentQuery, revision, scope, scopeKey, templateFilter])
+
+  useEffect(() => {
+    if (!workspace) return
+    const controller = new AbortController()
+    client.listTemplateLibrary(scope, controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setTemplateLibrary(result.results) })
+      .catch(() => { if (!controller.signal.aborted) setTemplateLibrary([]) })
+    return () => controller.abort()
+  }, [client, revision, scope, workspace])
 
   useEffect(() => {
     if (workspace || !shareQuery.trim() || selected === null || selected === 'new') return
@@ -128,7 +140,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
-  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setBlockLibraryQuery(''); setBlockLibrary([]) }
+  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setBlockLibraryQuery(''); setBlockLibrary([]); setTemplateRollout(null) }
   const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live') }
   const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setLibraryVisible(false); setMessage(null); setError(null) }
   const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
@@ -339,6 +351,39 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       open(created); setMessage('Independent document created from the template.'); setRevision((value) => value + 1)
     } catch (templateError) { setError(errorMessage(templateError)) } finally { setSaving(false) }
   }
+  const instantiateClientTemplate = async () => {
+    if (!templateDraft) return
+    setSaving(true); setError(null)
+    try {
+      const created = await client.instantiateTemplate(
+        scope,
+        templateDraft.source.id,
+        templateDraft.title.trim(),
+        templateDraft.source.category,
+        templateDraft.rules,
+      )
+      setTemplateDraft(null); open(created); setMessage('Client document created from a retained template revision.'); setRevision((value) => value + 1)
+    } catch (templateError) { setError(errorMessage(templateError)) } finally { setSaving(false) }
+  }
+  const previewSelectedTemplateRollout = async () => {
+    if (!selected || selected === 'new' || !selected.template_enrollment_id) return
+    setSaving(true); setError(null)
+    try { setTemplateRollout(await client.previewTemplateRollout(scope, selected.template_enrollment_id)) }
+    catch (templateError) { setError(errorMessage(templateError)) } finally { setSaving(false) }
+  }
+  const applySelectedTemplateRollout = async () => {
+    if (!selected || selected === 'new' || !templateRollout || templateRollout.conflicts.length > 0) return
+    setSaving(true); setError(null)
+    try {
+      const applied = await client.applyTemplateRollout(
+        scope,
+        templateRollout.enrollment_id,
+        templateRollout.applied_revision_id,
+        Object.fromEntries(templateRollout.added.map((item) => [item.source_block_id, 'copy' as const])),
+      )
+      setTemplateRollout(applied); setMessage(`Template revision ${applied.available_revision} applied.`); setRevision((value) => value + 1)
+    } catch (templateError) { setError(errorMessage(templateError)) } finally { setSaving(false) }
+  }
   const uploadAttachment = async (file: File) => {
     if (!selected || selected === 'new') return
     setSaving(true); setError(null)
@@ -414,6 +459,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       {visiblePhase === 'ready' && results.length === 0 && <p className="empty-state">No documents have been added to this workspace.</p>}
       {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || 'Untitled document'}</strong><small>{categories.find((item) => item.value === document.category)?.label}{document.is_template ? ' · Template' : ''}{document.is_reference ? ' · MSP reference' : ''}{document.publication_count ? ` · ${document.publication_count} STATIC` : ''}</small></span></button>{document.publications.length > 0 && <ul className="static-publication-list">{document.publications.map((publication) => <li key={publication.id}><button type="button" onClick={() => { void openPublication(document, publication) }}><FileCheck2 size={15} /><span><strong>{publication.title}</strong><small>STATIC · {publication.lifecycle_state.replace('_', ' ')} · {publication.audience.replace('_', ' ')} · {new Date(publication.published_at).toLocaleString()}</small></span></button></li>)}</ul>}</li>)}</ul>}
     </section>
+    {workspace && templateLibrary.length > 0 && <section className="content-section client-template-library" aria-labelledby="client-template-library-heading">
+      <div className="section-heading"><div><h2 id="client-template-library-heading">MSP client templates</h2><p>Start a client-owned document from an explicitly published, versioned MSP template.</p></div><span>{templateLibrary.length} available</span></div>
+      <ul>{templateLibrary.map((template) => <li key={template.id}><span><strong>{template.title}</strong><small>{template.placement_count} block{template.placement_count === 1 ? '' : 's'} · {categories.find((item) => item.value === template.category)?.label}</small></span><button className="secondary-button" type="button" onClick={() => setTemplateDraft({ source: template, title: `${workspace.name} — ${template.title}`, rules: Object.fromEntries(template.placements.slice(1).map((placement) => [placement.block_id, 'copy'])) })}><Copy size={15} />Use template</button></li>)}</ul>
+      {templateDraft && <section className="template-draft" aria-labelledby="template-draft-heading"><div className="section-heading"><div><h3 id="template-draft-heading">Create from {templateDraft.source.title}</h3><p>The primary block is always copied. Choose how each additional block should behave.</p></div><button className="icon-button" type="button" aria-label="Cancel template" onClick={() => setTemplateDraft(null)}><X size={16} /></button></div><label>Client document title<input maxLength={240} value={templateDraft.title} onChange={(event) => setTemplateDraft({ ...templateDraft, title: event.target.value })} /></label>{templateDraft.source.placements.slice(1).map((placement) => <label key={placement.id}>{placement.block_name.replace(/ — content$/, '')}<select value={templateDraft.rules[placement.block_id] ?? 'copy'} onChange={(event) => setTemplateDraft({ ...templateDraft, rules: { ...templateDraft.rules, [placement.block_id]: event.target.value as TemplatePlacementMode } })}><option value="copy">Independent copy</option><option value="live">Live reference</option><option value="pinned">Pinned reference</option></select></label>)}<div className="document-actions"><button className="primary-button" type="button" disabled={saving || !templateDraft.title.trim()} onClick={() => { void instantiateClientTemplate() }}>{saving ? 'Creating…' : 'Create client document'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setTemplateDraft(null)}>Cancel</button></div></section>}
+    </section>}
     {publicationView && <section className="document-workspace static-publication" aria-label="STATIC publication">
       <div className="document-edit-heading"><div><h2>{publicationView.record?.title ?? 'STATIC publication'}</h2><p>Immutable retained version</p></div><button className="icon-button" type="button" aria-label="Close publication" onClick={close}><X size={19} /></button></div>
       {publicationView.phase === 'loading' && <p className="empty-state" role="status">Loading STATIC publication…</p>}
@@ -460,7 +510,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       </section>}
       <div className="entity-mention-picker"><label><Search size={15} /><span>Reference an entity</span><input type="search" placeholder="Search people, sites, organizations…" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionQuery.trim() && mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div>
       {conflict && <div className="revision-conflict" role="alert"><strong>Newer revision detected</strong><p>Your draft remains in the editor. Review the server changes below and reconcile them into your draft.</p>{conflict.payload.diff && <pre>{conflict.payload.diff}</pre>}<button className="secondary-button" type="button" onClick={acknowledgeConflict}>I reconciled with revision {conflict.payload.current_revision.revision_number}</button></div>}
-      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" disabled={saving} onClick={() => beginPublication(selected)}><FileCheck2 size={15} />Publish STATIC</button>}{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || conflict !== null} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save document'}</button>{selected !== 'new' && <button className="secondary-button" type="button" disabled={saving} onClick={() => beginPublication(selected)}><FileCheck2 size={15} />Publish STATIC</button>}{selected !== 'new' && selected.is_template && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />Use template</button>}{selected !== 'new' && selected.template_enrollment_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void previewSelectedTemplateRollout() }}><History size={15} />Check template updates</button>}{selected !== 'new' && <a className="secondary-button" href={client.exportUrl(scope, selected.id)}><Download size={15} />Export Markdown</a>}{selected !== 'new' && <button className="secondary-button" type="button" onClick={() => { if (historyOpen) setHistoryOpen(false); else void loadHistory() }}><History size={15} />{historyOpen ? 'Hide history' : 'Revision history'}</button>}{selected !== 'new' && <button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />Archive</button>}</div>
+      {templateRollout && <section className="template-rollout" aria-labelledby="template-rollout-heading"><div className="section-heading"><div><h2 id="template-rollout-heading">Template rollout</h2><p>Applied revision {templateRollout.current_revision}; available revision {templateRollout.available_revision}.</p></div><button className="icon-button" type="button" aria-label="Close template rollout" onClick={() => setTemplateRollout(null)}><X size={16} /></button></div>{templateRollout.up_to_date ? <p className="empty-state">This client document is current with its template.</p> : <><dl><div><dt>Added blocks</dt><dd>{templateRollout.added.length}</dd></div><div><dt>Changed blocks</dt><dd>{templateRollout.changed.length}</dd></div><div><dt>Removed blocks</dt><dd>{templateRollout.removed.length}</dd></div></dl>{templateRollout.conflicts.length > 0 && <div className="form-message error" role="alert"><strong>Manual resolution required</strong><ul>{templateRollout.conflicts.map((item) => <li key={`${item.source_block_id}-${item.reason}`}>{item.name}: {item.reason}</li>)}</ul></div>}<button className="primary-button" type="button" disabled={saving || templateRollout.conflicts.length > 0} onClick={() => { void applySelectedTemplateRollout() }}>{saving ? 'Applying…' : 'Apply safe changes'}</button></>}</section>}
       {selected !== 'new' && <section className="document-attachments" aria-labelledby="document-attachments-heading"><div className="section-heading"><div><h2 id="document-attachments-heading">Attachments</h2><p>Private managed files referenced by stable Markdown links.</p></div><div><input ref={attachmentInput} aria-label="Attachment file" className="sr-only" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => attachmentInput.current?.click()}><Paperclip size={15} />Add attachment</button></div></div>{selected.attachments.length === 0 ? <p className="empty-state">No files attached.</p> : <ul>{selected.attachments.map((attachment) => <li key={attachment.id}><a href={client.attachmentDownloadUrl(scope, selected.id, attachment.id)}><strong>{attachment.filename}</strong><small>{attachment.media_type} · {attachment.size.toLocaleString()} bytes · scanned</small></a><div><button className="secondary-button" type="button" onClick={() => insertAttachment(attachment.id, attachment.filename)}>Insert link</button><button className="icon-button" type="button" aria-label={`Remove ${attachment.filename}`} disabled={saving} onClick={() => { void removeAttachment(attachment.id) }}><Trash2 size={15} /></button></div></li>)}</ul>}</section>}
       {selected !== 'new' && <section className="document-composition" aria-labelledby="document-composition-heading">
         <div className="section-heading"><div><h2 id="document-composition-heading">Block sources</h2><p>Create a local block or reuse content from a visible document.</p></div><span>{selected.placement_count} block{selected.placement_count === 1 ? '' : 's'}</span></div>

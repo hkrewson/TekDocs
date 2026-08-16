@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.21
+  version: 0.8.22
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1662,6 +1662,14 @@ paths:
     get:
       operationId: documents_msp_export
       parameters:
+      - in: query
+        name: attachment_ids
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 50
       - in: path
         name: document_entity_id
         schema:
@@ -1672,15 +1680,17 @@ paths:
         name: export_format
         schema:
           enum:
+          - bundle
           - docx
           - html
           - md
           - pdf
           type: string
-          x-spec-enum-id: dd5c88f82d29a651
+          x-spec-enum-id: 384acc1b7fd14c29
           default: md
           minLength: 1
         description: |-
+          * `bundle` - bundle
           * `docx` - docx
           * `html` - html
           * `md` - md
@@ -13667,6 +13677,14 @@ paths:
     get:
       operationId: documents_organization_export
       parameters:
+      - in: query
+        name: attachment_ids
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 50
       - in: path
         name: document_entity_id
         schema:
@@ -13677,15 +13695,17 @@ paths:
         name: export_format
         schema:
           enum:
+          - bundle
           - docx
           - html
           - md
           - pdf
           type: string
-          x-spec-enum-id: dd5c88f82d29a651
+          x-spec-enum-id: 384acc1b7fd14c29
           default: md
           minLength: 1
         description: |-
+          * `bundle` - bundle
           * `docx` - docx
           * `html` - html
           * `md` - md

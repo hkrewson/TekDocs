@@ -113,6 +113,9 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[4]?.[1]?.body).toBeInstanceOf(FormData)
     expect(fetchMock.mock.calls[5]?.[1]?.method).toBe('DELETE')
     expect(browserDocumentsClient.exportUrl(scope, 'doc')).toContain('/documents/doc/export?export_format=md')
+    expect(browserDocumentsClient.exportUrl(scope, 'doc', 'bundle', ['first', 'second'])).toBe(
+      '/api/v1/workspaces/organizations/org/documents/doc/export?export_format=bundle&attachment_ids=first&attachment_ids=second',
+    )
     expect(browserDocumentsClient.attachmentDownloadUrl(scope, 'doc', 'attachment').endsWith('/attachments/attachment/download')).toBe(true)
   })
 

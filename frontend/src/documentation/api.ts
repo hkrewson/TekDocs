@@ -287,14 +287,15 @@ export interface DocumentsClient {
   publicationMarkdownUrl(scope: DocumentScope, id: string, publicationId: string): string
   publicationManifestUrl(scope: DocumentScope, id: string, publicationId: string): string
   publicationArtifactUrl(scope: DocumentScope, id: string, publicationId: string, artifactId: string): string
-  publicationExportUrl(scope: DocumentScope, id: string, publicationId: string, format: ExportFormat): string
-  exportUrl(scope: DocumentScope, id: string, format?: ExportFormat): string
+  publicationExportUrl(scope: DocumentScope, id: string, publicationId: string, format: PublicationExportFormat): string
+  exportUrl(scope: DocumentScope, id: string, format?: ExportFormat, attachmentIds?: string[]): string
   attachmentDownloadUrl(scope: DocumentScope, id: string, attachmentId: string): string
   archive(scope: DocumentScope, id: string): Promise<void>
   addReference(documentId: string, organizationId: string): Promise<void>
 }
 
-export type ExportFormat = 'md' | 'html' | 'pdf' | 'docx'
+export type ExportFormat = 'md' | 'html' | 'pdf' | 'docx' | 'bundle'
+export type PublicationExportFormat = Exclude<ExportFormat, 'bundle'>
 
 function collectionPath(scope: DocumentScope) {
   return scope.organizationId
@@ -444,7 +445,11 @@ export const browserDocumentsClient: DocumentsClient = {
   publicationManifestUrl: (scope, id, publicationId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/manifest`,
   publicationArtifactUrl: (scope, id, publicationId, artifactId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,
   publicationExportUrl: (scope, id, publicationId, format) => `${collectionPath(scope)}/${encodeURIComponent(id)}/publications/${encodeURIComponent(publicationId)}/export?export_format=${format}`,
-  exportUrl: (scope, id, format = 'md') => `${collectionPath(scope)}/${encodeURIComponent(id)}/export?export_format=${format}`,
+  exportUrl: (scope, id, format = 'md', attachmentIds = []) => {
+    const query = new URLSearchParams({ export_format: format })
+    attachmentIds.forEach((attachmentId) => query.append('attachment_ids', attachmentId))
+    return `${collectionPath(scope)}/${encodeURIComponent(id)}/export?${query}`
+  },
   attachmentDownloadUrl: (scope, id, attachmentId) => `${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/download`,
   archive: (scope, id) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'DELETE'),
   addReference: (documentId, organizationId) => mutate<void>(`/api/v1/documents/${encodeURIComponent(documentId)}/references`, 'POST', { organization_id: organizationId }),

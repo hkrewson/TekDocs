@@ -11817,13 +11817,15 @@ export interface operations {
     readonly documents_msp_export: {
         readonly parameters: {
             readonly query?: {
+                readonly attachment_ids?: readonly string[];
                 /**
-                 * @description * `docx` - docx
+                 * @description * `bundle` - bundle
+                 *     * `docx` - docx
                  *     * `html` - html
                  *     * `md` - md
                  *     * `pdf` - pdf
                  */
-                readonly export_format?: "docx" | "html" | "md" | "pdf";
+                readonly export_format?: "bundle" | "docx" | "html" | "md" | "pdf";
             };
             readonly header?: never;
             readonly path: {
@@ -20966,13 +20968,15 @@ export interface operations {
     readonly documents_organization_export: {
         readonly parameters: {
             readonly query?: {
+                readonly attachment_ids?: readonly string[];
                 /**
-                 * @description * `docx` - docx
+                 * @description * `bundle` - bundle
+                 *     * `docx` - docx
                  *     * `html` - html
                  *     * `md` - md
                  *     * `pdf` - pdf
                  */
-                readonly export_format?: "docx" | "html" | "md" | "pdf";
+                readonly export_format?: "bundle" | "docx" | "html" | "md" | "pdf";
             };
             readonly header?: never;
             readonly path: {

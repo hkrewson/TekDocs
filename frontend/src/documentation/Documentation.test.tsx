@@ -86,7 +86,11 @@ function clients() {
     publicationManifestUrl: (_scope, id, publicationId) => `/documents/${id}/publications/${publicationId}/manifest`,
     publicationArtifactUrl: (_scope, id, publicationId, artifactId) => `/documents/${id}/publications/${publicationId}/artifacts/${artifactId}/download`,
     publicationExportUrl: (_scope, id, publicationId, format) => `/documents/${id}/publications/${publicationId}/export?export_format=${format}`,
-    exportUrl: (_scope, id, format = 'md') => `/documents/${id}/export?export_format=${format}`,
+    exportUrl: (_scope, id, format = 'md', attachmentIds = []) => {
+      const query = new URLSearchParams({ export_format: format })
+      attachmentIds.forEach((attachmentId) => query.append('attachment_ids', attachmentId))
+      return `/documents/${id}/export?${query.toString()}`
+    },
     attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
     addReference,
@@ -122,6 +126,30 @@ it('loads revision history and a selected diff', async () => {
   await user.click(screen.getByRole('button', { name: 'History' }))
   await user.click(await screen.findByRole('button', { name: /Revision 1/ }))
   expect(await screen.findByText('+# Firewall')).toBeInTheDocument()
+})
+
+it('exports an exact editable snapshot and includes only explicitly selected files in the portable ZIP', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const attachment = { id: 'attachment-1', filename: 'private-notes.txt', media_type: 'text/plain', size: 24, checksum: 'a'.repeat(64), scan_status: 'clean' as const, scan_engine: 'test-scanner', scanned_at: '2026-08-09T00:00:00Z', created_at: '2026-08-09T00:00:00Z' }
+  const primary = { ...attachment, id: 'primary-1', filename: 'approved-guide.txt', version_number: 1, replaces_id: null, is_current: true }
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, attachments: [attachment], attachment_count: 1, primary_file: primary, primary_file_versions: [primary] }], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Export' }))
+
+  expect(await screen.findByRole('heading', { name: 'Export editable snapshot' })).toBeVisible()
+  expect(screen.getByText(/not a retained STATIC publication/)).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Markdown' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=md')
+  expect(screen.getByRole('link', { name: 'DOCX' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=docx')
+  expect(screen.getByRole('link', { name: 'Download portable ZIP' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=bundle')
+
+  await user.click(screen.getByRole('checkbox', { name: /private-notes.txt/ }))
+  expect(screen.getByRole('link', { name: 'Download portable ZIP' })).toHaveAttribute(
+    'href',
+    '/documents/doc-1/export?export_format=bundle&attachment_ids=attachment-1',
+  )
+  expect(screen.getByRole('checkbox', { name: /approved-guide.txt/ })).not.toBeChecked()
 })
 
 it('previews and explicitly restructures legacy content from document settings', async () => {

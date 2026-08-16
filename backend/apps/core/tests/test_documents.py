@@ -1,14 +1,17 @@
 import base64
+import json
 import secrets
 import uuid
 from hashlib import sha256
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from defusedxml import ElementTree
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -18,6 +21,7 @@ from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
+from docx import Document as WordDocument
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
@@ -908,9 +912,7 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
 
 
 @pytest.mark.django_db
-def test_file_backed_document_creation_and_primary_file_replacement_are_versioned(
-    owner_client, installation, tmp_path
-):
+def test_file_backed_document_creation_and_primary_file_replacement_are_versioned(owner_client, installation, tmp_path):
     acme = organization(installation.tenant, "Acme file documents")
     beta = organization(installation.tenant, "Beta file documents")
     create_url = reverse(
@@ -1070,7 +1072,8 @@ def test_markdown_import_and_resolved_export_use_portable_bytes(owner_client, in
     exported = owner_client.get(reverse("msp-document-export", kwargs={"document_entity_id": payload["id"]}))
     assert exported.content == "# Switch\n\nCafé\n".encode()
     assert exported["Content-Type"].startswith("text/markdown")
-    assert "imported-switch-guide.md" in exported["Content-Disposition"]
+    assert "imported-switch-guide-editable.md" in exported["Content-Disposition"]
+    assert exported["X-TekDocs-Export-Class"] == "editable_revision_snapshot"
     assert exported["Cache-Control"] == "private, no-store"
 
 
@@ -2150,12 +2153,15 @@ def test_publication_approval_role_is_exact_client_scoped_and_does_not_grant_wit
 
 @pytest.mark.django_db
 def test_live_document_exports_supported_sanitized_and_deterministic_formats(owner_client, installation):
+    fidelity_markdown = (Path(__file__).parent / "fixtures" / "docx-fidelity.md").read_bytes()
     created = owner_client.post(
         reverse("msp-document-import"),
         {
             "title": "Router & switch guide",
             "file": SimpleUploadedFile(
-                "guide.md", b"# Setup\n\n<script>alert(1)</script>\n\n- Connect uplink", content_type="text/markdown"
+                "guide.md",
+                b"<script>alert(1)</script>\n\n" + fidelity_markdown,
+                content_type="text/markdown",
             ),
             "category": "guide",
             "is_template": "false",
@@ -2170,7 +2176,7 @@ def test_live_document_exports_supported_sanitized_and_deterministic_formats(own
     repeated_docx = owner_client.get(route, {"export_format": "docx"})
 
     assert markdown.status_code == 200
-    assert markdown.content == b"# Setup\n\n<script>alert(1)</script>\n\n- Connect uplink\n"
+    assert markdown.content == created["resolved_markdown"].encode()
     assert b"<script>" not in html.content
     assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in html.content
     assert pdf.content.startswith(b"%PDF-")
@@ -2178,13 +2184,149 @@ def test_live_document_exports_supported_sanitized_and_deterministic_formats(own
     assert docx.content == repeated_docx.content
     with ZipFile(BytesIO(docx.content)) as archive:
         document_xml = archive.read("word/document.xml")
+        for xml_name in (name for name in archive.namelist() if name.endswith(".xml")):
+            ElementTree.fromstring(archive.read(xml_name))
+    reopened = WordDocument(BytesIO(docx.content))
     assert b"Router &amp; switch guide" in document_xml
     assert b'<w:pStyle w:val="Heading1"' in document_xml
     assert b"Connect uplink" in document_xml
+    assert b"Preserve the rollback path" in document_xml
+    assert b"ping gateway" in document_xml
+    assert b"w:tbl" in document_xml
+    assert b"w:hyperlink" in document_xml
+    assert b"w:strike" in document_xml
+    assert reopened.tables[0].cell(1, 1).text == "20"
     assert docx["Cache-Control"] == "private, no-store"
     assert docx["X-Content-Type-Options"] == "nosniff"
+    assert docx["X-TekDocs-Export-Class"] == "editable_revision_snapshot"
+    assert len(docx["X-TekDocs-Content-Digest"]) == 64
     metadata = list(AuditEvent.objects.filter(action="document.exported").values_list("metadata", flat=True))
     assert sorted(item["format"] for item in metadata) == ["docx", "docx", "html", "md", "pdf"]
+
+
+@pytest.mark.django_db
+def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clean_files(
+    owner_client, installation, tmp_path
+):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Portable network guide", "markdown": "# Network\n\nRetain this revision."},
+        content_type="application/json",
+    ).json()
+    upload_route = reverse(
+        "msp-document-attachment-list-create",
+        kwargs={"document_entity_id": created["id"]},
+    )
+    export_route = reverse("msp-document-export", kwargs={"document_entity_id": created["id"]})
+
+    with override_settings(MEDIA_ROOT=tmp_path):
+        selected = owner_client.post(
+            upload_route,
+            {"file": SimpleUploadedFile("switch notes.txt", b"private attachment")},
+        ).json()
+        unselected = owner_client.post(
+            upload_route,
+            {"file": SimpleUploadedFile("diagram.txt", b"not exported")},
+        ).json()
+        query = {"export_format": "bundle", "attachment_ids": [selected["id"]]}
+        first = owner_client.get(export_route, query)
+        repeated = owner_client.get(export_route, query)
+
+    assert first.status_code == 200
+    assert first.content == repeated.content
+    assert first["Content-Type"] == "application/zip"
+    assert "portable-network-guide-editable.zip" in first["Content-Disposition"]
+    assert first["X-TekDocs-Export-Class"] == "editable_revision_snapshot"
+    assert len(first["X-TekDocs-Content-Digest"]) == 64
+
+    with ZipFile(BytesIO(first.content)) as archive:
+        names = archive.namelist()
+        assert names == sorted(names)
+        manifest = json.loads(archive.read("manifest.json"))
+        assert archive.read("document/document.md") == created["resolved_markdown"].encode()
+        assert b"<h1>Network</h1>" in archive.read("document/document.html")
+        attachment_path = manifest["attachments"][0]["path"]
+        assert archive.read(attachment_path) == b"private attachment"
+        assert all(unselected["id"] not in name for name in names)
+
+    document = Document.objects.get(entity_id=created["id"])
+    resolved_placement = document.placements.get()
+    resolved_revision = resolved_placement.block.current_revision
+    assert manifest["format"] == "tekdocs-portable-document/v1"
+    assert manifest["export_class"] == "editable_revision_snapshot"
+    assert manifest["immutable_publication"] is False
+    assert manifest["content_digest"] == first["X-TekDocs-Content-Digest"]
+    assert manifest["placements"] == [
+        {
+            "id": str(resolved_placement.id),
+            "parent_id": None,
+            "position": 0,
+            "depth": 0,
+            "block_id": str(resolved_placement.block.entity_id),
+            "resolution_mode": "live",
+            "revision_id": str(resolved_revision.id),
+            "revision_number": resolved_revision.revision_number,
+            "checksum": resolved_revision.checksum,
+        }
+    ]
+    assert manifest["attachments"][0]["id"] == selected["id"]
+    assert manifest["attachments"][0]["checksum"] == sha256(b"private attachment").hexdigest()
+    assert (
+        AuditEvent.objects.filter(
+            action="document.exported",
+            metadata={"format": "bundle", "attachment_count": 1},
+        ).count()
+        == 2
+    )
+
+
+@pytest.mark.django_db
+def test_portable_bundle_rejects_foreign_or_unavailable_files_without_disclosing_them(
+    owner_client, installation, tmp_path
+):
+    acme = organization(installation.tenant, "Acme portable export")
+    beta = organization(installation.tenant, "Beta portable export")
+    first_document = owner_client.post(
+        reverse(
+            "organization-document-list-create",
+            kwargs={"organization_entity_id": acme.entity_id},
+        ),
+        {"title": "First document", "markdown": "First"},
+        content_type="application/json",
+    ).json()
+    second_document = owner_client.post(
+        reverse(
+            "organization-document-list-create",
+            kwargs={"organization_entity_id": beta.entity_id},
+        ),
+        {"title": "Second document", "markdown": "Second"},
+        content_type="application/json",
+    ).json()
+    with override_settings(MEDIA_ROOT=tmp_path):
+        foreign_file = owner_client.post(
+            reverse(
+                "organization-document-attachment-list-create",
+                kwargs={
+                    "organization_entity_id": beta.entity_id,
+                    "document_entity_id": second_document["id"],
+                },
+            ),
+            {"file": SimpleUploadedFile("foreign.txt", b"foreign private content")},
+        ).json()
+        rejected = owner_client.get(
+            reverse(
+                "organization-document-export",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": first_document["id"],
+                },
+            ),
+            {"export_format": "bundle", "attachment_ids": [foreign_file["id"]]},
+        )
+
+    assert rejected.status_code == 409
+    assert rejected.content == b"One or more selected or referenced files are unavailable."
+    assert not AuditEvent.objects.filter(action="document.exported", metadata__format="bundle").exists()
 
 
 @pytest.mark.django_db
@@ -2198,9 +2340,7 @@ def test_static_exports_use_retained_snapshot_and_pdf_artifact(owner_client, ins
             "is_template": "false",
         },
     ).json()
-    publication_route = reverse(
-        "msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}
-    )
+    publication_route = reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]})
     with override_settings(MEDIA_ROOT=tmp_path):
         publication = owner_client.post(
             publication_route,
@@ -2225,19 +2365,25 @@ def test_static_exports_use_retained_snapshot_and_pdf_artifact(owner_client, ins
         html = owner_client.get(route, {"export_format": "html"})
         pdf = owner_client.get(route, {"export_format": "pdf"})
         docx = owner_client.get(route, {"export_format": "docx"})
+        bundle = owner_client.get(route, {"export_format": "bundle"})
         retained = DocumentPublication.objects.get(entity_id=publication["id"])
         pdf_artifact = retained.artifacts.get(kind="pdf")
 
         assert markdown.content == retained.canonical_markdown.encode()
+        assert "frozen-guide-static.md" in markdown["Content-Disposition"]
+        assert markdown["X-TekDocs-Export-Class"] == "immutable_static_publication"
+        assert markdown["X-TekDocs-Content-Digest"] == retained.content_digest
         assert retained.sanitized_html.encode() in html.content
+        assert html["X-TekDocs-Export-Class"] == "immutable_static_publication"
         assert pdf.content == pdf_artifact.file.read()
+        assert pdf["X-TekDocs-Content-Digest"] == retained.content_digest
         with ZipFile(BytesIO(docx.content)) as archive:
             document_xml = archive.read("word/document.xml")
         assert b"Retained content" in document_xml
         assert b"Replacement content" not in document_xml
-        assert AuditEvent.objects.filter(
-            action="document.publication_exported", metadata={"format": "docx"}
-        ).exists()
+        assert docx["X-TekDocs-Export-Class"] == "immutable_static_publication"
+        assert bundle.status_code == 400
+        assert AuditEvent.objects.filter(action="document.publication_exported", metadata={"format": "docx"}).exists()
 
 
 @pytest.mark.django_db
@@ -2302,13 +2448,12 @@ def test_legacy_document_restructure_is_previewed_atomic_audited_and_idempotent(
     assert result["document"]["id"] == str(original_entity_id)
     assert result["document"]["category"] == "guide"
     assert result["document"]["placement_count"] == 4
-    assert result["document"]["resolved_markdown"] == "\n\n".join(
-        section["markdown"] for section in payload["sections"]
-    ) + "\n"
-    original_revision.refresh_from_db()
-    primary_revisions = list(
-        BlockRevision.objects.filter(block=original_revision.block).order_by("revision_number")
+    assert (
+        result["document"]["resolved_markdown"]
+        == "\n\n".join(section["markdown"] for section in payload["sections"]) + "\n"
     )
+    original_revision.refresh_from_db()
+    primary_revisions = list(BlockRevision.objects.filter(block=original_revision.block).order_by("revision_number"))
     assert [revision.id for revision in primary_revisions] == [
         original_revision.id,
         uuid.UUID(result["document"]["current_revision_id"]),
@@ -2328,9 +2473,7 @@ def test_legacy_document_restructure_is_previewed_atomic_audited_and_idempotent(
     assert replay.json()["status"] == "already_restructured"
     assert DocumentPlacement.objects.filter(document=document).count() == 4
     assert (
-        AuditEvent.objects.filter(
-            action="document.semantic_sections_created", entity_id=original_entity_id
-        ).count()
+        AuditEvent.objects.filter(action="document.semantic_sections_created", entity_id=original_entity_id).count()
         == 1
     )
 

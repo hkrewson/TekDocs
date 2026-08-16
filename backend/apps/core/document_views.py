@@ -23,7 +23,16 @@ from .document_attachments import (
     open_document_attachment,
     replace_primary_document_file,
 )
-from .document_exports import EXPORT_FORMATS, export_docx, export_html, export_pdf
+from .document_exports import (
+    EXPORT_FORMATS,
+    DocumentExportSnapshot,
+    ExportConflict,
+    export_bundle,
+    export_docx,
+    export_html,
+    export_pdf,
+    resolve_export_snapshot,
+)
 from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
@@ -42,7 +51,6 @@ from .documents import (
     instantiate_document_template,
     remove_document_placement,
     remove_listing_reference,
-    resolve_document,
     restructure_document,
     revision_diff,
     revisions_for_document,
@@ -324,9 +332,7 @@ def _template_enrollment(workspace: ResolvedWorkspace, enrollment_id: UUID) -> D
     )
 
 
-def _template_rollout_response(
-    enrollment: DocumentTemplateEnrollment, preview: dict[str, object]
-) -> Response:
+def _template_rollout_response(enrollment: DocumentTemplateEnrollment, preview: dict[str, object]) -> Response:
     payload = {
         "enrollment_id": enrollment.id,
         "applied_revision_id": enrollment.applied_revision_id,
@@ -409,10 +415,39 @@ def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response
 
 class DocumentExportQuerySerializer(serializers.Serializer):
     export_format = serializers.ChoiceField(choices=sorted(EXPORT_FORMATS), default="md")
+    attachment_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+        max_length=50,
+    )
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        attachment_ids = attrs["attachment_ids"]
+        if attrs["export_format"] != "bundle" and attachment_ids:
+            raise serializers.ValidationError("Files may be selected only for a portable bundle.")
+        if len(set(attachment_ids)) != len(attachment_ids):
+            raise serializers.ValidationError("Each selected file may appear only once.")
+        return attrs
 
 
-def _export_response(*, title: str, markdown: str, format_name: str, retained_html: str | None = None) -> HttpResponse:
+class DocumentPublicationExportQuerySerializer(serializers.Serializer):
+    export_format = serializers.ChoiceField(choices=sorted(EXPORT_FORMATS - {"bundle"}), default="md")
+
+
+def _export_response(
+    *,
+    title: str,
+    markdown: str,
+    format_name: str,
+    retained_html: str | None = None,
+    snapshot: DocumentExportSnapshot | None = None,
+    export_class: str = "editable_revision_snapshot",
+    content_digest: str = "",
+) -> HttpResponse:
     stem = slugify(title) or "document"
+    suffix = "static" if export_class == "immutable_static_publication" else "editable"
+    filename_stem = stem if stem.endswith(f"-{suffix}") else f"{stem}-{suffix}"
     if format_name == "md":
         content, media_type, extension = markdown.encode("utf-8"), "text/markdown; charset=utf-8", "md"
     elif format_name == "html":
@@ -420,14 +455,22 @@ def _export_response(*, title: str, markdown: str, format_name: str, retained_ht
         media_type, extension = "text/html; charset=utf-8", "html"
     elif format_name == "pdf":
         content, media_type, extension = export_pdf(title=title, markdown=markdown), "application/pdf", "pdf"
-    else:
+    elif format_name == "docx":
         content = export_docx(title=title, markdown=markdown)
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         extension = "docx"
+    else:
+        if snapshot is None:
+            raise RuntimeError("Portable bundle export requires an exact document snapshot")
+        content = export_bundle(snapshot)
+        media_type, extension = "application/zip", "zip"
     response = HttpResponse(content, content_type=media_type)
-    response["Content-Disposition"] = f'attachment; filename="{stem}.{extension}"'
+    response["Content-Disposition"] = f'attachment; filename="{filename_stem}.{extension}"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
+    response["X-TekDocs-Export-Class"] = export_class
+    if content_digest:
+        response["X-TekDocs-Content-Digest"] = content_digest
     return response
 
 
@@ -436,17 +479,29 @@ def _export_document(workspace: ResolvedWorkspace, document_entity_id: UUID, req
     query = DocumentExportQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
     format_name = query.validated_data["export_format"]
+    attachment_ids = tuple(query.validated_data["attachment_ids"])
+    try:
+        snapshot = resolve_export_snapshot(
+            workspace=workspace,
+            document=document,
+            attachment_ids=attachment_ids,
+        )
+    except ExportConflict as conflict:
+        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
     AuditEvent.objects.create(
         tenant=workspace.member.tenant,
         actor=request.user,
         action="document.exported",
         entity_id=document.entity_id,
-        metadata={"format": format_name},
+        metadata={"format": format_name, "attachment_count": len(attachment_ids)},
     )
     return _export_response(
-        title=document.entity.display_name,
-        markdown=resolve_document(document).markdown,
+        title=snapshot.title,
+        markdown=snapshot.markdown,
         format_name=format_name,
+        retained_html=snapshot.sanitized_html if format_name == "html" else None,
+        snapshot=snapshot,
+        content_digest=snapshot.digest,
     )
 
 
@@ -522,14 +577,16 @@ def _archive_attachment(
 
 
 def _publication_records(document: Document):  # type: ignore[no-untyped-def]
-    return DocumentPublication.objects.filter(tenant=document.tenant, document=document).select_related(
-        "entity", "document", "document__entity", "published_by", "supersedes__entity"
-    ).prefetch_related(
-        "artifacts",
-        "artifacts__entity",
-        "artifacts__source_attachment__entity",
-        "control_events__actor",
-        "successors__control_events",
+    return (
+        DocumentPublication.objects.filter(tenant=document.tenant, document=document)
+        .select_related("entity", "document", "document__entity", "published_by", "supersedes__entity")
+        .prefetch_related(
+            "artifacts",
+            "artifacts__entity",
+            "artifacts__source_attachment__entity",
+            "control_events__actor",
+            "successors__control_events",
+        )
     )
 
 
@@ -658,6 +715,8 @@ def _publication_markdown(
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
+    response["X-TekDocs-Export-Class"] = "immutable_static_publication"
+    response["X-TekDocs-Content-Digest"] = publication.content_digest
     return response
 
 
@@ -668,7 +727,7 @@ def _publication_export(
     request: Request,
 ) -> HttpResponse:
     publication = _publication(workspace, document_entity_id, publication_entity_id)
-    query = DocumentExportQuerySerializer(data=request.query_params)
+    query = DocumentPublicationExportQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
     format_name = query.validated_data["export_format"]
     AuditEvent.objects.create(
@@ -689,12 +748,16 @@ def _publication_export(
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
+        response["X-TekDocs-Export-Class"] = "immutable_static_publication"
+        response["X-TekDocs-Content-Digest"] = publication.content_digest
         return response
     return _export_response(
         title=f"{publication.title} STATIC",
         markdown=publication.canonical_markdown,
         format_name=format_name,
         retained_html=publication.sanitized_html if format_name == "html" else None,
+        export_class="immutable_static_publication",
+        content_digest=publication.content_digest,
     )
 
 
@@ -1029,9 +1092,7 @@ class MSPDocumentRestructureView(APIView):
         responses={200: DocumentRestructurePreviewSerializer},
     )
     def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
-        return _restructure_preview(
-            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request
-        )
+        return _restructure_preview(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
 
     @extend_schema(
         operation_id="documents_msp_restructure",
@@ -1076,9 +1137,7 @@ class MSPDocumentPrimaryFileView(APIView):
         responses={201: DocumentPrimaryFileSerializer},
     )
     def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
-        return _replace_primary_file(
-            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request
-        )
+        return _replace_primary_file(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
 
 
 class MSPDocumentAttachmentDetailView(APIView):
@@ -1167,7 +1226,7 @@ class MSPDocumentPublicationMarkdownView(APIView):
 class MSPDocumentPublicationExportView(APIView):
     @extend_schema(
         operation_id="document_publications_msp_export",
-        parameters=[DocumentExportQuerySerializer],
+        parameters=[DocumentPublicationExportQuerySerializer],
         responses={200: bytes},
     )
     def get(self, request, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]
@@ -1320,9 +1379,7 @@ class OrganizationFileBackedDocumentCreateView(APIView):
 class OrganizationDocumentTemplateLibraryView(APIView):
     @extend_schema(operation_id="document_templates_organization_library", responses={200: DocumentResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _template_library(
-            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
-        )
+        return _template_library(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW))
 
 
 class OrganizationDocumentTemplateRolloutPreviewView(APIView):
@@ -1579,7 +1636,7 @@ class OrganizationDocumentPublicationMarkdownView(APIView):
 class OrganizationDocumentPublicationExportView(APIView):
     @extend_schema(
         operation_id="document_publications_organization_export",
-        parameters=[DocumentExportQuerySerializer],
+        parameters=[DocumentPublicationExportQuerySerializer],
         responses={200: bytes},
     )
     def get(self, request, organization_entity_id, document_entity_id, publication_entity_id):  # type: ignore[no-untyped-def]

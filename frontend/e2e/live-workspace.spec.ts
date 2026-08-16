@@ -590,6 +590,16 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   const exportedMarkdown = await readFile(exportedPath, 'utf8')
   expect(exportedMarkdown).toContain('# Incident response')
   expect(exportedMarkdown).toMatch(/tekdocs:\/\/attachment\/[0-9a-f-]{36}/)
+  await page.getByRole('checkbox', { name: /incident-checklist\.txt/ }).check()
+  const [portableExport] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Download portable ZIP' }).click(),
+  ])
+  expect(portableExport.suggestedFilename()).toMatch(/-editable\.zip$/)
+  const portablePath = await portableExport.path()
+  if (!portablePath) throw new Error('The portable export did not produce a local download.')
+  const portableBytes = await readFile(portablePath)
+  expect(portableBytes.subarray(0, 4).toString('hex')).toBe('504b0304')
 
   await page.getByLabel('Markdown file to import').setInputFiles({
     name: 'live-import.md',

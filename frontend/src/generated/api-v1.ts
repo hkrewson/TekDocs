@@ -7104,6 +7104,7 @@ export interface components {
             readonly resolved_revision_number: number;
             readonly resolved_checksum: string;
             readonly resolved_markdown: string;
+            readonly resolved_html: string;
             readonly is_primary: boolean;
         };
         readonly DocumentPlacementWrite: {

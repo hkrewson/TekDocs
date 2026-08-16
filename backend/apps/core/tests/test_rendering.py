@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import InstallationState
-from apps.core.rendering import render_markdown, render_pdf
+from apps.core.rendering import render_markdown, render_pdf, split_markdown_sections
 
 
 class RenderedHTMLProbe(HTMLParser):
@@ -18,6 +18,26 @@ class RenderedHTMLProbe(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.tags.append(tag)
         self.attributes.extend((tag, name, value) for name, value in attrs)
+
+
+def test_markdown_sections_preserve_top_level_constructs() -> None:
+    markdown = "# Setup\n\nIntro with **mixed formatting**.\n\n- First\n- Second\n\n```shell\nmake check\n```\n"
+
+    sections = split_markdown_sections(markdown)
+
+    assert sections == [
+        ("heading", "# Setup"),
+        ("rich_text", "Intro with **mixed formatting**."),
+        ("rich_text", "- First\n- Second"),
+        ("code", "```shell\nmake check\n```"),
+    ]
+    assert "\n\n".join(content for _, content in sections) + "\n" == markdown
+
+
+def test_markdown_sections_keep_footnotes_in_one_render_context() -> None:
+    markdown = "Paragraph with a note.[^1]\n\n[^1]: Retained note.\n"
+
+    assert split_markdown_sections(markdown) == [("rich_text", markdown.rstrip("\n"))]
 
 
 def test_markdown_renderer_disables_raw_html_and_unsafe_urls() -> None:

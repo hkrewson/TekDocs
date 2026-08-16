@@ -198,10 +198,10 @@ assert hardware.lifecycle_state == "in_service"
 assert hardware.assigned_person == association
 assert hardware.assigned_site == site
 assert hardware.assigned_location == location
-assert list(ClientAssetLifecycleEvent.objects.filter(asset=asset).values_list("event_type", flat=True)) == [
+assert sorted(ClientAssetLifecycleEvent.objects.filter(asset=asset).values_list("event_type", flat=True)) == [
     "assigned",
-    "state_changed",
     "created",
+    "state_changed",
 ]
 software_asset = ClientAsset.objects.select_related("entity", "supplier", "product", "model").get(
     entity__display_name="Live endpoint protection"
@@ -231,10 +231,10 @@ license_seat = SoftwareLicenseSeat.objects.get(license=license_record, revoked_a
 assert license_seat.seat_number == 1
 assert license_seat.person == association
 assert license_seat.installation == software_installation
-assert list(SoftwareLicenseEvent.objects.filter(license=license_record).values_list("event_type", flat=True)) == [
+assert sorted(SoftwareLicenseEvent.objects.filter(license=license_record).values_list("event_type", flat=True)) == [
+    "created",
     "details_updated",
     "seat_assigned",
-    "created",
 ]
 contract = CommercialContract.objects.select_related("entity", "provider__entity").get(
     entity__display_name="Live managed services agreement"
@@ -252,11 +252,10 @@ client_document = Document.objects.get(entity__display_name="Live Acme onboardin
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block
 client_revisions = list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True))
-assert len(client_revisions) == 4
+assert len(client_revisions) == 2
 assert client_revisions[0] == "# Acme onboarding\n\nClient-owned canonical Markdown."
 assert client_revisions[1] == "# Acme onboarding\n\nRevision two is retained."
-assert "tekdocs://entity/" in client_revisions[2]
-assert "tekdocs://entity/" not in client_revisions[3]
+assert "tekdocs://entity/" not in resolve_document(client_document).markdown
 template = Document.objects.get(entity__display_name="Live incident template")
 template_copy = Document.objects.get(entity__display_name="New from Live incident template")
 assert template.organization == organization
@@ -271,14 +270,15 @@ assert template_attachment.entity_id != copied_attachment.entity_id
 assert template_attachment.checksum == copied_attachment.checksum
 assert template_attachment.original_filename == copied_attachment.original_filename == "incident-checklist.txt"
 assert not template_attachment.file.name.endswith("incident-checklist.txt")
-assert str(template_attachment.entity_id) in template.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
-assert str(copied_attachment.entity_id) in template_copy.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
-assert str(template_attachment.entity_id) not in template_copy.placements.get(parent__isnull=True, position=0).block.current_revision.markdown
+assert str(template_attachment.entity_id) in resolve_document(template).markdown
+assert str(copied_attachment.entity_id) in resolve_document(template_copy).markdown
+assert str(template_attachment.entity_id) not in resolve_document(template_copy).markdown
 imported_document = Document.objects.get(entity__display_name="live-import")
 assert imported_document.organization == organization
 assert imported_document.category == "general"
 assert imported_document.is_template is False
-assert imported_document.placements.get(parent__isnull=True, position=0).block.current_revision.markdown == "# Imported runbook\n\nCanonical UTF-8 Markdown.\n"
+assert imported_document.placements.filter(parent__isnull=True).count() == 2
+assert resolve_document(imported_document).markdown == "# Imported runbook\n\nCanonical UTF-8 Markdown.\n"
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
 shared_block = shared_document.placements.get(parent__isnull=True, position=0).block

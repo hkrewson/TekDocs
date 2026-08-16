@@ -27,7 +27,7 @@ const document = {
   revision_number: 1,
   checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4',
   resolved_markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n',
-  placements: [{ id: documentPlacementId, parent_id: null, block_id: documentBlockId, block_name: 'UniFi Network Setup Guide — content', position: 0, depth: 0, resolution_mode: 'live', pinned_revision_id: null, resolved_revision_id: documentRevisionId, resolved_revision_number: 1, resolved_checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4', is_primary: true }],
+  placements: [{ id: documentPlacementId, parent_id: null, block_id: documentBlockId, block_name: 'UniFi Network Setup Guide — content', block_kind: 'rich_text', position: 0, depth: 0, resolution_mode: 'live', pinned_revision_id: null, resolved_revision_id: documentRevisionId, resolved_revision_number: 1, resolved_checksum: '4c5543b28d58a32c3140a9f59050c48d862576dd71b031a825cfb4d8aa3fd4a4', resolved_markdown: '# UniFi Network Setup Guide\n\nUse **approved** access.\n', resolved_html: '<h1>UniFi Network Setup Guide</h1><p>Use <strong>approved</strong> access.</p>', is_primary: true }],
   placement_count: 1,
   attachments: [],
   attachment_count: 0,
@@ -59,7 +59,7 @@ async function mockAuthenticated(page: Page) {
 
 async function openPrimaryBlockEditor(page: Page) {
   await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
-  const blockButton = page.getByRole('button', { name: /Edit block/ })
+  const blockButton = page.getByRole('button', { name: 'Edit this content' })
   const markdownTab = page.getByRole('tab', { name: 'Markdown' })
   await expect(blockButton.or(markdownTab)).toBeVisible()
   if (await blockButton.isVisible()) await blockButton.click()
@@ -168,13 +168,13 @@ test('revision history pagination and diffs remain keyboard-accessible', async (
   await mockAuthenticated(page)
   await page.goto('/documentation')
   await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
-  await page.getByRole('button', { name: 'Revision history' }).click()
-  await expect(page.getByText('Showing 1–50 of 51')).toBeVisible()
+  await page.getByRole('button', { name: 'History' }).click()
+  await expect(page.getByText(/page 1/)).toBeVisible()
   await page.getByRole('button', { name: /Revision 1/ }).focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Revision 1 changes' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Newer revisions' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Older revisions' })).toBeEnabled()
+  await expect(page.getByRole('heading', { name: 'Revision 1' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Newer' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Older' })).toBeEnabled()
   expect((await new AxeBuilder({ page }).include('.revision-history').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 

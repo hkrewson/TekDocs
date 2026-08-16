@@ -23853,6 +23853,9 @@ components:
           readOnly: true
         resolved_markdown:
           type: string
+        resolved_html:
+          type: string
+          readOnly: true
         is_primary:
           type: boolean
           readOnly: true
@@ -23868,6 +23871,7 @@ components:
       - position
       - resolution_mode
       - resolved_checksum
+      - resolved_html
       - resolved_markdown
       - resolved_revision_id
       - resolved_revision_number

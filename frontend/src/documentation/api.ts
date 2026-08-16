@@ -19,6 +19,7 @@ export type DocumentPlacement = {
   resolved_revision_number: number
   resolved_checksum: string
   resolved_markdown: string
+  resolved_html: string
   is_primary: boolean
 }
 export type DocumentRecord = {

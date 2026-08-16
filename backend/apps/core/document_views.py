@@ -1,6 +1,7 @@
 from typing import cast
 from uuid import UUID
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -65,6 +66,7 @@ from .publications import (
     withdraw_publication,
 )
 from .relationships import search_entities
+from .rendering import split_markdown_sections
 from .scoping import DataScope
 from .serializers import (
     BlockLibraryQuerySerializer,
@@ -138,7 +140,10 @@ def _list(workspace: ResolvedWorkspace, request: Request) -> Response:
     elif values["template"] == "templates":
         queryset = queryset.filter(is_template=True)
     records = list(queryset.order_by("entity__display_name", "entity_id")[:500])
-    context = {"workspace_organization_id": workspace.organization.id if workspace.organization else None}
+    context = {
+        "workspace": workspace,
+        "workspace_organization_id": workspace.organization.id if workspace.organization else None,
+    }
     return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
 
 
@@ -155,11 +160,17 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         is_template=serializer.validated_data["is_template"],
         library_visible=serializer.validated_data["library_visible"],
     )
-    return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+    return Response(
+        DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
+        status=201,
+    )
 
 
 def _retrieve(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
-    context = {"workspace_organization_id": workspace.organization.id if workspace.organization else None}
+    context = {
+        "workspace": workspace,
+        "workspace_organization_id": workspace.organization.id if workspace.organization else None,
+    }
     return Response(DocumentSerializer(_document(workspace, document_entity_id), context=context).data)
 
 
@@ -220,7 +231,10 @@ def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Res
         )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
-    return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+    return Response(
+        DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
+        status=201,
+    )
 
 
 def _template_library(workspace: ResolvedWorkspace) -> Response:
@@ -282,6 +296,7 @@ def _apply_template_rollout(workspace: ResolvedWorkspace, request: Request) -> R
     return _template_rollout_response(enrollment, preview)
 
 
+@transaction.atomic
 def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = MarkdownImportSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -297,16 +312,35 @@ def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response
         markdown = content.decode("utf-8")
     except UnicodeDecodeError:
         return Response({"file": ["Markdown imports must use UTF-8."]}, status=400)
+    sections = split_markdown_sections(markdown)
+    first_kind, first_markdown = sections[0]
     document = create_document(
         tenant=workspace.member.tenant,
         organization=workspace.organization,
         actor_id=request.user.pk,
         title=serializer.validated_data["title"],
-        markdown=markdown,
+        markdown=first_markdown,
         category=serializer.validated_data["category"],
         is_template=serializer.validated_data["is_template"],
     )
-    return Response(DocumentSerializer(_document(workspace, document.entity_id)).data, status=201)
+    primary = document.placements.select_related("block").get(parent__isnull=True, position=0)
+    if primary.block.kind != first_kind:
+        primary.block.kind = first_kind
+        primary.block.save(update_fields=("kind", "updated_at"))
+    for position, (kind, section_markdown) in enumerate(sections[1:], start=1):
+        create_document_block(
+            document=document,
+            actor_id=request.user.pk,
+            markdown=section_markdown,
+            kind=kind,
+            name="",
+            parent_id=None,
+            position=position,
+        )
+    return Response(
+        DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
+        status=201,
+    )
 
 
 class DocumentExportQuerySerializer(serializers.Serializer):

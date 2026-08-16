@@ -11,7 +11,7 @@ import { RevisionConflictError } from './api'
 import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClient } from './api'
 import type { WorkspaceClient } from '../workspaces/api'
 
-const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', is_primary: true }
+const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
 const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
@@ -92,12 +92,15 @@ it('lists titles and persists an independently edited block', async () => {
   const { documents, workspaces, updateSharedBlock } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
+  expect(await screen.findByRole('heading', { name: 'Firewall' })).toBeVisible()
+  expect(screen.queryByText('Document blocks')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Select a block to edit/)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Edit this content' }))
   await user.clear(await screen.findByRole('textbox', { name: 'Document Markdown' }))
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '# Updated')
-  await user.click(screen.getByRole('button', { name: 'Save block' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(updateSharedBlock).toHaveBeenCalledWith({}, 'doc-1', 'placement-1', '# Updated', 'revision-1'))
-  expect(screen.getByRole('status')).toHaveTextContent('Block revision saved.')
+  expect(screen.getByRole('status')).toHaveTextContent('Content saved.')
 })
 
 it('loads revision history and a selected diff', async () => {
@@ -105,7 +108,7 @@ it('loads revision history and a selected diff', async () => {
   const { documents, workspaces } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Revision history' }))
+  await user.click(screen.getByRole('button', { name: 'History' }))
   await user.click(await screen.findByRole('button', { name: /Revision 1/ }))
   expect(await screen.findByText('+# Firewall')).toBeInTheDocument()
 })
@@ -119,10 +122,10 @@ it('navigates large revision histories without loading every revision', async ()
   documents.listRevisions = listRevisions
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Revision history' }))
-  expect(await screen.findByText('Showing 1–50 of 75')).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Older revisions' }))
-  expect(await screen.findByText('Showing 51–75 of 75')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'History' }))
+  expect(await screen.findByText(/page 1/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Older' }))
+  expect(await screen.findByText(/page 2/)).toBeInTheDocument()
   expect(listRevisions).toHaveBeenLastCalledWith({}, 'doc-1', 2)
 })
 
@@ -136,14 +139,14 @@ it('keeps the draft visible when a stale revision is rejected', async () => {
   }))
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
+  await user.click(screen.getByRole('button', { name: 'Edit this content' }))
   const editor = await screen.findByRole('textbox', { name: 'Document Markdown' })
   await user.clear(editor); await user.type(editor, '# My unsaved draft')
-  await user.click(screen.getByRole('button', { name: 'Save block' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('Newer revision detected')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Newer content detected')
   expect(editor).toHaveValue('# My unsaved draft')
   expect(screen.getByText(/Server edit/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Save document' })).toBeDisabled()
+  expect(screen.getByRole('textbox', { name: 'Document Markdown' })).toHaveValue('# My unsaved draft')
 })
 
 it('creates a document and adds an MSP-owned reference to a searched client', async () => {
@@ -154,8 +157,10 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.click(screen.getByRole('button', { name: 'New document' }))
   await user.type(screen.getByLabelText('Document title'), 'New guide')
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), 'Portable Markdown')
-  await user.click(screen.getByRole('button', { name: 'Save document' }))
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
   await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', is_template: false, library_visible: false }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Client listings' }))
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
@@ -166,11 +171,12 @@ it('adds a visible document block live and can pin its resolved revision', async
   const { documents, workspaces, addPlacement, updatePlacement } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.selectOptions(screen.getByLabelText('Document block'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Reuse document block' }))
-  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null }))
-  expect((await screen.findAllByText('Revision 1')).length).toBeGreaterThanOrEqual(2)
-  await user.click(screen.getAllByRole('button', { name: 'Pin' })[0])
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'Existing content' }))
+  await user.selectOptions(screen.getByLabelText('Link a document'), 'doc-source')
+  await user.click(screen.getByRole('button', { name: 'Insert document' }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null, position: 1 }))
+  await user.click(screen.getByRole('button', { name: 'Keep this version' }))
   expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused', { resolution_mode: 'pinned', pinned_revision_id: 'revision-source' })
 })
 
@@ -179,16 +185,15 @@ it('creates a typed local block at an explicit document position', async () => {
   const { documents, workspaces, addPlacement } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'New block' }))
-  await user.selectOptions(screen.getByLabelText('Block type'), 'heading')
-  await user.type(screen.getByLabelText(/Block name/), 'Network assumptions')
-  await user.selectOptions(screen.getByLabelText('Insert after'), '1')
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('menuitem', { name: 'Heading' }))
+  await user.clear(screen.getByRole('textbox', { name: 'Document Markdown' }))
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '## Addressing')
-  await user.click(screen.getByRole('button', { name: 'Add block' }))
+  await user.click(screen.getByRole('button', { name: 'Add' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', {
     operation: 'create_block',
     block_kind: 'heading',
-    block_name: 'Network assumptions',
+    block_name: 'Heading',
     markdown: '## Addressing',
     position: 1,
     library_visible: false,
@@ -204,10 +209,12 @@ it('discovers and reuses an explicitly available MSP block from a client workspa
   })
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'Existing content' }))
   expect(await screen.findByText('Printer isolation rationale')).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Reuse live' }))
+  await user.click(screen.getByRole('button', { name: 'Insert' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', {
-    operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null,
+    operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null, position: 1,
   }))
 })
 
@@ -252,6 +259,7 @@ it('previews and applies a conflict-free client template rollout', async () => {
   documents.applyTemplateRollout = applyTemplateRollout
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
   await user.click(screen.getByRole('button', { name: 'Check template updates' }))
   expect(await screen.findByText('Applied revision 1; available revision 2.')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Apply safe changes' }))
@@ -266,6 +274,7 @@ it('reviews a monitored public source before applying its Markdown', async () =>
   const { documents, workspaces, saveRemoteSource, checkRemoteSource, applyRemoteObservation } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
   await user.click(screen.getByRole('button', { name: 'Remote source' }))
   await user.type(screen.getByLabelText('Public document URL'), 'https://docs.example.invalid/setup')
   await user.click(screen.getByRole('button', { name: 'Save source' }))
@@ -278,7 +287,7 @@ it('reviews a monitored public source before applying its Markdown', async () =>
   await user.click(screen.getByRole('button', { name: 'Apply reviewed change' }))
   await waitFor(() => expect(checkRemoteSource).toHaveBeenCalledWith({}, 'doc-1'))
   expect(applyRemoteObservation).toHaveBeenCalledWith({}, 'doc-1', 'observation-1')
-  expect(screen.getByRole('status')).toHaveTextContent('Reviewed source change applied as a new block revision.')
+  expect(screen.getByRole('status')).toHaveTextContent('Reviewed source change applied as a new revision.')
 })
 
 it('reviews shared audiences and detaches a reused block', async () => {
@@ -288,13 +297,15 @@ it('reviews shared audiences and detaches a reused block', async () => {
   getReuseImpact.mockResolvedValue(reusedImpact)
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.selectOptions(screen.getByLabelText('Document block'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Reuse document block' }))
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'Existing content' }))
+  await user.selectOptions(screen.getByLabelText('Link a document'), 'doc-source')
+  await user.click(screen.getByRole('button', { name: 'Insert document' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalled())
-  await user.click(screen.getAllByRole('button', { name: 'Reuse impact' })[1])
-  expect(await screen.findByRole('heading', { name: 'Reuse impact' })).toBeVisible()
+  await user.click(screen.getAllByRole('button', { name: 'Reuse and impact' })[1])
+  expect(await screen.findByRole('heading', { name: 'Where this content is used' })).toBeVisible()
   expect(screen.getByText('Will update')).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Detach into this workspace' }))
+  await user.click(screen.getByRole('button', { name: 'Make an independent copy here' }))
   expect(detachPlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused')
 })
 
@@ -305,11 +316,13 @@ it('imports Markdown and manages a private attachment link', async () => {
   await screen.findByRole('button', { name: /Firewall standard/ })
   await user.upload(screen.getByLabelText('Markdown file to import'), new File(['# Imported'], 'imported.md', { type: 'text/markdown' }))
   await waitFor(() => expect(importMarkdown).toHaveBeenCalledWith({}, expect.any(File), 'imported', 'general', false))
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'File' }))
   await user.upload(screen.getByLabelText('Attachment file'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
   await waitFor(() => expect(uploadAttachment).toHaveBeenCalledWith({}, 'doc-imported', expect.any(File)))
-  await user.click(screen.getByRole('button', { name: /Firewall standard.*Edit block/ }))
-  await user.click(await screen.findByRole('button', { name: 'Insert link' }))
+  await user.click(await screen.findByRole('button', { name: 'Insert here' }))
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
+  await user.click(screen.getByRole('button', { name: /Files \(1\)/ }))
   await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
   expect(archiveAttachment).toHaveBeenCalledWith({}, 'doc-imported', 'attachment-1')
 })
@@ -323,8 +336,9 @@ it('offers inline viewing only for clean PDF files', async () => {
   ], attachment_count: 2 }], count: 1 })
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: /Files/ }))
   expect(screen.getByRole('button', { name: 'View PDF' })).toBeVisible()
-  expect(screen.getAllByRole('button', { name: 'Insert link' })).toHaveLength(2)
+  expect(screen.getAllByRole('button', { name: 'Insert here' })).toHaveLength(2)
 })
 
 it('publishes and opens an immutable verified STATIC version', async () => {

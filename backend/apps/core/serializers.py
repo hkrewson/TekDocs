@@ -8,7 +8,9 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from .document_attachments import resolve_rendered_attachments
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
+from .entity_mentions import resolve_entity_mentions
 from .models import (
     Block,
     BlockKind,
@@ -29,6 +31,7 @@ from .models import (
     Site,
 )
 from .relationships import SEARCHABLE_ENTITY_TYPES
+from .rendering import render_markdown
 
 
 def _clean_name(value: str) -> str:
@@ -739,6 +742,7 @@ class DocumentPlacementSerializer(serializers.Serializer):
     resolved_revision_number = serializers.SerializerMethodField()
     resolved_checksum = serializers.SerializerMethodField()
     resolved_markdown = serializers.CharField(source="revision.markdown", allow_blank=True)
+    resolved_html = serializers.SerializerMethodField()
     is_primary = serializers.SerializerMethodField()
 
     def _placement(self, obj: ResolvedPlacement) -> DocumentPlacement:
@@ -791,6 +795,13 @@ class DocumentPlacementSerializer(serializers.Serializer):
     def get_is_primary(self, obj: ResolvedPlacement) -> bool:
         placement = self._placement(obj)
         return placement.parent_id is None and placement.position == 0
+
+    def get_resolved_html(self, obj: ResolvedPlacement) -> str:
+        return render_markdown(
+            obj.revision.markdown,
+            entity_mentions=self.context.get("entity_mentions", {}),
+            attachments=self.context.get("attachments", {}),
+        )
 
 
 class DocumentSerializer(serializers.Serializer):
@@ -915,9 +926,17 @@ class DocumentSerializer(serializers.Serializer):
 
     @extend_schema_field(DocumentPlacementSerializer(many=True))
     def get_placements(self, obj: Document) -> list[dict[str, object]]:
+        context: dict[str, object] = {}
+        workspace = self.context.get("workspace")
+        if workspace is not None:
+            markdown = self._resolved(obj).markdown
+            context = {
+                "entity_mentions": resolve_entity_mentions(workspace=workspace, markdown=markdown),
+                "attachments": resolve_rendered_attachments(workspace=workspace, document=obj, markdown=markdown),
+            }
         return cast(
             list[dict[str, object]],
-            DocumentPlacementSerializer(self._resolved(obj).placements, many=True).data,
+            DocumentPlacementSerializer(self._resolved(obj).placements, many=True, context=context).data,
         )
 
     def get_placement_count(self, obj: Document) -> int:

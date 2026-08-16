@@ -308,6 +308,51 @@ _ATTRIBUTES = {
 _URL_SCHEMES = {"http", "https", "mailto", "tekdocs"}
 
 
+def split_markdown_sections(markdown: str, *, limit: int = 500) -> list[tuple[str, str]]:
+    """Split imported Markdown at top-level semantic boundaries without splitting constructs."""
+
+    if not markdown:
+        return [("rich_text", "")]
+    if re.search(r"\[\^[^\]\n]+\]", markdown):
+        # Footnote definitions and references must remain in one render context.
+        return [("rich_text", markdown.strip("\n"))]
+    lines = markdown.splitlines(keepends=True)
+    candidates: list[tuple[int, int, str]] = []
+    for token in _MARKDOWN.parse(markdown):
+        if token.level != 0 or token.map is None:
+            continue
+        start, end = token.map
+        if end <= start or (candidates and start < candidates[-1][1]):
+            continue
+        kind = (
+            "heading"
+            if token.type == "heading_open"
+            else "code"
+            if token.type in {"fence", "code_block"}
+            else "rich_text"
+        )
+        candidates.append((start, end, kind))
+
+    sections: list[tuple[str, str]] = []
+    cursor = 0
+    for start, end, kind in candidates:
+        if start > cursor and "".join(lines[cursor:start]).strip():
+            sections.append(("rich_text", "".join(lines[cursor:start]).strip("\n")))
+        content = "".join(lines[start:end]).strip("\n")
+        if content:
+            sections.append((kind, content))
+        cursor = max(cursor, end)
+    if cursor < len(lines) and "".join(lines[cursor:]).strip():
+        sections.append(("rich_text", "".join(lines[cursor:]).strip("\n")))
+    if not sections:
+        sections = [("rich_text", markdown.strip("\n"))]
+    if len(sections) > limit:
+        retained = sections[: limit - 1]
+        retained.append(("rich_text", "\n\n".join(content for _, content in sections[limit - 1 :])))
+        return retained
+    return sections
+
+
 def entity_ids_in_markdown(markdown: str) -> set[UUID]:
     entity_ids: set[UUID] = set()
     for token in _REFERENCE_SCAN_MARKDOWN.parse(markdown):

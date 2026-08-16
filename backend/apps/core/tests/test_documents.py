@@ -120,6 +120,9 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert msp_created.json()["block_id"]
     assert msp_created.json()["placements"][0]["block_kind"] == BlockKind.RICH_TEXT
     assert msp_created.json()["placements"][0]["resolved_markdown"] == "# Firewall\n\nUse **MFA**."
+    assert msp_created.json()["placements"][0]["resolved_html"] == (
+        "<h1>Firewall</h1>\n<p>Use <strong>MFA</strong>.</p>\n"
+    )
     assert org_created.json()["owner_organization_id"] == str(client_org.entity_id)
     assert Document.objects.count() == 2
     assert Block.objects.count() == 2
@@ -917,7 +920,9 @@ def test_markdown_import_and_resolved_export_use_portable_bytes(owner_client, in
     )
     assert imported.status_code == 201
     payload = imported.json()
-    assert payload["markdown"] == "# Switch\n\nCafé\n"
+    assert payload["markdown"] == "# Switch"
+    assert payload["resolved_markdown"] == "# Switch\n\nCafé\n"
+    assert [placement["block_kind"] for placement in payload["placements"]] == ["heading", "rich_text"]
     exported = owner_client.get(reverse("msp-document-export", kwargs={"document_entity_id": payload["id"]}))
     assert exported.content == "# Switch\n\nCafé\n".encode()
     assert exported["Content-Type"].startswith("text/markdown")

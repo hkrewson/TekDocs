@@ -45,8 +45,8 @@ if [ "$baseline_version" != "0.8.21" ]; then
   echo "File/export upgrade expected baseline 0.8.21, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.8.24" ]; then
-  echo "File/export upgrade expected current version 0.8.24, found $current_version" >&2
+if [ "$current_version" != "0.8.25" ]; then
+  echo "File/export upgrade expected current version 0.8.25, found $current_version" >&2
   exit 1
 fi
 

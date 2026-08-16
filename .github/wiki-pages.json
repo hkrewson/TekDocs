@@ -2,6 +2,7 @@
   "wiki_url": "https://github.com/hkrewson/TekDocs/wiki",
   "pages": [
     {"slug": "Home", "audience": "end_user"},
+    {"slug": "Roadmap", "audience": "end_user"},
     {"slug": "TekDocs-Setup", "audience": "operator"},
     {"slug": "Workspaces-and-organizations", "audience": "end_user", "contextual": true},
     {"slug": "Organizations", "audience": "end_user", "contextual": true},

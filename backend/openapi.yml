@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.24
+  version: 0.8.25
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:

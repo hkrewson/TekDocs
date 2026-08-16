@@ -2,13 +2,13 @@
 
 TekDocs is a self-hosted MSP documentation and inventory platform built around reusable, addressable Markdown blocks. It supports one MSP per installation while enforcing explicit ownership and authorization boundaries for MSP and client data.
 
-TekDocs is under active pre-1.0 development. Do not deploy it without tested backups, controlled access, and an upgrade plan.
+TekDocs is an active homelab project published for people who want to run, inspect, or adapt it. Version numbers mark tested development checkpoints rather than commercial product releases. Do not deploy it without tested backups, controlled access, and an upgrade plan.
 
 ## Development provenance
 
 TekDocs is human-directed and built with AI assistance, primarily using OpenAI Sol. The maintainer defines the product, architecture, security boundaries, acceptance criteria, and release decisions. AI-produced implementation is treated as engineering work that must pass the same review, test, migration, isolation, and production-image gates as any other contribution.
 
-The pre-1.0 security review currently recorded by the project used Claude Opus 5 (High) for three maintainer-directed automated review passes culminating in commit `32c72c0`. The reviewer and method are identified explicitly in the review record. This work is not represented as an independent human assessment; a human third-party security review remains a requirement before 1.0.
+The security review currently recorded by the project used Claude Opus 5 (High) for three maintainer-directed automated review passes culminating in commit `32c72c0`. The reviewer and method are identified explicitly in the review record. This work is not represented as an independent human assessment; a future human third-party review would provide useful additional assurance.
 
 ## Capabilities
 

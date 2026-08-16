@@ -188,6 +188,30 @@ test('mobile authenticated navigation is operable', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible()
 })
 
+test('document reading and inline insertion remain accessible on mobile', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/documentation')
+  await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
+
+  await expect(page.getByRole('heading', { name: 'UniFi Network Setup Guide', exact: true })).toBeVisible()
+  await expect(page.getByText('Document blocks')).not.toBeVisible()
+  await expect(page.locator('.document-page')).toBeVisible()
+  expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.document.documentElement.clientWidth + 1)).toBe(true)
+
+  const insertion = page.getByRole('button', { name: 'Add content here' })
+  await expect(insertion).toHaveCSS('width', '44px')
+  await insertion.click()
+  const choices = page.getByRole('group', { name: 'Add content' })
+  await expect(choices).toBeVisible()
+  await expect(choices.getByRole('button', { name: 'Text', exact: true })).toBeFocused()
+  expect((await new AxeBuilder({ page }).include('.document-workspace').withTags(wcag22Tags).analyze()).violations).toEqual([])
+
+  await page.keyboard.press('Escape')
+  await expect(choices).not.toBeVisible()
+  await expect(insertion).toBeFocused()
+})
+
 test('first-owner browser setup enters the authenticated shell', async ({ page, baseURL }) => {
   const csrf = crypto.randomUUID().replaceAll('-', '')
   await page.context().addCookies([{ name: 'csrftoken', value: csrf, url: baseURL }])

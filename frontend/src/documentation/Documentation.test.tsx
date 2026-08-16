@@ -186,7 +186,7 @@ it('creates a typed local block at an explicit document position', async () => {
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Add content here' }))
-  await user.click(screen.getByRole('menuitem', { name: 'Heading' }))
+  await user.click(screen.getByRole('button', { name: 'Heading' }))
   await user.clear(screen.getByRole('textbox', { name: 'Document Markdown' }))
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '## Addressing')
   await user.click(screen.getByRole('button', { name: 'Add' }))

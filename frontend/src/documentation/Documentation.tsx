@@ -100,6 +100,21 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [publicationControl, setPublicationControl] = useState<{ action: 'approve' | 'withdraw'; reason: string } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
   const attachmentInput = useRef<HTMLInputElement>(null)
+  const insertionMenu = useRef<HTMLDivElement>(null)
+  const restoreInsertionPosition = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (inserterOpen) insertionMenu.current?.querySelector<HTMLButtonElement>('.document-insert-types button')?.focus()
+  }, [inserterOpen])
+
+  useEffect(() => {
+    if (inserterOpen || newBlockOpen || newBlockPosition !== null || restoreInsertionPosition.current === null) return
+    const position = restoreInsertionPosition.current
+    restoreInsertionPosition.current = null
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-insertion-position="${position}"]`)?.focus()
+    })
+  }, [inserterOpen, newBlockOpen, newBlockPosition])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -244,6 +259,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const openInserter = (position: number | null) => {
     setNewBlockPosition(position); setNewBlockOpen(false); setInserterOpen(true); setActivePanel(null)
     setNewBlockKind('rich_text'); setNewBlockName(''); setNewBlockMarkdown(''); setNewBlockLibraryVisible(false)
+  }
+  const closeInsertion = () => {
+    restoreInsertionPosition.current = newBlockPosition
+    setInserterOpen(false); setNewBlockOpen(false); setNewBlockPosition(null)
   }
   const chooseContentPreset = (preset: (typeof contentPresets)[number]) => {
     setNewBlockKind(preset.kind); setNewBlockName(preset.label); setNewBlockMarkdown(preset.markdown); setNewBlockOpen(true); setInserterOpen(false)
@@ -507,17 +526,17 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const insertionPoint = (position: number) => {
     const isCurrent = newBlockPosition === position
     return <div className={`document-insertion${isCurrent ? ' active' : ''}`}>
-      {!isCurrent && <button className="document-insert-button" type="button" aria-label="Add content here" onClick={() => openInserter(position)}><Plus size={18} /></button>}
-      {isCurrent && inserterOpen && <div className="document-insert-menu" role="menu" aria-label="Add content">
-        <div className="document-insert-menu-heading"><strong>Add content</strong><button className="icon-button" type="button" aria-label="Close add content menu" onClick={() => { setInserterOpen(false); setNewBlockPosition(null) }}><X size={16} /></button></div>
-        <div className="document-insert-types">{contentPresets.map((preset) => { const Icon = preset.icon; return <button key={preset.label} type="button" role="menuitem" onClick={() => chooseContentPreset(preset)}><Icon size={17} /><span>{preset.label}</span></button> })}</div>
+      {!isCurrent && <button className="document-insert-button" type="button" aria-label="Add content here" data-insertion-position={position} onClick={() => openInserter(position)}><Plus size={18} /></button>}
+      {isCurrent && inserterOpen && <div ref={insertionMenu} className="document-insert-menu" role="group" aria-label="Add content" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); closeInsertion() } }}>
+        <div className="document-insert-menu-heading"><strong>Add content</strong><button className="icon-button" type="button" aria-label="Close add content menu" onClick={closeInsertion}><X size={16} /></button></div>
+        <div className="document-insert-types">{contentPresets.map((preset) => { const Icon = preset.icon; return <button key={preset.label} type="button" onClick={() => chooseContentPreset(preset)}><Icon size={17} /><span>{preset.label}</span></button> })}</div>
         <div className="document-insert-secondary"><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Copy size={16} />Existing content</button><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('files') }}><Paperclip size={16} />File</button><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Link2 size={16} />TekDocs record</button></div>
       </div>}
       {isCurrent && newBlockOpen && selected && selected !== 'new' && <div className="document-inline-editor">
-        <div className="document-inline-editor-heading"><strong>{newBlockName || 'New content'}</strong><button className="icon-button" type="button" aria-label="Cancel adding content" onClick={() => { setNewBlockOpen(false); setNewBlockPosition(null) }}><X size={16} /></button></div>
+        <div className="document-inline-editor-heading"><strong>{newBlockName || 'New content'}</strong><button className="icon-button" type="button" aria-label="Cancel adding content" onClick={closeInsertion}><X size={16} /></button></div>
         <Suspense fallback={<p role="status">Loading editor…</p>}><Editor key={`new-content-${newBlockKind}-${editorGeneration}`} initialMarkdown={newBlockMarkdown} title={newBlockName || 'New content'} description="" organizationId={workspace?.id} documentId={selected.id} onMarkdownChange={setNewBlockMarkdown} /></Suspense>
         {!workspace && <label className="checkbox-field"><input type="checkbox" checked={newBlockLibraryVisible} onChange={(event) => setNewBlockLibraryVisible(event.target.checked)} />Make this content available for reuse in client documents</label>}
-        <div className="document-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void createLocalBlock() }}>{saving ? 'Adding…' : 'Add'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => { setNewBlockOpen(false); setNewBlockPosition(null) }}>Cancel</button></div>
+        <div className="document-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void createLocalBlock() }}>{saving ? 'Adding…' : 'Add'}</button><button className="secondary-button" type="button" disabled={saving} onClick={closeInsertion}>Cancel</button></div>
       </div>}
     </div>
   }

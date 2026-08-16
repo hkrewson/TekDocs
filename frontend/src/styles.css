@@ -494,7 +494,8 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-content-item { position: relative; }
 .document-content-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
 .document-content-body { min-width: 0; }
-.document-content .markdown-preview { min-height: 0; padding: 0; }
+.document-content .markdown-preview { min-height: 0; padding: 0; overflow-wrap: anywhere; }
+.document-content .markdown-preview table { display: block; max-width: 100%; overflow-x: auto; }
 .document-content .markdown-preview > :first-child { margin-top: 0; }
 .document-content .markdown-preview > :last-child { margin-bottom: 0; }
 .document-content-controls { position: absolute; top: -4px; right: -42px; display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 120ms ease; }
@@ -538,7 +539,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .document-reader-actions { justify-content: flex-start; }
   .document-page { padding: 34px 24px 52px; }
   .document-content-controls { position: static; margin-left: 6px; opacity: 1; }
-  .document-insert-button { opacity: 1; }
+  .document-insert-button { width: 44px; height: 44px; opacity: 1; }
   .document-insert-types { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .document-detail-fields, .reuse-resolution, .reuse-document { grid-template-columns: 1fr; }
 }

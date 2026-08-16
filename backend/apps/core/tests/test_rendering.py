@@ -40,6 +40,18 @@ def test_markdown_sections_keep_footnotes_in_one_render_context() -> None:
     assert split_markdown_sections(markdown) == [("rich_text", markdown.rstrip("\n"))]
 
 
+def test_markdown_sections_bound_large_legacy_documents_without_losing_order() -> None:
+    paragraphs = [f"Paragraph {position}" for position in range(750)]
+
+    sections = split_markdown_sections("\n\n".join(paragraphs))
+
+    assert len(sections) == 500
+    assert sections[0] == ("rich_text", "Paragraph 0")
+    assert sections[498] == ("rich_text", "Paragraph 498")
+    assert sections[499][0] == "rich_text"
+    assert sections[499][1].split("\n\n") == paragraphs[499:]
+
+
 def test_markdown_renderer_disables_raw_html_and_unsafe_urls() -> None:
     rendered = render_markdown("# Safe\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))")
 

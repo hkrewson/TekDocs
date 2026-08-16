@@ -36,11 +36,13 @@ from .documents import (
     create_document,
     create_document_block,
     detach_document_placement,
+    document_restructure_preview,
     documents_for_scope,
     instantiate_document_template,
     remove_document_placement,
     remove_listing_reference,
     resolve_document,
+    restructure_document,
     revision_diff,
     revisions_for_document,
     template_rollout_preview,
@@ -86,6 +88,9 @@ from .serializers import (
     DocumentPublicationDetailSerializer,
     DocumentPublicationResultSerializer,
     DocumentPublicationWriteSerializer,
+    DocumentRestructureApplySerializer,
+    DocumentRestructurePreviewSerializer,
+    DocumentRestructureResultSerializer,
     DocumentResultSerializer,
     DocumentSerializer,
     DocumentTemplateInstantiateSerializer,
@@ -191,6 +196,36 @@ def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> 
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
     return _retrieve(workspace, document_entity_id)
+
+
+def _restructure_preview(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    return Response(DocumentRestructurePreviewSerializer(document_restructure_preview(document)).data)
+
+
+def _restructure(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    serializer = DocumentRestructureApplySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        result = restructure_document(
+            document=document,
+            actor_id=request.user.pk,
+            base_revision_id=serializer.validated_data["base_revision_id"],
+        )
+    except RevisionConflict as conflict:
+        return _revision_conflict_response(conflict)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    refreshed = _document(workspace, document_entity_id)
+    return Response(
+        DocumentRestructureResultSerializer(
+            {"status": result.status, "section_count": result.section_count, "document": refreshed},
+            context={"workspace": workspace},
+        ).data
+    )
 
 
 def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Response:
@@ -929,6 +964,28 @@ class MSPDocumentDetailView(APIView):
         return _archive(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
 
 
+class MSPDocumentRestructureView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_restructure_preview",
+        responses={200: DocumentRestructurePreviewSerializer},
+    )
+    def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _restructure_preview(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request
+        )
+
+    @extend_schema(
+        operation_id="documents_msp_restructure",
+        request=DocumentRestructureApplySerializer,
+        responses={
+            200: DocumentRestructureResultSerializer,
+            409: OpenApiResponse(description="Revision or dependency conflict"),
+        },
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _restructure(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
 class MSPDocumentExportView(APIView):
     @extend_schema(
         operation_id="documents_msp_export",
@@ -1248,6 +1305,34 @@ class OrganizationDocumentDetailView(APIView):
     )
     def delete(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
         return _archive(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentRestructureView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_restructure_preview",
+        responses={200: DocumentRestructurePreviewSerializer},
+    )
+    def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _restructure_preview(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+    @extend_schema(
+        operation_id="documents_organization_restructure",
+        request=DocumentRestructureApplySerializer,
+        responses={
+            200: DocumentRestructureResultSerializer,
+            409: OpenApiResponse(description="Revision or dependency conflict"),
+        },
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _restructure(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
             document_entity_id,
             request,

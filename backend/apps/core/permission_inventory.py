@@ -54,6 +54,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route(
+        "msp-document-restructure",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_EDIT,
+        (PermissionKey.DOCUMENTS_EDIT,),
+    ),
     route("msp-document-revision-list", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-revision-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route(
@@ -1087,6 +1093,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-document-detail",
         ("GET", "PUT", "DELETE"),
         PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-restructure",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_EDIT,
         (PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
     ),

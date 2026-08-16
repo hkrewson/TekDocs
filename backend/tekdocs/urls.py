@@ -127,6 +127,7 @@ from apps.core.document_views import (
     MSPDocumentPublicationWithdrawView,
     MSPDocumentReferenceDetailView,
     MSPDocumentReferenceListCreateView,
+    MSPDocumentRestructureView,
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
     MSPDocumentTemplateInstantiateView,
@@ -151,6 +152,7 @@ from apps.core.document_views import (
     OrganizationDocumentPublicationManifestView,
     OrganizationDocumentPublicationMarkdownView,
     OrganizationDocumentPublicationWithdrawView,
+    OrganizationDocumentRestructureView,
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
     OrganizationDocumentTemplateInstantiateView,
@@ -488,6 +490,11 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/restructure",
+        MSPDocumentRestructureView.as_view(),
+        name="msp-document-restructure",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/export",
@@ -1565,6 +1572,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/restructure",
+        OrganizationDocumentRestructureView.as_view(),
+        name="organization-document-restructure",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/export",

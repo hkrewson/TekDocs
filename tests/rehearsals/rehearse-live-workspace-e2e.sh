@@ -56,7 +56,7 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
-from apps.core.models import Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
@@ -252,9 +252,19 @@ client_document = Document.objects.get(entity__display_name="Live Acme onboardin
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block
 client_revisions = list(client_block.revisions.order_by("revision_number").values_list("markdown", flat=True))
-assert len(client_revisions) == 2
-assert client_revisions[0] == "# Acme onboarding\n\nClient-owned canonical Markdown."
-assert client_revisions[1] == "# Acme onboarding\n\nRevision two is retained."
+assert client_revisions == [
+    "# Acme onboarding\n\nClient-owned canonical Markdown.",
+    "# Acme onboarding\n\nRevision two is retained.",
+    "# Acme onboarding",
+]
+semantic_placement = client_document.placements.get(parent__isnull=True, position=1)
+assert semantic_placement.block.current_revision.markdown == "Revision two is retained."
+conversion_event = AuditEvent.objects.get(
+    action="document.semantic_sections_created",
+    entity_id=client_document.entity_id,
+)
+assert conversion_event.metadata["section_count"] == 2
+assert "markdown" not in conversion_event.metadata
 assert "tekdocs://entity/" not in resolve_document(client_document).markdown
 template = Document.objects.get(entity__display_name="Live incident template")
 template_copy = Document.objects.get(entity__display_name="New from Live incident template")
@@ -291,7 +301,7 @@ assert list(shared_block.revisions.order_by("revision_number").values_list("mark
 assert DocumentationListingReference.objects.filter(
     document=shared_document, organization=organization, archived_at__isnull=True
 ).count() == 1
-reuse = client_document.placements.exclude(parent__isnull=True, position=0).get()
+reuse = client_document.placements.get(block__current_revision__markdown="MSP-owned block revision two.")
 assert reuse.block != shared_block
 assert reuse.block.organization == organization
 assert reuse.resolution_mode == "live"

@@ -804,6 +804,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/restructure": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_msp_restructure_preview"];
+        readonly put?: never;
+        readonly post: operations["documents_msp_restructure"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/revisions": {
         readonly parameters: {
             readonly query?: never;
@@ -4212,6 +4228,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/restructure": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_organization_restructure_preview"];
+        readonly put?: never;
+        readonly post: operations["documents_organization_restructure"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions": {
         readonly parameters: {
             readonly query?: never;
@@ -7295,6 +7327,59 @@ export interface components {
             readonly retention_review_on?: string | null;
             /** Format: uuid */
             readonly supersedes_id?: string | null;
+        };
+        readonly DocumentRestructureApply: {
+            /** Format: uuid */
+            readonly base_revision_id: string;
+        };
+        readonly DocumentRestructureDependencies: {
+            readonly publication_count: number;
+            readonly attachment_count: number;
+            readonly template_managed: boolean;
+            readonly remote_managed: boolean;
+            readonly shared_placement_count: number;
+        };
+        readonly DocumentRestructureNotice: {
+            readonly code: string;
+            readonly detail: string;
+        };
+        readonly DocumentRestructurePreview: {
+            readonly eligible: boolean;
+            /** Format: uuid */
+            readonly base_revision_id: string | null;
+            readonly base_checksum: string;
+            readonly section_count: number;
+            readonly sections: readonly components["schemas"]["DocumentRestructureSection"][];
+            readonly blockers: readonly components["schemas"]["DocumentRestructureNotice"][];
+            readonly warnings: readonly components["schemas"]["DocumentRestructureNotice"][];
+            readonly dependencies: components["schemas"]["DocumentRestructureDependencies"];
+        };
+        readonly DocumentRestructureResult: {
+            /**
+             * @description * `restructured` - restructured
+             *     * `already_restructured` - already_restructured
+             * @enum {string}
+             */
+            readonly status: "restructured" | "already_restructured";
+            readonly section_count: number;
+            readonly document: components["schemas"]["Document"];
+        };
+        readonly DocumentRestructureSection: {
+            readonly position: number;
+            /**
+             * @description * `rich_text` - Rich text
+             *     * `heading` - Heading
+             *     * `code` - Code
+             *     * `url` - URL
+             *     * `document_link` - Document link
+             *     * `entity_reference` - Entity reference
+             *     * `file_reference` - File reference
+             * @enum {string}
+             */
+            readonly kind: "rich_text" | "heading" | "code" | "url" | "document_link" | "entity_reference" | "file_reference";
+            readonly name: string;
+            readonly markdown: string;
+            readonly checksum: string;
         };
         readonly DocumentResult: {
             readonly results: readonly components["schemas"]["Document"][];
@@ -12362,6 +12447,69 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RemoteObservation"];
+                };
+            };
+        };
+    };
+    readonly documents_msp_restructure_preview: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentRestructurePreview"];
+                };
+            };
+        };
+    };
+    readonly documents_msp_restructure: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentRestructureApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentRestructureApply"];
+                readonly "multipart/form-data": components["schemas"]["DocumentRestructureApply"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentRestructureResult"];
+                };
+            };
+            /** @description Revision or dependency conflict */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };
@@ -21329,6 +21477,71 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RemoteObservation"];
+                };
+            };
+        };
+    };
+    readonly documents_organization_restructure_preview: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentRestructurePreview"];
+                };
+            };
+        };
+    };
+    readonly documents_organization_restructure: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentRestructureApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentRestructureApply"];
+                readonly "multipart/form-data": components["schemas"]["DocumentRestructureApply"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentRestructureResult"];
+                };
+            };
+            /** @description Revision or dependency conflict */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

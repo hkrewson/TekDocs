@@ -58,6 +58,20 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' })
   })
 
+  it('previews and applies a document restructure through the scoped document route', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ eligible: true }), { status: 200 })))
+
+    await browserDocumentsClient.previewRestructure({ organizationId: 'org' }, 'document/id')
+    await browserDocumentsClient.applyRestructure({ organizationId: 'org' }, 'document/id', 'revision/id')
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/document%2Fid/restructure')
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/document%2Fid/restructure')
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('POST')
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ base_revision_id: 'revision/id' }))
+  })
+
   it('reviews, updates, and detaches a shared block through destination-scoped routes', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))

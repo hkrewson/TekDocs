@@ -18,6 +18,10 @@ const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: '
 function clients() {
   const createDocument = vi.fn((_scope: object, input: DocumentInput) => Promise.resolve({ ...document, ...input, id: 'doc-2' }))
   const updateDocument = vi.fn((_scope: object, _id: string, input: DocumentUpdateInput) => Promise.resolve({ ...document, ...input, current_revision_id: 'revision-2', revision_number: 2 }))
+  const restructurePreview = { eligible: true, base_revision_id: 'revision-1', base_checksum: 'abc123', section_count: 2, sections: [{ position: 0, kind: 'heading' as const, name: 'Firewall standard — Firewall', markdown: '# Firewall', checksum: 'section-1' }, { position: 1, kind: 'rich_text' as const, name: 'Firewall standard — Require MFA', markdown: 'Require MFA.', checksum: 'section-2' }], blockers: [], warnings: [], dependencies: { publication_count: 0, attachment_count: 0, template_managed: false, remote_managed: false, shared_placement_count: 0 } }
+  const restructuredDocument = { ...document, markdown: '# Firewall', resolved_markdown: '# Firewall\n\nRequire MFA.\n', placements: [primaryPlacement, { ...primaryPlacement, id: 'placement-2', block_id: 'block-2', block_name: 'Firewall standard — Require MFA', resolved_revision_id: 'revision-section-2', resolved_markdown: 'Require MFA.', resolved_html: '<p>Require MFA.</p>', position: 1, is_primary: false }], placement_count: 2 }
+  const previewRestructure = vi.fn().mockResolvedValue(restructurePreview)
+  const applyRestructure = vi.fn().mockResolvedValue({ status: 'restructured', section_count: 2, document: restructuredDocument })
   const addReference = vi.fn(() => Promise.resolve())
   const reusedPlacement = { ...sourceDocument.placements[0], id: 'placement-reused', is_primary: false }
   const composed = { ...document, resolved_markdown: '# Firewall\n\nShared content\n', placements: [primaryPlacement, reusedPlacement], placement_count: 2 }
@@ -45,6 +49,8 @@ function clients() {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
     update: updateDocument,
+    previewRestructure,
+    applyRestructure,
     listRevisions: vi.fn().mockResolvedValue({ results: [{ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true }], count: 1, page: 1, page_size: 50, has_more: false }),
     getRevision: vi.fn().mockResolvedValue({ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true, markdown: '# Firewall', diff_from_parent: '+# Firewall' }),
     addPlacement,
@@ -84,7 +90,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
+  return { documents, workspaces, createDocument, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -111,6 +117,24 @@ it('loads revision history and a selected diff', async () => {
   await user.click(screen.getByRole('button', { name: 'History' }))
   await user.click(await screen.findByRole('button', { name: /Revision 1/ }))
   expect(await screen.findByText('+# Firewall')).toBeInTheDocument()
+})
+
+it('previews and explicitly restructures legacy content from document settings', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, previewRestructure, applyRestructure } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(screen.queryByText('Separate legacy content')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Review section conversion' }))
+  expect(await screen.findByRole('heading', { name: 'Separate legacy content' })).toBeVisible()
+  expect(screen.getByText(/2 independently editable sections/)).toBeVisible()
+  expect(screen.getByText('Require MFA')).toBeVisible()
+  expect(previewRestructure).toHaveBeenCalledWith({}, 'doc-1')
+  await user.click(screen.getByRole('button', { name: 'Create 2 sections' }))
+  await waitFor(() => expect(applyRestructure).toHaveBeenCalledWith({}, 'doc-1', 'revision-1'))
+  expect(screen.getByRole('status')).toHaveTextContent('Content separated into 2 editable sections.')
+  expect(screen.getByText('Require MFA.')).toBeVisible()
 })
 
 it('navigates large revision histories without loading every revision', async () => {

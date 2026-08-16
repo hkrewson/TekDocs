@@ -90,6 +90,35 @@ export type DocumentPublicationDetail = DocumentPublication & {
 }
 export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'> & { library_visible?: boolean }
 export type DocumentUpdateInput = DocumentInput & { base_revision_id: string }
+export type DocumentRestructureNotice = { code: string; detail: string }
+export type DocumentRestructureSection = {
+  position: number
+  kind: BlockKind
+  name: string
+  markdown: string
+  checksum: string
+}
+export type DocumentRestructurePreview = {
+  eligible: boolean
+  base_revision_id: string | null
+  base_checksum: string
+  section_count: number
+  sections: DocumentRestructureSection[]
+  blockers: DocumentRestructureNotice[]
+  warnings: DocumentRestructureNotice[]
+  dependencies: {
+    publication_count: number
+    attachment_count: number
+    template_managed: boolean
+    remote_managed: boolean
+    shared_placement_count: number
+  }
+}
+export type DocumentRestructureResult = {
+  status: 'restructured' | 'already_restructured'
+  section_count: number
+  document: DocumentRecord
+}
 export type DocumentResult = { results: DocumentRecord[]; count: number }
 export type BlockRevision = {
   id: string
@@ -222,6 +251,8 @@ export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
+  previewRestructure(scope: DocumentScope, id: string): Promise<DocumentRestructurePreview>
+  applyRestructure(scope: DocumentScope, id: string, baseRevisionId: string): Promise<DocumentRestructureResult>
   listRevisions(scope: DocumentScope, id: string, page?: number): Promise<RevisionResult>
   getRevision(scope: DocumentScope, id: string, revisionId: string): Promise<BlockRevisionDetail>
   addPlacement(scope: DocumentScope, id: string, input: PlacementInput): Promise<DocumentRecord>
@@ -324,6 +355,12 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
   update: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'PUT', input),
+  async previewRestructure(scope, id) {
+    return parse<DocumentRestructurePreview>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/restructure`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' },
+    }))
+  },
+  applyRestructure: (scope, id, baseRevisionId) => mutate<DocumentRestructureResult>(`${collectionPath(scope)}/${encodeURIComponent(id)}/restructure`, 'POST', { base_revision_id: baseRevisionId }),
   async listRevisions(scope, id, page = 1) {
     return parse<RevisionResult>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/revisions?page=${page}&page_size=50`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },

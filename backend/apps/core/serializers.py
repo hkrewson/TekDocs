@@ -312,6 +312,42 @@ class DocumentUpdateSerializer(DocumentCreateSerializer):
     base_revision_id = serializers.UUIDField()
 
 
+class DocumentRestructureApplySerializer(serializers.Serializer):
+    base_revision_id = serializers.UUIDField()
+
+
+class DocumentRestructureNoticeSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    detail = serializers.CharField()
+
+
+class DocumentRestructureSectionSerializer(serializers.Serializer):
+    position = serializers.IntegerField()
+    kind = serializers.ChoiceField(choices=BlockKind.choices)
+    name = serializers.CharField()
+    markdown = serializers.CharField(allow_blank=True)
+    checksum = serializers.CharField()
+
+
+class DocumentRestructureDependenciesSerializer(serializers.Serializer):
+    publication_count = serializers.IntegerField()
+    attachment_count = serializers.IntegerField()
+    template_managed = serializers.BooleanField()
+    remote_managed = serializers.BooleanField()
+    shared_placement_count = serializers.IntegerField()
+
+
+class DocumentRestructurePreviewSerializer(serializers.Serializer):
+    eligible = serializers.BooleanField()
+    base_revision_id = serializers.UUIDField(allow_null=True)
+    base_checksum = serializers.CharField(allow_blank=True)
+    section_count = serializers.IntegerField()
+    sections = DocumentRestructureSectionSerializer(many=True)
+    blockers = DocumentRestructureNoticeSerializer(many=True)
+    warnings = DocumentRestructureNoticeSerializer(many=True)
+    dependencies = DocumentRestructureDependenciesSerializer()
+
+
 class DocumentListQuerySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
     category = serializers.ChoiceField(
@@ -941,6 +977,12 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_placement_count(self, obj: Document) -> int:
         return len(self._resolved(obj).placements)
+
+
+class DocumentRestructureResultSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("restructured", "already_restructured"))
+    section_count = serializers.IntegerField()
+    document = DocumentSerializer()
 
 
 class BlockRevisionSerializer(serializers.Serializer):

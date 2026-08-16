@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.19
+  version: 0.8.20
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -2661,6 +2661,85 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/restructure:
+    get:
+      operationId: documents_msp_restructure_preview
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentRestructurePreview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: documents_msp_restructure
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentRestructureResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Revision or dependency conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_msp_list
@@ -14535,6 +14614,97 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/restructure:
+    get:
+      operationId: documents_organization_restructure_preview
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentRestructurePreview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: documents_organization_restructure
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentRestructureApply'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentRestructureResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Revision or dependency conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -24302,6 +24472,135 @@ components:
       - audience
       - reason
       - retention
+    DocumentRestructureApply:
+      type: object
+      properties:
+        base_revision_id:
+          type: string
+          format: uuid
+      required:
+      - base_revision_id
+    DocumentRestructureDependencies:
+      type: object
+      properties:
+        publication_count:
+          type: integer
+        attachment_count:
+          type: integer
+        template_managed:
+          type: boolean
+        remote_managed:
+          type: boolean
+        shared_placement_count:
+          type: integer
+      required:
+      - attachment_count
+      - publication_count
+      - remote_managed
+      - shared_placement_count
+      - template_managed
+    DocumentRestructureNotice:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+      required:
+      - code
+      - detail
+    DocumentRestructurePreview:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        base_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+        base_checksum:
+          type: string
+        section_count:
+          type: integer
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentRestructureSection'
+        blockers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentRestructureNotice'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentRestructureNotice'
+        dependencies:
+          $ref: '#/components/schemas/DocumentRestructureDependencies'
+      required:
+      - base_checksum
+      - base_revision_id
+      - blockers
+      - dependencies
+      - eligible
+      - section_count
+      - sections
+      - warnings
+    DocumentRestructureResult:
+      type: object
+      properties:
+        status:
+          enum:
+          - restructured
+          - already_restructured
+          type: string
+          description: |-
+            * `restructured` - restructured
+            * `already_restructured` - already_restructured
+          x-spec-enum-id: cbde583be592d33a
+        section_count:
+          type: integer
+        document:
+          $ref: '#/components/schemas/Document'
+      required:
+      - document
+      - section_count
+      - status
+    DocumentRestructureSection:
+      type: object
+      properties:
+        position:
+          type: integer
+        kind:
+          enum:
+          - rich_text
+          - heading
+          - code
+          - url
+          - document_link
+          - entity_reference
+          - file_reference
+          type: string
+          description: |-
+            * `rich_text` - Rich text
+            * `heading` - Heading
+            * `code` - Code
+            * `url` - URL
+            * `document_link` - Document link
+            * `entity_reference` - Entity reference
+            * `file_reference` - File reference
+          x-spec-enum-id: ec9cab9f2400346f
+        name:
+          type: string
+        markdown:
+          type: string
+        checksum:
+          type: string
+      required:
+      - checksum
+      - kind
+      - markdown
+      - name
+      - position
     DocumentResult:
       type: object
       properties:

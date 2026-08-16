@@ -90,6 +90,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-credential-reference-open": ("credential_reference_entity_id",),
         "msp-site-detail": ("site_entity_id",),
         "msp-document-detail": ("document_entity_id",),
+        "msp-document-restructure": ("document_entity_id",),
         "msp-document-export": ("document_entity_id",),
         "msp-document-remote-source": ("document_entity_id",),
         "msp-document-remote-observations": ("document_entity_id",),
@@ -355,6 +356,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-site-list-create": ("organization_entity_id",),
         "organization-document-list-create": ("organization_entity_id",),
         "organization-document-detail": ("organization_entity_id", "document_entity_id"),
+        "organization-document-restructure": ("organization_entity_id", "document_entity_id"),
         "organization-document-export": ("organization_entity_id", "document_entity_id"),
         "organization-document-attachment-list-create": ("organization_entity_id", "document_entity_id"),
         "organization-document-attachment-detail": (

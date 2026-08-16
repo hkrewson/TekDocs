@@ -31,7 +31,7 @@ from apps.accounts.models import (
 )
 from apps.core.approved_egress import ApprovedTarget
 from apps.core.document_sources import apply_remote_observation, fetch_remote_document, html_to_markdown
-from apps.core.documents import PlacementConflict, update_shared_block
+from apps.core.documents import PlacementConflict, restructure_document, update_shared_block
 from apps.core.models import (
     AuditEvent,
     Block,
@@ -2107,3 +2107,221 @@ def test_document_export_rejects_unknown_format(owner_client, installation):
     response = owner_client.get(route, {"export_format": "gdoc"})
 
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_legacy_document_restructure_is_previewed_atomic_audited_and_idempotent(owner_client, installation):
+    original = "# Network standard\n\nUse segmented networks.\n\n## Required VLANs\n\n- Staff\n- Guest\n"
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Network standard", "markdown": original, "category": "guide"},
+        content_type="application/json",
+    ).json()
+    document = Document.objects.get(entity_id=created["id"])
+    original_entity_id = document.entity_id
+    original_revision = BlockRevision.objects.get(id=created["current_revision_id"])
+    route = reverse("msp-document-restructure", kwargs={"document_entity_id": created["id"]})
+
+    before = {
+        "placements": DocumentPlacement.objects.filter(document=document).count(),
+        "revisions": BlockRevision.objects.filter(block__source_document=document).count(),
+        "audits": AuditEvent.objects.filter(action="document.semantic_sections_created").count(),
+    }
+    preview = owner_client.get(route)
+
+    assert preview.status_code == 200
+    payload = preview.json()
+    assert payload["eligible"] is True
+    assert payload["base_revision_id"] == created["current_revision_id"]
+    assert payload["section_count"] == 4
+    assert [section["kind"] for section in payload["sections"]] == [
+        "heading",
+        "rich_text",
+        "heading",
+        "rich_text",
+    ]
+    assert before == {
+        "placements": DocumentPlacement.objects.filter(document=document).count(),
+        "revisions": BlockRevision.objects.filter(block__source_document=document).count(),
+        "audits": AuditEvent.objects.filter(action="document.semantic_sections_created").count(),
+    }
+
+    converted = owner_client.post(
+        route,
+        {"base_revision_id": created["current_revision_id"]},
+        content_type="application/json",
+    )
+    assert converted.status_code == 200
+    result = converted.json()
+    assert result["status"] == "restructured"
+    assert result["section_count"] == 4
+    assert result["document"]["id"] == str(original_entity_id)
+    assert result["document"]["category"] == "guide"
+    assert result["document"]["placement_count"] == 4
+    assert result["document"]["resolved_markdown"] == "\n\n".join(
+        section["markdown"] for section in payload["sections"]
+    ) + "\n"
+    original_revision.refresh_from_db()
+    primary_revisions = list(
+        BlockRevision.objects.filter(block=original_revision.block).order_by("revision_number")
+    )
+    assert [revision.id for revision in primary_revisions] == [
+        original_revision.id,
+        uuid.UUID(result["document"]["current_revision_id"]),
+    ]
+    assert primary_revisions[1].parent_id == original_revision.id
+    audit = AuditEvent.objects.get(action="document.semantic_sections_created", entity_id=original_entity_id)
+    assert audit.metadata["base_revision_id"] == str(original_revision.id)
+    assert audit.metadata["section_count"] == 4
+    assert original not in str(audit.metadata)
+
+    replay = owner_client.post(
+        route,
+        {"base_revision_id": created["current_revision_id"]},
+        content_type="application/json",
+    )
+    assert replay.status_code == 200
+    assert replay.json()["status"] == "already_restructured"
+    assert DocumentPlacement.objects.filter(document=document).count() == 4
+    assert (
+        AuditEvent.objects.filter(
+            action="document.semantic_sections_created", entity_id=original_entity_id
+        ).count()
+        == 1
+    )
+
+
+@pytest.mark.django_db
+def test_legacy_document_restructure_rejects_stale_shared_and_managed_content(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Legacy guide", "markdown": "# Start\n\nFirst.\n\n## Next\n\nSecond."},
+        content_type="application/json",
+    ).json()
+    route = reverse("msp-document-restructure", kwargs={"document_entity_id": created["id"]})
+    updated = owner_client.put(
+        reverse("msp-document-detail", kwargs={"document_entity_id": created["id"]}),
+        {
+            "title": "Legacy guide",
+            "markdown": "# Start\n\nChanged.\n\n## Next\n\nSecond.",
+            "base_revision_id": created["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    stale = owner_client.post(
+        route,
+        {"base_revision_id": created["current_revision_id"]},
+        content_type="application/json",
+    )
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "revision_conflict"
+    assert Document.objects.get(entity_id=created["id"]).placements.count() == 1
+
+    destination = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Destination", "markdown": "Local"},
+        content_type="application/json",
+    ).json()
+    reused = owner_client.post(
+        reverse("msp-document-placement-list-create", kwargs={"document_entity_id": destination["id"]}),
+        {"source_document_id": created["id"], "resolution_mode": "live"},
+        content_type="application/json",
+    )
+    assert reused.status_code == 200
+    shared_preview = owner_client.get(route).json()
+    assert shared_preview["eligible"] is False
+    assert "shared_primary" in {item["code"] for item in shared_preview["blockers"]}
+
+    managed = owner_client.post(
+        reverse("msp-document-list-create"),
+        {
+            "title": "Managed template",
+            "markdown": "# Start\n\nFirst.\n\n## Next\n\nSecond.",
+            "is_template": True,
+        },
+        content_type="application/json",
+    ).json()
+    managed_preview = owner_client.get(
+        reverse("msp-document-restructure", kwargs={"document_entity_id": managed["id"]})
+    ).json()
+    assert managed_preview["eligible"] is False
+    assert "template_source" in {item["code"] for item in managed_preview["blockers"]}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legacy_document_restructure_rolls_back_without_orphans(owner_client, installation, monkeypatch):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Rollback guide", "markdown": "# Start\n\nFirst.\n\n## Next\n\nSecond."},
+        content_type="application/json",
+    ).json()
+    document = Document.objects.get(entity_id=created["id"])
+    original_create = DocumentPlacement.objects.create
+
+    def fail_new_placement(**kwargs):  # type: ignore[no-untyped-def]
+        if kwargs.get("position") == 1:
+            raise RuntimeError("injected placement failure")
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(DocumentPlacement.objects, "create", fail_new_placement)
+    with pytest.raises(RuntimeError, match="injected placement failure"):
+        restructure_document(
+            document=document,
+            actor_id=installation.owner.id,
+            base_revision_id=uuid.UUID(created["current_revision_id"]),
+        )
+
+    document.refresh_from_db()
+    primary = document.placements.select_related("block").get(parent__isnull=True, position=0)
+    assert document.placements.count() == 1
+    assert primary.block.current_revision_id == uuid.UUID(created["current_revision_id"])
+    assert Block.objects.filter(source_document=document).count() == 1
+    assert BlockRevision.objects.filter(block__source_document=document).count() == 1
+    assert not AuditEvent.objects.filter(
+        action="document.semantic_sections_created", entity_id=document.entity_id
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_client_document_restructure_respects_scoped_authorization(owner_client, installation):
+    acme = organization(installation.tenant, "Acme")
+    beta = organization(installation.tenant, "Beta")
+    acme_document = owner_client.post(
+        reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+        {"title": "Acme guide", "markdown": "# Start\n\nFirst.\n\n## Next\n\nSecond."},
+        content_type="application/json",
+    ).json()
+    editor = User.objects.create_user(email="restructure-editor@example.com", display_name="Acme editor")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=editor,
+        role=BuiltInRole.READ_ONLY,
+    )
+    role = CustomRole.objects.create(
+        tenant=installation.tenant,
+        name="Document restructurer",
+        scope=CustomRoleScope.ORGANIZATION,
+        created_by=installation.owner,
+    )
+    CustomRolePermission.objects.create(tenant=installation.tenant, role=role, permission="documents.edit")
+    ScopedRoleAssignment.objects.create(
+        tenant=installation.tenant,
+        membership=membership,
+        role=role,
+        organization=acme,
+        created_by=installation.owner,
+    )
+    TOTP.activate(editor, generate_totp_secret())
+    editor_client = Client()
+    editor_client.force_login(editor)
+    acme_route = reverse(
+        "organization-document-restructure",
+        kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": acme_document["id"]},
+    )
+    assert editor_client.get(acme_route).status_code == 200
+    cross_client_route = reverse(
+        "organization-document-restructure",
+        kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": acme_document["id"]},
+    )
+    assert editor_client.get(cross_client_route).status_code == 403

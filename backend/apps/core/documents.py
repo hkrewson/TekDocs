@@ -30,7 +30,7 @@ from .models import (
     Tenant,
     workspace_for_owner,
 )
-from .rendering import attachment_ids_in_markdown
+from .rendering import attachment_ids_in_markdown, split_markdown_sections
 from .scoping import DataScope
 
 
@@ -63,6 +63,13 @@ class ResolvedPlacement:
 class ResolvedDocument:
     markdown: str
     placements: tuple[ResolvedPlacement, ...]
+
+
+@dataclass(frozen=True)
+class DocumentRestructureResult:
+    status: str
+    document: Document
+    section_count: int
 
 
 def markdown_checksum(markdown: str) -> str:
@@ -244,6 +251,257 @@ def primary_placement(document: Document) -> DocumentPlacement:
     return document.placements.select_related("block", "block__entity", "block__current_revision").get(
         parent__isnull=True, position=0
     )
+
+
+def _semantic_section_name(*, document: Document, position: int, markdown: str) -> str:
+    first_line = next((line.strip() for line in markdown.splitlines() if line.strip()), "")
+    label = first_line.lstrip("#>-* `").rstrip("# `").strip()
+    if not label:
+        label = f"Section {position + 1}"
+    if len(label) > 100:
+        label = f"{label[:97].rstrip()}…"
+    return f"{document.entity.display_name} — {label}"[:240]
+
+
+def document_restructure_preview(document: Document) -> dict[str, object]:
+    """Describe a safe single-region conversion without changing persisted state."""
+
+    placements = list(
+        document.placements.select_related(
+            "block", "block__entity", "block__current_revision", "pinned_revision", "parent"
+        ).order_by("parent_id", "position", "id")
+    )
+    blockers: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    primary = next(
+        (placement for placement in placements if placement.parent_id is None and placement.position == 0),
+        None,
+    )
+    already_converted = AuditEvent.objects.filter(
+        tenant=document.tenant,
+        action="document.semantic_sections_created",
+        entity_id=document.entity_id,
+    ).exists()
+    if len(placements) != 1:
+        blockers.append(
+            {
+                "code": "composition_not_legacy",
+                "detail": "Only documents with one top-level content region can be restructured.",
+            }
+        )
+    if primary is None or primary.block.current_revision is None:
+        blockers.append({"code": "primary_unavailable", "detail": "The primary content revision is unavailable."})
+    elif primary.resolution_mode != PlacementResolutionMode.LIVE:
+        blockers.append({"code": "primary_pinned", "detail": "A pinned primary content region cannot be restructured."})
+    if already_converted:
+        blockers.append(
+            {"code": "already_restructured", "detail": "This document has already been restructured."}
+        )
+    if document.is_template:
+        blockers.append(
+            {
+                "code": "template_source",
+                "detail": "Reusable templates must be copied or retired before restructuring.",
+            }
+        )
+    if DocumentTemplateEnrollment.objects.filter(destination_document=document, archived_at__isnull=True).exists():
+        blockers.append(
+            {
+                "code": "template_managed",
+                "detail": "A document managed by a template rollout cannot be restructured.",
+            }
+        )
+    if hasattr(document, "remote_source") and document.remote_source.archived_at is None:
+        blockers.append(
+            {
+                "code": "remote_managed",
+                "detail": "Remove the remote source before restructuring this document.",
+            }
+        )
+    if (
+        primary is not None
+        and DocumentPlacement.objects.filter(block_id=primary.block_id).exclude(id=primary.id).exists()
+    ):
+        blockers.append(
+            {
+                "code": "shared_primary",
+                "detail": "The current content is reused elsewhere. Detach those uses before restructuring.",
+            }
+        )
+
+    publication_count = DocumentPublication.objects.filter(document=document).count()
+    if publication_count:
+        warnings.append(
+            {
+                "code": "retained_publications",
+                "detail": f"{publication_count} retained STATIC publication(s) remain unchanged.",
+            }
+        )
+    attachment_count = DocumentAttachment.objects.filter(document=document, archived_at__isnull=True).count()
+    if attachment_count:
+        warnings.append(
+            {
+                "code": "retained_attachments",
+                "detail": f"{attachment_count} managed attachment(s) remain attached to this document.",
+            }
+        )
+
+    revision = primary.block.current_revision if primary is not None else None
+    sections = split_markdown_sections(revision.markdown) if revision is not None else []
+    if len(sections) < 2 and not any(item["code"] == "already_restructured" for item in blockers):
+        blockers.append(
+            {
+                "code": "no_semantic_boundaries",
+                "detail": "This content does not contain multiple safe semantic sections.",
+            }
+        )
+    return {
+        "eligible": not blockers,
+        "base_revision_id": revision.id if revision is not None else None,
+        "base_checksum": revision.checksum if revision is not None else "",
+        "section_count": len(sections),
+        "sections": [
+            {
+                "position": position,
+                "kind": kind,
+                "name": _semantic_section_name(document=document, position=position, markdown=markdown),
+                "markdown": markdown,
+                "checksum": markdown_checksum(markdown),
+            }
+            for position, (kind, markdown) in enumerate(sections)
+        ],
+        "blockers": blockers,
+        "warnings": warnings,
+        "dependencies": {
+            "publication_count": publication_count,
+            "attachment_count": attachment_count,
+            "template_managed": DocumentTemplateEnrollment.objects.filter(
+                destination_document=document, archived_at__isnull=True
+            ).exists(),
+            "remote_managed": hasattr(document, "remote_source") and document.remote_source.archived_at is None,
+            "shared_placement_count": (
+                DocumentPlacement.objects.filter(block_id=primary.block_id).exclude(id=primary.id).count()
+                if primary is not None
+                else 0
+            ),
+        },
+    }
+
+
+@transaction.atomic
+def restructure_document(
+    *, document: Document, actor_id: UUID, base_revision_id: UUID
+) -> DocumentRestructureResult:
+    """Convert one legacy content region into ordered semantic blocks atomically."""
+
+    locked = Document.objects.select_for_update().select_related("entity", "tenant").get(pk=document.pk)
+    prior_event = AuditEvent.objects.filter(
+        tenant=locked.tenant,
+        action="document.semantic_sections_created",
+        entity_id=locked.entity_id,
+        metadata__base_revision_id=str(base_revision_id),
+    ).first()
+    if prior_event is not None:
+        retained_section_count = prior_event.metadata.get("section_count")
+        return DocumentRestructureResult(
+            status="already_restructured",
+            document=locked,
+            section_count=(
+                retained_section_count if isinstance(retained_section_count, int) else locked.placements.count()
+            ),
+        )
+
+    primary = locked.placements.select_related("block", "block__entity", "block__current_revision").get(
+        parent__isnull=True, position=0
+    )
+    primary_block = (
+        Block.objects.select_for_update(of=("self",))
+        .select_related("entity", "current_revision")
+        .get(pk=primary.block_id)
+    )
+    preview = document_restructure_preview(locked)
+    current_revision = primary_block.current_revision
+    if current_revision is None:
+        raise PlacementConflict("The primary content revision is unavailable.")
+    if current_revision.id != base_revision_id:
+        base_revision = BlockRevision.objects.filter(block=primary.block, id=base_revision_id).first()
+        raise RevisionConflict(
+            submitted_base_revision_id=base_revision_id,
+            current_revision=current_revision,
+            base_revision=base_revision,
+        )
+    blockers = cast(list[dict[str, str]], preview["blockers"])
+    if blockers:
+        raise PlacementConflict(blockers[0]["detail"])
+
+    sections = cast(list[dict[str, object]], preview["sections"])
+    first = sections[0]
+    _append_block_revision(
+        block=primary_block,
+        actor_id=actor_id,
+        markdown=str(first["markdown"]),
+        base_revision_id=base_revision_id,
+    )
+    primary_block.kind = str(first["kind"])
+    primary_block.entity.display_name = str(first["name"])
+    primary_block.entity.save(update_fields=("display_name", "updated_at"))
+    primary_block.save(update_fields=("kind", "updated_at"))
+
+    placement_ids = [str(primary.id)]
+    for position, section in enumerate(sections[1:], start=1):
+        entity = Entity.objects.create(
+            tenant=locked.tenant,
+            workspace=locked.entity.workspace,
+            organization=locked.organization,
+            entity_type="document_block",
+            display_name=str(section["name"]),
+        )
+        block = Block.objects.create(
+            tenant=locked.tenant,
+            organization=locked.organization,
+            entity=entity,
+            source_document=locked,
+            kind=str(section["kind"]),
+            library_visible=locked.library_visible,
+        )
+        revision = BlockRevision.objects.create(
+            tenant=locked.tenant,
+            organization=locked.organization,
+            block=block,
+            revision_number=1,
+            markdown=str(section["markdown"]),
+            checksum=str(section["checksum"]),
+            created_by_id=actor_id,
+        )
+        block.current_revision = revision
+        block.save(update_fields=("current_revision", "updated_at"))
+        placement = DocumentPlacement.objects.create(
+            tenant=locked.tenant,
+            organization=locked.organization,
+            document=locked,
+            block=block,
+            position=position,
+            resolution_mode=PlacementResolutionMode.LIVE,
+        )
+        placement_ids.append(str(placement.id))
+
+    result_checksum = markdown_checksum(
+        "\n\n".join(str(section["markdown"]).strip("\n") for section in sections) + "\n"
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="document.semantic_sections_created",
+        entity_id=locked.entity_id,
+        metadata={
+            "base_revision_id": str(base_revision_id),
+            "source_checksum": str(preview["base_checksum"]),
+            "result_checksum": result_checksum,
+            "section_count": len(sections),
+            "placement_ids": placement_ids,
+        },
+    )
+    return DocumentRestructureResult(status="restructured", document=locked, section_count=len(sections))
 
 
 @transaction.atomic
@@ -922,7 +1180,11 @@ def add_block_placement(
     locked_document = Document.objects.select_for_update().get(pk=document.pk)
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
-    block = Block.objects.select_related("current_revision").get(pk=block.pk)
+    block = (
+        Block.objects.select_for_update(of=("self",))
+        .select_related("current_revision")
+        .get(pk=block.pk)
+    )
     if block.tenant_id != locked_document.tenant_id or block.archived_at is not None:
         raise PlacementConflict("The selected block is unavailable in this installation.")
     if block.source_document_id == locked_document.id:

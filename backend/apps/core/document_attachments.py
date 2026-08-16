@@ -240,7 +240,10 @@ def copy_attachment_content(attachment: DocumentAttachment) -> bytes:
     provider = attachment_storage_provider()
     if provider.provider_id != attachment.storage_provider:
         raise ValidationError("The attachment storage provider is unavailable.")
-    content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
+    try:
+        content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
+    except (AttachmentSecurityError, OSError) as exc:
+        raise ValidationError("The attachment storage provider is unavailable.") from exc
     if len(content) != attachment.size or sha256(content).hexdigest() != attachment.checksum:
         raise ValidationError("A template attachment failed its integrity check.")
     return content
@@ -252,7 +255,10 @@ def open_document_attachment(attachment: DocumentAttachment) -> ContentFile[byte
     provider = attachment_storage_provider()
     if provider.provider_id != attachment.storage_provider:
         raise ValidationError("The attachment storage provider is unavailable.")
-    content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
+    try:
+        content = provider.read(key=attachment.file.name, maximum_bytes=MAX_ATTACHMENT_BYTES)
+    except (AttachmentSecurityError, OSError) as exc:
+        raise ValidationError("The attachment storage provider is unavailable.") from exc
     if len(content) != attachment.size or sha256(content).hexdigest() != attachment.checksum:
         raise ValidationError("The stored attachment failed its integrity check.")
     return ContentFile(content)

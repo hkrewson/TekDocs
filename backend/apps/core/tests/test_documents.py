@@ -1,10 +1,13 @@
 import base64
 import json
 import secrets
+import threading
+import time
 import uuid
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 from zipfile import ZipFile
 
 import pytest
@@ -15,7 +18,7 @@ from defusedxml import ElementTree
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import Client
 from django.test.utils import override_settings
@@ -23,6 +26,7 @@ from django.urls import reverse
 from django.utils import timezone
 from docx import Document as WordDocument
 
+import apps.core.document_exports as document_exports
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
     BuiltInRole,
@@ -57,6 +61,22 @@ from apps.core.models import (
 )
 from apps.core.publications import canonical_json, publish_document, snapshot_payload, verify_publication
 from apps.core.workspaces import resolve_msp_workspace
+
+
+class UnavailableStorageProvider:
+    provider_id = "django-default"
+
+    def quarantine(self, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("unavailable")
+
+    def promote(self, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("unavailable")
+
+    def read(self, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("unavailable")
+
+    def delete(self, **_kwargs):  # type: ignore[no-untyped-def]
+        return None
 
 
 @pytest.fixture
@@ -884,6 +904,52 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
         assert download["Content-Type"] == "application/octet-stream"
         assert download["Cache-Control"] == "private, no-store"
         assert download["X-Content-Type-Options"] == "nosniff"
+        assert download["Accept-Ranges"] == "bytes"
+        partial = owner_client.get(
+            reverse(
+                "organization-document-attachment-download",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": created["id"],
+                    "attachment_entity_id": attachment.entity_id,
+                },
+            ),
+            HTTP_RANGE="bytes=5-8",
+        )
+        assert partial.status_code == 206
+        assert partial.content == b"UTF-"
+        assert partial["Content-Range"] == "bytes 5-8/16"
+        suffix = owner_client.get(
+            reverse(
+                "organization-document-attachment-download",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": created["id"],
+                    "attachment_entity_id": attachment.entity_id,
+                },
+            ),
+            HTTP_RANGE="bytes=-5",
+        )
+        assert suffix.status_code == 206
+        assert suffix.content == b"notes"
+        unsatisfiable = owner_client.get(
+            reverse(
+                "organization-document-attachment-download",
+                kwargs={
+                    "organization_entity_id": acme.entity_id,
+                    "document_entity_id": created["id"],
+                    "attachment_entity_id": attachment.entity_id,
+                },
+            ),
+            HTTP_RANGE="bytes=999-1000",
+        )
+        assert unsatisfiable.status_code == 416
+        assert unsatisfiable["Content-Range"] == "bytes */16"
+        download_events = AuditEvent.objects.filter(
+            action="document.attachment.downloaded", entity_id=attachment.entity_id
+        )
+        assert sorted(event.metadata["partial"] for event in download_events) == [False, True, True]
+        assert all(set(event.metadata) == {"partial", "purpose"} for event in download_events)
         stored_name = attachment.file.name
         attachment.file.storage.delete(stored_name)
         assert attachment.file.storage.save(stored_name, ContentFile(b"tampered bytes")) == stored_name
@@ -2206,7 +2272,7 @@ def test_live_document_exports_supported_sanitized_and_deterministic_formats(own
 
 @pytest.mark.django_db
 def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clean_files(
-    owner_client, installation, tmp_path
+    owner_client, installation, tmp_path, monkeypatch
 ):
     created = owner_client.post(
         reverse("msp-document-list-create"),
@@ -2231,9 +2297,13 @@ def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clea
         query = {"export_format": "bundle", "attachment_ids": [selected["id"]]}
         first = owner_client.get(export_route, query)
         repeated = owner_client.get(export_route, query)
+        monkeypatch.setattr("apps.core.document_exports.MAX_BUNDLE_ATTACHMENT_BYTES", 10)
+        over_limit = owner_client.get(export_route, query)
 
     assert first.status_code == 200
     assert first.content == repeated.content
+    assert over_limit.status_code == 409
+    assert over_limit.content == b"Portable export file content may not exceed 50 MiB."
     assert first["Content-Type"] == "application/zip"
     assert "portable-network-guide-editable.zip" in first["Content-Disposition"]
     assert first["X-TekDocs-Export-Class"] == "editable_revision_snapshot"
@@ -2278,6 +2348,105 @@ def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clea
         ).count()
         == 2
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_export_snapshot_serializes_with_concurrent_document_edit(installation, monkeypatch):
+    client = Client()
+    client.force_login(installation.owner)
+    created = client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Concurrent export", "markdown": "Revision one"},
+        content_type="application/json",
+    ).json()
+    route = reverse("msp-document-export", kwargs={"document_entity_id": created["id"]})
+    detail_route = reverse("msp-document-detail", kwargs={"document_entity_id": created["id"]})
+    export_holds_lock = threading.Event()
+    release_export = threading.Event()
+    original_resolve = document_exports.resolve_document
+
+    def paused_resolve(document):  # type: ignore[no-untyped-def]
+        export_holds_lock.set()
+        assert release_export.wait(timeout=10)
+        return original_resolve(document)
+
+    monkeypatch.setattr("apps.core.document_exports.resolve_document", paused_resolve)
+    results: dict[str, Any] = {}
+
+    def run_export() -> None:
+        close_old_connections()
+        worker = Client()
+        worker.force_login(installation.owner)
+        results["export"] = worker.get(route, {"export_format": "md"})
+        close_old_connections()
+
+    def run_edit() -> None:
+        close_old_connections()
+        worker = Client()
+        worker.force_login(installation.owner)
+        results["edit"] = worker.put(
+            detail_route,
+            {
+                "title": "Concurrent export",
+                "markdown": "Revision two",
+                "base_revision_id": created["current_revision_id"],
+                "category": "general",
+            },
+            content_type="application/json",
+        )
+        close_old_connections()
+
+    export_thread = threading.Thread(target=run_export)
+    edit_thread = threading.Thread(target=run_edit)
+    export_thread.start()
+    assert export_holds_lock.wait(timeout=10)
+    edit_thread.start()
+    time.sleep(0.2)
+    assert edit_thread.is_alive()
+    release_export.set()
+    export_thread.join(timeout=10)
+    edit_thread.join(timeout=10)
+
+    assert not export_thread.is_alive()
+    assert not edit_thread.is_alive()
+    assert results["export"].status_code == 200
+    assert results["export"].content == b"Revision one\n"
+    assert results["edit"].status_code == 200
+    monkeypatch.setattr("apps.core.document_exports.resolve_document", original_resolve)
+    assert client.get(route, {"export_format": "md"}).content == b"Revision two\n"
+
+
+@pytest.mark.django_db
+def test_file_download_and_bundle_fail_closed_during_storage_outage(owner_client, installation, tmp_path):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Storage outage", "markdown": "Retained source"},
+        content_type="application/json",
+    ).json()
+    upload_route = reverse("msp-document-attachment-list-create", kwargs={"document_entity_id": created["id"]})
+    with override_settings(MEDIA_ROOT=tmp_path):
+        attachment = owner_client.post(
+            upload_route,
+            {"file": SimpleUploadedFile("outage.txt", b"private retained bytes")},
+        ).json()
+        with override_settings(
+            TEKDOCS_ATTACHMENT_STORAGE_PROVIDER="apps.core.tests.test_documents.UnavailableStorageProvider"
+        ):
+            download = owner_client.get(
+                reverse(
+                    "msp-document-attachment-download",
+                    kwargs={"document_entity_id": created["id"], "attachment_entity_id": attachment["id"]},
+                )
+            )
+            bundle = owner_client.get(
+                reverse("msp-document-export", kwargs={"document_entity_id": created["id"]}),
+                {"export_format": "bundle", "attachment_ids": [attachment["id"]]},
+            )
+
+    assert download.status_code == 400
+    assert bundle.status_code == 409
+    assert bundle.content == b"A selected file failed its retained-content integrity check."
+    assert not AuditEvent.objects.filter(action__in=("document.exported", "document.attachment.downloaded")).exists()
 
 
 @pytest.mark.django_db

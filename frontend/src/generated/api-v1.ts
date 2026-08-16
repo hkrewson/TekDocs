@@ -11812,6 +11812,27 @@ export interface operations {
                     readonly "application/octet-stream": string;
                 };
             };
+            readonly 206: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/octet-stream": string;
+                };
+            };
+            /** @description Requested byte range is unavailable */
+            readonly 416: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly documents_msp_export: {
@@ -20961,6 +20982,27 @@ export interface operations {
                 };
                 content: {
                     readonly "application/octet-stream": string;
+                };
+            };
+            readonly 206: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/octet-stream": string;
+                };
+            };
+            /** @description Requested byte range is unavailable */
+            readonly 416: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

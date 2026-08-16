@@ -80,13 +80,19 @@ docker volume create "${restore_project}_media_data" >/dev/null
 docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_directory:/backup:ro" postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 tar -xzf /backup/media.tar.gz -C /restore
 compose_for "$restore_project" up -d --build --wait backend
 compose_for "$restore_project" exec -T backend python manage.py shell -c '
+from hashlib import sha256
+from pathlib import Path
+from django.conf import settings
+from apps.core.document_exports import export_bundle, resolve_export_snapshot
 from apps.core.documents import primary_placement, resolve_document
 from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentAttachmentPurpose, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, InstallationState
 from apps.core.publications import verify_publication
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
+from apps.core.workspaces import resolve_msp_workspace
 
-tenant = InstallationState.objects.select_related("tenant").get(pk=1).tenant
+state = InstallationState.objects.select_related("tenant", "owner").get(pk=1)
+tenant = state.tenant
 scope_context = rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
 scope_context.__enter__()
 document = Document.objects.select_related("entity").get(entity__display_name="Recovery evidence runbook")
@@ -96,21 +102,34 @@ primary = primary_placement(document)
 assert list(BlockRevision.objects.filter(block=primary.block).order_by("revision_number").values_list("markdown", flat=True)) == ["# Recovery evidence\n\nRevision one.\n", "# Recovery evidence\n\nRevision two is canonical.\n", "# Recovery evidence"]
 attachment = DocumentAttachment.objects.get(document=document, original_filename="recovery-evidence.txt")
 with attachment.file.storage.open(attachment.file.name, "rb") as stored:
-    assert stored.read() == b"retained attachment bytes\n"
+    attachment_content = stored.read()
+assert attachment_content == b"retained attachment bytes\n"
+assert attachment.checksum == sha256(attachment_content).hexdigest()
 primary_versions = list(DocumentAttachment.objects.filter(document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE).order_by("version_number"))
 assert [record.version_number for record in primary_versions] == [1, 2]
 assert primary_versions[1].replaces_id == primary_versions[0].id
 for record, expected in zip(primary_versions, (b"%PDF-1.4\nretained primary v1\n%%EOF", b"%PDF-1.4\nretained primary v2\n%%EOF"), strict=True):
     with record.file.storage.open(record.file.name, "rb") as stored:
-        assert stored.read() == expected
+        content = stored.read()
+    assert content == expected
+    assert record.checksum == sha256(content).hexdigest()
 publication = DocumentPublication.objects.get(document=document)
 assert verify_publication(publication)["valid"] is True
 assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
 artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind="pdf")
 with artifact.file.storage.open(artifact.file.name, "rb") as stored:
     assert stored.read(5) == b"%PDF-"
+before = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
+snapshot = resolve_export_snapshot(
+    workspace=resolve_msp_workspace(state.owner),
+    document=document,
+    attachment_ids=tuple(record.entity_id for record in [attachment, *primary_versions]),
+)
+assert export_bundle(snapshot).startswith(b"PK")
+after = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
+assert after == before
 scope_context.__exit__(None, None, None)
-print("Database, revision history, attachment, primary-file history, signed manifest, and PDF restored")
+print("Database, revision history, source files, signed publication, and regenerable export restored")
 '
 compose_for "$restore_project" exec -T backend python manage.py check
 

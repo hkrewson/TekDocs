@@ -34,3 +34,14 @@ it('loads a protected PDF as bytes and exposes navigation, text, and download co
   expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/files/setup')
   expect(fetch).toHaveBeenCalledWith('/api/files/setup', expect.objectContaining({ credentials: 'same-origin' }))
 })
+
+it('fails closed on viewer disagreement while retaining download and keyboard close', async () => {
+  const user = userEvent.setup()
+  const onClose = vi.fn()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+  render(<PdfViewer filename="unreadable.pdf" url="/api/files/unreadable" onClose={onClose} />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('The PDF could not be loaded.')
+  expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/files/unreadable')
+  await user.keyboard('{Escape}')
+  expect(onClose).toHaveBeenCalledOnce()
+})

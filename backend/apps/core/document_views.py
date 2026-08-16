@@ -1,9 +1,11 @@
+import re
 from typing import cast
 from uuid import UUID
 
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Q
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
 from django.utils.text import slugify
@@ -118,6 +120,8 @@ from .serializers import (
     SharedBlockUpdateSerializer,
 )
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
+
+_BYTE_RANGE = re.compile(r"bytes=(\d{0,20})-(\d{0,20})")
 
 
 def _msp_workspace(request, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
@@ -553,17 +557,65 @@ def _replace_primary_file(workspace: ResolvedWorkspace, document_entity_id: UUID
 
 
 def _download_attachment(
-    workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID
-) -> FileResponse:
+    workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID, request: Request
+) -> HttpResponseBase:
     _document_record, attachment = _attachment(workspace, document_entity_id, attachment_entity_id)
-    response = FileResponse(
-        open_document_attachment(attachment),
-        as_attachment=True,
-        filename=attachment.original_filename,
-        content_type="application/octet-stream",
-    )
+    retained = open_document_attachment(attachment)
+    content = retained.read()
+    range_header = request.headers.get("Range", "").strip()
+    status = 200
+    response_content = content
+    if range_header:
+        match = _BYTE_RANGE.fullmatch(range_header)
+        if match is None or (not match.group(1) and not match.group(2)):
+            error_response = HttpResponse(status=416)
+            error_response["Accept-Ranges"] = "bytes"
+            error_response["Content-Range"] = f"bytes */{len(content)}"
+            error_response["Cache-Control"] = "private, no-store"
+            error_response["X-Content-Type-Options"] = "nosniff"
+            return error_response
+        start_text, end_text = match.groups()
+        if start_text:
+            start = int(start_text)
+            end = min(int(end_text), len(content) - 1) if end_text else len(content) - 1
+        else:
+            suffix_length = int(end_text)
+            start = max(0, len(content) - suffix_length)
+            end = len(content) - 1
+        if start >= len(content) or start > end or (not start_text and int(end_text) == 0):
+            error_response = HttpResponse(status=416)
+            error_response["Accept-Ranges"] = "bytes"
+            error_response["Content-Range"] = f"bytes */{len(content)}"
+            error_response["Cache-Control"] = "private, no-store"
+            error_response["X-Content-Type-Options"] = "nosniff"
+            return error_response
+        status = 206
+        response_content = content[start : end + 1]
+    response: HttpResponseBase
+    if status == 200:
+        response = FileResponse(
+            ContentFile(content),
+            as_attachment=True,
+            filename=attachment.original_filename,
+            content_type="application/octet-stream",
+        )
+    else:
+        response = HttpResponse(response_content, status=status, content_type="application/octet-stream")
+        disposition = content_disposition_header(True, attachment.original_filename)
+        if disposition is not None:
+            response["Content-Disposition"] = disposition
+    response["Accept-Ranges"] = "bytes"
+    if status == 206:
+        response["Content-Range"] = f"bytes {start}-{end}/{len(content)}"
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="document.attachment.downloaded",
+        entity_id=attachment.entity_id,
+        metadata={"partial": status == 206, "purpose": attachment.purpose},
+    )
     return response
 
 
@@ -1150,11 +1202,16 @@ class MSPDocumentAttachmentDetailView(APIView):
 
 class MSPDocumentAttachmentDownloadView(APIView):
     @extend_schema(
-        operation_id="document_attachments_msp_download", responses={(200, "application/octet-stream"): bytes}
+        operation_id="document_attachments_msp_download",
+        responses={
+            (200, "application/octet-stream"): bytes,
+            (206, "application/octet-stream"): bytes,
+            416: OpenApiResponse(description="Requested byte range is unavailable"),
+        },
     )
     def get(self, request, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
         return _download_attachment(
-            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, attachment_entity_id
+            _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, attachment_entity_id, request
         )
 
 
@@ -1542,13 +1599,19 @@ class OrganizationDocumentAttachmentDetailView(APIView):
 
 class OrganizationDocumentAttachmentDownloadView(APIView):
     @extend_schema(
-        operation_id="document_attachments_organization_download", responses={(200, "application/octet-stream"): bytes}
+        operation_id="document_attachments_organization_download",
+        responses={
+            (200, "application/octet-stream"): bytes,
+            (206, "application/octet-stream"): bytes,
+            416: OpenApiResponse(description="Requested byte range is unavailable"),
+        },
     )
     def get(self, request, organization_entity_id, document_entity_id, attachment_entity_id):  # type: ignore[no-untyped-def]
         return _download_attachment(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
             attachment_entity_id,
+            request,
         )
 
 

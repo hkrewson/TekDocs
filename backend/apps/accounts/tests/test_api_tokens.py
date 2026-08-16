@@ -8,6 +8,7 @@ import pytest
 from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.totp.internal.auth import format_hotp_value, hotp_value
 from django.contrib.auth.hashers import check_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import Client
 from django.utils import timezone
@@ -122,6 +123,48 @@ def test_organization_token_is_exact_scope_and_msp_data_is_not_visible():
     assert first_response.status_code == 200
     assert second_response.status_code in {403, 404}
     assert client.get("/api/v1/documents", headers=headers).status_code == 403
+
+
+@pytest.mark.django_db
+def test_personal_token_can_read_but_not_mutate_document_files_and_exports(tmp_path, settings):
+    installation, _password, client = authenticated_owner()
+    settings.MEDIA_ROOT = tmp_path
+    created = post(client, "/api/v1/documents", {"title": "Token export", "markdown": "# Token export"})
+    assert created.status_code == 201
+    document_id = created.json()["id"]
+    upload = client.post(
+        f"/api/v1/documents/{document_id}/attachments",
+        {"file": SimpleUploadedFile("private.txt", b"bounded private file")},
+        headers={"X-CSRFToken": csrf(client)},
+    )
+    assert upload.status_code == 201
+    attachment_id = upload.json()["id"]
+    issued = issue(client)
+    token = issued.json()["token"]
+    bearer = {"Authorization": f"Bearer {token}"}
+
+    exported = client.get(f"/api/v1/documents/{document_id}/export?export_format=md", headers=bearer)
+    downloaded = client.get(
+        f"/api/v1/documents/{document_id}/attachments/{attachment_id}/download",
+        headers={**bearer, "Range": "bytes=0-6"},
+    )
+    denied_upload = client.post(
+        f"/api/v1/documents/{document_id}/attachments",
+        {"file": SimpleUploadedFile("denied.txt", b"must not persist")},
+        headers=bearer,
+    )
+
+    assert exported.status_code == 200
+    assert exported.content == b"# Token export\n"
+    assert downloaded.status_code == 206
+    assert downloaded.content == b"bounded"
+    assert denied_upload.status_code == 403
+    assert AuditEvent.objects.get(action="document.exported").metadata == {"format": "md", "attachment_count": 0}
+    assert AuditEvent.objects.get(action="document.attachment.downloaded").metadata == {
+        "partial": True,
+        "purpose": "attachment",
+    }
+    assert b"private" not in json.dumps(list(AuditEvent.objects.values_list("metadata", flat=True))).encode()
 
 
 @pytest.mark.django_db

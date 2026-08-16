@@ -9,6 +9,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-isolation test-rls test-organizations test-workspaces test-people \
 	test-sites test-custom-fields test-relationships test-recovery test-stabilization \
 	test-public-beta-performance test-entity-rbac-validation test-documentation-validation \
+	test-file-export-stabilization \
 	test-publication-control test-credential-references test-catalogs test-inventory \
 	test-inventory-validation test-commercial test-networks test-network-stabilization \
 	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
@@ -18,7 +19,7 @@ BACKEND_IMAGE_GATES := check security \
 .PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
-.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
+.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization file-export-release-gate test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -181,6 +182,12 @@ test-entity-rbac-validation:
 test-documentation-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
 
+test-file-export-stabilization:
+	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
+	./scripts/frontend-gate.sh test
+
+file-export-release-gate: check test-file-export-stabilization test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
+
 test-publication-control:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
@@ -254,7 +261,7 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true ./tests/rehearsals/rehearse-production-image.sh
 
-release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
+release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
 release-gate: test-compliance-catalogs
 
 compose-doctor:
@@ -292,6 +299,9 @@ documentation-backup-rehearsal:
 
 documentation-upgrade-rehearsal:
 	./tests/rehearsals/rehearse-documentation-upgrade.sh
+
+file-export-upgrade-rehearsal:
+	./tests/rehearsals/rehearse-file-export-upgrade.sh
 
 publication-control-upgrade-rehearsal:
 	./tests/rehearsals/rehearse-publication-control-upgrade.sh

@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import secrets
 import stat
+import struct
 import zipfile
 
 import pytest
@@ -11,14 +12,17 @@ from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, override_settings
 from django.urls import reverse
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.attachment_security import (
+    MAX_STORED_ATTACHMENT_BYTES,
     AttachmentSecurityError,
     ClamAVAttachmentScanner,
     DjangoAttachmentStorageProvider,
     StrictAttachmentScanner,
 )
+from apps.core.document_attachments import validate_attachment_upload
 from apps.core.models import DocumentAttachment, InstallationState
 from apps.core.tests.test_documents import organization
 
@@ -71,6 +75,23 @@ def _symlink_zip() -> bytes:
     return output.getvalue()
 
 
+def _crc_corrupt_zip() -> bytes:
+    content = bytearray(_zip({"evidence.txt": b"retained evidence"}))
+    central_header = content.find(b"PK\x01\x02")
+    assert central_header >= 0
+    declared_crc = struct.unpack_from("<I", content, central_header + 16)[0]
+    struct.pack_into("<I", content, central_header + 16, declared_crc ^ 0xFFFFFFFF)
+    return bytes(content)
+
+
+def _duplicate_path_zip() -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("Evidence.txt", b"first")
+        archive.writestr("evidence.txt", b"second")
+    return output.getvalue()
+
+
 def test_strict_scanner_rejects_active_polyglot_and_unsafe_archive_content():
     scanner = StrictAttachmentScanner()
     assert scanner.scan(filename="notes.txt", media_type="text/plain", content=b"safe notes\n").engine
@@ -85,6 +106,8 @@ def test_strict_scanner_rejects_active_polyglot_and_unsafe_archive_content():
         ("nested.zip", "application/zip", _zip({"payload.tar": b"nested"})),
         ("bomb.zip", "application/zip", _zip({"large.txt": b"A" * 100_000})),
         ("many.zip", "application/zip", _zip({f"{index}.txt": b"x" for index in range(101)})),
+        ("crc.zip", "application/zip", _crc_corrupt_zip()),
+        ("duplicate.zip", "application/zip", _duplicate_path_zip()),
         ("controls.txt", "text/plain", b"value\x07"),
         ("trailing.png", "image/png", b"\x89PNG\r\n\x1a\nIEND\xaeB`\x82trailing"),
     )
@@ -178,6 +201,12 @@ def test_storage_provider_quarantines_promotes_and_verifies_bytes(tmp_path):
     )
     assert provider.read(key=promoted, maximum_bytes=1024) == content
     assert not (tmp_path / quarantined).exists()
+
+
+def test_attachment_intake_reads_only_the_bounded_limit():
+    oversized = SimpleUploadedFile("oversized.txt", b"A" * (MAX_STORED_ATTACHMENT_BYTES + 1))
+    with pytest.raises(ValidationError, match="10 MiB"):
+        validate_attachment_upload(oversized)
 
 
 class RejectingScanner:

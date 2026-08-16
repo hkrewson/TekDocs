@@ -5,6 +5,7 @@ import ipaddress
 import re
 import socket
 import struct
+import unicodedata
 import zipfile
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -108,10 +109,15 @@ class StrictAttachmentScanner:
                 if not entries or len(entries) > MAX_ARCHIVE_ENTRIES:
                     raise AttachmentSecurityError("ZIP attachments must contain 1 to 100 entries.")
                 total_uncompressed = 0
+                canonical_paths: set[str] = set()
                 for entry in entries:
                     path = PurePosixPath(entry.filename.replace("\\", "/"))
                     if path.is_absolute() or ".." in path.parts or any(ord(char) < 32 for char in entry.filename):
                         raise AttachmentSecurityError("ZIP attachments contain an unsafe member path.")
+                    canonical_path = unicodedata.normalize("NFC", path.as_posix()).casefold()
+                    if canonical_path in canonical_paths:
+                        raise AttachmentSecurityError("ZIP attachments contain duplicate member paths.")
+                    canonical_paths.add(canonical_path)
                     if entry.flag_bits & 0x1:
                         raise AttachmentSecurityError("Encrypted ZIP attachments are not accepted.")
                     if ((entry.external_attr >> 16) & 0o170000) == 0o120000:
@@ -123,7 +129,11 @@ class StrictAttachmentScanner:
                         raise AttachmentSecurityError("The expanded ZIP size exceeds the safety limit.")
                     if entry.file_size > max(1, entry.compress_size) * MAX_ARCHIVE_RATIO:
                         raise AttachmentSecurityError("The ZIP compression ratio exceeds the safety limit.")
-        except (zipfile.BadZipFile, UnicodeError) as exc:
+                    if not entry.is_dir():
+                        member = archive.read(entry)
+                        if len(member) != entry.file_size:
+                            raise AttachmentSecurityError("A ZIP member does not match its declared size.")
+        except (zipfile.BadZipFile, UnicodeError, RuntimeError, NotImplementedError, OSError) as exc:
             raise AttachmentSecurityError("The ZIP attachment is malformed.") from exc
 
 

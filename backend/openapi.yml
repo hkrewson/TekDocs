@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.22
+  version: 0.8.23
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1658,6 +1658,31 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '416':
+          description: Requested byte range is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/documents/{document_entity_id}/export:
     get:
       operationId: documents_msp_export
@@ -13673,6 +13698,31 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '416':
+          description: Requested byte range is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/export:
     get:
       operationId: documents_organization_export

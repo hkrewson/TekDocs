@@ -27,7 +27,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/migrate.sh /migrate.sh
 RUN chmod 0555 /entrypoint.sh \
     && chmod 0555 /migrate.sh \
-    && mkdir -p /app/staticfiles /app/media \
+    && mkdir -p /app/staticfiles /app/media /app/diagram-jobs \
     && chown -R tekdocs:tekdocs /app
 
 FROM base AS development

@@ -23,6 +23,12 @@ from docx.shared import Inches, Pt
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from .diagram_exports import (
+    DiagramExportArtifact,
+    diagram_manifest,
+    embed_diagrams_in_html,
+    render_diagram_exports,
+)
 from .document_attachments import copy_attachment_content
 from .documents import resolve_document
 from .entity_mentions import resolve_entity_mentions
@@ -71,6 +77,7 @@ class DocumentExportSnapshot:
     manifest: dict[str, object]
     digest: str
     attachments: tuple[ExportedAttachment, ...]
+    diagrams: tuple[DiagramExportArtifact, ...]
 
 
 def canonical_json(value: object) -> bytes:
@@ -166,11 +173,13 @@ def resolve_export_snapshot(
             )
         )
 
+    diagrams = render_diagram_exports(resolved.markdown)
     sanitized_html = render_markdown(
         resolved.markdown,
         entity_mentions=entity_mentions,
         attachments=rendered_attachments,
     )
+    sanitized_html = embed_diagrams_in_html(sanitized_html, diagrams)
     markdown_bytes = resolved.markdown.encode("utf-8")
     html_bytes = export_html(
         title=locked_document.entity.display_name,
@@ -197,6 +206,16 @@ def resolve_export_snapshot(
         *[
             _file_descriptor(item.path, item.media_type or "application/octet-stream", item.content)
             for item in exported_attachments
+        ],
+        *[
+            _file_descriptor(f"diagrams/{item.source.index:03d}.svg", "image/svg+xml", item.svg)
+            for item in diagrams
+            if item.svg is not None
+        ],
+        *[
+            _file_descriptor(f"diagrams/{item.source.index:03d}.png", "image/png", item.png)
+            for item in diagrams
+            if item.png is not None
         ],
     ]
     organization = locked_document.organization
@@ -227,6 +246,7 @@ def resolve_export_snapshot(
         ],
         "entities": [entity_mentions[entity_id] for entity_id in sorted(entity_mentions)],
         "attachments": attachment_manifest,
+        "diagrams": diagram_manifest(diagrams),
         "files": files,
     }
     digest = hashlib.sha256(b"TEKDOCS-PORTABLE-EXPORT\x00v1\x00" + canonical_json(manifest)).hexdigest()
@@ -238,19 +258,30 @@ def resolve_export_snapshot(
         manifest=manifest,
         digest=digest,
         attachments=tuple(exported_attachments),
+        diagrams=diagrams,
     )
 
 
-def export_html(*, title: str, markdown: str, retained_html: str | None = None) -> bytes:
+def export_html(
+    *,
+    title: str,
+    markdown: str,
+    retained_html: str | None = None,
+    diagrams: tuple[DiagramExportArtifact, ...] = (),
+) -> bytes:
     body = retained_html if retained_html is not None else render_markdown(markdown)
+    if retained_html is None:
+        body = embed_diagrams_in_html(body, diagrams)
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta http-equiv="Content-Security-Policy" '
+        'content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
         f"<title>{escape(title)}</title></head><body><main>{body}</main></body></html>\n"
     ).encode()
 
 
-def export_pdf(*, title: str, markdown: str) -> bytes:
-    return render_pdf(markdown, title=title)
+def export_pdf(*, title: str, markdown: str, diagrams: tuple[DiagramExportArtifact, ...] = ()) -> bytes:
+    return render_pdf(markdown, title=title, diagrams=diagrams)
 
 
 def _add_hyperlink(paragraph, text: str, url: str) -> None:  # type: ignore[no-untyped-def]
@@ -358,7 +389,7 @@ def _normalize_docx_archive(content: bytes) -> bytes:
     return target.getvalue()
 
 
-def export_docx(*, title: str, markdown: str) -> bytes:
+def export_docx(*, title: str, markdown: str, diagrams: tuple[DiagramExportArtifact, ...] = ()) -> bytes:
     document = create_word_document()
     section = document.sections[0]
     section.top_margin = section.bottom_margin = Inches(0.75)
@@ -381,6 +412,7 @@ def export_docx(*, title: str, markdown: str) -> bytes:
     list_styles: list[str] = []
     heading_level: int | None = None
     blockquote_depth = 0
+    diagram_index = 0
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -414,6 +446,18 @@ def export_docx(*, title: str, markdown: str) -> bytes:
             else:
                 paragraph = document.add_paragraph()
             _write_inline(paragraph, token.children or [])
+        elif token.type == "fence" and token.info.strip().casefold() == "mermaid":
+            item = diagrams[diagram_index] if diagram_index < len(diagrams) else None
+            diagram_index += 1
+            document.add_heading(item.source.title if item is not None else "Technical diagram", level=3)
+            if item is not None and item.source.description:
+                document.add_paragraph(item.source.description)
+            if item is not None and item.png is not None:
+                document.add_picture(BytesIO(item.png), width=Inches(6.2))
+            else:
+                document.add_paragraph("The diagram could not be rendered; its canonical source follows.")
+            paragraph = document.add_paragraph(style="TekDocs Code")
+            paragraph.add_run(token.content.rstrip("\n"))
         elif token.type in {"fence", "code_block"}:
             paragraph = document.add_paragraph(style="TekDocs Code")
             paragraph.add_run(token.content.rstrip("\n"))
@@ -445,6 +489,8 @@ def export_bundle(snapshot: DocumentExportSnapshot) -> bytes:
             ),
         ),
         ("document/document.md", snapshot.markdown.encode("utf-8")),
+        *((f"diagrams/{item.source.index:03d}.svg", item.svg) for item in snapshot.diagrams if item.svg is not None),
+        *((f"diagrams/{item.source.index:03d}.png", item.png) for item in snapshot.diagrams if item.png is not None),
         *((item.path, item.content) for item in snapshot.attachments),
     ]
     output = BytesIO()

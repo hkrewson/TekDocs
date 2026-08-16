@@ -13,6 +13,7 @@ bash -n \
 
 TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+TEKDOCS_RENDERER_IMAGE=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 docker compose \
   --env-file "$repository_root/.env.production.example" \
   -f "$repository_root/compose.yml" \
@@ -24,6 +25,7 @@ docker compose \
 
 rendered=$(TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
   TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+  TEKDOCS_RENDERER_IMAGE=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
   docker compose \
   --env-file "$repository_root/.env.production.example" \
   -f "$repository_root/compose.yml" \
@@ -35,6 +37,7 @@ rendered=$(TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000
 
 printf '%s\n' "$rendered" | grep -q 'image: ghcr.io/hkrewson/tekdocs-backend@sha256:'
 printf '%s\n' "$rendered" | grep -q 'image: ghcr.io/hkrewson/tekdocs-frontend@sha256:'
+printf '%s\n' "$rendered" | grep -q 'image: ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:'
 if printf '%s\n' "$rendered" | grep -q 'build:'; then
   echo "The production image overlay must remove application build definitions." >&2
   exit 1

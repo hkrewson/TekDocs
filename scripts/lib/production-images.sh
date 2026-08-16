@@ -2,6 +2,7 @@
 
 TEKDOCS_BACKEND_REPOSITORY=ghcr.io/hkrewson/tekdocs-backend
 TEKDOCS_FRONTEND_REPOSITORY=ghcr.io/hkrewson/tekdocs-frontend
+TEKDOCS_RENDERER_REPOSITORY=ghcr.io/hkrewson/tekdocs-diagram-renderer
 
 tekdocs_resolve_digest_reference() {
   local repository=$1
@@ -24,8 +25,8 @@ tekdocs_resolve_digest_reference() {
 
 tekdocs_resolve_production_images() {
   local commit=$1
-  local commit_tag backend_tagged_reference frontend_tagged_reference
-  local backend_revision frontend_revision
+  local commit_tag backend_tagged_reference frontend_tagged_reference renderer_tagged_reference
+  local backend_revision frontend_revision renderer_revision
 
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || {
     echo "A full 40-character Git commit is required to resolve production images." >&2
@@ -34,13 +35,16 @@ tekdocs_resolve_production_images() {
   commit_tag="sha-$commit"
   backend_tagged_reference="$TEKDOCS_BACKEND_REPOSITORY:$commit_tag"
   frontend_tagged_reference="$TEKDOCS_FRONTEND_REPOSITORY:$commit_tag"
+  renderer_tagged_reference="$TEKDOCS_RENDERER_REPOSITORY:$commit_tag"
 
   echo "Pulling validated production images for commit $commit"
   docker pull "$backend_tagged_reference"
   docker pull "$frontend_tagged_reference"
+  docker pull "$renderer_tagged_reference"
 
   backend_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$backend_tagged_reference")
   frontend_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$frontend_tagged_reference")
+  renderer_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$renderer_tagged_reference")
   [[ "$backend_revision" == "$commit" ]] || {
     echo "The backend image revision does not match the checked-out commit." >&2
     return 1
@@ -49,10 +53,15 @@ tekdocs_resolve_production_images() {
     echo "The frontend image revision does not match the checked-out commit." >&2
     return 1
   }
+  [[ "$renderer_revision" == "$commit" ]] || {
+    echo "The diagram renderer image revision does not match the checked-out commit." >&2
+    return 1
+  }
 
   TEKDOCS_RESOLVED_BACKEND_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_BACKEND_REPOSITORY" "$backend_tagged_reference")
   TEKDOCS_RESOLVED_FRONTEND_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_FRONTEND_REPOSITORY" "$frontend_tagged_reference")
-  export TEKDOCS_RESOLVED_BACKEND_IMAGE TEKDOCS_RESOLVED_FRONTEND_IMAGE
+  TEKDOCS_RESOLVED_RENDERER_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_RENDERER_REPOSITORY" "$renderer_tagged_reference")
+  export TEKDOCS_RESOLVED_BACKEND_IMAGE TEKDOCS_RESOLVED_FRONTEND_IMAGE TEKDOCS_RESOLVED_RENDERER_IMAGE
 }
 
 tekdocs_persist_environment_value() {

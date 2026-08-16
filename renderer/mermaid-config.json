@@ -1,0 +1,14 @@
+{
+  "deterministicIds": true,
+  "deterministicIDSeed": "tekdocs-export",
+  "flowchart": {
+    "htmlLabels": false,
+    "useMaxWidth": true
+  },
+  "htmlLabels": false,
+  "maxTextSize": 50000,
+  "securityLevel": "strict",
+  "startOnLoad": false,
+  "suppressErrorRendering": true,
+  "theme": "neutral"
+}

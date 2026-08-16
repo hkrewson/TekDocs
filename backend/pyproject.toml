@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tekdocs-backend"
-version = "0.8.23"
+version = "0.8.24"
 description = "TekDocs API and background services"
 license = "AGPL-3.0-only"
 requires-python = ">=3.13,<3.14"
@@ -52,6 +52,7 @@ addopts = "--strict-markers --strict-config --disable-warnings -q -m 'not perfor
 testpaths = ["apps"]
 markers = [
   "performance: resource-intensive reference-dataset performance tests run by the dedicated performance gate",
+  "renderer_runtime: requires the isolated diagram-renderer container and shared job volume",
 ]
 
 [tool.ruff]

@@ -14,3 +14,6 @@ services:
   frontend:
     image: ${TEKDOCS_FRONTEND_IMAGE:?Set TEKDOCS_FRONTEND_IMAGE to the published GHCR digest}
     build: !reset null
+  diagram-renderer:
+    image: ${TEKDOCS_RENDERER_IMAGE:?Set TEKDOCS_RENDERER_IMAGE to the published GHCR digest}
+    build: !reset null

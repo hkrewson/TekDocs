@@ -38,6 +38,7 @@ from apps.accounts.models import (
     User,
 )
 from apps.core.approved_egress import ApprovedTarget
+from apps.core.diagram_exports import DiagramExportArtifact, DiagramRenderError, DiagramSource
 from apps.core.document_sources import apply_remote_observation, fetch_remote_document, html_to_markdown
 from apps.core.documents import PlacementConflict, restructure_document, update_shared_block
 from apps.core.models import (
@@ -58,6 +59,7 @@ from apps.core.models import (
     InstallationState,
     Organization,
     OrganizationClassification,
+    PublicationArtifactKind,
 )
 from apps.core.publications import canonical_json, publish_document, snapshot_payload, verify_publication
 from apps.core.workspaces import resolve_msp_workspace
@@ -600,6 +602,86 @@ def test_static_publication_fails_closed_for_unavailable_dependencies(owner_clie
     assert response.json()["code"] == "publication_conflict"
     assert DocumentPublication.objects.count() == 0
     assert Entity.objects.filter(entity_type="document_publication").count() == 0
+
+
+@pytest.mark.django_db
+def test_static_publication_retains_exact_diagram_artifacts(owner_client, installation, tmp_path, monkeypatch):
+    markdown = """```mermaid
+flowchart LR
+  accTitle: Service request
+  accDescr: Browser reaches the API.
+  Browser --> API
+```
+"""
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Diagram publication", "markdown": markdown},
+        content_type="application/json",
+    ).json()
+    source = DiagramSource(
+        index=1,
+        source="flowchart LR\n  accTitle: Service request\n  accDescr: Browser reaches the API.\n  Browser --> API",
+        source_checksum=sha256(
+            b"flowchart LR\n  accTitle: Service request\n  accDescr: Browser reaches the API.\n  Browser --> API"
+        ).hexdigest(),
+        title="Service request",
+        description="Browser reaches the API.",
+    )
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    diagram = DiagramExportArtifact(
+        source=source,
+        state="rendered",
+        renderer_version="renderer-test",
+        svg=b"<svg><title>Service request</title><desc>Browser reaches the API.</desc></svg>",
+        png=png,
+    )
+    monkeypatch.setattr("apps.core.publications.render_diagram_exports", lambda *_args, **_kwargs: (diagram,))
+
+    with override_settings(MEDIA_ROOT=tmp_path):
+        response = owner_client.post(
+            reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+            {"reason": "Diagram retention", "audience": "msp_internal", "retention": "permanent"},
+            content_type="application/json",
+        )
+
+    assert response.status_code == 201
+    publication = DocumentPublication.objects.get(entity_id=response.json()["id"])
+    assert [item["state"] for item in publication.manifest["diagrams"]] == ["rendered"]
+    assert publication.manifest["diagrams"][0]["source_checksum"] == source.source_checksum
+    assert "data:image/svg+xml;base64," in publication.sanitized_html
+    assert "Accessible diagram source" in publication.sanitized_html
+    artifacts = publication.artifacts.order_by("kind")
+    assert {item.kind for item in artifacts} == {
+        PublicationArtifactKind.PDF,
+        PublicationArtifactKind.DIAGRAM_SVG,
+        PublicationArtifactKind.DIAGRAM_PNG,
+    }
+    assert all(item.checksum and item.size > 0 for item in artifacts)
+
+
+@pytest.mark.django_db
+def test_static_publication_does_not_promote_when_diagram_rendering_fails(owner_client, installation, monkeypatch):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Rejected diagram", "markdown": "```mermaid\nflowchart LR\nA-->B\n```\n"},
+        content_type="application/json",
+    ).json()
+
+    def fail_render(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise DiagramRenderError("failed")
+
+    monkeypatch.setattr("apps.core.publications.render_diagram_exports", fail_render)
+    response = owner_client.post(
+        reverse("msp-document-publication-list-create", kwargs={"document_entity_id": created["id"]}),
+        {"reason": "Must fail", "audience": "msp_internal", "retention": "permanent"},
+        content_type="application/json",
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "publication_conflict"
+    assert DocumentPublication.objects.count() == 0
+    assert DocumentPublicationArtifact.objects.count() == 0
 
 
 @pytest.mark.django_db

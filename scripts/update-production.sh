@@ -240,12 +240,14 @@ current_commit=$(git rev-parse HEAD)
 tekdocs_resolve_production_images "$current_commit"
 TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
 TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
-export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE
+TEKDOCS_RENDERER_IMAGE=$TEKDOCS_RESOLVED_RENDERER_IMAGE
+export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
 compose+=(-f "$repository_root/compose.images.yml")
 
 "${compose[@]}" config --quiet
 echo "Resolved backend image: $TEKDOCS_BACKEND_IMAGE"
 echo "Resolved frontend image: $TEKDOCS_FRONTEND_IMAGE"
+echo "Resolved diagram renderer image: $TEKDOCS_RENDERER_IMAGE"
 
 echo "Stopping application services for the migration boundary"
 "${compose[@]}" stop frontend worker scheduler backend
@@ -284,6 +286,7 @@ current_version=$(tr -d '[:space:]' < VERSION)
 application_stopped=false
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
+tekdocs_persist_environment_value "$environment_file" TEKDOCS_RENDERER_IMAGE "$TEKDOCS_RENDERER_IMAGE"
 trap - ERR
 
 echo "TekDocs production update passed: $previous_version ($previous_commit) -> $current_version ($current_commit)"

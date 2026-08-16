@@ -1,0 +1,11 @@
+{
+  "name": "tekdocs-diagram-renderer",
+  "version": "0.8.24",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "11.16.0",
+    "puppeteer": "25.7.0"
+  }
+}

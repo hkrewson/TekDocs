@@ -19,6 +19,7 @@ backend/media/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+renderer/node_modules/
 playwright-report/
 test-results/
 artifacts/

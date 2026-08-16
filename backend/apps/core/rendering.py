@@ -15,7 +15,9 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import Flowable, Paragraph, Preformatted, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, Image, Paragraph, Preformatted, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from .diagram_exports import DiagramExportArtifact
 
 CALLOUT_TYPES = frozenset({"note", "tip", "important", "warning", "caution"})
 _CALLOUT_PATTERN = re.compile(r"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]*\n|[ \t]+)?")
@@ -404,6 +406,7 @@ def render_pdf(
     published_at: str = "",
     audience: str = "",
     reason: str = "",
+    diagrams: tuple[DiagramExportArtifact, ...] = (),
 ) -> bytes:
     output = BytesIO()
     styles = getSampleStyleSheet()
@@ -413,6 +416,7 @@ def render_pdf(
     table_rows: list[list[Flowable]] | None = None
     table_row: list[Flowable] | None = None
     table_header_cell = False
+    diagram_index = 0
 
     if publication_id:
         story.extend(
@@ -472,6 +476,22 @@ def render_pdf(
                 style = styles[f"Heading{min(heading_level, 3)}"] if heading_level else styles["BodyText"]
                 prefix = f"{'  ' * (list_depth - 1)}- " if list_depth else ""
                 story.extend((Paragraph(escape(prefix + token.content), style), Spacer(1, 6)))
+        elif token.type == "fence" and token.info.strip().casefold() == "mermaid":
+            item = diagrams[diagram_index] if diagram_index < len(diagrams) else None
+            diagram_index += 1
+            title_text = item.source.title if item is not None else "Technical diagram"
+            story.append(Paragraph(escape(title_text), styles["Heading3"]))
+            if item is not None and item.source.description:
+                story.append(Paragraph(escape(item.source.description), styles["BodyText"]))
+            if item is not None and item.png is not None:
+                image = Image(BytesIO(item.png), width=468, height=312, kind="proportional")
+                image._restrictSize(468, 360)
+                story.extend((image, Spacer(1, 6)))
+            else:
+                story.append(
+                    Paragraph("The diagram could not be rendered; its canonical source follows.", styles["BodyText"])
+                )
+            story.extend((Preformatted(token.content, styles["Code"]), Spacer(1, 6)))
         elif token.type in {"fence", "code_block"}:
             story.extend((Preformatted(token.content, styles["Code"]), Spacer(1, 6)))
 

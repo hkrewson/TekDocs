@@ -53,6 +53,22 @@ attachment = create_document_attachment(document=document, actor_id=result.owner
 primary_v1 = create_document_attachment(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v1.pdf", b"%PDF-1.4\nretained primary v1\n%%EOF", content_type="application/pdf"), purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1)
 primary_v2 = replace_primary_document_file(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v2.pdf", b"%PDF-1.4\nretained primary v2\n%%EOF", content_type="application/pdf"))
 publication = publish_document(workspace=resolve_msp_workspace(result.owner), document=document, actor_id=result.owner.id, reason="Backup rehearsal fixture", audience=PublicationAudience.MSP_INTERNAL, retention=PublicationRetention.PERMANENT, retention_review_on=None)
+diagram_document = create_document(
+    tenant=result.tenant,
+    organization=None,
+    actor_id=result.owner.id,
+    title="Recovery topology",
+    markdown="# Recovery topology\n\n```mermaid\n%% accTitle: Recovery path\n%% accDescr: Source to restored service\ngraph LR\n  Source --> Restore\n```\n",
+)
+diagram_publication = publish_document(
+    workspace=resolve_msp_workspace(result.owner),
+    document=diagram_document,
+    actor_id=result.owner.id,
+    reason="Diagram recovery fixture",
+    audience=PublicationAudience.MSP_INTERNAL,
+    retention=PublicationRetention.PERMANENT,
+    retention_review_on=None,
+)
 assert revision.revision_number == 2
 assert restructured.section_count == 2
 assert document.placements.count() == 2
@@ -60,6 +76,7 @@ assert resolve_document(document).markdown == "# Recovery evidence\n\nRevision t
 assert attachment.file.storage.exists(attachment.file.name)
 assert primary_v2.replaces_id == primary_v1.id
 assert DocumentPublicationArtifact.objects.filter(publication=publication, kind="pdf").count() == 1
+assert set(DocumentPublicationArtifact.objects.filter(publication=diagram_publication).values_list("kind", flat=True)) == {"pdf", "diagram_svg", "diagram_png"}
 assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
 scope_context.__exit__(None, None, None)
 print("Documentation recovery fixture created")
@@ -119,6 +136,23 @@ assert list(DocumentPublicationControlEvent.objects.filter(publication=publicati
 artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind="pdf")
 with artifact.file.storage.open(artifact.file.name, "rb") as stored:
     assert stored.read(5) == b"%PDF-"
+diagram_document = Document.objects.select_related("entity").get(entity__display_name="Recovery topology")
+diagram_publication = DocumentPublication.objects.get(document=diagram_document)
+assert verify_publication(diagram_publication)["valid"] is True
+diagram_artifacts = {
+    artifact.kind: artifact
+    for artifact in DocumentPublicationArtifact.objects.filter(
+        publication=diagram_publication,
+        kind__in=("diagram_svg", "diagram_png"),
+    )
+}
+assert set(diagram_artifacts) == {"diagram_svg", "diagram_png"}
+for kind, expected_prefix in (("diagram_svg", b"<svg"), ("diagram_png", b"\x89PNG\r\n\x1a\n")):
+    record = diagram_artifacts[kind]
+    with record.file.storage.open(record.file.name, "rb") as stored:
+        content = stored.read()
+    assert content.startswith(expected_prefix)
+    assert record.checksum == sha256(content).hexdigest()
 before = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
 snapshot = resolve_export_snapshot(
     workspace=resolve_msp_workspace(state.owner),

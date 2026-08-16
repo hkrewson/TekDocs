@@ -79,6 +79,8 @@ if _image_variant == "production" and TEKDOCS_ATTACHMENT_SCANNER != "apps.core.a
     raise ImproperlyConfigured("Production deployments require the ClamAV attachment scanner provider")
 if _image_variant == "production" and not TEKDOCS_CLAMAV_HOST:  # noqa: F405
     raise ImproperlyConfigured("Production deployments require TEKDOCS_CLAMAV_HOST")
+if _image_variant == "production" and TEKDOCS_DIAGRAM_JOB_DIRECTORY != "/app/diagram-jobs":  # noqa: F405
+    raise ImproperlyConfigured("Production deployments require the isolated diagram renderer job directory")
 
 validate_production_email(
     backend=EMAIL_BACKEND,  # noqa: F405

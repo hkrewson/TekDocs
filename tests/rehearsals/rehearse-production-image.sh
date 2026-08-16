@@ -20,7 +20,7 @@ cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
     echo "Production-target rehearsal failed; recent service logs follow." >&2
-    production_compose logs --no-color --tail=120 backend frontend >&2 || true
+    production_compose logs --no-color --tail=120 backend frontend diagram-renderer >&2 || true
   fi
   production_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
@@ -78,6 +78,7 @@ production_compose exec -T backend python manage.py migrate --check
 production_compose exec -T backend python -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None'
 production_compose exec -T backend python -c 'import os; from django.conf import settings; assert os.environ["TEKDOCS_IMAGE_VARIANT"] == "production"; assert settings.TEKDOCS_ATTACHMENT_SCANNER == "apps.core.attachment_security.ClamAVAttachmentScanner"; assert settings.TEKDOCS_CLAMAV_HOST'
 production_compose exec -T backend python -c 'from apps.core.attachment_security import attachment_scanner; assert attachment_scanner().scan(filename="probe.txt", media_type="text/plain", content=b"TekDocs production scanner probe").engine == "clamav/instream"'
+production_compose exec -T backend python -c 'from apps.core.diagram_exports import render_diagram_exports; value=render_diagram_exports("```mermaid\nflowchart LR\nA-->B\n```\n", required=True)[0]; assert value.svg and value.png and value.state == "rendered"'
 backend_id=$(production_compose ps -q backend)
 backend_user=$(docker inspect --format '{{.Config.User}}' "$backend_id")
 if [ "$backend_user" != "tekdocs" ] && [ "$backend_user" != "10001" ]; then
@@ -94,6 +95,12 @@ for service in migrate backend worker scheduler; do
   pids_limit=$(docker inspect --format '{{.HostConfig.PidsLimit}}' "$container_id")
   [ "$pids_limit" -gt 0 ]
 done
+renderer_id=$(production_compose ps -q diagram-renderer)
+[ "$(docker inspect --format '{{.Config.User}}' "$renderer_id")" = "10001:10001" ]
+[ "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$renderer_id")" = "none" ]
+[ "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$renderer_id")" = "true" ]
+docker inspect --format '{{json .HostConfig.CapDrop}}' "$renderer_id" | grep -q '"ALL"'
+docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$renderer_id" | grep -q 'no-new-privileges:true'
 frontend_id=$(production_compose ps -q frontend)
 [ "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$frontend_id")" = "true" ]
 docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$frontend_id" | grep -q 'no-new-privileges:true'

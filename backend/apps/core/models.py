@@ -3276,6 +3276,8 @@ class PublicationRetention(models.TextChoices):
 class PublicationArtifactKind(models.TextChoices):
     PDF = "pdf", "PDF"
     ATTACHMENT = "attachment", "Retained attachment"
+    DIAGRAM_SVG = "diagram_svg", "Diagram SVG"
+    DIAGRAM_PNG = "diagram_png", "Diagram PNG"
 
 
 class PublicationControlAction(models.TextChoices):
@@ -3571,7 +3573,14 @@ class DocumentPublicationArtifact(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(kind=PublicationArtifactKind.PDF, source_attachment__isnull=True)
+                    models.Q(
+                        kind__in=(
+                            PublicationArtifactKind.PDF,
+                            PublicationArtifactKind.DIAGRAM_SVG,
+                            PublicationArtifactKind.DIAGRAM_PNG,
+                        ),
+                        source_attachment__isnull=True,
+                    )
                     | models.Q(kind=PublicationArtifactKind.ATTACHMENT, source_attachment__isnull=False)
                 ),
                 name="publication_artifact_source_valid",
@@ -3611,8 +3620,12 @@ class DocumentPublicationArtifact(models.Model):
             or self.entity.entity_type != "document_publication_artifact"
         ):
             raise ValidationError("Publication artifact entity scope or type is invalid")
-        if self.kind == PublicationArtifactKind.PDF and self.source_attachment_id is not None:
-            raise ValidationError("PDF artifacts cannot identify a source attachment")
+        if self.kind in {
+            PublicationArtifactKind.PDF,
+            PublicationArtifactKind.DIAGRAM_SVG,
+            PublicationArtifactKind.DIAGRAM_PNG,
+        } and self.source_attachment_id is not None:
+            raise ValidationError("Generated artifacts cannot identify a source attachment")
         if self.kind == PublicationArtifactKind.ATTACHMENT and self.source_attachment_id is None:
             raise ValidationError("Retained attachment artifacts require a source attachment")
         source_attachment = self.source_attachment if self.source_attachment_id else None

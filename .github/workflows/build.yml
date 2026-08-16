@@ -120,7 +120,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            renderer/package-lock.json
       - name: Audit Python dependencies and code
         run: |
           python -m pip install --require-hashes -r backend/build-requirements.lock
@@ -134,6 +136,12 @@ jobs:
           npm ci --no-audit --no-fund
           npm audit --omit=dev --audit-level=high
           npm run license:check
+      - name: Audit diagram renderer dependencies and licenses
+        working-directory: renderer
+        run: |
+          npm ci --omit=dev --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+          node check-licenses.mjs
       - name: Scan repository history for secrets
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
@@ -214,6 +222,7 @@ jobs:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
       BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
       FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
+      RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
       COMMIT_TAG: sha-${{ github.sha }}
       MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
       TRIVY_IMAGE: aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
@@ -232,6 +241,11 @@ jobs:
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
             --tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" ./frontend
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
+            --tag "${RENDERER_IMAGE}:${COMMIT_TAG}" ./renderer
           docker pull "$MAILPIT_IMAGE"
       - name: Validate Python production licenses
         run: docker run --rm -v "$PWD/scripts/check-python-licenses.py:/check-python-licenses.py:ro" "${BACKEND_IMAGE}:${COMMIT_TAG}" python /check-python-licenses.py
@@ -245,6 +259,11 @@ jobs:
           image: ${{ env.FRONTEND_IMAGE }}:${{ env.COMMIT_TAG }}
           format: cyclonedx-json
           output-file: frontend-sbom.cdx.json
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.RENDERER_IMAGE }}:${{ env.COMMIT_TAG }}
+          format: cyclonedx-json
+          output-file: renderer-sbom.cdx.json
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: ${{ env.MAILPIT_IMAGE }}
@@ -269,6 +288,13 @@ jobs:
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
           --severity HIGH,CRITICAL --exit-code 1
           "${FRONTEND_IMAGE}:${COMMIT_TAG}"
+      - name: Scan diagram renderer image
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
+          --severity HIGH,CRITICAL --exit-code 1
+          "${RENDERER_IMAGE}:${COMMIT_TAG}"
       - name: Scan Mailpit image
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
@@ -278,7 +304,7 @@ jobs:
           "$MAILPIT_IMAGE"
       - name: Preserve tested application images for publication
         if: github.event_name == 'push'
-        run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}"
+        run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${COMMIT_TAG}"
       - name: Upload tested application images
         if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -302,6 +328,7 @@ jobs:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
       BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
       FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
+      RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
       COMMIT_TAG: sha-${{ github.sha }}
     steps:
       - name: Download tested application images
@@ -330,25 +357,35 @@ jobs:
         run: |
           docker push "${BACKEND_IMAGE}:${COMMIT_TAG}"
           docker push "${FRONTEND_IMAGE}:${COMMIT_TAG}"
+          docker push "${RENDERER_IMAGE}:${COMMIT_TAG}"
 
           if [[ "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == "main" ]]; then
             docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:main"
             docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:main"
+            docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:main"
             docker push "${BACKEND_IMAGE}:main"
             docker push "${FRONTEND_IMAGE}:main"
+            docker push "${RENDERER_IMAGE}:main"
           elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
             docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
+            docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
             docker push "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
             docker push "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
+            docker push "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
           fi
 
           backend_digest=$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           frontend_digest=$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          renderer_digest=$(docker buildx imagetools inspect "${RENDERER_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           [[ "$backend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid backend registry digest" >&2; exit 1; }
           [[ "$frontend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid frontend registry digest" >&2; exit 1; }
-          echo "backend-digest=$backend_digest" >> "$GITHUB_OUTPUT"
-          echo "frontend-digest=$frontend_digest" >> "$GITHUB_OUTPUT"
+          [[ "$renderer_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid diagram renderer registry digest" >&2; exit 1; }
+          {
+            echo "backend-digest=$backend_digest"
+            echo "frontend-digest=$frontend_digest"
+            echo "renderer-digest=$renderer_digest"
+          } >> "$GITHUB_OUTPUT"
       - name: Attest backend build provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
@@ -360,6 +397,12 @@ jobs:
         with:
           subject-name: ${{ env.FRONTEND_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.frontend-digest }}
+          push-to-registry: true
+      - name: Attest diagram renderer build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.RENDERER_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.renderer-digest }}
           push-to-registry: true
       - name: Attest backend SBOM
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
@@ -375,6 +418,13 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.frontend-digest }}
           sbom-path: frontend-sbom.cdx.json
           push-to-registry: true
+      - name: Attest diagram renderer SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.RENDERER_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.renderer-digest }}
+          sbom-path: renderer-sbom.cdx.json
+          push-to-registry: true
       - name: Summarize published images
         run: |
           {
@@ -382,6 +432,7 @@ jobs:
             echo
             echo "- \`${BACKEND_IMAGE}:${COMMIT_TAG}\`"
             echo "- \`${FRONTEND_IMAGE}:${COMMIT_TAG}\`"
+            echo "- \`${RENDERER_IMAGE}:${COMMIT_TAG}\`"
             echo
             echo "Production deployments resolve these commit tags to immutable registry digests."
             echo "The package visibility must be Public in GitHub Packages for unauthenticated production pulls."

@@ -1,0 +1,15 @@
+{
+  "args": [
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--disable-default-apps",
+    "--disable-dev-shm-usage",
+    "--disable-extensions",
+    "--disable-features=Translate,OptimizationHints,MediaRouter",
+    "--disable-sync",
+    "--metrics-recording-only",
+    "--no-first-run",
+    "--no-sandbox"
+  ],
+  "executablePath": "/usr/bin/chromium-browser"
+}

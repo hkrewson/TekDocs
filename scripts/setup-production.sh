@@ -192,9 +192,11 @@ if [[ "$mode" == finalize ]]; then
   [[ "$secret_directory" == /* && -d "$secret_directory" ]] || fail "TEKDOCS_SECRET_DIRECTORY must identify an existing absolute directory"
   TEKDOCS_BACKEND_IMAGE=$(read_environment_value TEKDOCS_BACKEND_IMAGE)
   TEKDOCS_FRONTEND_IMAGE=$(read_environment_value TEKDOCS_FRONTEND_IMAGE)
-  export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE
+  TEKDOCS_RENDERER_IMAGE=$(read_environment_value TEKDOCS_RENDERER_IMAGE)
+  export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
   [[ "$TEKDOCS_BACKEND_IMAGE" == "$TEKDOCS_BACKEND_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_BACKEND_IMAGE is not pinned"
   [[ "$TEKDOCS_FRONTEND_IMAGE" == "$TEKDOCS_FRONTEND_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_FRONTEND_IMAGE is not pinned"
+  [[ "$TEKDOCS_RENDERER_IMAGE" == "$TEKDOCS_RENDERER_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_RENDERER_IMAGE is not pinned"
   verify_secret_set
   build_compose false
 
@@ -291,9 +293,11 @@ current_commit=$(git -C "$repository_root" rev-parse HEAD)
 tekdocs_resolve_production_images "$current_commit"
 TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
 TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
-export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE
+TEKDOCS_RENDERER_IMAGE=$TEKDOCS_RESOLVED_RENDERER_IMAGE
+export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
+tekdocs_persist_environment_value "$environment_file" TEKDOCS_RENDERER_IMAGE "$TEKDOCS_RENDERER_IMAGE"
 
 build_compose true
 "${compose[@]}" config --quiet

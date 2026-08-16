@@ -32,6 +32,19 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:25", timezone: America/Chicago }
     rebase-strategy: disabled
     labels: [dependencies, containers]
+  - package-ecosystem: npm
+    directory: /renderer
+    schedule: { interval: weekly, day: monday, time: "09:27", timezone: America/Chicago }
+    rebase-strategy: disabled
+    groups:
+      renderer-production: { dependency-type: production }
+    labels: [dependencies, renderer]
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /renderer
+    schedule: { interval: weekly, day: monday, time: "09:28", timezone: America/Chicago }
+    rebase-strategy: disabled
+    labels: [dependencies, containers]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, time: "09:30", timezone: America/Chicago }

@@ -42,6 +42,7 @@ case " $* " in
       *org.opencontainers.image.revision*) printf '%s\n' "$TEKDOCS_TEST_COMMIT" ;;
       *tekdocs-backend*) printf '%s@sha256:%064d\n' 'ghcr.io/hkrewson/tekdocs-backend' 0 ;;
       *tekdocs-frontend*) printf '%s@sha256:%064d\n' 'ghcr.io/hkrewson/tekdocs-frontend' 1 ;;
+      *tekdocs-diagram-renderer*) printf '%s@sha256:%064d\n' 'ghcr.io/hkrewson/tekdocs-diagram-renderer' 2 ;;
       *) echo "unexpected image inspection: $*" >&2; exit 1 ;;
     esac
     ;;
@@ -83,6 +84,7 @@ grep -q '^SECURE_SSL_REDIRECT=true$' "$environment_file"
 grep -q '^TZ=America/Chicago$' "$environment_file"
 grep -q '^TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:' "$environment_file"
 grep -q '^TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:' "$environment_file"
+grep -q '^TEKDOCS_RENDERER_IMAGE=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:' "$environment_file"
 
 for secret_name in \
   django_secret_key \

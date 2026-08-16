@@ -21,6 +21,13 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
+from .diagram_exports import (
+    DiagramExportArtifact,
+    diagram_manifest,
+    diagram_sources,
+    embed_diagrams_in_html,
+    render_diagram_exports,
+)
 from .document_attachments import copy_attachment_content
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
@@ -243,11 +250,16 @@ def publish_document(
             if len(source_attachments) > MAX_RETAINED_ATTACHMENTS:
                 raise PublicationConflict("A publication may retain at most 50 referenced attachments.")
             rendered_entities = {record["id"]: record for record in entity_projections}
+            try:
+                diagrams = render_diagram_exports(resolved.markdown, required=True)
+            except ValueError as exc:
+                raise PublicationConflict("A required diagram could not be rendered reproducibly.") from exc
             sanitized_html = render_markdown(
                 resolved.markdown,
                 entity_mentions=rendered_entities,  # type: ignore[arg-type]
                 attachments=rendered_attachments,
             )
+            sanitized_html = embed_diagrams_in_html(sanitized_html, diagrams)
 
             publication_id = uuid4()
             publication_entity_id = uuid4()
@@ -260,6 +272,7 @@ def publish_document(
                 published_at=encoded_timestamp,
                 audience=audience,
                 reason=reason,
+                diagrams=diagrams,
             )
             pending_artifacts = [
                 PendingArtifact(
@@ -272,6 +285,38 @@ def publish_document(
                     checksum=hashlib.sha256(pdf_content).hexdigest(),
                 )
             ]
+            diagram_records: list[dict[str, object]] = []
+            for item, record in zip(diagrams, diagram_manifest(diagrams), strict=True):
+                if item.svg is None or item.png is None:
+                    raise PublicationConflict("A required diagram artifact is unavailable.")
+                svg_artifact = PendingArtifact(
+                    id=uuid4(),
+                    entity_id=uuid4(),
+                    kind=PublicationArtifactKind.DIAGRAM_SVG,
+                    filename=f"diagram-{item.source.index:03d}.svg",
+                    media_type="image/svg+xml",
+                    content=item.svg,
+                    checksum=item.svg_checksum or "",
+                )
+                png_artifact = PendingArtifact(
+                    id=uuid4(),
+                    entity_id=uuid4(),
+                    kind=PublicationArtifactKind.DIAGRAM_PNG,
+                    filename=f"diagram-{item.source.index:03d}.png",
+                    media_type="image/png",
+                    content=item.png,
+                    checksum=item.png_checksum or "",
+                )
+                pending_artifacts.extend((svg_artifact, png_artifact))
+                diagram_records.append(
+                    {
+                        **record,
+                        "svg_artifact_id": str(svg_artifact.entity_id),
+                        "svg_filename": svg_artifact.filename,
+                        "png_artifact_id": str(png_artifact.entity_id),
+                        "png_filename": png_artifact.filename,
+                    }
+                )
             retained_size = 0
             for attachment in source_attachments:
                 try:
@@ -331,6 +376,7 @@ def publish_document(
                 ],
                 "entities": entity_projections,
                 "attachments": attachment_records,
+                "diagrams": diagram_records,
                 "artifacts": [_artifact_descriptor(artifact) for artifact in pending_artifacts],
             }
             payload = snapshot_payload(manifest=manifest, markdown=resolved.markdown, sanitized_html=sanitized_html)
@@ -499,9 +545,7 @@ def _client_reference_projection_safe(publication: DocumentPublication) -> bool:
 
 
 @transaction.atomic
-def approve_publication(
-    *, publication: DocumentPublication, actor_id: UUID, reason: str
-) -> DocumentPublication:
+def approve_publication(*, publication: DocumentPublication, actor_id: UUID, reason: str) -> DocumentPublication:
     control_ids = [publication.id]
     if publication.supersedes_id is not None:
         control_ids.append(publication.supersedes_id)
@@ -557,9 +601,7 @@ def approve_publication(
 
 
 @transaction.atomic
-def withdraw_publication(
-    *, publication: DocumentPublication, actor_id: UUID, reason: str
-) -> DocumentPublication:
+def withdraw_publication(*, publication: DocumentPublication, actor_id: UUID, reason: str) -> DocumentPublication:
     _lock_publication_controls(publication.id)
     locked = DocumentPublication.objects.select_related(
         "document", "document__entity", "entity", "published_by", "supersedes"
@@ -648,3 +690,51 @@ def read_publication_artifact(artifact: DocumentPublicationArtifact) -> bytes:
     if len(content) != artifact.size or hashlib.sha256(content).hexdigest() != artifact.checksum:
         raise PublicationConflict("The retained publication artifact failed its integrity check.")
     return content
+
+
+def retained_publication_diagrams(
+    publication: DocumentPublication,
+) -> tuple[DiagramExportArtifact, ...]:
+    sources = diagram_sources(publication.canonical_markdown)
+    if "diagrams" not in publication.manifest:
+        return tuple(
+            DiagramExportArtifact(
+                source=source,
+                state="text_fallback",
+                renderer_version="legacy-static-text-fallback",
+            )
+            for source in sources
+        )
+    records = publication.manifest.get("diagrams", [])
+    if not sources and records in (None, []):
+        return ()
+    if not isinstance(records, list) or len(records) != len(sources):
+        raise PublicationConflict("The retained diagram manifest is invalid.")
+    artifact_by_entity = {str(item.entity_id): item for item in publication.artifacts.all()}
+    values: list[DiagramExportArtifact] = []
+    try:
+        for source, record in zip(sources, records, strict=True):
+            if not isinstance(record, dict) or record.get("source_checksum") != source.source_checksum:
+                raise PublicationConflict("The retained diagram manifest is invalid.")
+            svg_artifact = artifact_by_entity[str(record["svg_artifact_id"])]
+            png_artifact = artifact_by_entity[str(record["png_artifact_id"])]
+            if (
+                svg_artifact.kind != PublicationArtifactKind.DIAGRAM_SVG
+                or png_artifact.kind != PublicationArtifactKind.DIAGRAM_PNG
+            ):
+                raise PublicationConflict("The retained diagram manifest is invalid.")
+            svg = read_publication_artifact(svg_artifact)
+            png = read_publication_artifact(png_artifact)
+            value = DiagramExportArtifact(
+                source=source,
+                state="rendered",
+                renderer_version=str(record["renderer_version"]),
+                svg=svg,
+                png=png,
+            )
+            if value.svg_checksum != record.get("svg_checksum") or value.png_checksum != record.get("png_checksum"):
+                raise PublicationConflict("A retained diagram failed its integrity check.")
+            values.append(value)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PublicationConflict("The retained diagram manifest is invalid.") from exc
+    return tuple(values)

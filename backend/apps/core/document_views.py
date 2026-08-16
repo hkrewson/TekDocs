@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
+from .diagram_exports import DiagramExportArtifact
 from .document_attachments import (
     MAX_MARKDOWN_IMPORT_BYTES,
     archive_document_attachment,
@@ -77,6 +78,7 @@ from .publications import (
     canonical_json,
     publish_document,
     read_publication_artifact,
+    retained_publication_diagrams,
     withdraw_publication,
 )
 from .relationships import search_entities
@@ -448,6 +450,7 @@ def _export_response(
     snapshot: DocumentExportSnapshot | None = None,
     export_class: str = "editable_revision_snapshot",
     content_digest: str = "",
+    diagrams: tuple[DiagramExportArtifact, ...] = (),
 ) -> HttpResponse:
     stem = slugify(title) or "document"
     suffix = "static" if export_class == "immutable_static_publication" else "editable"
@@ -455,12 +458,13 @@ def _export_response(
     if format_name == "md":
         content, media_type, extension = markdown.encode("utf-8"), "text/markdown; charset=utf-8", "md"
     elif format_name == "html":
-        content = export_html(title=title, markdown=markdown, retained_html=retained_html)
+        content = export_html(title=title, markdown=markdown, retained_html=retained_html, diagrams=diagrams)
         media_type, extension = "text/html; charset=utf-8", "html"
     elif format_name == "pdf":
-        content, media_type, extension = export_pdf(title=title, markdown=markdown), "application/pdf", "pdf"
+        content = export_pdf(title=title, markdown=markdown, diagrams=diagrams)
+        media_type, extension = "application/pdf", "pdf"
     elif format_name == "docx":
-        content = export_docx(title=title, markdown=markdown)
+        content = export_docx(title=title, markdown=markdown, diagrams=diagrams)
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         extension = "docx"
     else:
@@ -506,6 +510,7 @@ def _export_document(workspace: ResolvedWorkspace, document_entity_id: UUID, req
         retained_html=snapshot.sanitized_html if format_name == "html" else None,
         snapshot=snapshot,
         content_digest=snapshot.digest,
+        diagrams=snapshot.diagrams,
     )
 
 
@@ -803,6 +808,10 @@ def _publication_export(
         response["X-TekDocs-Export-Class"] = "immutable_static_publication"
         response["X-TekDocs-Content-Digest"] = publication.content_digest
         return response
+    try:
+        diagrams = retained_publication_diagrams(publication) if format_name == "docx" else ()
+    except PublicationConflict as conflict:
+        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
     return _export_response(
         title=f"{publication.title} STATIC",
         markdown=publication.canonical_markdown,
@@ -810,6 +819,7 @@ def _publication_export(
         retained_html=publication.sanitized_html if format_name == "html" else None,
         export_class="immutable_static_publication",
         content_digest=publication.content_digest,
+        diagrams=diagrams,
     )
 
 

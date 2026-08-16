@@ -16,6 +16,8 @@ from .models import (
     BlockKind,
     BlockRevision,
     Document,
+    DocumentAttachment,
+    DocumentAttachmentPurpose,
     DocumentCategory,
     DocumentPlacement,
     DocumentPublication,
@@ -308,6 +310,20 @@ class DocumentCreateSerializer(serializers.Serializer):
     library_visible = serializers.BooleanField(required=False, default=False)
 
 
+class FileBackedDocumentCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=1_000_000, trim_whitespace=False)
+    category = serializers.ChoiceField(
+        choices=DocumentCategory.choices,
+        required=False,
+        default=DocumentCategory.GENERAL,
+    )
+    file = serializers.FileField()
+
+    def validate_notes(self, value: str) -> str:
+        return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
 class DocumentUpdateSerializer(DocumentCreateSerializer):
     base_revision_id = serializers.UUIDField()
 
@@ -421,6 +437,12 @@ class DocumentAttachmentSerializer(serializers.Serializer):
     scan_engine = serializers.CharField()
     scanned_at = serializers.DateTimeField()
     created_at = serializers.DateTimeField()
+
+
+class DocumentPrimaryFileSerializer(DocumentAttachmentSerializer):
+    version_number = serializers.IntegerField()
+    replaces_id = serializers.UUIDField(source="replaces.entity_id", allow_null=True)
+    is_current = serializers.BooleanField()
 
 
 class PublicationVerificationSerializer(serializers.Serializer):
@@ -855,6 +877,8 @@ class DocumentSerializer(serializers.Serializer):
     template_source_id = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
+    primary_file = serializers.SerializerMethodField()
+    primary_file_versions = serializers.SerializerMethodField()
     publications = serializers.SerializerMethodField()
     publication_count = serializers.SerializerMethodField()
     markdown = serializers.SerializerMethodField()
@@ -902,12 +926,69 @@ class DocumentSerializer(serializers.Serializer):
     def get_attachments(self, obj: Document) -> list[dict[str, object]]:
         records = getattr(obj, "active_attachments", None)
         if records is None:
-            records = obj.attachments.filter(archived_at__isnull=True).order_by("original_filename", "entity_id")
+            records = obj.attachments.filter(
+                archived_at__isnull=True,
+                purpose=DocumentAttachmentPurpose.ATTACHMENT,
+            ).order_by("original_filename", "entity_id")
+        else:
+            records = [item for item in records if item.purpose == DocumentAttachmentPurpose.ATTACHMENT]
         return cast(list[dict[str, object]], DocumentAttachmentSerializer(records, many=True).data)
 
     def get_attachment_count(self, obj: Document) -> int:
         records = getattr(obj, "active_attachments", None)
-        return len(records) if records is not None else obj.attachments.filter(archived_at__isnull=True).count()
+        if records is not None:
+            return sum(item.purpose == DocumentAttachmentPurpose.ATTACHMENT for item in records)
+        return obj.attachments.filter(
+            archived_at__isnull=True,
+            purpose=DocumentAttachmentPurpose.ATTACHMENT,
+        ).count()
+
+    def _primary_file_versions(self, obj: Document) -> list[DocumentAttachment]:
+        cached = obj.__dict__.get("_tekdocs_primary_file_versions")
+        if cached is not None:
+            return cast(list[DocumentAttachment], cached)
+        records = getattr(obj, "active_attachments", None)
+        if records is None:
+            versions = list(
+                obj.attachments.filter(
+                    archived_at__isnull=True,
+                    purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                )
+                .select_related("entity", "replaces__entity")
+                .order_by("-version_number", "-created_at")
+            )
+        else:
+            versions = sorted(
+                (item for item in records if item.purpose == DocumentAttachmentPurpose.PRIMARY_FILE),
+                key=lambda item: (item.version_number or 0, item.created_at),
+                reverse=True,
+            )
+        obj.__dict__["_tekdocs_primary_file_versions"] = versions
+        return versions
+
+    def _serialize_primary_file(self, record: DocumentAttachment, *, is_current: bool) -> dict[str, object]:
+        data = cast(dict[str, object], DocumentAttachmentSerializer(record).data)
+        replaced = record.replaces if record.replaces_id else None
+        data.update(
+            {
+                "version_number": record.version_number,
+                "replaces_id": replaced.entity_id if replaced is not None else None,
+                "is_current": is_current,
+            }
+        )
+        return data
+
+    @extend_schema_field(DocumentPrimaryFileSerializer(allow_null=True))
+    def get_primary_file(self, obj: Document) -> dict[str, object] | None:
+        versions = self._primary_file_versions(obj)
+        return self._serialize_primary_file(versions[0], is_current=True) if versions else None
+
+    @extend_schema_field(DocumentPrimaryFileSerializer(many=True))
+    def get_primary_file_versions(self, obj: Document) -> list[dict[str, object]]:
+        return [
+            self._serialize_primary_file(record, is_current=index == 0)
+            for index, record in enumerate(self._primary_file_versions(obj))
+        ]
 
     @extend_schema_field(DocumentPublicationSerializer(many=True))
     def get_publications(self, obj: Document) -> list[dict[str, object]]:

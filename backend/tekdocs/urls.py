@@ -117,6 +117,7 @@ from apps.core.document_views import (
     MSPDocumentPlacementDetailView,
     MSPDocumentPlacementListCreateView,
     MSPDocumentPlacementReuseView,
+    MSPDocumentPrimaryFileView,
     MSPDocumentPublicationApproveView,
     MSPDocumentPublicationArtifactDownloadView,
     MSPDocumentPublicationDetailView,
@@ -131,6 +132,7 @@ from apps.core.document_views import (
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
     MSPDocumentTemplateInstantiateView,
+    MSPFileBackedDocumentCreateView,
     MSPMarkdownImportView,
     OrganizationDocumentAttachmentDetailView,
     OrganizationDocumentAttachmentDownloadView,
@@ -144,6 +146,7 @@ from apps.core.document_views import (
     OrganizationDocumentPlacementDetailView,
     OrganizationDocumentPlacementListCreateView,
     OrganizationDocumentPlacementReuseView,
+    OrganizationDocumentPrimaryFileView,
     OrganizationDocumentPublicationApproveView,
     OrganizationDocumentPublicationArtifactDownloadView,
     OrganizationDocumentPublicationDetailView,
@@ -159,6 +162,7 @@ from apps.core.document_views import (
     OrganizationDocumentTemplateLibraryView,
     OrganizationDocumentTemplateRolloutApplyView,
     OrganizationDocumentTemplateRolloutPreviewView,
+    OrganizationFileBackedDocumentCreateView,
     OrganizationMarkdownImportView,
 )
 from apps.core.domain_hierarchy_views import (
@@ -462,6 +466,11 @@ urlpatterns = [
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
     path(
+        "api/v1/documents/file-backed",
+        MSPFileBackedDocumentCreateView.as_view(),
+        name="msp-document-file-backed-create",
+    ),
+    path(
         "api/v1/credential-references",
         MSPCredentialReferenceListCreateView.as_view(),
         name="msp-credential-reference-list-create",
@@ -520,6 +529,11 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/attachments",
         MSPDocumentAttachmentListCreateView.as_view(),
         name="msp-document-attachment-list-create",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/primary-file",
+        MSPDocumentPrimaryFileView.as_view(),
+        name="msp-document-primary-file",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>",
@@ -1206,6 +1220,11 @@ urlpatterns = [
         name="organization-document-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/file-backed",
+        OrganizationFileBackedDocumentCreateView.as_view(),
+        name="organization-document-file-backed-create",
+    ),
+    path(
         "api/v1/workspaces/msp/assets/model-choices",
         ClientAssetModelChoiceListView.as_view(),
         {"organization_entity_id": None},
@@ -1602,6 +1621,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments",
         OrganizationDocumentAttachmentListCreateView.as_view(),
         name="organization-document-attachment-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/primary-file",
+        OrganizationDocumentPrimaryFileView.as_view(),
+        name="organization-document-primary-file",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/attachments/<uuid:attachment_entity_id>",

@@ -11,6 +11,9 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
   const [page, setPage] = useState(1)
   const [scale, setScale] = useState(1.2)
   const [text, setText] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -55,9 +58,36 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
     return () => { cancelled = true }
   }, [document, page, scale])
 
+  const search = async () => {
+    const query = searchQuery.trim().toLocaleLowerCase()
+    if (!document || !query) {
+      setSearchStatus(query ? 'The PDF is still loading.' : 'Enter text to search this PDF.')
+      return
+    }
+    setSearching(true)
+    setSearchStatus('Searching…')
+    try {
+      for (let candidate = 1; candidate <= document.numPages; candidate += 1) {
+        const pdfPage = await document.getPage(candidate)
+        const content = await pdfPage.getTextContent()
+        const pageText = content.items.map((item) => 'str' in item ? item.str : '').join(' ').toLocaleLowerCase()
+        if (pageText.includes(query)) {
+          setPage(candidate)
+          setSearchStatus(`Found on page ${candidate}.`)
+          return
+        }
+      }
+      setSearchStatus('No matches found.')
+    } catch {
+      setSearchStatus('This PDF could not be searched.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
   return <section className="pdf-viewer" aria-labelledby="pdf-viewer-heading">
     <header><div><h3 id="pdf-viewer-heading">{filename}</h3><p>{document ? `Page ${page} of ${document.numPages}` : 'Loading PDF…'}</p></div><button className="icon-button" type="button" aria-label="Close PDF viewer" onClick={onClose}><X size={17} /></button></header>
     {error && <p className="form-message error" role="alert">{error}</p>}
-    {!error && <><nav aria-label="PDF viewer controls"><button className="secondary-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />Previous</button><button className="secondary-button" type="button" disabled={!document || page >= document.numPages} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={15} /></button><button className="icon-button" type="button" aria-label="Zoom out" disabled={scale <= .6} onClick={() => setScale((value) => Math.max(.6, value - .2))}><Minus size={16} /></button><span aria-live="polite">{Math.round(scale * 100)}%</span><button className="icon-button" type="button" aria-label="Zoom in" disabled={scale >= 2.4} onClick={() => setScale((value) => Math.min(2.4, value + .2))}><Plus size={16} /></button><a className="secondary-button" href={url}><Download size={15} />Download</a></nav><div className="pdf-canvas"><canvas ref={canvasRef} aria-label={`${filename}, page ${page}`} /></div><details><summary>Accessible page text</summary><p>{text || 'No extractable text is available for this page.'}</p></details></>}
+    {!error && <><nav aria-label="PDF viewer controls"><button className="secondary-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />Previous</button><button className="secondary-button" type="button" disabled={!document || page >= document.numPages} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={15} /></button><button className="icon-button" type="button" aria-label="Zoom out" disabled={scale <= .6} onClick={() => setScale((value) => Math.max(.6, value - .2))}><Minus size={16} /></button><span aria-live="polite">{Math.round(scale * 100)}%</span><button className="icon-button" type="button" aria-label="Zoom in" disabled={scale >= 2.4} onClick={() => setScale((value) => Math.min(2.4, value + .2))}><Plus size={16} /></button><form role="search" onSubmit={(event) => { event.preventDefault(); void search() }}><label className="sr-only" htmlFor="pdf-search">Search PDF</label><input id="pdf-search" type="search" value={searchQuery} maxLength={120} placeholder="Search PDF" onChange={(event) => setSearchQuery(event.target.value)} /><button className="secondary-button" type="submit" disabled={searching || !document}>Search</button></form><a className="secondary-button" href={url}><Download size={15} />Download</a></nav><p role="status">{searchStatus}</p><div className="pdf-canvas"><canvas ref={canvasRef} aria-label={`${filename}, page ${page}`} /></div><details><summary>Accessible page text</summary><p>{text || 'No extractable text is available for this page.'}</p></details></>}
   </section>
 }

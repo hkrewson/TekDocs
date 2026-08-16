@@ -19,7 +19,7 @@ from .attachment_security import (
     attachment_scanner,
     attachment_storage_provider,
 )
-from .models import AuditEvent, Document, DocumentAttachment, Entity
+from .models import AuditEvent, Document, DocumentAttachment, DocumentAttachmentPurpose, Entity
 from .rendering import RenderedAttachment, attachment_ids_in_markdown
 from .workspaces import ResolvedWorkspace
 
@@ -91,7 +91,14 @@ def validate_attachment_upload(upload: UploadedFile) -> ValidatedUpload:
 
 
 def create_document_attachment(
-    *, document: Document, actor_id: UUID, upload: UploadedFile, entity_id: UUID | None = None
+    *,
+    document: Document,
+    actor_id: UUID,
+    upload: UploadedFile,
+    entity_id: UUID | None = None,
+    purpose: str = DocumentAttachmentPurpose.ATTACHMENT,
+    version_number: int | None = None,
+    replaces: DocumentAttachment | None = None,
 ) -> DocumentAttachment:
     validated = validate_attachment_upload(upload)
     attachment_id = uuid4()
@@ -149,17 +156,27 @@ def create_document_attachment(
                 scan_status="clean",
                 scan_engine=scan.engine,
                 scanned_at=timezone.now(),
+                purpose=purpose,
+                version_number=version_number,
+                replaces=replaces,
                 created_by_id=actor_id,
             )
             attachment.file.name = stored_name
             attachment.full_clean()
-            attachment.save()
+            attachment.save()  # type: ignore[no-untyped-call]
             AuditEvent.objects.create(
                 tenant=document.tenant,
                 actor_id=actor_id,
-                action="document.attachment.created",
+                action=(
+                    "document.primary_file.created"
+                    if purpose == DocumentAttachmentPurpose.PRIMARY_FILE
+                    else "document.attachment.created"
+                ),
                 entity_id=attachment.entity_id,
-                metadata={"document_id": str(document.entity_id)},
+                metadata={
+                    "document_id": str(document.entity_id),
+                    **({"version_number": version_number} if version_number is not None else {}),
+                },
             )
     except Exception:
         provider.delete(key=stored_name)
@@ -172,10 +189,12 @@ def create_document_attachment(
 @transaction.atomic
 def archive_document_attachment(*, attachment: DocumentAttachment, actor_id: UUID) -> None:
     locked = DocumentAttachment.objects.select_for_update().get(pk=attachment.pk)
+    if locked.purpose == DocumentAttachmentPurpose.PRIMARY_FILE:
+        raise ValidationError("Primary document file versions are retained and cannot be archived.")
     if locked.archived_at is not None:
         return
     locked.archived_at = timezone.now()
-    locked.save(update_fields=["archived_at", "updated_at"])
+    locked.save(update_fields=["archived_at", "updated_at"])  # type: ignore[no-untyped-call]
     Entity.objects.filter(pk=locked.entity_id, archived_at__isnull=True).update(archived_at=locked.archived_at)
     AuditEvent.objects.create(
         tenant=locked.tenant,
@@ -183,6 +202,35 @@ def archive_document_attachment(*, attachment: DocumentAttachment, actor_id: UUI
         action="document.attachment.archived",
         entity_id=locked.entity_id,
         metadata={"document_id": str(locked.document.entity_id)},
+    )
+
+
+@transaction.atomic
+def replace_primary_document_file(
+    *, document: Document, actor_id: UUID, upload: UploadedFile
+) -> DocumentAttachment:
+    """Append one scanned primary-file version under a document lock."""
+
+    locked_document = Document.objects.select_for_update().get(pk=document.pk)
+    current = (
+        DocumentAttachment.objects.select_for_update()
+        .filter(
+            document=locked_document,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            archived_at__isnull=True,
+        )
+        .order_by("-version_number", "-created_at")
+        .first()
+    )
+    if current is None:
+        raise ValidationError("This document does not have a primary file to replace.")
+    return create_document_attachment(
+        document=locked_document,
+        actor_id=actor_id,
+        upload=upload,
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        version_number=(current.version_number or 0) + 1,
+        replaces=current,
     )
 
 

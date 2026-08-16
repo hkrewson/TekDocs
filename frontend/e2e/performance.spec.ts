@@ -25,6 +25,8 @@ const documentRecord = {
   placement_count: 0,
   attachments: [],
   attachment_count: 0,
+  primary_file: null,
+  primary_file_versions: [],
   publications: [],
   publication_count: 0,
   created_at: '2026-08-13T12:00:00Z',

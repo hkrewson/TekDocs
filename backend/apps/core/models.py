@@ -3129,6 +3129,11 @@ def publication_artifact_upload_to(instance: "DocumentPublicationArtifact", _fil
     )
 
 
+class DocumentAttachmentPurpose(models.TextChoices):
+    ATTACHMENT = "attachment", "Attachment"
+    PRIMARY_FILE = "primary_file", "Primary document file"
+
+
 class DocumentAttachment(TimestampedModel):
     """A private managed file owned by exactly one document."""
 
@@ -3152,6 +3157,19 @@ class DocumentAttachment(TimestampedModel):
     scan_status = models.CharField(max_length=20, default="clean")
     scan_engine = models.CharField(max_length=120, default="legacy-validation")
     scanned_at = models.DateTimeField(default=timezone.now)
+    purpose = models.CharField(
+        max_length=20,
+        choices=DocumentAttachmentPurpose.choices,
+        default=DocumentAttachmentPurpose.ATTACHMENT,
+    )
+    version_number = models.PositiveIntegerField(null=True, blank=True)
+    replaces = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="replacement",
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -3167,6 +3185,25 @@ class DocumentAttachment(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(condition=models.Q(scan_status="clean"), name="document_attachment_clean_only"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        purpose=DocumentAttachmentPurpose.ATTACHMENT,
+                        version_number__isnull=True,
+                        replaces__isnull=True,
+                    )
+                    | models.Q(
+                        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                        version_number__isnull=False,
+                    )
+                ),
+                name="document_attachment_purpose_version",
+            ),
+            models.UniqueConstraint(
+                fields=("document", "version_number"),
+                condition=models.Q(purpose=DocumentAttachmentPurpose.PRIMARY_FILE),
+                name="unique_document_primary_file_version",
+            ),
         ]
         indexes = [
             models.Index(
@@ -3174,10 +3211,28 @@ class DocumentAttachment(TimestampedModel):
                 name="core_docatt_scope_idx",
             ),
             models.Index(fields=["document", "checksum"], name="core_docatt_checksum_idx"),
+            models.Index(
+                fields=["document", "purpose", "version_number"],
+                name="core_docatt_primary_idx",
+            ),
         ]
 
     def __str__(self) -> str:
         return self.original_filename
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            stored_purpose = type(self).objects.filter(pk=self.pk).values_list("purpose", flat=True).first()
+            if stored_purpose == DocumentAttachmentPurpose.PRIMARY_FILE or (
+                stored_purpose is not None and stored_purpose != self.purpose
+            ):
+                raise ValidationError("Primary document file versions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self.purpose == DocumentAttachmentPurpose.PRIMARY_FILE:
+            raise ValidationError("Primary document file versions are immutable")
+        return super().delete(*args, **kwargs)
 
     def clean(self) -> None:
         if self.document_id and (
@@ -3190,6 +3245,22 @@ class DocumentAttachment(TimestampedModel):
             raise ValidationError("Attachment entity must use the attachment workspace scope")
         if self.scan_status != "clean" or not self.scan_engine or not self.storage_provider or not self.scanned_at:
             raise ValidationError("Only clean, scanned attachments may enter managed storage")
+        if self.purpose == DocumentAttachmentPurpose.PRIMARY_FILE:
+            if self.version_number is None:
+                raise ValidationError("Primary document files require a version number")
+            if self.version_number == 1 and self.replaces_id is not None:
+                raise ValidationError("The first primary document file version cannot replace another file")
+            if self.version_number > 1 and self.replaces_id is None:
+                raise ValidationError("Replacement primary document files require their prior version")
+            replaced = self.replaces if self.replaces_id else None
+            if replaced is not None and (
+                replaced.document_id != self.document_id
+                or replaced.tenant_id != self.tenant_id
+                or replaced.organization_id != self.organization_id
+                or replaced.purpose != DocumentAttachmentPurpose.PRIMARY_FILE
+                or replaced.version_number != self.version_number - 1
+            ):
+                raise ValidationError("Primary document file versions must form one ordered document-local chain")
 
 
 class PublicationAudience(models.TextChoices):

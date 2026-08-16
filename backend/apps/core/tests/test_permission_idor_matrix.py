@@ -96,6 +96,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-document-remote-observations": ("document_entity_id",),
         "msp-document-remote-observation-apply": ("document_entity_id", "observation_id"),
         "msp-document-attachment-list-create": ("document_entity_id",),
+        "msp-document-primary-file": ("document_entity_id",),
         "msp-document-attachment-detail": ("document_entity_id", "attachment_entity_id"),
         "msp-document-attachment-download": ("document_entity_id", "attachment_entity_id"),
         "msp-document-publication-list-create": ("document_entity_id",),
@@ -359,6 +360,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-document-restructure": ("organization_entity_id", "document_entity_id"),
         "organization-document-export": ("organization_entity_id", "document_entity_id"),
         "organization-document-attachment-list-create": ("organization_entity_id", "document_entity_id"),
+        "organization-document-primary-file": ("organization_entity_id", "document_entity_id"),
         "organization-document-attachment-detail": (
             "organization_entity_id",
             "document_entity_id",
@@ -411,6 +413,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-document-template-rollout-preview": ("organization_entity_id",),
         "organization-document-template-rollout-apply": ("organization_entity_id",),
         "organization-document-import": ("organization_entity_id",),
+        "organization-document-file-backed-create": ("organization_entity_id",),
         "organization-document-block-library": ("organization_entity_id",),
         "organization-document-remote-source": ("organization_entity_id", "document_entity_id"),
         "organization-document-remote-observations": ("organization_entity_id", "document_entity_id"),

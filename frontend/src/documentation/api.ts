@@ -37,6 +37,8 @@ export type DocumentRecord = {
   template_source_id: string | null
   attachments: DocumentAttachment[]
   attachment_count: number
+  primary_file: DocumentPrimaryFile | null
+  primary_file_versions: DocumentPrimaryFile[]
   publications: DocumentPublication[]
   publication_count: number
   markdown: string
@@ -51,6 +53,7 @@ export type DocumentRecord = {
   updated_at: string
 }
 export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; scan_status: 'clean'; scan_engine: string; scanned_at: string; created_at: string }
+export type DocumentPrimaryFile = DocumentAttachment & { version_number: number; replaces_id: string | null; is_current: boolean }
 export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
 export type PublicationAudience = 'msp_internal' | 'client_visible'
 export type PublicationRetention = 'permanent' | 'review_on'
@@ -250,6 +253,7 @@ export class RevisionConflictError extends AuthRequestError {
 export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
+  createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
   previewRestructure(scope: DocumentScope, id: string): Promise<DocumentRestructurePreview>
   applyRestructure(scope: DocumentScope, id: string, baseRevisionId: string): Promise<DocumentRestructureResult>
@@ -274,6 +278,7 @@ export interface DocumentsClient {
   applyRemoteObservation(scope: DocumentScope, id: string, observationId: string): Promise<DocumentRemoteObservation>
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
+  replacePrimaryFile(scope: DocumentScope, id: string, file: File): Promise<DocumentPrimaryFile>
   archiveAttachment(scope: DocumentScope, id: string, attachmentId: string): Promise<void>
   publish(scope: DocumentScope, id: string, input: DocumentPublicationInput): Promise<DocumentPublicationDetail>
   approvePublication(scope: DocumentScope, id: string, publicationId: string, reason: string): Promise<DocumentPublicationDetail>
@@ -354,6 +359,14 @@ export const browserDocumentsClient: DocumentsClient = {
     return parse<DocumentResult>(response)
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
+  async createFileBacked(scope, input) {
+    const form = new FormData()
+    form.set('title', input.title)
+    form.set('notes', input.notes)
+    form.set('category', input.category)
+    form.set('file', input.file)
+    return mutateForm<DocumentRecord>(`${collectionPath(scope)}/file-backed`, form)
+  },
   update: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'PUT', input),
   async previewRestructure(scope, id) {
     return parse<DocumentRestructurePreview>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/restructure`, {
@@ -414,6 +427,11 @@ export const browserDocumentsClient: DocumentsClient = {
     const form = new FormData()
     form.set('file', file)
     return mutateForm<DocumentAttachment>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments`, form)
+  },
+  async replacePrimaryFile(scope, id, file) {
+    const form = new FormData()
+    form.set('file', file)
+    return mutateForm<DocumentPrimaryFile>(`${collectionPath(scope)}/${encodeURIComponent(id)}/primary-file`, form)
   },
   archiveAttachment: (scope, id, attachmentId) => mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
   publish: (scope, id, input) => mutate<DocumentPublicationDetail>(`${collectionPath(scope)}/${encodeURIComponent(id)}/publications`, 'POST', input),

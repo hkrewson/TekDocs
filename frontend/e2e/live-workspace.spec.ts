@@ -526,6 +526,33 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Revision two is retained.')).toBeVisible()
 
   await page.getByRole('button', { name: 'New document' }).click()
+  await page.getByRole('button', { name: 'Upload file' }).click()
+  await page.getByLabel('Document title').fill('Live vendor source file')
+  await page.getByLabel('Primary file').setInputFiles({
+    name: 'vendor-source-v1.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('retained source version one\n'),
+  })
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  await page.getByRole('textbox', { name: 'Markdown source' }).fill('## Local notes\n\nClient-specific context.')
+  await page.getByRole('button', { name: 'Create file-backed document' }).click()
+  await expect(successStatus(page)).toHaveText('File-backed document created.')
+  await expect(page.getByText(/Primary file · version 1/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Local notes' })).toBeVisible()
+  await expect(page.getByText('Client-specific context.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download' })).toBeVisible()
+  await page.getByLabel('Replacement primary file').setInputFiles({
+    name: 'vendor-source-v2.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('retained source version two\n'),
+  })
+  await expect(successStatus(page)).toHaveText('vendor-source-v2.txt saved as primary file version 2.')
+  await page.getByRole('button', { name: /Files/ }).click()
+  await expect(page.getByRole('heading', { name: 'Primary file versions' })).toBeVisible()
+  await expect(page.getByText('Version 1 · 28 bytes')).toBeVisible()
+  await expect(page.getByText('Version 2 · Current · 28 bytes')).toBeVisible()
+
+  await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Document title').fill('Live incident template')
   await page.locator('.document-edit-heading').getByLabel('Category').selectOption('procedure')
   await page.getByRole('checkbox', { name: 'Reusable template' }).check()

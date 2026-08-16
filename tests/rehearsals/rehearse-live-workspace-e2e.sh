@@ -266,6 +266,17 @@ conversion_event = AuditEvent.objects.get(
 assert conversion_event.metadata["section_count"] == 2
 assert "markdown" not in conversion_event.metadata
 assert "tekdocs://entity/" not in resolve_document(client_document).markdown
+file_document = Document.objects.get(entity__display_name="Live vendor source file")
+assert file_document.organization == organization
+resolved_file_notes = resolve_document(file_document).markdown
+assert resolved_file_notes == "## Local notes\n\nClient-specific context.\n", repr(resolved_file_notes)
+primary_versions = list(DocumentAttachment.objects.filter(document=file_document, purpose="primary_file").order_by("version_number"))
+assert [record.version_number for record in primary_versions] == [1, 2]
+assert primary_versions[1].replaces_id == primary_versions[0].id
+for record, expected in zip(primary_versions, (b"retained source version one\n", b"retained source version two\n"), strict=True):
+    with record.file.storage.open(record.file.name, "rb") as stored:
+        assert stored.read() == expected
+assert AuditEvent.objects.filter(action="document.primary_file.created", entity_id__in=[record.entity_id for record in primary_versions]).count() == 2
 template = Document.objects.get(entity__display_name="Live incident template")
 template_copy = Document.objects.get(entity__display_name="New from Live incident template")
 assert template.organization == organization

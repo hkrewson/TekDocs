@@ -133,7 +133,7 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
     attachments = DocumentAttachment.objects.filter(
         tenant_id=scope.tenant_id,
         archived_at__isnull=True,
-    ).select_related("entity", "created_by")
+    ).select_related("entity", "created_by", "replaces__entity")
     publications = DocumentPublication.objects.filter(tenant_id=scope.tenant_id).select_related(
         "entity", "document", "document__entity", "published_by"
     ).prefetch_related("control_events__actor", "successors__control_events")

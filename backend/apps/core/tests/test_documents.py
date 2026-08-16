@@ -908,6 +908,150 @@ def test_managed_attachment_download_is_private_and_scope_bound(owner_client, in
 
 
 @pytest.mark.django_db
+def test_file_backed_document_creation_and_primary_file_replacement_are_versioned(
+    owner_client, installation, tmp_path
+):
+    acme = organization(installation.tenant, "Acme file documents")
+    beta = organization(installation.tenant, "Beta file documents")
+    create_url = reverse(
+        "organization-document-file-backed-create",
+        kwargs={"organization_entity_id": acme.entity_id},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        created = owner_client.post(
+            create_url,
+            {
+                "title": "Firewall datasheet",
+                "notes": "## Deployment notes\r\n\r\nRetain the approved model.",
+                "category": "reference",
+                "file": SimpleUploadedFile(
+                    "firewall-v1.pdf",
+                    b"%PDF-1.4\nTekDocs primary fixture v1\n%%EOF",
+                    content_type="text/html",
+                ),
+            },
+        )
+        assert created.status_code == 201
+        payload = created.json()
+        assert payload["markdown"] == "## Deployment notes\n\nRetain the approved model."
+        assert payload["attachments"] == []
+        assert payload["attachment_count"] == 0
+        assert payload["primary_file"]["filename"] == "firewall-v1.pdf"
+        assert payload["primary_file"]["media_type"] == "application/pdf"
+        assert payload["primary_file"]["version_number"] == 1
+        assert payload["primary_file"]["is_current"] is True
+        assert payload["primary_file"]["replaces_id"] is None
+
+        replace_url = reverse(
+            "organization-document-primary-file",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": payload["id"]},
+        )
+        replaced = owner_client.post(
+            replace_url,
+            {
+                "file": SimpleUploadedFile(
+                    "firewall-v2.pdf",
+                    b"%PDF-1.4\nTekDocs primary fixture v2\n%%EOF",
+                    content_type="application/pdf",
+                )
+            },
+        )
+        assert replaced.status_code == 201
+        assert replaced.json()["version_number"] == 2
+        assert replaced.json()["replaces_id"] == payload["primary_file"]["id"]
+
+        refreshed = owner_client.get(
+            reverse(
+                "organization-document-detail",
+                kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": payload["id"]},
+            )
+        ).json()
+        assert refreshed["primary_file"]["filename"] == "firewall-v2.pdf"
+        assert [item["version_number"] for item in refreshed["primary_file_versions"]] == [2, 1]
+        assert [item["is_current"] for item in refreshed["primary_file_versions"]] == [True, False]
+
+        current = DocumentAttachment.objects.get(entity_id=refreshed["primary_file"]["id"])
+        current.original_filename = "mutated.pdf"
+        with pytest.raises(ValidationError, match="immutable"):
+            current.save()
+        with pytest.raises(ValidationError, match="immutable"):
+            current.delete()
+        if connection.vendor == "postgresql":
+            with pytest.raises(DatabaseError, match="immutable"), transaction.atomic():
+                DocumentAttachment.objects.filter(pk=current.pk).update(original_filename="database-mutated.pdf")
+            with pytest.raises(DatabaseError, match="immutable"), transaction.atomic(), connection.cursor() as cursor:
+                cursor.execute("DELETE FROM core_documentattachment WHERE id = %s", [current.pk])
+
+        for version, expected in zip(
+            refreshed["primary_file_versions"],
+            (b"%PDF-1.4\nTekDocs primary fixture v2\n%%EOF", b"%PDF-1.4\nTekDocs primary fixture v1\n%%EOF"),
+            strict=True,
+        ):
+            download = owner_client.get(
+                reverse(
+                    "organization-document-attachment-download",
+                    kwargs={
+                        "organization_entity_id": acme.entity_id,
+                        "document_entity_id": payload["id"],
+                        "attachment_entity_id": version["id"],
+                    },
+                )
+            )
+            assert b"".join(download.streaming_content) == expected
+            assert download["Cache-Control"] == "private, no-store"
+            assert download["Content-Type"] == "application/octet-stream"
+
+        assert (
+            owner_client.post(
+                reverse(
+                    "organization-document-primary-file",
+                    kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": payload["id"]},
+                ),
+                {"file": SimpleUploadedFile("hidden.pdf", b"%PDF-1.4\nhidden\n%%EOF")},
+            ).status_code
+            == 404
+        )
+        assert (
+            owner_client.delete(
+                reverse(
+                    "organization-document-attachment-detail",
+                    kwargs={
+                        "organization_entity_id": acme.entity_id,
+                        "document_entity_id": payload["id"],
+                        "attachment_entity_id": payload["primary_file"]["id"],
+                    },
+                )
+            ).status_code
+            == 400
+        )
+
+    assert AuditEvent.objects.filter(action="document.primary_file.created").count() == 2
+    assert all(
+        set(event.metadata) <= {"document_id", "version_number"}
+        for event in AuditEvent.objects.filter(action="document.primary_file.created")
+    )
+
+
+@pytest.mark.django_db
+def test_rejected_file_backed_document_creation_leaves_no_document(owner_client, installation, tmp_path):
+    before_documents = Document.objects.count()
+    before_entities = Entity.objects.count()
+    with override_settings(MEDIA_ROOT=tmp_path):
+        rejected = owner_client.post(
+            reverse("msp-document-file-backed-create"),
+            {
+                "title": "Rejected file",
+                "notes": "This must roll back.",
+                "category": "reference",
+                "file": SimpleUploadedFile("payload.pdf", b"MZ executable content", content_type="application/pdf"),
+            },
+        )
+    assert rejected.status_code == 400
+    assert Document.objects.count() == before_documents
+    assert Entity.objects.count() == before_entities
+
+
+@pytest.mark.django_db
 def test_markdown_import_and_resolved_export_use_portable_bytes(owner_client, installation):
     imported = owner_client.post(
         reverse("msp-document-import"),

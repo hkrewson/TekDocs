@@ -34,9 +34,9 @@ compose_for "$source_project" up -d --build --wait backend
 compose_for "$source_project" exec -T backend python manage.py shell -c '
 from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.core.document_attachments import create_document_attachment
+from apps.core.document_attachments import create_document_attachment, replace_primary_document_file
 from apps.core.documents import create_document, resolve_document, restructure_document, update_document
-from apps.core.models import DocumentPublicationArtifact, DocumentPublicationControlEvent, PublicationAudience, PublicationRetention
+from apps.core.models import DocumentAttachmentPurpose, DocumentPublicationArtifact, DocumentPublicationControlEvent, PublicationAudience, PublicationRetention
 from apps.core.publications import publish_document
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
@@ -50,12 +50,15 @@ revision = update_document(document=document, actor_id=result.owner.id, title="R
 restructured = restructure_document(document=document, actor_id=result.owner.id, base_revision_id=revision.id)
 document.refresh_from_db()
 attachment = create_document_attachment(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("recovery-evidence.txt", b"retained attachment bytes\n", content_type="text/plain"))
+primary_v1 = create_document_attachment(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v1.pdf", b"%PDF-1.4\nretained primary v1\n%%EOF", content_type="application/pdf"), purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1)
+primary_v2 = replace_primary_document_file(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v2.pdf", b"%PDF-1.4\nretained primary v2\n%%EOF", content_type="application/pdf"))
 publication = publish_document(workspace=resolve_msp_workspace(result.owner), document=document, actor_id=result.owner.id, reason="Backup rehearsal fixture", audience=PublicationAudience.MSP_INTERNAL, retention=PublicationRetention.PERMANENT, retention_review_on=None)
 assert revision.revision_number == 2
 assert restructured.section_count == 2
 assert document.placements.count() == 2
 assert resolve_document(document).markdown == "# Recovery evidence\n\nRevision two is canonical.\n"
 assert attachment.file.storage.exists(attachment.file.name)
+assert primary_v2.replaces_id == primary_v1.id
 assert DocumentPublicationArtifact.objects.filter(publication=publication, kind="pdf").count() == 1
 assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
 scope_context.__exit__(None, None, None)
@@ -78,7 +81,7 @@ docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_director
 compose_for "$restore_project" up -d --build --wait backend
 compose_for "$restore_project" exec -T backend python manage.py shell -c '
 from apps.core.documents import primary_placement, resolve_document
-from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, InstallationState
+from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentAttachmentPurpose, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, InstallationState
 from apps.core.publications import verify_publication
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
@@ -94,6 +97,12 @@ assert list(BlockRevision.objects.filter(block=primary.block).order_by("revision
 attachment = DocumentAttachment.objects.get(document=document, original_filename="recovery-evidence.txt")
 with attachment.file.storage.open(attachment.file.name, "rb") as stored:
     assert stored.read() == b"retained attachment bytes\n"
+primary_versions = list(DocumentAttachment.objects.filter(document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE).order_by("version_number"))
+assert [record.version_number for record in primary_versions] == [1, 2]
+assert primary_versions[1].replaces_id == primary_versions[0].id
+for record, expected in zip(primary_versions, (b"%PDF-1.4\nretained primary v1\n%%EOF", b"%PDF-1.4\nretained primary v2\n%%EOF"), strict=True):
+    with record.file.storage.open(record.file.name, "rb") as stored:
+        assert stored.read() == expected
 publication = DocumentPublication.objects.get(document=document)
 assert verify_publication(publication)["valid"] is True
 assert list(DocumentPublicationControlEvent.objects.filter(publication=publication).order_by("occurred_at").values_list("action", flat=True)) == ["submitted", "approved"]
@@ -101,7 +110,7 @@ artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind
 with artifact.file.storage.open(artifact.file.name, "rb") as stored:
     assert stored.read(5) == b"%PDF-"
 scope_context.__exit__(None, None, None)
-print("Database, revision history, attachment, signed manifest, and PDF restored")
+print("Database, revision history, attachment, primary-file history, signed manifest, and PDF restored")
 '
 compose_for "$restore_project" exec -T backend python manage.py check
 

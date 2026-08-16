@@ -48,6 +48,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route("msp-document-file-backed-create", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route(
         "msp-document-detail",
         ("GET", "PUT", "DELETE"),
@@ -90,6 +91,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-document-remote-observation-apply", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-attachment-list-create", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-primary-file", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-attachment-detail", ("DELETE",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-attachment-download", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route(
@@ -967,6 +969,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-document-file-backed-create",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-document-template-instantiate",
         ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
@@ -1024,6 +1032,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-document-attachment-list-create",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-primary-file",
         ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,

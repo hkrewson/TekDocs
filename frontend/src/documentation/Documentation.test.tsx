@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -36,6 +36,9 @@ function clients() {
   const instantiateTemplate = vi.fn().mockResolvedValue({ ...document, id: 'doc-from-template', title: 'New from Firewall standard', is_template: false })
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
   const uploadAttachment = vi.fn().mockResolvedValue({ id: 'attachment-1', filename: 'notes.txt', media_type: 'text/plain', size: 5, checksum: 'checksum', scan_status: 'clean', scan_engine: 'test-scanner', scanned_at: '2026-08-09T00:00:00Z', created_at: '2026-08-09T00:00:00Z' })
+  const primaryFile = { id: 'primary-1', filename: 'runbook.txt', media_type: 'text/plain', size: 512, checksum: 'p'.repeat(64), scan_status: 'clean' as const, scan_engine: 'test-scanner', scanned_at: '2026-08-09T00:00:00Z', created_at: '2026-08-09T00:00:00Z', version_number: 1, replaces_id: null, is_current: true }
+  const createFileBacked = vi.fn((_scope: object, input: { title: string; notes: string; category: string; file: File }) => Promise.resolve({ ...document, id: 'doc-file', title: input.title, markdown: input.notes, category: input.category as DocumentRecord['category'], primary_file: primaryFile, primary_file_versions: [primaryFile] }))
+  const replacePrimaryFile = vi.fn().mockResolvedValue({ ...primaryFile, id: 'primary-2', filename: 'firewall-v2.pdf', version_number: 2, replaces_id: 'primary-1' })
   const archiveAttachment = vi.fn().mockResolvedValue(undefined)
   const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, reason: 'Approved for operations', audience: 'msp_internal' as const, retention: 'permanent' as const, retention_review_on: null, lifecycle_state: 'published' as const, supersedes_id: null, superseded_by_id: null, control_events: [{ id: 'event-1', action: 'submitted' as const, reason: 'Approved for operations', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }, { id: 'event-2', action: 'approved' as const, reason: 'Approved for MSP-internal distribution at publication time.', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }], audience_projections: [{ audience: 'msp_staff' as const, available: true, state: 'retained' }, { audience: 'client_portal' as const, available: false, state: 'not_intended' }], artifacts: [{ id: 'pdf-1', kind: 'pdf' as const, filename: 'firewall-static.pdf', media_type: 'application/pdf', size: 1200, checksum: 'c'.repeat(64), source_attachment_id: null }], content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v2' } }
   const publish = vi.fn().mockResolvedValue(publication)
@@ -48,6 +51,7 @@ function clients() {
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     create: createDocument,
+    createFileBacked,
     update: updateDocument,
     previewRestructure,
     applyRestructure,
@@ -72,6 +76,7 @@ function clients() {
     applyRemoteObservation,
     importMarkdown,
     uploadAttachment,
+    replacePrimaryFile,
     archiveAttachment,
     publish,
     approvePublication,
@@ -90,7 +95,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
+  return { documents, workspaces, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -188,6 +193,28 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
+})
+
+it('creates a file-backed document with notes and exposes retained primary-file versions', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, createFileBacked, replacePrimaryFile } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await screen.findByRole('button', { name: /Firewall standard/ })
+  await user.click(screen.getByRole('button', { name: 'New document' }))
+  await user.click(screen.getByRole('button', { name: 'Upload file' }))
+  await user.type(screen.getByLabelText('Document title'), 'Vendor runbook')
+  const source = new File(['approved instructions'], 'runbook.txt', { type: 'text/plain' })
+  await user.upload(screen.getByLabelText('Primary file'), source)
+  await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '## Local notes')
+  await user.click(screen.getByRole('button', { name: 'Create file-backed document' }))
+  await waitFor(() => expect(createFileBacked).toHaveBeenCalledWith({}, { title: 'Vendor runbook', notes: '## Local notes', category: 'general', file: source }))
+  expect(screen.getByText('Primary file · version 1 · 512 bytes')).toBeVisible()
+  expect(screen.getByRole('link', { name: /Download/ })).toHaveAttribute('href', '/documents/doc-file/attachments/primary-1/download')
+
+  const replacement = new File(['%PDF-1.4 replacement'], 'firewall-v2.pdf', { type: 'application/pdf' })
+  await user.upload(screen.getByLabelText('Replacement primary file'), replacement)
+  await waitFor(() => expect(replacePrimaryFile).toHaveBeenCalledWith({}, 'doc-file', replacement))
+  expect(await screen.findByText('Primary file · version 2 · 512 bytes')).toBeVisible()
 })
 
 it('adds a visible document block live and can pin its resolved revision', async () => {

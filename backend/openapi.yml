@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.20
+  version: 0.8.21
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1994,6 +1994,43 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/primary-file:
+    post:
+      operationId: document_primary_file_msp_replace
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPrimaryFile'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/publications:
     get:
       operationId: document_publications_msp_list
@@ -2829,6 +2866,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockLibraryResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/file-backed:
+    post:
+      operationId: documents_msp_create_file_backed
+      tags:
+      - documents
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileBackedDocumentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FileBackedDocumentCreate'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
           description: ''
           headers:
             X-Request-ID:
@@ -13974,6 +14041,49 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/primary-file:
+    post:
+      operationId: document_primary_file_organization_replace
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPrimaryFile'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/publications:
     get:
       operationId: document_publications_organization_list
@@ -14813,6 +14923,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockLibraryResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/file-backed:
+    post:
+      operationId: documents_organization_create_file_backed
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileBackedDocumentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FileBackedDocumentCreate'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
           description: ''
           headers:
             X-Request-ID:
@@ -23804,6 +23951,16 @@ components:
         attachment_count:
           type: integer
           readOnly: true
+        primary_file:
+          allOf:
+          - $ref: '#/components/schemas/DocumentPrimaryFile'
+          nullable: true
+          readOnly: true
+        primary_file_versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPrimaryFile'
+          readOnly: true
         publications:
           type: array
           items:
@@ -23867,6 +24024,8 @@ components:
       - owner_organization_name
       - placement_count
       - placements
+      - primary_file
+      - primary_file_versions
       - publication_count
       - publications
       - resolved_markdown
@@ -24119,6 +24278,51 @@ components:
         library_visible:
           type: boolean
           default: false
+    DocumentPrimaryFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+        scan_status:
+          type: string
+        scan_engine:
+          type: string
+        scanned_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        version_number:
+          type: integer
+        replaces_id:
+          type: string
+          format: uuid
+          nullable: true
+        is_current:
+          type: boolean
+      required:
+      - checksum
+      - created_at
+      - filename
+      - id
+      - is_current
+      - media_type
+      - replaces_id
+      - scan_engine
+      - scan_status
+      - scanned_at
+      - size
+      - version_number
     DocumentPublication:
       type: object
       properties:
@@ -25414,6 +25618,38 @@ components:
       - page
       - page_size
       - results
+    FileBackedDocumentCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        notes:
+          type: string
+          maxLength: 1000000
+        category:
+          enum:
+          - general
+          - policy
+          - procedure
+          - guide
+          - reference
+          type: string
+          description: |-
+            * `general` - General
+            * `policy` - Policy
+            * `procedure` - Procedure
+            * `guide` - Guide
+            * `reference` - Reference
+          x-spec-enum-id: 5c27c16eb333c7c1
+          default: general
+        file:
+          type: string
+          format: uri
+      required:
+      - file
+      - title
     GitExport:
       type: object
       properties:

@@ -21,6 +21,7 @@ from .document_attachments import (
     archive_document_attachment,
     create_document_attachment,
     open_document_attachment,
+    replace_primary_document_file,
 )
 from .document_exports import EXPORT_FORMATS, export_docx, export_html, export_pdf
 from .document_reuse import reuse_impact_for_placement
@@ -55,6 +56,7 @@ from .models import (
     Document,
     DocumentationListingReference,
     DocumentAttachment,
+    DocumentAttachmentPurpose,
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentTemplateEnrollment,
@@ -84,6 +86,7 @@ from .serializers import (
     DocumentListQuerySerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
+    DocumentPrimaryFileSerializer,
     DocumentPublicationControlWriteSerializer,
     DocumentPublicationDetailSerializer,
     DocumentPublicationResultSerializer,
@@ -100,6 +103,7 @@ from .serializers import (
     DocumentUpdateSerializer,
     EntityMentionResultSerializer,
     EntityMentionSearchQuerySerializer,
+    FileBackedDocumentCreateSerializer,
     MarkdownImportSerializer,
     ReuseImpactSerializer,
     RevisionConflictSerializer,
@@ -164,6 +168,31 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         category=serializer.validated_data["category"],
         is_template=serializer.validated_data["is_template"],
         library_visible=serializer.validated_data["library_visible"],
+    )
+    return Response(
+        DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
+        status=201,
+    )
+
+
+@transaction.atomic
+def _create_file_backed(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = FileBackedDocumentCreateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    document = create_document(
+        tenant=workspace.member.tenant,
+        organization=workspace.organization,
+        actor_id=request.user.pk,
+        title=serializer.validated_data["title"],
+        markdown=serializer.validated_data.get("notes", ""),
+        category=serializer.validated_data["category"],
+    )
+    create_document_attachment(
+        document=document,
+        actor_id=request.user.pk,
+        upload=serializer.validated_data["file"],
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        version_number=1,
     )
     return Response(
         DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
@@ -448,6 +477,24 @@ def _upload_attachment(workspace: ResolvedWorkspace, document_entity_id: UUID, r
         upload=serializer.validated_data["file"],
     )
     return Response(DocumentAttachmentSerializer(attachment).data, status=201)
+
+
+def _replace_primary_file(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    serializer = DocumentAttachmentWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    replacement = replace_primary_document_file(
+        document=document,
+        actor_id=request.user.pk,
+        upload=serializer.validated_data["file"],
+    )
+    payload = DocumentAttachmentSerializer(replacement).data
+    replaced = replacement.replaces if replacement.replaces_id else None
+    payload["version_number"] = replacement.version_number
+    payload["replaces_id"] = replaced.entity_id if replaced is not None else None
+    payload["is_current"] = True
+    return Response(payload, status=201)
 
 
 def _download_attachment(
@@ -932,6 +979,18 @@ class MSPDocumentTemplateInstantiateView(APIView):
         return _instantiate_template(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
 
 
+class MSPFileBackedDocumentCreateView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="documents_msp_create_file_backed",
+        request=FileBackedDocumentCreateSerializer,
+        responses={201: DocumentSerializer},
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        return _create_file_backed(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
+
+
 class MSPMarkdownImportView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
@@ -1006,6 +1065,20 @@ class MSPDocumentAttachmentListCreateView(APIView):
     )
     def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
         return _upload_attachment(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentPrimaryFileView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="document_primary_file_msp_replace",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentPrimaryFileSerializer},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _replace_primary_file(
+            _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request
+        )
 
 
 class MSPDocumentAttachmentDetailView(APIView):
@@ -1230,6 +1303,20 @@ class OrganizationDocumentTemplateInstantiateView(APIView):
         )
 
 
+class OrganizationFileBackedDocumentCreateView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="documents_organization_create_file_backed",
+        request=FileBackedDocumentCreateSerializer,
+        responses={201: DocumentSerializer},
+    )
+    def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _create_file_backed(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request
+        )
+
+
 class OrganizationDocumentTemplateLibraryView(APIView):
     @extend_schema(operation_id="document_templates_organization_library", responses={200: DocumentResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
@@ -1361,6 +1448,22 @@ class OrganizationDocumentAttachmentListCreateView(APIView):
     )
     def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
         return _upload_attachment(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentPrimaryFileView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        operation_id="document_primary_file_organization_replace",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentPrimaryFileSerializer},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _replace_primary_file(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
             document_entity_id,
             request,

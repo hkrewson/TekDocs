@@ -79,6 +79,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_certificateendpoint",
     "core_certificatemonitorrun",
     "core_certificatemonitoralert",
+    "core_relationshipgraphview",
+    "core_relationshipgraphsnapshot",
 )
 
 TENANT_SCOPED_TABLES = (

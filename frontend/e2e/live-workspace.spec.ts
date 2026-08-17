@@ -388,7 +388,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Name').fill('Live management LAN')
   await page.getByLabel('Location').selectOption({ label: 'Live Main Campus · Building A' })
   await page.getByLabel('VLAN').fill('20')
-  await page.getByLabel(/^Network \(CIDR\)/).fill('192.0.2.0/24')
+  await page.locator('input[placeholder*="CIDR"], input[placeholder*="192"]').first().fill('192.0.2.0/24')
   await page.getByLabel('Primary DNS').fill('9.9.9.9')
   await page.getByLabel('Secondary DNS').fill('1.1.1.1')
   await page.getByLabel('Description').fill('Core management network')

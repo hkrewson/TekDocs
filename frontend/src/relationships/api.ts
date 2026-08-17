@@ -42,6 +42,10 @@ export type EntityRelationship = {
 
 export type RelationshipScope = { organizationId?: string }
 export type EntitySearchResult = { results: EntityReference[]; page: number; page_size: number; count: number; has_more: boolean }
+export type RelationshipGraphFamily = 'network' | 'asset' | 'document'
+export type RelationshipGraphNode = { id: string; label: string; entity_type: string; visibility: 'msp_private' | 'client_visible'; root: boolean }
+export type RelationshipGraphEdge = { id: string; source: string; target: string; link_type: EntityLinkType; label: string; symmetric: boolean }
+export type RelationshipGraph = { family: RelationshipGraphFamily; workspace: { kind: 'msp' | 'organization'; id: string }; root_entity_id: string | null; depth: number; edge_limit: number; truncated: boolean; digest: string; nodes: RelationshipGraphNode[]; edges: RelationshipGraphEdge[] }
 
 export interface RelationshipsClient {
   linkTypes(signal?: AbortSignal): Promise<LinkTypeDefinition[]>
@@ -49,6 +53,7 @@ export interface RelationshipsClient {
   list(scope: RelationshipScope, entityId: string, signal?: AbortSignal): Promise<EntityRelationship[]>
   create(scope: RelationshipScope, entityId: string, targetId: string, linkType: EntityLinkType): Promise<EntityRelationship>
   archive(scope: RelationshipScope, entityId: string, linkId: string): Promise<void>
+  graph?(scope: RelationshipScope, family: RelationshipGraphFamily, options?: { rootId?: string; depth?: number; edgeLimit?: number }, signal?: AbortSignal): Promise<RelationshipGraph>
 }
 
 function entitiesPath(scope: RelationshipScope) {
@@ -60,6 +65,10 @@ function entitiesPath(scope: RelationshipScope) {
 function relationshipsPath(scope: RelationshipScope, entityId: string, linkId?: string) {
   const base = `${entitiesPath(scope)}/${encodeURIComponent(entityId)}/links`
   return linkId ? `${base}/${encodeURIComponent(linkId)}` : base
+}
+
+function graphPath(scope: RelationshipScope) {
+  return scope.organizationId ? `/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}/relationship-graph` : '/api/v1/relationship-graph'
 }
 
 async function json<T>(response: Response): Promise<T> {
@@ -134,5 +143,12 @@ export const browserRelationshipsClient: RelationshipsClient = {
   async archive(scope, entityId, linkId) {
     const response = await mutation(relationshipsPath(scope, entityId, linkId), 'DELETE')
     if (!response.ok) throw requestError(response, 'change')
+  },
+  async graph(scope, family, options = {}, signal) {
+    const parameters = new URLSearchParams({ family, depth: String(options.depth ?? 2), edge_limit: String(options.edgeLimit ?? 100) })
+    if (options.rootId) parameters.set('root', options.rootId)
+    const response = await fetch(`${graphPath(scope)}?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
+    if (!response.ok) throw requestError(response, 'load')
+    return json<RelationshipGraph>(response)
   },
 }

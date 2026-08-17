@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapPin, Pencil, Plus } from 'lucide-react'
 
 import type { RelationshipsClient } from '../relationships/api'
+import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserNetworksClient } from './api'
 import type { NetworkChoices, NetworkRecord, NetworkRecordWrite, NetworksClient } from './api'
@@ -27,7 +28,7 @@ const emptyForm: NetworkRecordWrite = {
 }
 
 export function Networks({ workspace, client = browserNetworksClient, relationshipsClient }: Props) {
-  void relationshipsClient
+  const relationshipScope = useMemo(() => workspace.kind === 'organization' ? { organizationId: workspace.id } : {}, [workspace])
   const [records, setRecords] = useState<NetworkRecord[] | null>(null)
   const [choices, setChoices] = useState<NetworkChoices | null>(null)
   const [canManage, setCanManage] = useState(false)
@@ -149,6 +150,8 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
         </table>
       </div>}
     </section>
+
+    <RelationshipGraph scope={relationshipScope} family="network" client={relationshipsClient} heading="Network relationship map" />
 
     {form && <section className="content-section network-editor" aria-labelledby="network-editor-heading">
       <div className="section-heading"><div><h2 id="network-editor-heading">{editingId ? 'Edit network' : 'New network'}</h2><p>The gateway and usable full range are calculated from the CIDR.</p></div></div>

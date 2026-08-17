@@ -30422,10 +30422,13 @@ components:
             * `msp_private` - MSP private
             * `client_visible` - Client visible
           x-spec-enum-id: c3fb18c701837328
+        root:
+          type: boolean
       required:
       - entity_type
       - id
       - label
+      - root
       - visibility
     Reminder:
       type: object

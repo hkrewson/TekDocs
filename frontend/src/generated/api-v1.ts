@@ -9857,6 +9857,7 @@ export interface components {
              * @enum {string}
              */
             readonly visibility: "msp_private" | "client_visible";
+            readonly root: boolean;
         };
         readonly Reminder: {
             /** Format: uuid */

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -134,6 +136,27 @@ LINK_TYPES: tuple[LinkTypeDefinition, ...] = (
     LinkTypeDefinition(EntityLinkType.REFERENCES, "References", "Referenced by"),
 )
 LINK_TYPE_BY_VALUE = {item.value: item for item in LINK_TYPES}
+
+GRAPH_FAMILY_ENTITY_TYPES: dict[str, tuple[str, ...]] = {
+    "network": (
+        "client_asset",
+        "site",
+        "location",
+        "network_rack",
+        "network_device",
+        "network_vlan",
+        "network_subnet",
+        "network_ip_address",
+        "network_mac_address",
+        "wireless_network",
+        "dns_zone",
+        "dns_record",
+        "network_circuit",
+        "network_circuit_handoff",
+    ),
+    "asset": ("client_asset", "catalog_product", "catalog_model"),
+    "document": ("document",),
+}
 
 
 def link_type_catalog() -> list[dict[str, object]]:
@@ -379,6 +402,117 @@ def relationships_for_entity(*, workspace: ResolvedWorkspace, entity_id: UUID) -
         relationship_projection(link=link, perspective=entity, workspace=workspace)
         for link in _active_links_for_entity(workspace=workspace, entity=entity)
     ]
+
+
+def _graph_node(entity: Entity, *, root_id: UUID | None) -> dict[str, object]:
+    return {
+        "id": str(entity.id),
+        "label": entity.display_name,
+        "entity_type": entity.entity_type,
+        "visibility": entity.visibility,
+        "root": entity.id == root_id,
+    }
+
+
+def _graph_edge(link: EntityLink) -> dict[str, object]:
+    definition = LINK_TYPE_BY_VALUE[link.link_type]
+    return {
+        "id": str(link.id),
+        "source": str(link.source_id),
+        "target": str(link.target_id),
+        "link_type": link.link_type,
+        "label": definition.forward_label,
+        "symmetric": definition.symmetric,
+    }
+
+
+def relationship_graph_projection(
+    *,
+    workspace: ResolvedWorkspace,
+    family: str,
+    root_entity_id: UUID | None,
+    depth: int,
+    edge_limit: int,
+) -> dict[str, object]:
+    """Return a bounded graph after authorizing every node and edge server-side."""
+
+    family_types = GRAPH_FAMILY_ENTITY_TYPES[family]
+    visible = _visible_entities(workspace=workspace, include_reference_organizations=False)
+    visible_ids = visible.values("id")
+    root: Entity | None = None
+    if root_entity_id is not None:
+        root = visible.get(id=root_entity_id, entity_type__in=family_types)
+
+    links = (
+        EntityLink.scoped.for_tenant(workspace.member.tenant)
+        .filter(archived_at__isnull=True, source_id__in=visible_ids, target_id__in=visible_ids)
+        .select_related("source", "target")
+        .order_by("id")
+    )
+    selected: list[EntityLink] = []
+    truncated = False
+    if root is None:
+        candidates = list(
+            links.filter(Q(source__entity_type__in=family_types) | Q(target__entity_type__in=family_types))[
+                : edge_limit + 1
+            ]
+        )
+        truncated = len(candidates) > edge_limit
+        selected = candidates[:edge_limit]
+    else:
+        frontier = {root.id}
+        visited_nodes = {root.id}
+        visited_links: set[UUID] = set()
+        for _level in range(depth):
+            if not frontier or len(selected) >= edge_limit:
+                break
+            remaining = edge_limit - len(selected)
+            candidates = list(
+                links.filter(Q(source_id__in=frontier) | Q(target_id__in=frontier))
+                .exclude(id__in=visited_links)[: remaining + 1]
+            )
+            if len(candidates) > remaining:
+                truncated = True
+            candidates = candidates[:remaining]
+            selected.extend(candidates)
+            visited_links.update(item.id for item in candidates)
+            next_frontier = {
+                endpoint
+                for item in candidates
+                for endpoint in (item.source_id, item.target_id)
+                if endpoint not in visited_nodes
+            }
+            visited_nodes.update(next_frontier)
+            frontier = next_frontier
+
+    entities: dict[UUID, Entity] = {}
+    if root is not None:
+        entities[root.id] = root
+    for link in selected:
+        entities[link.source_id] = link.source
+        entities[link.target_id] = link.target
+    nodes = [_graph_node(entities[key], root_id=root.id if root else None) for key in sorted(entities, key=str)]
+    edges = [_graph_edge(link) for link in selected]
+    digest_source = {
+        "family": family,
+        "root_entity_id": str(root.id) if root else None,
+        "nodes": nodes,
+        "edges": edges,
+    }
+    digest = hashlib.sha256(
+        json.dumps(digest_source, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        **digest_source,
+        "workspace": {
+            "kind": workspace.kind,
+            "id": str(workspace.organization.entity_id) if workspace.organization is not None else str(workspace.member.tenant_id),
+        },
+        "depth": depth,
+        "edge_limit": edge_limit,
+        "truncated": truncated,
+        "digest": digest,
+    }
 
 
 @transaction.atomic

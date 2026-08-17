@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import EntityLinkType, EntityVisibility
 from .relationships import SEARCHABLE_ENTITY_TYPES
 
+GRAPH_FAMILIES = ("network", "asset", "document")
+
 
 class EntitySearchQuerySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
@@ -66,3 +68,39 @@ class EntityRelationshipSerializer(serializers.Serializer):
 
 class EntityRelationshipResultSerializer(serializers.Serializer):
     relationships = EntityRelationshipSerializer(many=True)
+
+
+class RelationshipGraphQuerySerializer(serializers.Serializer):
+    family = serializers.ChoiceField(choices=GRAPH_FAMILIES)
+    root_entity_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    depth = serializers.IntegerField(min_value=1, max_value=3, required=False, default=1)
+    edge_limit = serializers.IntegerField(min_value=1, max_value=200, required=False, default=100)
+
+
+class RelationshipGraphNodeSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField()
+    entity_type = serializers.CharField()
+    visibility = serializers.ChoiceField(choices=EntityVisibility.choices)
+    root = serializers.BooleanField()
+
+
+class RelationshipGraphEdgeSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    source = serializers.UUIDField()
+    target = serializers.UUIDField()
+    link_type = serializers.ChoiceField(choices=EntityLinkType.choices)
+    label = serializers.CharField()
+    symmetric = serializers.BooleanField()
+
+
+class RelationshipGraphSerializer(serializers.Serializer):
+    family = serializers.ChoiceField(choices=GRAPH_FAMILIES)
+    root_entity_id = serializers.UUIDField(allow_null=True)
+    workspace = serializers.DictField()
+    depth = serializers.IntegerField()
+    edge_limit = serializers.IntegerField()
+    truncated = serializers.BooleanField()
+    digest = serializers.RegexField(r"^[0-9a-f]{64}$")
+    nodes = RelationshipGraphNodeSerializer(many=True)
+    edges = RelationshipGraphEdgeSerializer(many=True)

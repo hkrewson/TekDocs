@@ -325,6 +325,88 @@ def test_relationship_archive_preserves_history_and_hides_active_link(owner_clie
     assert recreated.status_code == 201
 
 
+@pytest.mark.django_db
+def test_relationship_graph_is_exact_workspace_bounded_and_deterministic(owner_client, installation):
+    first = organization(installation.tenant, "Graph First", "client")
+    second = organization(installation.tenant, "Graph Second", "client")
+    root = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=first,
+        entity_type="network_subnet",
+        display_name="Office LAN",
+    )
+    switch = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=first,
+        entity_type="client_asset",
+        display_name="Core switch",
+    )
+    sibling = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=second,
+        entity_type="client_asset",
+        display_name="Sibling firewall",
+    )
+    allowed = EntityLink.objects.create(
+        tenant=installation.tenant,
+        source=root,
+        target=switch,
+        link_type="depends_on",
+    )
+    EntityLink.objects.create(
+        tenant=installation.tenant,
+        source=root,
+        target=sibling,
+        link_type="depends_on",
+    )
+    url = reverse("organization-relationship-graph", kwargs={"organization_entity_id": first.entity_id})
+
+    first_response = owner_client.get(
+        url,
+        {"family": "network", "root_entity_id": root.id, "depth": 2, "edge_limit": 20},
+    )
+    second_response = owner_client.get(
+        url,
+        {"family": "network", "root_entity_id": root.id, "depth": 2, "edge_limit": 20},
+    )
+
+    assert first_response.status_code == 200
+    graph = first_response.json()
+    assert {item["id"] for item in graph["nodes"]} == {str(root.id), str(switch.id)}
+    assert [item["id"] for item in graph["edges"]] == [str(allowed.id)]
+    assert graph["workspace"] == {"kind": "organization", "id": str(first.entity_id)}
+    assert graph["digest"] == second_response.json()["digest"]
+    assert "Sibling firewall" not in first_response.content.decode()
+
+
+@pytest.mark.django_db
+def test_relationship_graph_rejects_wrong_family_hidden_root_and_unbounded_parameters(
+    client, owner_client, installation
+):
+    first = organization(installation.tenant, "Graph Boundary First", "client")
+    second = organization(installation.tenant, "Graph Boundary Second", "client")
+    document = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=first,
+        entity_type="document",
+        display_name="Runbook",
+    )
+    sibling = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=second,
+        entity_type="network_subnet",
+        display_name="Hidden network",
+    )
+    url = reverse("organization-relationship-graph", kwargs={"organization_entity_id": first.entity_id})
+
+    assert client.get(url, {"family": "network"}).status_code == 403
+    assert owner_client.get(url, {"family": "network", "root_entity_id": document.id}).status_code == 404
+    assert owner_client.get(url, {"family": "network", "root_entity_id": sibling.id}).status_code == 404
+    assert owner_client.get(url, {"family": "network", "depth": 4}).status_code == 400
+    assert owner_client.get(url, {"family": "network", "edge_limit": 201}).status_code == 400
+    assert owner_client.get(url, {"family": "unknown"}).status_code == 400
+
+
 @pytest.mark.django_db(transaction=True)
 def test_postgres_link_guards_reject_scope_identity_metadata_and_noncanonical_writes(installation):
     if connection.vendor != "postgresql":

@@ -1444,6 +1444,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/relationship-graph": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_relationship_graph"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/sites": {
         readonly parameters: {
             readonly query?: never;
@@ -5620,6 +5636,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_relationship_graph"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/reminders": {
         readonly parameters: {
             readonly query?: never;
@@ -9769,6 +9801,62 @@ export interface components {
             readonly page_size: number;
             readonly count: number;
             readonly has_more: boolean;
+        };
+        readonly RelationshipGraph: {
+            /**
+             * @description * `network` - network
+             *     * `asset` - asset
+             *     * `document` - document
+             * @enum {string}
+             */
+            readonly family: "network" | "asset" | "document";
+            /** Format: uuid */
+            readonly root_entity_id: string | null;
+            readonly workspace: {
+                readonly [key: string]: unknown;
+            };
+            readonly depth: number;
+            readonly edge_limit: number;
+            readonly truncated: boolean;
+            readonly digest: string;
+            readonly nodes: readonly components["schemas"]["RelationshipGraphNode"][];
+            readonly edges: readonly components["schemas"]["RelationshipGraphEdge"][];
+        };
+        readonly RelationshipGraphEdge: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly source: string;
+            /** Format: uuid */
+            readonly target: string;
+            /**
+             * @description * `related_to` - Related to
+             *     * `connected_to` - Connected to
+             *     * `depends_on` - Depends on
+             *     * `managed_by` - Managed by
+             *     * `supplied_by` - Supplied by
+             *     * `manufactured_by` - Manufactured by
+             *     * `partnered_with` - Partnered with
+             *     * `located_at` - Located at
+             *     * `assigned_to` - Assigned to
+             *     * `references` - References
+             * @enum {string}
+             */
+            readonly link_type: "related_to" | "connected_to" | "depends_on" | "managed_by" | "supplied_by" | "manufactured_by" | "partnered_with" | "located_at" | "assigned_to" | "references";
+            readonly label: string;
+            readonly symmetric: boolean;
+        };
+        readonly RelationshipGraphNode: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly label: string;
+            readonly entity_type: string;
+            /**
+             * @description * `msp_private` - MSP private
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly visibility: "msp_private" | "client_visible";
         };
         readonly Reminder: {
             /** Format: uuid */
@@ -14585,6 +14673,70 @@ export interface operations {
             };
             /** @description Archived dependencies must be recovered first */
             readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly msp_relationship_graph: {
+        readonly parameters: {
+            readonly query: {
+                readonly depth?: number;
+                readonly edge_limit?: number;
+                /**
+                 * @description * `network` - network
+                 *     * `asset` - asset
+                 *     * `document` - document
+                 */
+                readonly family: "network" | "asset" | "document";
+                readonly root_entity_id?: string | null;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraph"];
+                };
+            };
+            /** @description Invalid graph parameters */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Workspace or record permission required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Root entity not found in workspace */
+            readonly 404: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;
@@ -25496,6 +25648,72 @@ export interface operations {
             };
             /** @description Archived dependencies must be recovered first */
             readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly organization_relationship_graph: {
+        readonly parameters: {
+            readonly query: {
+                readonly depth?: number;
+                readonly edge_limit?: number;
+                /**
+                 * @description * `network` - network
+                 *     * `asset` - asset
+                 *     * `document` - document
+                 */
+                readonly family: "network" | "asset" | "document";
+                readonly root_entity_id?: string | null;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraph"];
+                };
+            };
+            /** @description Invalid graph parameters */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Workspace or record permission required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Root entity not found in workspace */
+            readonly 404: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

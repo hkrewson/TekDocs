@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.25
+  version: 0.8.30
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5172,6 +5172,99 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
         '409':
           description: Archived dependencies must be recovered first
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/relationship-graph:
+    get:
+      operationId: msp_relationship_graph
+      parameters:
+      - in: query
+        name: depth
+        schema:
+          type: integer
+          maximum: 3
+          minimum: 1
+          default: 1
+      - in: query
+        name: edge_limit
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+      - in: query
+        name: family
+        schema:
+          enum:
+          - network
+          - asset
+          - document
+          type: string
+          x-spec-enum-id: 0886db5866fe1488
+          minLength: 1
+        description: |-
+          * `network` - network
+          * `asset` - asset
+          * `document` - document
+        required: true
+      - in: query
+        name: root_entity_id
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+      tags:
+      - relationship-graph
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid graph parameters
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Workspace or record permission required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '404':
+          description: Root entity not found in workspace
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -20252,6 +20345,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph:
+    get:
+      operationId: organization_relationship_graph
+      parameters:
+      - in: query
+        name: depth
+        schema:
+          type: integer
+          maximum: 3
+          minimum: 1
+          default: 1
+      - in: query
+        name: edge_limit
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+      - in: query
+        name: family
+        schema:
+          enum:
+          - network
+          - asset
+          - document
+          type: string
+          x-spec-enum-id: 0886db5866fe1488
+          minLength: 1
+        description: |-
+          * `network` - network
+          * `asset` - asset
+          * `document` - document
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: root_entity_id
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid graph parameters
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Workspace or record permission required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '404':
+          description: Root entity not found in workspace
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/reminders:
     get:
       operationId: organization_reminder_list
@@ -30115,6 +30307,126 @@ components:
       - page
       - page_size
       - results
+    RelationshipGraph:
+      type: object
+      properties:
+        family:
+          enum:
+          - network
+          - asset
+          - document
+          type: string
+          description: |-
+            * `network` - network
+            * `asset` - asset
+            * `document` - document
+          x-spec-enum-id: 0886db5866fe1488
+        root_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        workspace:
+          type: object
+          additionalProperties: {}
+        depth:
+          type: integer
+        edge_limit:
+          type: integer
+        truncated:
+          type: boolean
+        digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipGraphNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipGraphEdge'
+      required:
+      - depth
+      - digest
+      - edge_limit
+      - edges
+      - family
+      - nodes
+      - root_entity_id
+      - truncated
+      - workspace
+    RelationshipGraphEdge:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          format: uuid
+        target:
+          type: string
+          format: uuid
+        link_type:
+          enum:
+          - related_to
+          - connected_to
+          - depends_on
+          - managed_by
+          - supplied_by
+          - manufactured_by
+          - partnered_with
+          - located_at
+          - assigned_to
+          - references
+          type: string
+          description: |-
+            * `related_to` - Related to
+            * `connected_to` - Connected to
+            * `depends_on` - Depends on
+            * `managed_by` - Managed by
+            * `supplied_by` - Supplied by
+            * `manufactured_by` - Manufactured by
+            * `partnered_with` - Partnered with
+            * `located_at` - Located at
+            * `assigned_to` - Assigned to
+            * `references` - References
+          x-spec-enum-id: 84cb4ddbc0a29784
+        label:
+          type: string
+        symmetric:
+          type: boolean
+      required:
+      - id
+      - label
+      - link_type
+      - source
+      - symmetric
+      - target
+    RelationshipGraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        entity_type:
+          type: string
+        visibility:
+          enum:
+          - msp_private
+          - client_visible
+          type: string
+          description: |-
+            * `msp_private` - MSP private
+            * `client_visible` - Client visible
+          x-spec-enum-id: c3fb18c701837328
+      required:
+      - entity_type
+      - id
+      - label
+      - visibility
     Reminder:
       type: object
       properties:

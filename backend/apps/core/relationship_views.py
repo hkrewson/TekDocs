@@ -15,6 +15,8 @@ from .relationship_serializers import (
     EntityRelationshipSerializer,
     EntitySearchQuerySerializer,
     EntitySearchResultSerializer,
+    RelationshipGraphQuerySerializer,
+    RelationshipGraphSerializer,
 )
 from .relationships import (
     EntityRelationshipError,
@@ -22,6 +24,7 @@ from .relationships import (
     create_entity_link,
     link_type_catalog,
     relationships_for_entity,
+    relationship_graph_projection,
     search_entities,
 )
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
@@ -162,6 +165,28 @@ class EntityRelationshipDetailView(APIView):
         return Response(status=204)
 
 
+class RelationshipGraphView(APIView):
+    @extend_schema(
+        operation_id="relationship_graph",
+        parameters=[RelationshipGraphQuerySerializer],
+        responses={
+            200: RelationshipGraphSerializer,
+            400: OpenApiResponse(description="Invalid graph parameters"),
+            403: OpenApiResponse(description="Workspace or record permission required"),
+            404: OpenApiResponse(description="Root entity not found in workspace"),
+        },
+    )
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.RELATIONSHIPS_VIEW)
+        serializer = RelationshipGraphQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        try:
+            graph = relationship_graph_projection(workspace=workspace, **serializer.validated_data)
+        except ObjectDoesNotExist as exc:
+            raise _not_found() from exc
+        return Response(RelationshipGraphSerializer(graph).data)
+
+
 @extend_schema_view(get=extend_schema(operation_id="msp_entities_search"))
 class MSPEntitySearchView(EntitySearchView):
     pass
@@ -195,4 +220,14 @@ class MSPEntityRelationshipDetailView(EntityRelationshipDetailView):
 
 @extend_schema_view(delete=extend_schema(operation_id="organization_entity_relationships_archive"))
 class OrganizationEntityRelationshipDetailView(EntityRelationshipDetailView):
+    pass
+
+
+@extend_schema_view(get=extend_schema(operation_id="msp_relationship_graph"))
+class MSPRelationshipGraphView(RelationshipGraphView):
+    pass
+
+
+@extend_schema_view(get=extend_schema(operation_id="organization_relationship_graph"))
+class OrganizationRelationshipGraphView(RelationshipGraphView):
     pass

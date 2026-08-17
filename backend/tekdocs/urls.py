@@ -294,9 +294,11 @@ from apps.core.relationship_views import (
     MSPEntityRelationshipDetailView,
     MSPEntityRelationshipListCreateView,
     MSPEntitySearchView,
+    MSPRelationshipGraphView,
     OrganizationEntityRelationshipDetailView,
     OrganizationEntityRelationshipListCreateView,
     OrganizationEntitySearchView,
+    OrganizationRelationshipGraphView,
 )
 from apps.core.reminder_views import (
     MSPReminderCalendarView,
@@ -633,6 +635,7 @@ urlpatterns = [
     ),
     path("api/v1/entity-link-types", EntityLinkTypeCatalogView.as_view(), name="entity-link-type-catalog"),
     path("api/v1/entities/search", MSPEntitySearchView.as_view(), name="msp-entity-search"),
+    path("api/v1/relationship-graph", MSPRelationshipGraphView.as_view(), name="msp-relationship-graph"),
     path(
         "api/v1/entities/<uuid:entity_id>/links",
         MSPEntityRelationshipListCreateView.as_view(),
@@ -1901,6 +1904,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/search",
         OrganizationEntitySearchView.as_view(),
         name="organization-entity-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/relationship-graph",
+        OrganizationRelationshipGraphView.as_view(),
+        name="organization-relationship-graph",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/<uuid:entity_id>/links",

@@ -79,6 +79,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-detail": ("entity_id",),
         "msp-entity-relationship-list-create": ("entity_id",),
         "msp-entity-relationship-detail": ("entity_id", "link_id"),
+        "msp-relationship-graph-view-detail": ("view_id",),
+        "msp-relationship-graph-snapshots": ("view_id",),
+        "msp-relationship-graph-snapshot-export": ("snapshot_id", "export_format"),
         "msp-domain-review": ("domain_entity_id",),
         "msp-domain-monitoring": ("domain_entity_id",),
         "msp-certificate-endpoint-list-create": ("domain_entity_id",),
@@ -463,6 +466,15 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-entity-search": ("organization_entity_id",),
         "organization-entity-relationship-list-create": ("organization_entity_id", "entity_id"),
         "organization-entity-relationship-detail": ("organization_entity_id", "entity_id", "link_id"),
+        "organization-relationship-graph": ("organization_entity_id",),
+        "organization-relationship-graph-views": ("organization_entity_id",),
+        "organization-relationship-graph-view-detail": ("organization_entity_id", "view_id"),
+        "organization-relationship-graph-snapshots": ("organization_entity_id", "view_id"),
+        "organization-relationship-graph-snapshot-export": (
+            "organization_entity_id",
+            "snapshot_id",
+            "export_format",
+        ),
         "organization-recycle-bin": ("organization_entity_id",),
         "notification-delivery-retry": ("delivery_id",),
     }
@@ -471,7 +483,10 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         if route_name.startswith("organization-"):
             kwargs["organization_entity_id"] = value
         return kwargs
-    return {name: (1 if name == "revision_number" else value) for name in route_kwargs.get(route_name, ())}
+    return {
+        name: ("json" if name == "export_format" else 1 if name == "revision_number" else value)
+        for name in route_kwargs.get(route_name, ())
+    }
 
 
 def _request(client: Client, method: str, route_name: str):

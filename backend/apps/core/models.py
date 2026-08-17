@@ -5900,3 +5900,94 @@ class CertificateMonitorAlert(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Certificate monitoring alerts are retained")
+
+
+class RelationshipGraphFamily(models.TextChoices):
+    NETWORK = "network", "Network"
+    ASSET = "asset", "Asset"
+    DOCUMENT = "document", "Document"
+
+
+class RelationshipGraphView(TimestampedModel):
+    """A named, workspace-owned graph query and its optional manual positions."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="relationship_graph_views")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="relationship_graph_views")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="relationship_graph_views", null=True, blank=True
+    )
+    name = models.CharField(max_length=120)
+    family = models.CharField(max_length=16, choices=RelationshipGraphFamily.choices)
+    root_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="relationship_graph_views", null=True, blank=True
+    )
+    depth = models.PositiveSmallIntegerField(default=2)
+    edge_limit = models.PositiveSmallIntegerField(default=100)
+    positions = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_relationship_graph_views"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(family__in=RelationshipGraphFamily.values), name="graph_view_family_valid"
+            ),
+            models.CheckConstraint(condition=models.Q(depth__gte=1, depth__lte=3), name="graph_view_depth_bounded"),
+            models.CheckConstraint(
+                condition=models.Q(edge_limit__gte=1, edge_limit__lte=200), name="graph_view_limit_bounded"
+            ),
+            models.UniqueConstraint(
+                fields=("workspace", "name"),
+                condition=models.Q(archived_at__isnull=True),
+                name="graph_view_workspace_name_unique",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Relationship graph views must be archived")
+
+
+class RelationshipGraphSnapshot(models.Model):
+    """An immutable, exact authorized graph retained for review and export."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="relationship_graph_snapshots")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="relationship_graph_snapshots")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="relationship_graph_snapshots", null=True, blank=True
+    )
+    view = models.ForeignKey(RelationshipGraphView, on_delete=models.PROTECT, related_name="snapshots")
+    graph = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_relationship_graph_snapshots"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        indexes = [models.Index(fields=("view", "created_at"), name="core_graphsnapshot_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.view}: {self.created_at}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Relationship graph snapshots are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Relationship graph snapshots are retained")

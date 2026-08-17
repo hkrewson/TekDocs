@@ -1460,6 +1460,70 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/relationship-graph/snapshots/{snapshot_id}/export/{export_format}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["relationship_graph_snapshots_export_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/relationship-graph/views": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["relationship_graph_views_retrieve"];
+        readonly put?: never;
+        readonly post: operations["relationship_graph_views_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/relationship-graph/views/{view_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["relationship_graph_views_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["relationship_graph_views_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/relationship-graph/views/{view_id}/snapshots": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["relationship_graph_views_snapshots_retrieve"];
+        readonly put?: never;
+        readonly post: operations["relationship_graph_views_snapshots_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/sites": {
         readonly parameters: {
             readonly query?: never;
@@ -5652,6 +5716,70 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/snapshots/{snapshot_id}/export/{export_format}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_relationship_graph_snapshots_export_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_relationship_graph_views_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_relationship_graph_views_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views/{view_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["workspaces_organizations_relationship_graph_views_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_relationship_graph_views_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views/{view_id}/snapshots": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_relationship_graph_views_snapshots_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_relationship_graph_views_snapshots_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/reminders": {
         readonly parameters: {
             readonly query?: never;
@@ -9436,6 +9564,27 @@ export interface components {
             /** @default  */
             readonly description: string;
         };
+        readonly PatchedRelationshipGraphViewWrite: {
+            /**
+             * @description * `network` - network
+             *     * `asset` - asset
+             *     * `document` - document
+             * @enum {string}
+             */
+            readonly family?: "network" | "asset" | "document";
+            /** Format: uuid */
+            readonly root_entity_id?: string | null;
+            /** @default 1 */
+            readonly depth: number;
+            /** @default 100 */
+            readonly edge_limit: number;
+            readonly name?: string;
+            readonly positions?: {
+                readonly [key: string]: {
+                    readonly [key: string]: unknown;
+                };
+            };
+        };
         readonly PatchedSiteWrite: {
             readonly name?: string;
             readonly code?: string;
@@ -9858,6 +10007,39 @@ export interface components {
              */
             readonly visibility: "msp_private" | "client_visible";
             readonly root: boolean;
+        };
+        readonly RelationshipGraphSnapshot: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly view_id: string;
+            readonly content_digest: string;
+            readonly graph: {
+                readonly [key: string]: unknown;
+            };
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly RelationshipGraphViewWrite: {
+            /**
+             * @description * `network` - network
+             *     * `asset` - asset
+             *     * `document` - document
+             * @enum {string}
+             */
+            readonly family: "network" | "asset" | "document";
+            /** Format: uuid */
+            readonly root_entity_id?: string | null;
+            /** @default 1 */
+            readonly depth: number;
+            /** @default 100 */
+            readonly edge_limit: number;
+            readonly name: string;
+            readonly positions?: {
+                readonly [key: string]: {
+                    readonly [key: string]: unknown;
+                };
+            };
         };
         readonly Reminder: {
             /** Format: uuid */
@@ -14745,6 +14927,181 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_snapshots_export_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly export_format: string;
+                readonly snapshot_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_views_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_views_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RelationshipGraphViewWrite"];
+                readonly "multipart/form-data": components["schemas"]["RelationshipGraphViewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_views_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly relationship_graph_views_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_views_snapshots_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                };
+            };
+        };
+    };
+    readonly relationship_graph_views_snapshots_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RelationshipGraphSnapshot"];
+                readonly "multipart/form-data": components["schemas"]["RelationshipGraphSnapshot"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
                 };
             };
         };
@@ -25722,6 +26079,190 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_snapshots_export_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly export_format: string;
+                readonly organization_entity_id: string;
+                readonly snapshot_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RelationshipGraphViewWrite"];
+                readonly "multipart/form-data": components["schemas"]["RelationshipGraphViewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedRelationshipGraphViewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphViewWrite"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_snapshots_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_relationship_graph_views_snapshots_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly view_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RelationshipGraphSnapshot"];
+                readonly "multipart/form-data": components["schemas"]["RelationshipGraphSnapshot"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
                 };
             };
         };

@@ -2,6 +2,7 @@ import secrets
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.test import Client
 from django.urls import reverse
@@ -16,6 +17,7 @@ from apps.core.models import (
     InstallationState,
     Organization,
     OrganizationClassification,
+    RelationshipGraphSnapshot,
     Tenant,
 )
 
@@ -405,6 +407,94 @@ def test_relationship_graph_rejects_wrong_family_hidden_root_and_unbounded_param
     assert owner_client.get(url, {"family": "network", "depth": 4}).status_code == 400
     assert owner_client.get(url, {"family": "network", "edge_limit": 201}).status_code == 400
     assert owner_client.get(url, {"family": "unknown"}).status_code == 400
+
+
+@pytest.mark.django_db
+def test_saved_graph_views_positions_snapshots_and_exports_are_workspace_bounded(owner_client, installation):
+    client_org = organization(installation.tenant, "Saved Graph Client", "client")
+    network = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=client_org,
+        entity_type="network_subnet",
+        display_name="Office LAN",
+    )
+    firewall = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=client_org,
+        entity_type="client_asset",
+        display_name="Firewall",
+    )
+    EntityLink.objects.create(tenant=installation.tenant, source=network, target=firewall, link_type="connected_to")
+    views_url = reverse("organization-relationship-graph-views", args=[client_org.entity_id])
+    created = owner_client.post(
+        views_url,
+        {
+            "name": "Office map",
+            "family": "network",
+            "root_entity_id": str(network.id),
+            "depth": 2,
+            "edge_limit": 50,
+            "positions": {
+                str(network.id): {"x": 120, "y": 80},
+                "00000000-0000-0000-0000-000000000001": {"x": 0, "y": 0},
+            },
+        },
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert created.json()["positions"] == {str(network.id): {"x": 120.0, "y": 80.0}}
+    view_id = created.json()["id"]
+    duplicate = owner_client.post(
+        views_url,
+        {
+            "name": "Office map",
+            "family": "network",
+            "root_entity_id": str(network.id),
+            "depth": 2,
+            "edge_limit": 50,
+            "positions": {},
+        },
+        content_type="application/json",
+    )
+    assert duplicate.status_code == 400
+    assert duplicate.json()["error"]["fields"]["name"] == [
+        "A saved relationship graph with this name already exists."
+    ]
+
+    snapshot_response = owner_client.post(
+        reverse("organization-relationship-graph-snapshots", args=[client_org.entity_id, view_id])
+    )
+    assert snapshot_response.status_code == 201
+    snapshot_id = snapshot_response.json()["id"]
+    snapshot = RelationshipGraphSnapshot.objects.get(id=snapshot_id)
+    with pytest.raises(ValidationError):
+        snapshot.save()
+
+    csv_export = owner_client.get(
+        reverse(
+            "organization-relationship-graph-snapshot-export",
+            args=[client_org.entity_id, snapshot_id, "csv"],
+        )
+    )
+    svg_export = owner_client.get(
+        reverse(
+            "organization-relationship-graph-snapshot-export",
+            args=[client_org.entity_id, snapshot_id, "svg"],
+        )
+    )
+    assert csv_export.status_code == 200
+    assert b"Office LAN,Connected to,Firewall" in csv_export.content
+    assert svg_export.status_code == 200
+    assert b"<svg" in svg_export.content
+    assert svg_export["X-Content-Type-Options"] == "nosniff"
+    other_org = organization(installation.tenant, "Other Graph Client", "client")
+    cross_workspace = owner_client.get(
+        reverse(
+            "organization-relationship-graph-snapshot-export",
+            args=[other_org.entity_id, snapshot_id, "json"],
+        )
+    )
+    assert cross_workspace.status_code == 404
 
 
 @pytest.mark.django_db(transaction=True)

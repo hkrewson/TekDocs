@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Core, ElementDefinition } from 'cytoscape'
+import type { Core, ElementDefinition, EventObjectNode } from 'cytoscape'
 import { ExternalLink, LocateFixed } from 'lucide-react'
 import { Link } from 'react-router'
 
-import type { RelationshipsClient, RelationshipGraph as Graph, RelationshipGraphFamily, RelationshipGraphNode, RelationshipScope } from './api'
+import type { RelationshipsClient, RelationshipGraph as Graph, RelationshipGraphFamily, RelationshipGraphNode, RelationshipGraphSnapshot, RelationshipGraphView, RelationshipScope } from './api'
+import './RelationshipGraph.css'
 
 function recordPath(node: RelationshipGraphNode, scope: RelationshipScope) {
   const prefix = scope.organizationId ? `/workspaces/organizations/${scope.organizationId}` : ''
@@ -25,24 +26,37 @@ export function RelationshipGraph({ scope, family, client, rootId, heading = 'Re
 }) {
   const container = useRef<HTMLDivElement | null>(null)
   const graphInstance = useRef<Core | null>(null)
-  const [graph, setGraph] = useState<Graph | null>(null)
+  const [graphResult, setGraphResult] = useState<{ key: string; graph: Graph } | null>(null)
   const [depth, setDepth] = useState(rootId ? 2 : 1)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(rootId ?? '')
   const [error, setError] = useState('')
+  const [savedViews, setSavedViews] = useState<RelationshipGraphView[]>([])
+  const [activeView, setActiveView] = useState<RelationshipGraphView | null>(null)
+  const [viewName, setViewName] = useState('')
+  const [snapshot, setSnapshot] = useState<RelationshipGraphSnapshot | null>(null)
+  const requestKey = `${scope.organizationId ?? 'msp'}:${family}:${rootId ?? 'all'}:${depth}`
+  const graph = graphResult?.key === requestKey ? graphResult.graph : null
 
   useEffect(() => {
     const controller = new AbortController()
-    setGraph(null)
     if (!client.graph) {
-      setError('Relationship maps are unavailable from this connection.')
       return () => controller.abort()
     }
     client.graph(scope, family, { rootId, depth, edgeLimit: 150 }, controller.signal)
-      .then((result) => { if (!controller.signal.aborted) { setGraph(result); setError('') } })
+      .then((result) => { if (!controller.signal.aborted) { setGraphResult({ key: requestKey, graph: result }); setError('') } })
       .catch((reason: unknown) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'The relationship map could not be loaded.') })
     return () => controller.abort()
-  }, [client, depth, family, rootId, scope])
+  }, [client, depth, family, requestKey, rootId, scope])
+
+  useEffect(() => {
+    if (!client.graphViews) return
+    const controller = new AbortController()
+    client.graphViews(scope, controller.signal)
+      .then((views) => { if (!controller.signal.aborted) setSavedViews(views.filter((view) => view.family === family)) })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [client, family, scope])
 
   const visibleNodeIds = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -77,19 +91,73 @@ export function RelationshipGraph({ scope, family, client, rootId, heading = 'Re
           { selector: ':selected', style: { 'border-width': 3, 'border-color': '#24231f' } },
         ],
       })
-      graphInstance.current.on('select', 'node', (event) => setSelectedId(event.target.id()))
+      graphInstance.current.on('select', 'node', (event: EventObjectNode) => setSelectedId(event.target.id()))
+      if (activeView) {
+        graphInstance.current.nodes().forEach((node) => {
+          const position = activeView.positions[node.id()]
+          if (position) node.position(position)
+        })
+        graphInstance.current.fit(undefined, 32)
+      }
     })
     return () => { disposed = true; graphInstance.current?.destroy(); graphInstance.current = null }
-  }, [family, graph, visibleEdges, visibleNodes])
+  }, [activeView, family, graph, visibleEdges, visibleNodes])
 
   const selected = graph?.nodes.find((node) => node.id === selectedId)
   const selectedPath = selected ? recordPath(selected, scope) : null
 
   if (!client.graph) return null
 
+  async function saveView() {
+    if (!client.saveGraphView || !viewName.trim()) return
+    const positions: Record<string, { x: number; y: number }> = {}
+    graphInstance.current?.nodes().forEach((node) => { positions[node.id()] = node.position() })
+    try {
+      const saved = await client.saveGraphView(scope, { name: viewName.trim(), family, root_entity_id: rootId ?? null, depth, edge_limit: 150, positions })
+      setSavedViews((current) => [...current, saved].sort((left, right) => left.name.localeCompare(right.name)))
+      setActiveView(saved)
+      setViewName('')
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The graph view could not be saved.')
+    }
+  }
+
+  async function retainSnapshot() {
+    if (!client.snapshotGraphView || !activeView) return
+    try {
+      setSnapshot(await client.snapshotGraphView(scope, activeView.id))
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The graph snapshot could not be retained.')
+    }
+  }
+
+  async function updateLayout() {
+    if (!client.updateGraphView || !activeView) return
+    const positions: Record<string, { x: number; y: number }> = {}
+    graphInstance.current?.nodes().forEach((node) => { positions[node.id()] = node.position() })
+    try {
+      const updated = await client.updateGraphView(scope, activeView.id, {
+        name: activeView.name,
+        family,
+        root_entity_id: rootId ?? null,
+        depth,
+        edge_limit: 150,
+        positions,
+      })
+      setActiveView(updated)
+      setSavedViews((current) => current.map((view) => view.id === updated.id ? updated : view))
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The graph layout could not be updated.')
+    }
+  }
+
   return <section className="content-section relationship-graph" aria-labelledby={`${family}-relationship-graph-heading`}>
     <div className="section-heading relationship-graph-heading"><div><h2 id={`${family}-relationship-graph-heading`}>{heading}</h2><p>Generated from records and relationships visible in this workspace.</p></div><div className="relationship-graph-controls"><label>Depth<select value={depth} onChange={(event) => setDepth(Number(event.target.value))}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option></select></label><button className="secondary-button" type="button" onClick={() => graphInstance.current?.fit(undefined, 32)}><LocateFixed size={15} aria-hidden="true" />Fit</button></div></div>
     <label className="relationship-graph-search"><span className="sr-only">Filter relationship map</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter visible records" /></label>
+    {client.saveGraphView && <div className="relationship-graph-saved"><label>Saved view<select value={activeView?.id ?? ''} onChange={(event) => { const view = savedViews.find((item) => item.id === event.target.value) ?? null; setActiveView(view); if (view) setDepth(view.depth) }}><option value="">Current view</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select></label><label>New view name<input maxLength={120} value={viewName} onChange={(event) => setViewName(event.target.value)} /></label><button className="secondary-button" type="button" disabled={!viewName.trim()} onClick={() => { void saveView() }}>Save view</button>{activeView && client.updateGraphView && <button className="secondary-button" type="button" onClick={() => { void updateLayout() }}>Update layout</button>}{activeView && client.snapshotGraphView && <button className="secondary-button" type="button" onClick={() => { void retainSnapshot() }}>Retain snapshot</button>}</div>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {!graph && !error && <p role="status">Loading relationship map…</p>}
     {graph && graph.nodes.length === 0 && <p className="empty-state">No related records are available in this workspace.</p>}
@@ -102,6 +170,7 @@ export function RelationshipGraph({ scope, family, client, rootId, heading = 'Re
         const target = graph.nodes.find((node) => node.id === edge.target)
         return <tr key={edge.id}><td>{source?.label}</td><td>{edge.label}</td><td>{target?.label}</td></tr>
       })}</tbody></table>{visibleEdges.length === 0 && <p className="empty-state">No relationships match this filter.</p>}</div>
+      {snapshot && client.graphSnapshotExportUrl && <div className="relationship-graph-exports" role="status"><span>Snapshot retained.</span>{(['json', 'csv', 'svg'] as const).map((format) => <a key={format} className="secondary-button" href={client.graphSnapshotExportUrl!(scope, snapshot.id, format)}>Download {format.toUpperCase()}</a>)}</div>}
     </>}
   </section>
 }

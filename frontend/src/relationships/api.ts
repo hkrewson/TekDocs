@@ -46,6 +46,8 @@ export type RelationshipGraphFamily = 'network' | 'asset' | 'document'
 export type RelationshipGraphNode = { id: string; label: string; entity_type: string; visibility: 'msp_private' | 'client_visible'; root: boolean }
 export type RelationshipGraphEdge = { id: string; source: string; target: string; link_type: EntityLinkType; label: string; symmetric: boolean }
 export type RelationshipGraph = { family: RelationshipGraphFamily; workspace: { kind: 'msp' | 'organization'; id: string }; root_entity_id: string | null; depth: number; edge_limit: number; truncated: boolean; digest: string; nodes: RelationshipGraphNode[]; edges: RelationshipGraphEdge[] }
+export type RelationshipGraphView = { id: string; name: string; family: RelationshipGraphFamily; root_entity_id: string | null; depth: number; edge_limit: number; positions: Record<string, { x: number; y: number }>; graph: RelationshipGraph; created_at: string; updated_at: string }
+export type RelationshipGraphSnapshot = { id: string; view_id: string; content_digest: string; graph: RelationshipGraph & { positions?: Record<string, { x: number; y: number }>; view_name?: string }; created_at: string }
 
 export interface RelationshipsClient {
   linkTypes(signal?: AbortSignal): Promise<LinkTypeDefinition[]>
@@ -54,6 +56,11 @@ export interface RelationshipsClient {
   create(scope: RelationshipScope, entityId: string, targetId: string, linkType: EntityLinkType): Promise<EntityRelationship>
   archive(scope: RelationshipScope, entityId: string, linkId: string): Promise<void>
   graph?(scope: RelationshipScope, family: RelationshipGraphFamily, options?: { rootId?: string; depth?: number; edgeLimit?: number }, signal?: AbortSignal): Promise<RelationshipGraph>
+  graphViews?(scope: RelationshipScope, signal?: AbortSignal): Promise<RelationshipGraphView[]>
+  saveGraphView?(scope: RelationshipScope, values: { name: string; family: RelationshipGraphFamily; root_entity_id: string | null; depth: number; edge_limit: number; positions: Record<string, { x: number; y: number }> }): Promise<RelationshipGraphView>
+  updateGraphView?(scope: RelationshipScope, viewId: string, values: { name: string; family: RelationshipGraphFamily; root_entity_id: string | null; depth: number; edge_limit: number; positions: Record<string, { x: number; y: number }> }): Promise<RelationshipGraphView>
+  snapshotGraphView?(scope: RelationshipScope, viewId: string): Promise<RelationshipGraphSnapshot>
+  graphSnapshotExportUrl?(scope: RelationshipScope, snapshotId: string, format: 'json' | 'csv' | 'svg'): string
 }
 
 function entitiesPath(scope: RelationshipScope) {
@@ -69,6 +76,11 @@ function relationshipsPath(scope: RelationshipScope, entityId: string, linkId?: 
 
 function graphPath(scope: RelationshipScope) {
   return scope.organizationId ? `/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}/relationship-graph` : '/api/v1/relationship-graph'
+}
+
+function graphViewsPath(scope: RelationshipScope, viewId?: string) {
+  const base = `${graphPath(scope)}/views`
+  return viewId ? `${base}/${encodeURIComponent(viewId)}` : base
 }
 
 async function json<T>(response: Response): Promise<T> {
@@ -100,7 +112,7 @@ function requestError(response: Response, action: 'load' | 'change') {
   return new AuthRequestError(message, response.status)
 }
 
-async function mutation(path: string, method: 'POST' | 'DELETE', body?: object) {
+async function mutation(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object) {
   return fetch(path, {
     method,
     credentials: 'same-origin',
@@ -150,5 +162,28 @@ export const browserRelationshipsClient: RelationshipsClient = {
     const response = await fetch(`${graphPath(scope)}?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     if (!response.ok) throw requestError(response, 'load')
     return json<RelationshipGraph>(response)
+  },
+  async graphViews(scope, signal) {
+    const response = await fetch(graphViewsPath(scope), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
+    if (!response.ok) throw requestError(response, 'load')
+    return json<RelationshipGraphView[]>(response)
+  },
+  async saveGraphView(scope, values) {
+    const response = await mutation(graphViewsPath(scope), 'POST', values)
+    if (!response.ok) throw requestError(response, 'change')
+    return json<RelationshipGraphView>(response)
+  },
+  async updateGraphView(scope, viewId, values) {
+    const response = await mutation(graphViewsPath(scope, viewId), 'PATCH', values)
+    if (!response.ok) throw requestError(response, 'change')
+    return json<RelationshipGraphView>(response)
+  },
+  async snapshotGraphView(scope, viewId) {
+    const response = await mutation(`${graphViewsPath(scope, viewId)}/snapshots`, 'POST')
+    if (!response.ok) throw requestError(response, 'change')
+    return json<RelationshipGraphSnapshot>(response)
+  },
+  graphSnapshotExportUrl(scope, snapshotId, format) {
+    return `${graphPath(scope)}/snapshots/${encodeURIComponent(snapshotId)}/export/${format}`
   },
 }

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.30
+  version: 0.8.32
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5275,6 +5275,221 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/relationship-graph/snapshots/{snapshot_id}/export/{export_format}:
+    get:
+      operationId: relationship_graph_snapshots_export_retrieve
+      parameters:
+      - in: path
+        name: export_format
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: snapshot_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - relationship-graph
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/relationship-graph/views:
+    get:
+      operationId: relationship_graph_views_retrieve
+      tags:
+      - relationship-graph
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: relationship_graph_views_create
+      tags:
+      - relationship-graph
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/relationship-graph/views/{view_id}:
+    patch:
+      operationId: relationship_graph_views_partial_update
+      parameters:
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - relationship-graph
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: relationship_graph_views_destroy
+      parameters:
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - relationship-graph
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/relationship-graph/views/{view_id}/snapshots:
+    get:
+      operationId: relationship_graph_views_snapshots_retrieve
+      parameters:
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - relationship-graph
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: relationship_graph_views_snapshots_create
+      parameters:
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - relationship-graph
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/sites:
     get:
       operationId: sites_msp_list
@@ -20444,6 +20659,265 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/snapshots/{snapshot_id}/export/{export_format}
+  : get:
+      operationId: workspaces_organizations_relationship_graph_snapshots_export_retrieve
+      parameters:
+      - in: path
+        name: export_format
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: snapshot_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views:
+    get:
+      operationId: workspaces_organizations_relationship_graph_views_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_relationship_graph_views_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphViewWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views/{view_id}:
+    patch:
+      operationId: workspaces_organizations_relationship_graph_views_partial_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRelationshipGraphViewWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphViewWrite'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_organizations_relationship_graph_views_destroy
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/relationship-graph/views/{view_id}/snapshots:
+    get:
+      operationId: workspaces_organizations_relationship_graph_views_snapshots_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_relationship_graph_views_snapshots_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: view_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RelationshipGraphSnapshot'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipGraphSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/reminders:
     get:
       operationId: organization_reminder_list
@@ -29469,6 +29943,42 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedRelationshipGraphViewWrite:
+      type: object
+      properties:
+        family:
+          enum:
+          - network
+          - asset
+          - document
+          type: string
+          description: |-
+            * `network` - network
+            * `asset` - asset
+            * `document` - document
+          x-spec-enum-id: 0886db5866fe1488
+        root_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        depth:
+          type: integer
+          maximum: 3
+          minimum: 1
+          default: 1
+        edge_limit:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+        name:
+          type: string
+          maxLength: 120
+        positions:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: {}
     PatchedSiteWrite:
       type: object
       properties:
@@ -30430,6 +30940,69 @@ components:
       - label
       - root
       - visibility
+    RelationshipGraphSnapshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        view_id:
+          type: string
+          format: uuid
+        content_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        graph:
+          type: object
+          additionalProperties: {}
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - content_digest
+      - created_at
+      - graph
+      - id
+      - view_id
+    RelationshipGraphViewWrite:
+      type: object
+      properties:
+        family:
+          enum:
+          - network
+          - asset
+          - document
+          type: string
+          description: |-
+            * `network` - network
+            * `asset` - asset
+            * `document` - document
+          x-spec-enum-id: 0886db5866fe1488
+        root_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        depth:
+          type: integer
+          maximum: 3
+          minimum: 1
+          default: 1
+        edge_limit:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+        name:
+          type: string
+          maxLength: 120
+        positions:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: {}
+      required:
+      - family
+      - name
     Reminder:
       type: object
       properties:

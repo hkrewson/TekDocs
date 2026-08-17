@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
@@ -12,7 +12,16 @@ from django.utils import timezone
 
 from apps.accounts.policy import PermissionKey, accessible_organizations, context_has_permission
 
-from .models import AuditEvent, Entity, EntityLink, EntityLinkType, Organization
+from .models import (
+    AuditEvent,
+    Entity,
+    EntityLink,
+    EntityLinkType,
+    Organization,
+    RelationshipGraphSnapshot,
+    RelationshipGraphView,
+    workspace_for_owner,
+)
 from .workspaces import ResolvedWorkspace
 
 SEARCHABLE_ENTITY_TYPES = (
@@ -433,11 +442,17 @@ def relationship_graph_projection(
     root_entity_id: UUID | None,
     depth: int,
     edge_limit: int,
+    related_visibility: str | None = None,
 ) -> dict[str, object]:
     """Return a bounded graph after authorizing every node and edge server-side."""
 
     family_types = GRAPH_FAMILY_ENTITY_TYPES[family]
     visible = _visible_entities(workspace=workspace, include_reference_organizations=False)
+    if related_visibility is not None:
+        if root_entity_id is None:
+            visible = visible.filter(visibility=related_visibility)
+        else:
+            visible = visible.filter(Q(id=root_entity_id) | Q(visibility=related_visibility))
     visible_ids = visible.values("id")
     root: Entity | None = None
     if root_entity_id is not None:
@@ -506,13 +521,104 @@ def relationship_graph_projection(
         **digest_source,
         "workspace": {
             "kind": workspace.kind,
-            "id": str(workspace.organization.entity_id) if workspace.organization is not None else str(workspace.member.tenant_id),
+            "id": (
+                str(workspace.organization.entity_id)
+                if workspace.organization is not None
+                else str(workspace.member.tenant.id)
+            ),
         },
         "depth": depth,
         "edge_limit": edge_limit,
         "truncated": truncated,
         "digest": digest,
     }
+
+
+def graph_snapshot_is_visible(*, workspace: ResolvedWorkspace, graph: dict[str, Any]) -> bool:
+    node_ids = {UUID(item["id"]) for item in graph.get("nodes", []) if isinstance(item, dict) and item.get("id")}
+    if len(node_ids) != len(graph.get("nodes", [])):
+        return False
+    visible_ids = set(
+        _visible_entities(workspace=workspace, include_reference_organizations=False)
+        .filter(id__in=node_ids)
+        .values_list("id", flat=True)
+    )
+    return node_ids == visible_ids
+
+
+def graph_view_projection(*, workspace: ResolvedWorkspace, view: RelationshipGraphView) -> dict[str, Any]:
+    graph = relationship_graph_projection(
+        workspace=workspace,
+        family=view.family,
+        root_entity_id=view.root_entity_id,
+        depth=view.depth,
+        edge_limit=view.edge_limit,
+    )
+    nodes = cast(list[dict[str, Any]], graph["nodes"])
+    visible_ids = {item["id"] for item in nodes}
+    positions = {key: value for key, value in view.positions.items() if key in visible_ids}
+    return {
+        "id": view.id,
+        "name": view.name,
+        "family": view.family,
+        "root_entity_id": view.root_entity_id,
+        "depth": view.depth,
+        "edge_limit": view.edge_limit,
+        "positions": positions,
+        "graph": graph,
+        "created_at": view.created_at,
+        "updated_at": view.updated_at,
+    }
+
+
+@transaction.atomic
+def save_graph_view(
+    *,
+    workspace: ResolvedWorkspace,
+    actor_id: UUID,
+    values: dict[str, Any],
+    view: RelationshipGraphView | None = None,
+) -> RelationshipGraphView:
+    graph = relationship_graph_projection(
+        workspace=workspace,
+        **{key: values[key] for key in ("family", "root_entity_id", "depth", "edge_limit")},
+    )
+    nodes = cast(list[dict[str, Any]], graph["nodes"])
+    visible_ids = {item["id"] for item in nodes}
+    positions = {key: value for key, value in values.get("positions", {}).items() if key in visible_ids}
+    owner_workspace = workspace_for_owner(tenant=workspace.member.tenant, organization=workspace.organization)
+    if view is None:
+        return RelationshipGraphView.objects.create(
+            tenant=workspace.member.tenant,
+            workspace=owner_workspace,
+            organization=workspace.organization,
+            created_by_id=actor_id,
+            positions=positions,
+            **{key: values[key] for key in ("name", "family", "root_entity_id", "depth", "edge_limit")},
+        )
+    for field in ("name", "family", "root_entity_id", "depth", "edge_limit"):
+        setattr(view, field, values[field])
+    view.positions = positions
+    view.save()
+    return view
+
+
+@transaction.atomic
+def create_graph_snapshot(
+    *, workspace: ResolvedWorkspace, actor_id: UUID, view: RelationshipGraphView
+) -> RelationshipGraphSnapshot:
+    projection = graph_view_projection(workspace=workspace, view=view)
+    graph = {**projection["graph"], "positions": projection["positions"], "view_name": view.name}
+    digest = hashlib.sha256(json.dumps(graph, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return RelationshipGraphSnapshot.objects.create(
+        tenant=view.tenant,
+        workspace=view.workspace,
+        organization=view.organization,
+        view=view,
+        graph=graph,
+        content_digest=digest,
+        created_by_id=actor_id,
+    )
 
 
 @transaction.atomic

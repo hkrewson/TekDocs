@@ -321,6 +321,29 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("DELETE",),
         mutations=(PermissionKey.RELATIONSHIPS_ARCHIVE,),
     ),
+    route("msp-relationship-graph", ("GET",), PermissionKey.RELATIONSHIPS_VIEW),
+    route(
+        "msp-relationship-graph-views",
+        ("GET", "POST"),
+        PermissionKey.RELATIONSHIPS_VIEW,
+        (PermissionKey.RELATIONSHIPS_CREATE,),
+    ),
+    route(
+        "msp-relationship-graph-view-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.RELATIONSHIPS_CREATE, PermissionKey.RELATIONSHIPS_ARCHIVE),
+    ),
+    route(
+        "msp-relationship-graph-snapshots",
+        ("GET", "POST"),
+        PermissionKey.RELATIONSHIPS_VIEW,
+        (PermissionKey.RELATIONSHIPS_CREATE,),
+    ),
+    route(
+        "msp-relationship-graph-snapshot-export",
+        ("GET",),
+        PermissionKey.RELATIONSHIPS_VIEW,
+    ),
     route(
         "msp-people-list-create",
         ("GET", "POST"),
@@ -1241,6 +1264,38 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-entity-relationship-detail",
         ("DELETE",),
         mutations=(PermissionKey.RELATIONSHIPS_ARCHIVE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-relationship-graph",
+        ("GET",),
+        PermissionKey.RELATIONSHIPS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-relationship-graph-views",
+        ("GET", "POST"),
+        PermissionKey.RELATIONSHIPS_VIEW,
+        (PermissionKey.RELATIONSHIPS_CREATE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-relationship-graph-view-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.RELATIONSHIPS_CREATE, PermissionKey.RELATIONSHIPS_ARCHIVE),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-relationship-graph-snapshots",
+        ("GET", "POST"),
+        PermissionKey.RELATIONSHIPS_VIEW,
+        (PermissionKey.RELATIONSHIPS_CREATE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-relationship-graph-snapshot-export",
+        ("GET",),
+        PermissionKey.RELATIONSHIPS_VIEW,
         organization_scoped=True,
     ),
     route(

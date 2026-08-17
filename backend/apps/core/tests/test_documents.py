@@ -56,6 +56,8 @@ from apps.core.models import (
     DocumentRemoteSource,
     DocumentTemplateEnrollment,
     Entity,
+    EntityLink,
+    EntityVisibility,
     InstallationState,
     Organization,
     OrganizationClassification,
@@ -304,6 +306,19 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             {"title": "Access standard", "markdown": "Initial", "category": "policy"},
             content_type="application/json",
         ).json()
+        private_asset = Entity.objects.create_owned(
+            tenant=installation.tenant,
+            organization=client_org,
+            entity_type="client_asset",
+            display_name="Private publishing note",
+            visibility=EntityVisibility.MSP_PRIVATE,
+        )
+        EntityLink.objects.create(
+            tenant=installation.tenant,
+            source_id=created["id"],
+            target=private_asset,
+            link_type="references",
+        )
         attachment = owner_client.post(
             reverse(
                 "organization-document-attachment-list-create",
@@ -354,6 +369,11 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
         assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
         assert publication_payload["manifest"]["entities"][0]["display_name"] == "Static Client"
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
+        assert publication_payload["manifest"]["relationship_graph"]["family"] == "document"
+        assert publication_payload["manifest"]["relationship_graph"]["root_entity_id"] == created["id"]
+        assert {
+            item["label"] for item in publication_payload["manifest"]["relationship_graph"]["nodes"]
+        } == {"Access standard"}
         assert publication_payload["reason"] == "Approved access policy"
         assert publication_payload["audience"] == "client_visible"
         assert publication_payload["lifecycle_state"] == "pending_approval"

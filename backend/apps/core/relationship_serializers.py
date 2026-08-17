@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from rest_framework import serializers
 
 from .models import EntityLinkType, EntityVisibility
@@ -104,3 +106,44 @@ class RelationshipGraphSerializer(serializers.Serializer):
     digest = serializers.RegexField(r"^[0-9a-f]{64}$")
     nodes = RelationshipGraphNodeSerializer(many=True)
     edges = RelationshipGraphEdgeSerializer(many=True)
+
+
+class RelationshipGraphViewWriteSerializer(RelationshipGraphQuerySerializer):
+    name = serializers.CharField(max_length=120)
+    positions = serializers.DictField(child=serializers.DictField(), required=False, default=dict)
+
+    def validate_positions(self, value):  # type: ignore[no-untyped-def]
+        if len(value) > 200:
+            raise serializers.ValidationError("At most 200 node positions may be saved.")
+        normalized = {}
+        for entity_id, position in value.items():
+            try:
+                UUID(entity_id)
+                x, y = float(position["x"]), float(position["y"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise serializers.ValidationError("Positions require UUID keys and numeric x/y values.") from exc
+            if not (-100000 <= x <= 100000 and -100000 <= y <= 100000):
+                raise serializers.ValidationError("Position coordinates are out of bounds.")
+            normalized[entity_id] = {"x": x, "y": y}
+        return normalized
+
+
+class RelationshipGraphViewSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    family = serializers.ChoiceField(choices=GRAPH_FAMILIES)
+    root_entity_id = serializers.UUIDField(allow_null=True)
+    depth = serializers.IntegerField()
+    edge_limit = serializers.IntegerField()
+    positions = serializers.DictField()
+    graph = RelationshipGraphSerializer()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+
+class RelationshipGraphSnapshotSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    view_id = serializers.UUIDField()
+    content_digest = serializers.RegexField(r"^[0-9a-f]{64}$")
+    graph = serializers.DictField()
+    created_at = serializers.DateTimeField()

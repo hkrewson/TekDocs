@@ -47,6 +47,7 @@ from .models import (
     PublicationControlAction,
 )
 from .outbox import OutboxTopic, enqueue_outbox_event
+from .relationships import relationship_graph_projection
 from .rendering import (
     RenderedAttachment,
     attachment_ids_in_markdown,
@@ -342,6 +343,18 @@ def publish_document(
                 )
 
             organization = locked_document.organization
+            relationship_graph = relationship_graph_projection(
+                workspace=workspace,
+                family="document",
+                root_entity_id=locked_document.entity_id,
+                depth=3,
+                edge_limit=200,
+                related_visibility=(
+                    EntityVisibility.CLIENT_VISIBLE
+                    if audience == PublicationAudience.CLIENT_VISIBLE
+                    else None
+                ),
+            )
             manifest: dict[str, Any] = {
                 "format": MANIFEST_VERSION,
                 "publication_id": str(publication_id),
@@ -377,6 +390,7 @@ def publish_document(
                 "entities": entity_projections,
                 "attachments": attachment_records,
                 "diagrams": diagram_records,
+                "relationship_graph": relationship_graph,
                 "artifacts": [_artifact_descriptor(artifact) for artifact in pending_artifacts],
             }
             payload = snapshot_payload(manifest=manifest, markdown=resolved.markdown, sanitized_html=sanitized_html)

@@ -1,0 +1,24 @@
+.relationship-graph { display: grid; gap: 14px; }
+.relationship-graph-heading { align-items: end; }
+.relationship-graph-controls { display: flex; align-items: end; gap: 8px; }
+.relationship-graph-controls label { display: grid; gap: 4px; color: var(--muted); font-size: .82rem; font-weight: 650; }
+.relationship-graph-controls select { min-width: 72px; }
+.relationship-graph-search { max-width: 420px; }
+.relationship-graph-canvas { min-height: 430px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-subtle); }
+.relationship-graph-notice { color: var(--muted); margin: 0; }
+.relationship-graph-selection { display: flex; align-items: center; gap: 10px; margin: 0; }
+.relationship-graph-selection span { color: var(--muted); text-transform: capitalize; }
+.relationship-graph-selection a { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.relationship-graph-table { overflow-x: auto; }
+.relationship-graph-table table { width: 100%; border-collapse: collapse; }
+.relationship-graph-table caption { text-align: left; font-weight: 700; padding: 4px 0 10px; }
+.relationship-graph-table th, .relationship-graph-table td { text-align: left; border-top: 1px solid var(--border); padding: 9px 8px; }
+.relationship-graph-saved, .relationship-graph-exports { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.relationship-graph-saved label { display: grid; gap: 4px; min-width: 180px; color: var(--muted); font-size: .82rem; font-weight: 650; }
+.relationship-graph-exports span { margin-right: auto; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .relationship-graph-heading { align-items: stretch; }
+  .relationship-graph-controls { width: 100%; }
+  .relationship-graph-canvas { min-height: 340px; }
+}

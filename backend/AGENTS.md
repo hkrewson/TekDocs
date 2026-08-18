@@ -8,4 +8,6 @@
 - Static publications and audit events are append-only.
 - External HTTP activity must use the approved egress service with redirect, address, timeout, and size controls.
 - Schema changes require normal Django migrations plus fresh-install and upgrade-path tests.
+- A new model carrying a `tenant` foreign key must be assigned a reviewed boundary in `apps/core/rls_contract.py` and `apps/core/validation.py` in the same commit as its migration.
+- A test that mutates schema, roles, or privileges shared by the rest of the session must restore that state in fixture teardown or `finally`, never only on the success path. Restore to migration head, never to a pinned revision.
 - New runtime dependencies require maintenance, vulnerability, and license review.

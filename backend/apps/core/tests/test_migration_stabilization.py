@@ -131,8 +131,26 @@ DOCUMENT_RLS_TABLES = {
 }
 
 
+@pytest.fixture
+def migration_head_restored(transactional_db):
+    """Return the shared test database to migration head however the test ends.
+
+    A reversal test downgrades the schema of the database every later test in the
+    session shares. Restoring it only on the success path means one failed assertion
+    between the downgrade and the restore leaves the whole session on a stale schema,
+    which then surfaces as unrelated ``UndefinedColumn`` errors far from the real
+    failure. Requesting ``transactional_db`` here orders this teardown ahead of the
+    flush pytest-django performs when the test finishes.
+    """
+    try:
+        yield
+    finally:
+        call_command("migrate", "core", verbosity=0, interactive=False)
+        call_command("migrate", "accounts", verbosity=0, interactive=False)
+
+
 @pytest.mark.django_db(transaction=True)
-def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
+def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss(migration_head_restored):
     if connection.vendor != "postgresql":
         pytest.skip("Migration-cycle validation requires PostgreSQL")
 
@@ -324,9 +342,9 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss():
         )
         assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
 
-    # Restore the shared test database to the current head of both apps. Naming an
-    # explicit target here leaves every later test in the session running against a
-    # stale schema as soon as a new migration lands.
+    # Restore to the current head of both apps so the assertions below observe the
+    # round trip. Never name an explicit target here: a pinned revision silently
+    # strands the session on a stale schema as soon as a new migration lands.
     call_command("migrate", "core", verbosity=0, interactive=False)
     call_command("migrate", "accounts", verbosity=0, interactive=False)
 

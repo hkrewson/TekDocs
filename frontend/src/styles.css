@@ -32,7 +32,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 9px 12px; color: var(--text); background: #fff; border: 2px solid var(--focus); border-radius: 6px; transform: translateY(-160%); }
 .skip-link:focus { transform: translateY(0); }
 
-.app-shell { min-height: 100vh; background: var(--canvas); }
+.app-shell { min-height: 100dvh; background: var(--canvas); }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 244px; display: flex; flex-direction: column; color: #e8e7e2; background: var(--sidebar); border-right: 1px solid var(--sidebar-border); z-index: 30; transition: width 150ms ease; }
 .sidebar.collapsed { width: 68px; }
 .sidebar-topline { height: 60px; display: flex; align-items: center; padding: 0 12px 0 16px; border-bottom: 1px solid var(--sidebar-border); }
@@ -79,7 +79,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .nav-link.active { color: #f2dfc6; background: #313029; }
 .collapsed .nav-link { justify-content: center; padding: 0; }
 .nav-divider { height: 1px; margin: 12px 10px; background: var(--sidebar-border); }
-.app-body { min-height: 100vh; margin-left: 244px; transition: margin-left 150ms ease; }
+.app-body { min-height: 100dvh; margin-left: 244px; padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); transition: margin-left 150ms ease; }
 .app-body.sidebar-collapsed { margin-left: 68px; }
 .topbar { height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .search-field { width: min(420px, 42vw); display: flex; align-items: center; gap: 8px; color: var(--quiet); }
@@ -723,7 +723,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .markdown-help-table code { overflow-x: auto; color: #4b3a27; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
 .markdown-help-safety { max-width: 780px; }
 
-.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 32px 20px; background: var(--canvas); }
+.auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px; background: var(--canvas); }
 .auth-panel { width: min(440px, 100%); padding: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 16px; font-weight: 650; }
 .auth-panel h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; letter-spacing: -.015em; }
@@ -1346,7 +1346,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .webhook-secret { grid-template-columns: 1fr; }
   .domain-monitor-summary { grid-template-columns: 1fr; }
 }
-.client-portal-shell { min-height: 100vh; background: var(--background); color: var(--text); }
+.client-portal-shell { min-height: 100dvh; background: var(--background); color: var(--text); }
 .client-portal-header { min-height: 64px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .client-portal-brand, .client-portal-account { display: flex; align-items: center; gap: 10px; }
 .client-portal-brand { font-weight: 700; }

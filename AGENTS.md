@@ -13,6 +13,8 @@ These instructions apply to the entire repository. More specific instructions in
 - Treat Django migrations as the sole database schema authority. Do not create a parallel initialization schema.
 - Keep implementation, migrations, OpenAPI, tests, architecture documentation, roadmap status, and release notes aligned.
 - Distinguish `verified`, `inferred`, and `blocked` in closeout notes. Docker evidence is required for runtime claims.
+- Reproduce a reported failure before changing code to fix it, and name the reproduction in the closeout. A cause read off an error message is a hypothesis, not a diagnosis. This binds hardest on test-only changes, where loosening a selector or an assertion can retire the symptom while leaving the defect in place.
+- Suspect the harness when a failure names a column, table, or fixture that the change under review never touched. Schema and privilege state leaking between tests presents as a missing migration.
 - Never put real credentials, fixed access tokens, customer identifiers, or private data in source, fixtures, logs, screenshots, commands, or uploaded artifacts.
 - Do not push, publish, tag, deploy, or alter external systems without explicit authorization.
 - A completed roadmap slice should be one descriptive commit. Do not commit incomplete or unrelated work merely to make the tree clean.

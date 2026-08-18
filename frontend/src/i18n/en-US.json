@@ -4,5 +4,7 @@
   "pagination.page": "Page {page}",
   "pagination.previous": "Previous",
   "pagination.next": "Next",
-  "shell.skip": "Skip to main content"
+  "shell.skip": "Skip to main content",
+  "documentation.import": "Import Markdown",
+  "documentation.new": "New document"
 }

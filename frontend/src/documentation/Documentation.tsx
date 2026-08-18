@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Archive, BookOpenText, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings2, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
+import { translate } from '../i18n/localization'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
 import { browserWorkspaceClient } from '../workspaces/api'
 import type { RelationshipsClient } from '../relationships/api'
@@ -598,7 +599,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
 
   return <>
-    <header className="page-header"><div><h1>Documentation</h1><p>{workspace ? `Documents owned by or referenced into ${workspace.name}.` : 'MSP-owned procedures, policies, and reusable reference material.'}</p></div><div className="page-actions"><input ref={importInput} aria-label="Markdown file to import" className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} />Import Markdown</button><button className="primary-button" type="button" onClick={create}><Plus size={16} />New document</button></div></header>
+    <header className="page-header"><div><h1>Documentation</h1><p>{workspace ? `Documents owned by or referenced into ${workspace.name}.` : 'MSP-owned procedures, policies, and reusable reference material.'}</p></div><div className="page-actions"><input ref={importInput} aria-label="Markdown file to import" className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={create}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {message && <div className="form-message success" role="status">{message}</div>}
     <section className="content-section document-index" aria-labelledby="document-index-heading">

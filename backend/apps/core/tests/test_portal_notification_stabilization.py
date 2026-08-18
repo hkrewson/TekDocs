@@ -36,6 +36,7 @@ PORTAL_DOCUMENT_HISTORY_SIZE = 125
 # Includes the exact-organization membership lookup performed before portal data is resolved.
 PORTAL_DOCUMENT_QUERY_BUDGET = 33
 P95_TARGET_SECONDS = 0.5
+P95_SAMPLES = 40
 
 
 def _p95(samples: list[float]) -> float:
@@ -204,7 +205,7 @@ def test_portal_document_history_has_fixed_queries_and_scope_bound_seek_pages(po
         assert client.get(url, {"cursor": first_payload["next_cursor"]}).status_code == 400
 
     samples = []
-    for _ in range(8):
+    for _ in range(P95_SAMPLES):
         started = time.perf_counter()
         response = client.get(url)
         samples.append(time.perf_counter() - started)
@@ -292,7 +293,7 @@ def test_portal_notification_history_is_bounded_seek_paginated_and_scope_bound(p
     assert other_client.get(url, {"cursor": first_payload["next_cursor"]}).status_code == 400
 
     samples = []
-    for _ in range(8):
+    for _ in range(P95_SAMPLES):
         started = time.perf_counter()
         response = client.get(url)
         samples.append(time.perf_counter() - started)

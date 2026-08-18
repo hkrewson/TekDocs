@@ -141,12 +141,24 @@ def migration_head_restored(transactional_db):
     which then surfaces as unrelated ``UndefinedColumn`` errors far from the real
     failure. Requesting ``transactional_db`` here orders this teardown ahead of the
     flush pytest-django performs when the test finishes.
+
+    Reversing and reapplying the whole migration set dirties thousands of relation
+    files. Left to PostgreSQL's own timing, that checkpoint lands in the middle of a
+    later test and stalls one request long enough to fail a latency budget that has
+    nothing to do with migrations. Forcing the checkpoint here pays that cost inside
+    the test that caused it.
     """
     try:
         yield
     finally:
         call_command("migrate", "core", verbosity=0, interactive=False)
         call_command("migrate", "accounts", verbosity=0, interactive=False)
+        if connection.vendor == "postgresql":
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("CHECKPOINT")
+            except DatabaseError:  # pragma: no cover - requires a non-superuser test role
+                pass
 
 
 @pytest.mark.django_db(transaction=True)

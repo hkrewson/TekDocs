@@ -13,7 +13,12 @@ from apps.core.inventory import create_client_asset
 from apps.core.models import CatalogModelLifecycle, SoftwareLicenseKind, SoftwareLicenseStatus, SoftwareRenewalInterval
 from apps.core.organizations import create_organization
 from apps.core.software_inventory import create_license
-from apps.core.tests.test_stabilization_performance import P95_TARGET_SECONDS, _create_reference_fixture, _p95
+from apps.core.tests.test_stabilization_performance import (
+    P95_SAMPLES,
+    P95_TARGET_SECONDS,
+    _create_reference_fixture,
+    _p95,
+)
 
 PRIVATE_LINK = (
     "https://start.1password.com/open/i?"
@@ -66,7 +71,7 @@ def _p95_get(client: Client, url: str, params: dict[str, object]) -> float:
     response = client.get(url, params)
     assert response.status_code == 200
     samples = []
-    for _ in range(8):
+    for _ in range(P95_SAMPLES):
         started = time.perf_counter()
         response = client.get(url, params)
         samples.append(time.perf_counter() - started)

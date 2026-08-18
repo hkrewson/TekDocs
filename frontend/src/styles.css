@@ -79,7 +79,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .nav-link.active { color: #f2dfc6; background: #313029; }
 .collapsed .nav-link { justify-content: center; padding: 0; }
 .nav-divider { height: 1px; margin: 12px 10px; background: var(--sidebar-border); }
-.app-body { min-height: 100dvh; margin-left: 244px; padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); transition: margin-left 150ms ease; }
+.app-body { min-height: 100dvh; margin-left: 244px; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); transition: margin-left 150ms ease; }
 .app-body.sidebar-collapsed { margin-left: 68px; }
 .topbar { height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .search-field { width: min(420px, 42vw); display: flex; align-items: center; gap: 8px; color: var(--quiet); }

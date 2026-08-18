@@ -39,6 +39,10 @@ REFERENCE_SITES = 50
 REFERENCE_LOCATIONS_PER_SITE = 5
 REFERENCE_DOCUMENT_REVISIONS = 2_500
 P95_TARGET_SECONDS = 0.5
+# A nearest-rank p95 only excludes the worst sample once there are at least 24 of
+# them. Below that, `_p95` returns the maximum, so a single stalled request fails
+# the gate. 40 samples keep this a p95 rather than a worst-of-N tripwire.
+P95_SAMPLES = 40
 
 
 def _p95(samples: list[float]) -> float:
@@ -50,7 +54,7 @@ def _timed_requests(client: Client, url: str, params: dict[str, object] | None =
     assert response.status_code == 200
 
     samples = []
-    for _ in range(8):
+    for _ in range(P95_SAMPLES):
         started = time.perf_counter()
         response = client.get(url, params or {})
         samples.append(time.perf_counter() - started)

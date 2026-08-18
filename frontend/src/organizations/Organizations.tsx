@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import { Link } from 'react-router'
 import { browserOrganizationClient } from './api'
 import type { Organization, OrganizationClassification, OrganizationClient, OrganizationInput } from './api'
@@ -135,7 +136,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
     <>
       <header className="page-header">
         <div><h1>Organizations</h1><p>Client, vendor, manufacturer, and partner records for this MSP.</p></div>
-        <button className="primary-button" type="button" onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}>New organization</button>
+        <button className="primary-button" type="button" aria-label={translate('organizations.new')} title={translate('organizations.new')} onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('organizations.new')}</span></button>
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="form-success" role="status">{message}</div>}

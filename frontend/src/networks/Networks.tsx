@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapPin, Pencil, Plus } from 'lucide-react'
+import { translate } from '../i18n/localization'
 
 import type { RelationshipsClient } from '../relationships/api'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
@@ -114,8 +115,8 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
         <h1>Networks</h1>
         <p>Address ranges and essential network settings for {workspace.name}.</p>
       </div>
-      {canManage && <button className="primary-button" type="button" onClick={() => { setEditingId(null); setForm({ ...emptyForm }); setError('') }}>
-        <Plus size={16} aria-hidden="true" />New network
+      {canManage && <button className="primary-button" type="button" aria-label={translate('networks.new')} title={translate('networks.new')} onClick={() => { setEditingId(null); setForm({ ...emptyForm }); setError('') }}>
+        <Plus size={16} aria-hidden="true" /><span className="button-label">{translate('networks.new')}</span>
       </button>}
     </header>
 

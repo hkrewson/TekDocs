@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, FileText, History, Plus, Search, Trash2 } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import type {
   CatalogClient,
@@ -165,7 +166,7 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
   }
 
   return <>
-    <header className="page-header"><div><h1>Products</h1><p>Supplier-owned templates and client-visible STATIC documentation retained by client assets.</p></div>{canManage && tab === 'products' && <button className="primary-button" type="button" onClick={() => setProductDraft({ ...EMPTY_PRODUCT })}><Plus size={16} />New product</button>}{canManage && tab === 'definitions' && <button className="primary-button" type="button" onClick={() => setDefinitionDraft('new')}><Plus size={16} />New specification set</button>}</header>
+    <header className="page-header"><div><h1>Products</h1><p>Supplier-owned templates and client-visible STATIC documentation retained by client assets.</p></div>{canManage && tab === 'products' && <button className="primary-button" type="button" aria-label={translate('products.new')} title={translate('products.new')} onClick={() => setProductDraft({ ...EMPTY_PRODUCT })}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('products.new')}</span></button>}{canManage && tab === 'definitions' && <button className="primary-button" type="button" aria-label={translate('products.newSpecificationSet')} title={translate('products.newSpecificationSet')} onClick={() => setDefinitionDraft('new')}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('products.newSpecificationSet')}</span></button>}</header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     <div className="mode-tabs catalog-tabs" role="tablist" aria-label="Product catalog sections"><button type="button" role="tab" aria-selected={tab === 'products'} className={tab === 'products' ? 'selected' : ''} onClick={() => setTab('products')}>Products and models</button><button type="button" role="tab" aria-selected={tab === 'definitions'} className={tab === 'definitions' ? 'selected' : ''} onClick={() => setTab('definitions')}>Specification sets</button></div>
     {phase === 'loading' && <section className="content-section" role="status">Loading supplier catalog…</section>}

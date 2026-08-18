@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { translate } from '../i18n/localization'
 import { History, Plus, Search, Trash2 } from "lucide-react";
 
 import { CollectionPagination } from "../CollectionPagination";
@@ -546,9 +547,9 @@ export function Compliance({
           </p>
         </div>
         {canManage && (
-          <button type="button" className="primary-button" onClick={startNew}>
-            <Plus size={16} />
-            New framework
+          <button type="button" className="primary-button" aria-label={translate('compliance.newFramework')} title={translate('compliance.newFramework')} onClick={startNew}>
+            <Plus size={16} aria-hidden="true" />
+            <span className="button-label">{translate('compliance.newFramework')}</span>
           </button>
         )}
       </header>

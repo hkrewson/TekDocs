@@ -6,5 +6,19 @@
   "pagination.next": "Next",
   "shell.skip": "Skip to main content",
   "documentation.import": "Import Markdown",
-  "documentation.new": "New document"
+  "documentation.new": "New document",
+  "products.new": "New product",
+  "products.newSpecificationSet": "New specification set",
+  "contracts.new": "New contract",
+  "compliance.newFramework": "New framework",
+  "credentials.new": "New reference",
+  "customFields.new": "New field",
+  "domains.add": "Add domain",
+  "webhooks.new": "New endpoint",
+  "assets.new": "New asset",
+  "licenses.new": "New license",
+  "networks.new": "New network",
+  "organizations.new": "New organization",
+  "people.new": "New person",
+  "sites.new": "New site"
 }

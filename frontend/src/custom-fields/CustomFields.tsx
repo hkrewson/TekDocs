@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserCustomFieldsClient } from './api'
 import type { CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldEntityType, CustomFieldType, CustomFieldsClient, MigrationImpact } from './api'
@@ -111,7 +112,7 @@ export function CustomFields({ workspace, client = browserCustomFieldsClient }: 
 
   return (
     <>
-      <header className="page-header"><div><h1>Custom fields</h1><p>Extend records with validated fields while preserving the version used by existing values.</p></div><button className="primary-button" type="button" onClick={() => { setEditing(null); setImpact(null) }}><Plus size={16} />New field</button></header>
+      <header className="page-header"><div><h1>Custom fields</h1><p>Extend records with validated fields while preserving the version used by existing values.</p></div><button className="primary-button" type="button" aria-label={translate('customFields.new')} title={translate('customFields.new')} onClick={() => { setEditing(null); setImpact(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('customFields.new')}</span></button></header>
       {editing !== undefined && <DefinitionForm key={editing?.id ?? `new-${scopeKey}`} definition={editing} organization={Boolean(workspace)} saving={saving} onCancel={() => setEditing(undefined)} onSave={save} />}
       {error && <div className="form-message error" role="alert">{error}</div>}
       {impact && <div className={`form-message${impact.incompatible ? ' warning' : ' success'}`} role="status">Version created. {impact.compatible} existing value{impact.compatible === 1 ? '' : 's'} remain compatible; {impact.incompatible} require review. Existing values were not changed.</div>}

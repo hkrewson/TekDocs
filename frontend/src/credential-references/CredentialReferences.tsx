@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, KeyRound, Plus, Search, Trash2 } from 'lucide-react'
+import { translate } from '../i18n/localization'
 
 import type { WorkspaceContext } from '../workspaces/api'
 import { CollectionPagination } from '../CollectionPagination'
@@ -67,7 +68,7 @@ export function CredentialReferences({ workspace, client }: { workspace: Workspa
   }
 
   return <>
-    <header className="page-header"><div><h1>Credential references</h1><p>Pointers to credentials protected by 1Password. TekDocs never stores, retrieves, or displays the credential value.</p></div>{canManage && <button className="primary-button" type="button" onClick={() => startEdit('new')}><Plus size={16} />New reference</button>}</header>
+    <header className="page-header"><div><h1>Credential references</h1><p>Pointers to credentials protected by 1Password. TekDocs never stores, retrieves, or displays the credential value.</p></div>{canManage && <button className="primary-button" type="button" aria-label={translate('credentials.new')} title={translate('credentials.new')} onClick={() => startEdit('new')}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('credentials.new')}</span></button>}</header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     <section className="content-section credential-reference-section" aria-busy={phase === 'loading'}>
       <div className="credential-reference-boundary"><KeyRound size={18} aria-hidden="true" /><div><strong>1Password remains the security boundary</strong><p>Opening a reference hands off to 1Password, which requires your own vault access and unlock. TekDocs cannot check whether an item still exists or whether you can access it. If it moved or became stale, edit the reference and paste a newly copied Private Link. Public share links are not accepted.</p></div></div>

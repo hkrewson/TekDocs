@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, UserPlus, X } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import type { InventoryClient, SoftwareChoices, SoftwareLicense } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -130,7 +131,7 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
   return <>
     <header className="page-header">
       <div><h1>Licenses</h1><p>{workspace.kind === 'msp' ? 'MSP' : 'Client'} software entitlements, covered installations, seats, and renewal dates.</p></div>
-      {canManage && <button type="button" className="primary-button" onClick={() => { setForm(blank); setMode('create') }}><Plus size={16} />New license</button>}
+      {canManage && <button type="button" className="primary-button" aria-label={translate('licenses.new')} title={translate('licenses.new')} onClick={() => { setForm(blank); setMode('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('licenses.new')}</span></button>}
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && <section className="content-section" role="status">Loading software licenses…</section>}

@@ -133,7 +133,7 @@ export function Sites({ workspace, client = browserSitesClient, customFieldsClie
 
   return (
     <>
-      <header className="page-header"><div><h1>Sites</h1><p>{workspace ? `Sites and physical locations owned by ${workspace.name}.` : 'MSP offices, facilities, and nested physical locations.'}</p></div><button className="primary-button" type="button" aria-label={translate('sites.new')} title={translate('sites.new')} onClick={() => { setEditingSite('new'); setEditingLocation(null); setArchiving(null); setCustomFieldTarget(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('sites.new')}</span></button></header>
+      <header className="page-header"><div><h1>Sites</h1></div><button className="primary-button" type="button" aria-label={translate('sites.new')} title={translate('sites.new')} onClick={() => { setEditingSite('new'); setEditingLocation(null); setArchiving(null); setCustomFieldTarget(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('sites.new')}</span></button></header>
       {error && <div className="form-error people-error" role="alert">{error}</div>}
       {message && <div className="form-success" role="status">{message}</div>}
       {editingSite && <SiteForm key={editingSite === 'new' ? 'new' : editingSite.id} site={editingSite === 'new' ? null : editingSite} saving={saving} onCancel={() => setEditingSite(null)} onSave={saveSite} />}

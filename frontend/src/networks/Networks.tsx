@@ -113,7 +113,7 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
     <header className="page-header">
       <div>
         <h1>Networks</h1>
-        <p>Address ranges and essential network settings for {workspace.name}.</p>
+        
       </div>
       {canManage && <button className="primary-button" type="button" aria-label={translate('networks.new')} title={translate('networks.new')} onClick={() => { setEditingId(null); setForm({ ...emptyForm }); setError('') }}>
         <Plus size={16} aria-hidden="true" /><span className="button-label">{translate('networks.new')}</span>

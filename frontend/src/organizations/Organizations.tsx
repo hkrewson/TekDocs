@@ -135,7 +135,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
   return (
     <>
       <header className="page-header">
-        <div><h1>Organizations</h1><p>Client, vendor, manufacturer, and partner records for this MSP.</p></div>
+        <div><h1>Organizations</h1></div>
         <button className="primary-button" type="button" aria-label={translate('organizations.new')} title={translate('organizations.new')} onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('organizations.new')}</span></button>
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}

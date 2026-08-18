@@ -197,7 +197,6 @@ describe('application shell', () => {
     render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/people'))
 
     expect(await screen.findByRole('heading', { name: 'People' })).toBeInTheDocument()
-    expect(screen.getByText('Employees and contacts associated with Acme Dental.')).toBeInTheDocument()
     expect(await screen.findByText('No people have been added to this workspace.')).toBeInTheDocument()
     await vi.waitFor(() => expect(listPeople).toHaveBeenCalledWith(
       { organizationId: '00000000-0000-4000-8000-000000000010' },
@@ -210,7 +209,6 @@ describe('application shell', () => {
     render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/sites'))
 
     expect(await screen.findByRole('heading', { name: 'Sites' })).toBeInTheDocument()
-    expect(screen.getByText('Sites and physical locations owned by Acme Dental.')).toBeInTheDocument()
     expect(await screen.findByText('No sites have been added to Acme Dental.')).toBeInTheDocument()
     expect(listSites).toHaveBeenCalledWith(
       { organizationId: '00000000-0000-4000-8000-000000000010' },

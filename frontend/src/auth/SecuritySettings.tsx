@@ -169,7 +169,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   return (
     <>
       <header className="page-header">
-        <div><h1>Settings</h1><p>Manage account security and browsers signed in to TekDocs.</p></div>
+        <div><h1>Settings</h1></div>
       </header>
       {error && <div className="form-error settings-error" role="alert">{error}</div>}
       <section className="content-section profile-section" aria-labelledby="profile-heading">

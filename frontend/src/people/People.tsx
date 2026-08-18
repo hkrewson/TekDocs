@@ -223,7 +223,7 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
 
   return (
     <>
-      <header className="page-header"><div><h1>People</h1><p>{workspace ? `Employees and contacts associated with ${workspace.name}.` : 'MSP employees and shared contacts.'}</p></div><button className="primary-button" type="button" aria-label={translate('people.new')} title={translate('people.new')} onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('people.new')}</span></button></header>
+      <header className="page-header"><div><h1>People</h1></div><button className="primary-button" type="button" aria-label={translate('people.new')} title={translate('people.new')} onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('people.new')}</span></button></header>
       {error && <div className="form-error people-error" role="alert">{error}</div>}
       {message && <div className="form-success" role="status">{message}</div>}
       {editing && <PersonForm key={editing === 'new' ? 'new' : editing.id} person={editing === 'new' ? null : editing} workspaceName={workspaceName} sites={sites} sitesUnavailable={sitesUnavailable} saving={saving} onCancel={() => setEditing(null)} onSave={save} />}

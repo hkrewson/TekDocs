@@ -65,7 +65,6 @@ describe('People', () => {
 
     expect(await screen.findByRole('cell', { name: 'Jordan Avery' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
-    expect(screen.getByText('Employees and contacts associated with Acme Dental.')).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Responsibility' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Choose visible columns' }))

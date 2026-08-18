@@ -51,7 +51,7 @@ export function NotificationDeliveryAdmin({ client }: { client: NotificationDeli
   }
 
   return <>
-    <header className="page-header"><div><h1>Email delivery</h1><p>Review delivery metadata and recover dead-lettered notification email.</p></div></header>
+    <header className="page-header"><div><h1>Email delivery</h1></div></header>
     <section className="content-section notification-delivery-admin">
       <div className="section-heading"><h2>Recent deliveries</h2><label>State <select value={filter} onChange={(event) => { setPhase('loading'); setFilter(event.target.value) }}>{states.map((state) => <option key={state} value={state}>{state ? state.replace('_', ' ') : 'All states'}</option>)}</select></label></div>
       <p className="workspace-area-note">Message content and recipient email addresses are intentionally excluded from this view.</p>

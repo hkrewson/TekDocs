@@ -130,7 +130,7 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
 
   return <>
     <header className="page-header">
-      <div><h1>Licenses</h1><p>{workspace.kind === 'msp' ? 'MSP' : 'Client'} software entitlements, covered installations, seats, and renewal dates.</p></div>
+      <div><h1>Licenses</h1></div>
       {canManage && <button type="button" className="primary-button" aria-label={translate('licenses.new')} title={translate('licenses.new')} onClick={() => { setForm(blank); setMode('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('licenses.new')}</span></button>}
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}

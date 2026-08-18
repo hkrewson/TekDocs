@@ -78,7 +78,7 @@ export function Contracts({ workspace, client }: { workspace: WorkspaceContext; 
   }
 
   return <>
-    <header className="page-header"><div><h1>Services & contracts</h1><p>Provider agreements, renewal terms, and permission-controlled costs.</p></div>{canManage && <button type="button" className="primary-button" aria-label={translate('contracts.new')} title={translate('contracts.new')} onClick={() => { setContract(blankContract); setModal('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('contracts.new')}</span></button>}</header>
+    <header className="page-header"><div><h1>Services & contracts</h1></div>{canManage && <button type="button" className="primary-button" aria-label={translate('contracts.new')} title={translate('contracts.new')} onClick={() => { setContract(blankContract); setModal('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('contracts.new')}</span></button>}</header>
     <label className="search-field"><span className="sr-only">Search contracts</span><input type="search" value={query} placeholder="Search contracts, providers, or references" onChange={(event) => { setPhase('loading'); setQuery(event.target.value); setPage(1) }} /></label>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && <section className="content-section" role="status">Loading contracts…</section>}

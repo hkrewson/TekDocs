@@ -133,7 +133,7 @@ export function Domains({ workspace, client }: { workspace: WorkspaceContext | n
   }
 
   return <>
-    <header className="page-header"><div><h1>Domains</h1><p>Registration ownership, renewal dates, and responsible staff for this workspace.</p></div><button type="button" className="primary-button" aria-label={translate('domains.add')} title={translate('domains.add')} aria-expanded={open} aria-controls="domain-create-form" onClick={() => setOpen(true)}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('domains.add')}</span></button></header>
+    <header className="page-header"><div><h1>Domains</h1></div><button type="button" className="primary-button" aria-label={translate('domains.add')} title={translate('domains.add')} aria-expanded={open} aria-controls="domain-create-form" onClick={() => setOpen(true)}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('domains.add')}</span></button></header>
     {error && <p role="alert" aria-live="polite" className="form-error">{error}</p>}
     {open && <section id="domain-create-form" className="content-section" aria-labelledby="domain-form-title">
       <div className="section-heading"><div><h2 id="domain-form-title">New registered domain</h2><p>Enter the known registration details. Monitoring keeps entered values separate from observed evidence.</p></div></div>

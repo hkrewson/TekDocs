@@ -7,9 +7,13 @@ import { describe, expect, it } from 'vitest'
  * A container with `overflow-x: auto` scrolls with a pointer or a trackpad, but a
  * keyboard user cannot reach it unless it is focusable, so any column past the
  * right edge is unreachable — WCAG 2.1.1. `tabindex="0"` makes the region
- * arrow-key scrollable; `role="region"` with an accessible name tells assistive
- * technology what it holds, which matters most on the narrow viewports where the
- * overflow actually happens.
+ * arrow-key scrollable, and an accessible name tells assistive technology what it
+ * holds, which matters most on the narrow viewports where the overflow happens.
+ *
+ * The role is `group`, not `region`. `region` is a landmark, so a wrapper whose
+ * name matched its own `<section aria-labelledby>` produced duplicate landmarks and
+ * failed axe's `landmark-unique` rule — and 27 new landmarks would clutter landmark
+ * navigation for no benefit. `group` names the container without that cost.
  *
  * This is the control for that rule. A new scrollable table wrapper without the
  * three attributes fails here rather than shipping unreachable.
@@ -48,11 +52,11 @@ describe('scrollable table regions', () => {
     expect(regions.length).toBeGreaterThan(20)
   })
 
-  it('makes every scroll region keyboard focusable and named', () => {
+  it('makes every scroll region keyboard focusable and named without a landmark', () => {
     const unreachable = regions
       .filter((region) => !(
         region.tag.includes('tabIndex={0}')
-        && region.tag.includes('role="region"')
+        && region.tag.includes('role="group"')
         && /aria-label=/.test(region.tag)
       ))
       .map((region) => `${region.path}: ${region.tag.slice(0, 90)}`)

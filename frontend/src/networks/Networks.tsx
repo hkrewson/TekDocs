@@ -135,7 +135,7 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
       {error && <p className="form-error" role="alert">{error}</p>}
       {records === null && !error && <p role="status">Loading networks…</p>}
       {records !== null && filtered.length === 0 && <p className="empty-state">{query ? 'No networks match this search.' : 'No networks have been added to this workspace.'}</p>}
-      {records !== null && filtered.length > 0 && <div className="network-table-wrap" role="region" aria-label={translate('networks.recordTable')} tabIndex={0}>
+      {records !== null && filtered.length > 0 && <div className="network-table-wrap" role="group" aria-label={translate('networks.recordTable')} tabIndex={0}>
         <table className="network-table">
           <thead><tr><th>Name</th><th>Location</th><th>VLAN</th><th>CIDR</th><th>Assignable range</th><th>Gateway</th><th>DNS</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>{filtered.map((record) => <tr key={record.id}>

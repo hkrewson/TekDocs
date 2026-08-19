@@ -26,7 +26,7 @@ export function NetworkSearch({ workspace, client, query, onOpen }: {
 
   if (error) return <div className="form-error" role="alert">{error}</div>
   if (result === null) return <p role="status">Searching this network workspace…</p>
-  return <div className="network-table-wrap" role="region" aria-label={translate('networks.searchTable')} tabIndex={0}>
+  return <div className="network-table-wrap" role="group" aria-label={translate('networks.searchTable')} tabIndex={0}>
     <table className="network-table">
       <caption className="sr-only">Search results across network inventory in this workspace</caption>
       <thead><tr><th>Name</th><th>Record type</th><th><span className="sr-only">Actions</span></th></tr></thead>

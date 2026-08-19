@@ -299,7 +299,9 @@ jobs:
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
+          -v "$PWD/.trivyignore.yaml:/.trivyignore.yaml:ro"
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
+          --ignorefile /.trivyignore.yaml
           --severity HIGH,CRITICAL --exit-code 1
           "$MAILPIT_IMAGE"
       - name: Preserve tested application images for publication

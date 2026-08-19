@@ -110,7 +110,13 @@ describe('application shell', () => {
 
   it('provides stable page-level help without loading remote content', async () => {
     const user = userEvent.setup()
+    // The documentation route fetches as soon as it mounts. Leaving that request
+    // unstubbed made this test assert on help while the page was still resolving,
+    // so whether the page's own code ran at all depended on how long the rest of the
+    // suite took. Stub it and wait for the page to settle before touching help.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
     render(app('/documentation'))
+    expect(await screen.findByText('No documents have been added to this workspace.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
     const help = within(screen.getByRole('dialog', { name: 'Documentation help' }))

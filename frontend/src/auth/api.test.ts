@@ -1,9 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthRequestError, browserAuthClient, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
+import {
+  AuthRequestError,
+  browserAuthClient,
+  browserCsrfToken,
+  privilegedActionError,
+  responseErrorCode,
+  takeInvitationFromLocation,
+  takePasswordResetFromLocation,
+} from './api'
 
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+}
+
+/** The request target as a string, whatever form the caller passed it in. */
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input
+  return input instanceof URL ? input.href : input.url
 }
 
 function jsonResponse(body: object, status = 200) {
@@ -273,5 +287,152 @@ describe('browser authentication client', () => {
     await expect(browserAuthClient.requestPasswordReset('owner@example.com')).rejects.toEqual(
       new AuthRequestError('Too many reset requests. Wait before trying again.', 429),
     )
+  })
+
+  it('returns no error code rather than failing when a body is not an error envelope', async () => {
+    await expect(responseErrorCode(new Response('not json', { status: 500 }))).resolves.toBeUndefined()
+    await expect(responseErrorCode(new Response('{}', { status: 403 }))).resolves.toBeUndefined()
+    await expect(
+      responseErrorCode(new Response(JSON.stringify({ error: { code: 'privileged_mfa_required' } }), { status: 403 })),
+    ).resolves.toBe('privileged_mfa_required')
+  })
+
+  it('reads an error envelope without consuming the body the caller still needs', async () => {
+    const response = new Response(JSON.stringify({ error: { code: 'privileged_mfa_required' } }), { status: 403 })
+
+    await responseErrorCode(response)
+
+    // The envelope is read from a clone, so the caller's body is still intact.
+    expect(response.bodyUsed).toBe(false)
+    await expect(response.json()).resolves.toEqual({ error: { code: 'privileged_mfa_required' } })
+  })
+
+  it('names the missing second factor instead of repeating a generic denial', async () => {
+    const required = await privilegedActionError(
+      new Response(JSON.stringify({ error: { code: 'privileged_mfa_required' } }), { status: 403 }),
+      'You are not allowed to do that.',
+    )
+    expect(required.message).toBe('Two-factor authentication is required for this action.')
+    expect(required.code).toBe('privileged_mfa_required')
+    expect(required.status).toBe(403)
+
+    // Any other denial keeps the caller's wording: only the MFA case is rewritten.
+    const denied = await privilegedActionError(new Response('{}', { status: 403 }), 'You are not allowed to do that.')
+    expect(denied.message).toBe('You are not allowed to do that.')
+    expect(denied.code).toBeUndefined()
+  })
+
+  it('reads the security token out of a cookie jar that holds other cookies', () => {
+    document.cookie = 'sessionid=abc'
+    document.cookie = 'theme=dark'
+    document.cookie = 'csrftoken=token%2Fvalue'
+
+    expect(browserCsrfToken()).toBe('token/value')
+
+    document.cookie = 'csrftoken=; Max-Age=0; path=/'
+    expect(browserCsrfToken()).toBeNull()
+  })
+
+  it('reports an unreadable session response rather than treating it as signed out', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(requestUrl(input).includes('/_allauth/')
+        ? new Response('not json', { status: 200 })
+        : jsonResponse({ bootstrap_required: false }))))
+
+    await expect(browserAuthClient.load()).rejects.toThrow('The server returned an unreadable response.')
+  })
+
+  it('separates an unavailable session service from an unauthenticated one', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(requestUrl(input).includes('/_allauth/')
+        ? jsonResponse({}, 503)
+        : jsonResponse({ bootstrap_required: false }))))
+
+    // 401 means signed out; anything else means the service failed, and the two must
+    // not be collapsed into "please sign in".
+    await expect(browserAuthClient.load()).rejects.toThrow('The session service is unavailable.')
+  })
+
+  it('reports a signed-out session without treating it as an error', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(requestUrl(input).includes('/_allauth/')
+        ? jsonResponse({ meta: { is_authenticated: false } }, 401)
+        : jsonResponse({ bootstrap_required: false }))))
+
+    await expect(browserAuthClient.load()).resolves.toEqual({ bootstrapRequired: false, context: null })
+  })
+
+  it('refuses the workspace when the session is valid but the account cannot open it', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (requestUrl(input).includes('/_allauth/')) return Promise.resolve(jsonResponse({ meta: { is_authenticated: true } }))
+      if (requestUrl(input).includes('/auth/context')) return Promise.resolve(jsonResponse({}, 403))
+      return Promise.resolve(jsonResponse({ bootstrap_required: false }))
+    }))
+
+    await expect(browserAuthClient.load()).rejects.toThrow('This account cannot open the TekDocs workspace.')
+  })
+
+  it('reports an unavailable installation status instead of assuming a fresh install', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(requestUrl(input).includes('/_allauth/')
+        ? jsonResponse({ meta: { is_authenticated: false } })
+        : jsonResponse({}, 503))))
+
+    await expect(browserAuthClient.load()).rejects.toThrow('Installation status is unavailable.')
+  })
+
+  it('stops at the bootstrap screen without asking for a context it cannot have', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(requestUrl(input).includes('/_allauth/')
+        ? jsonResponse({ meta: { is_authenticated: false } })
+        : jsonResponse({ bootstrap_required: true }))))
+
+    await expect(browserAuthClient.load()).resolves.toEqual({ bootstrapRequired: true, context: null })
+  })
+
+  it.each([
+    [400, 'The email address or password is incorrect.'],
+    [429, 'Too many sign-in attempts. Wait a few minutes and try again.'],
+    [500, 'Sign in was not completed.'],
+  ])('turns a %i sign-in rejection into wording that discloses nothing about the account', async (status, message) => {
+    document.cookie = 'csrftoken=login-csrf'
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse({}, status))))
+
+    await expect(browserAuthClient.login('owner@example.com', 'secret')).rejects.toThrow(message)
+  })
+
+  it('treats a 401 without a pending second factor as a failed sign-in, not a challenge', async () => {
+    document.cookie = 'csrftoken=login-csrf'
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve(jsonResponse({ data: { flows: [{ id: 'password_reset_by_code', is_pending: true }] } }, 401))))
+
+    await expect(browserAuthClient.login('owner@example.com', 'secret')).rejects.toThrow('Sign in was not completed.')
+  })
+
+  it('does not send a sign-in at all when no security token can be obtained', async () => {
+    document.cookie = 'csrftoken=; Max-Age=0; path=/'
+    const fetchMock = vi.fn((input: RequestInfo | URL) => Promise.resolve(jsonResponse({ meta: { is_authenticated: requestUrl(input) === '' } })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserAuthClient.login('owner@example.com', 'secret')).rejects.toThrow(
+      'The browser security token is unavailable. Refresh and try again.',
+    )
+    // Only the token-recovery attempt reached the network; the credentials never did.
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(['/_allauth/browser/v1/auth/session'])
+  })
+
+  it('reports no invitation or reset when the browser is on any other path', () => {
+    window.history.replaceState({}, '', '/overview')
+
+    expect(takeInvitationFromLocation()).toEqual({ isInvitationPath: false, token: null })
+    expect(takePasswordResetFromLocation()).toEqual({ isPasswordResetPath: false, key: null })
+  })
+
+  it('reports the path without a token when the fragment carries none', () => {
+    window.history.replaceState({}, '', '/auth/invitations/accept#other=value')
+    expect(takeInvitationFromLocation()).toEqual({ isInvitationPath: true, token: null })
+
+    window.history.replaceState({}, '', '/auth/reset-password#key=')
+    expect(takePasswordResetFromLocation()).toEqual({ isPasswordResetPath: true, key: null })
   })
 })

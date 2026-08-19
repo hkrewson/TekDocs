@@ -373,7 +373,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-attachments li small { color: var(--muted); font-size: 11px; }
 .document-attachments li > div { display: flex; align-items: center; gap: 6px; }
 .document-attachments .secondary-button { min-height: 31px; padding: 5px 8px; font-size: 11px; }
-@media (max-width: 700px) { .page-actions, .document-actions { flex-wrap: wrap; } .page-header .button-label { display: none; } .document-filters { grid-template-columns: 1fr; } .document-edit-heading { align-items: stretch; flex-direction: column; } .document-edit-heading label:nth-child(2) { flex-basis: auto; } .document-attachments li { align-items: flex-start; flex-direction: column; padding-block: 10px; } }
+@media (max-width: 700px) { .page-actions, .document-actions { flex-wrap: wrap; } .page-header .button-label { display: none; } .catalog-filters, .status-row, .notification-preferences .notification-quiet-hours { grid-template-columns: 1fr; } .document-filters { grid-template-columns: 1fr; } .document-edit-heading { align-items: stretch; flex-direction: column; } .document-edit-heading label:nth-child(2) { flex-basis: auto; } .document-attachments li { align-items: flex-start; flex-direction: column; padding-block: 10px; } }
 .revision-conflict { padding: 12px 14px; border: 1px solid #c9822a; border-radius: 7px; background: #fff8ed; }
 .revision-conflict p { margin: 4px 0 10px; color: var(--muted); }
 .revision-conflict button { margin-top: 10px; }
@@ -1281,6 +1281,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .plain-detail-list li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .plain-detail-list li span { display: block; color: var(--muted); font-size: .88rem; }
 .network-table-wrap { overflow-x: auto; }
+/* A scrollable table region is focusable so keyboard users can reach overflowing
+   columns; give that focus a visible boundary. */
+.network-table-wrap:focus-visible, .people-table-wrap:focus-visible, .recycle-bin-table-wrap:focus-visible,
+.asset-csv-table-wrap:focus-visible, .table-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .network-table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 13px; }
 .network-table th, .network-table td { padding: 10px 12px 10px 2px; border-bottom: 1px solid var(--border); text-align: left; }
 .network-table th { color: var(--muted); font-size: 11px; font-weight: 600; }

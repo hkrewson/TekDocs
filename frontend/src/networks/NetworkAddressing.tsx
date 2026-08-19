@@ -418,7 +418,7 @@ function Table<T extends { id: string }>({
   empty: string;
 }) {
   return (
-    <div className="network-table-wrap">
+    <div className="network-table-wrap" role="region" aria-label={translate('networks.addressingTable')} tabIndex={0}>
       <table className="network-table">
         <thead>
           <tr>

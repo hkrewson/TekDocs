@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError, browserCsrfToken, takeInvitationFromLocation, takePasswordResetFromLocation } from './api'
 import type { AuthClient, AuthenticatedContext, BootstrapDetails, InvitationAcceptance, OidcProvider } from './api'
@@ -53,7 +54,7 @@ function ErrorState({ detail, retry }: { detail: string; retry: () => void }) {
       <h1>TekDocs is unavailable</h1>
       <p className="auth-intro">The browser could not confirm the installation or session state.</p>
       <div className="form-error" role="alert">{detail}</div>
-      <button className="primary-button auth-submit" type="button" onClick={retry}>Try again</button>
+      <button className="primary-button auth-submit" type="button" onClick={retry}>{translate('auth.tryAgain')}</button>
     </AuthFrame>
   )
 }
@@ -208,7 +209,7 @@ function RequiredMfaSetup({ client, context, complete }: {
       <AuthFrame>
         <h1>Setup complete</h1>
         <p className="auth-intro">Two-factor authentication is enabled. Remove the bootstrap overlay and bootstrap-token file from the deployment after confirming this account can sign in.</p>
-        <button className="primary-button auth-submit" type="button" onClick={() => complete({ ...context, mfa_enrollment_required: false })}>Enter MSP workspace</button>
+        <button className="primary-button auth-submit" type="button" onClick={() => complete({ ...context, mfa_enrollment_required: false })}>{translate('auth.enterMspWorkspace')}</button>
       </AuthFrame>
     )
   }
@@ -243,11 +244,11 @@ function RequiredMfaSetup({ client, context, complete }: {
           <div><strong id="required-recovery-heading">Save these recovery codes now</strong><p>They will not be shown again. Store them separately from your password.</p></div>
           <ul>{recoveryCodes.map((recoveryCode) => <li key={recoveryCode}><code>{recoveryCode}</code></li>)}</ul>
           <div className="settings-actions">
-            <button className="secondary-button" type="button" onClick={() => { void copyRecoveryCodes() }}>Copy codes</button>
-            <button className="secondary-button" type="button" onClick={downloadRecoveryCodes}>Download text file</button>
+            <button className="secondary-button" type="button" onClick={() => { void copyRecoveryCodes() }}>{translate('auth.copyCodes')}</button>
+            <button className="secondary-button" type="button" onClick={downloadRecoveryCodes}>{translate('auth.downloadTextFile')}</button>
           </div>
           <label className="recovery-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />I saved the recovery codes in a secure location.</label>
-          <button className="primary-button" type="button" disabled={!acknowledged} onClick={() => { setRecoveryCodes(null); setReady(true) }}>Continue</button>
+          <button className="primary-button" type="button" disabled={!acknowledged} onClick={() => { setRecoveryCodes(null); setReady(true) }}>{translate('auth.continue')}</button>
         </div>
       )}
     </AuthFrame>
@@ -294,7 +295,7 @@ function SignInForm({ client, submit, forgotPassword }: {
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
         <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
-        <button className="auth-text-button" type="button" onClick={forgotPassword}>Forgot password?</button>
+        <button className="auth-text-button" type="button" onClick={forgotPassword}>{translate('auth.forgotPassword')}</button>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>
@@ -346,7 +347,7 @@ function MfaChallengeForm({ submit, cancel }: {
         <label>Authentication code<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="text" spellCheck={false} required autoFocus /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Verifying…' : 'Verify code'}</button>
-        <button className="auth-text-button auth-cancel-button" type="button" onClick={cancel}>Return to sign in</button>
+        <button className="auth-text-button auth-cancel-button" type="button" onClick={cancel}>{translate('auth.returnToSignIn')}</button>
       </form>
     </AuthFrame>
   )

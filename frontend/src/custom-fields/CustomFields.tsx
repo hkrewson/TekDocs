@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { translate } from '../i18n/localization'
+import { translate} from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserCustomFieldsClient } from './api'
 import type { CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldEntityType, CustomFieldType, CustomFieldsClient, MigrationImpact } from './api'
@@ -55,7 +55,7 @@ function DefinitionForm({ definition, organization, saving, onCancel, onSave }: 
         <label className="checkbox-label"><input type="checkbox" checked={input.required} onChange={(event) => setInput({ ...input, required: event.target.checked })} />Required when an integrated form collects this field</label>
         <label className="custom-field-form-wide">Help text<textarea maxLength={500} rows={2} value={input.description} onChange={(event) => setInput({ ...input, description: event.target.value })} /></label>
         {isChoice && <label className="custom-field-form-wide">Choices <span>One per line</span><textarea required rows={5} value={choiceText} onChange={(event) => setChoiceText(event.target.value)} /></label>}
-        <div className="form-actions custom-field-form-wide"><button className="primary-button" disabled={saving}>{saving ? 'Saving…' : definition ? 'Create version' : 'Add field'}</button><button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>Cancel</button></div>
+        <div className="form-actions custom-field-form-wide"><button className="primary-button" disabled={saving}>{saving ? 'Saving…' : definition ? 'Create version' : 'Add field'}</button><button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button></div>
       </form>
     </section>
   )
@@ -129,11 +129,11 @@ export function CustomFields({ workspace, client = browserCustomFieldsClient }: 
             <span role="cell">{fieldTypeLabels[definition.current_version.field_type]}</span>
             <span role="cell"><details><summary>v{definition.current_version.version}</summary><ol>{[...definition.versions].reverse().map((version) => <li key={version.id}>v{version.version} · {version.label}</li>)}</ol></details></span>
             <span role="cell">{definition.inherited ? 'Inherited from MSP' : definition.owner === 'msp' ? 'MSP-wide' : 'This organization'}</span>
-            <span role="cell" className="row-actions">{definition.inherited ? <span>Managed by MSP</span> : <><button className="row-action" type="button" onClick={() => { setEditing(definition); setImpact(null) }}><Pencil size={14} />New version</button><button className="row-action danger" type="button" onClick={() => setArchiving(definition)}><Trash2 size={14} />Archive</button></>}</span>
+            <span role="cell" className="row-actions">{definition.inherited ? <span>Managed by MSP</span> : <><button className="row-action" type="button" onClick={() => { setEditing(definition); setImpact(null) }}><Pencil size={14} />{translate('customFields.newVersion')}</button><button className="row-action danger" type="button" onClick={() => setArchiving(definition)}><Trash2 size={14} />{translate('common.archive')}</button></>}</span>
           </div>)}
         </div>}
       </section>
-      {archiving && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-custom-field-heading"><div><strong id="archive-custom-field-heading">Archive {archiving.current_version.label}?</strong><p>Existing values and all definition versions remain available for history. New values will be blocked.</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>Cancel</button></div></div>}
+      {archiving && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-custom-field-heading"><div><strong id="archive-custom-field-heading">Archive {archiving.current_version.label}?</strong><p>Existing values and all definition versions remain available for history. New values will be blocked.</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div></div>}
     </>
   )
 }

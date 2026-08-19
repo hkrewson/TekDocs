@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { NetworkSearchItem, NetworkSearchResult, NetworksClient } from './api'
 
@@ -29,9 +30,9 @@ export function NetworkSearch({ workspace, client, query, onOpen }: {
     <table className="network-table">
       <caption className="sr-only">Search results across network inventory in this workspace</caption>
       <thead><tr><th>Name</th><th>Record type</th><th><span className="sr-only">Actions</span></th></tr></thead>
-      <tbody>{result.results.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.type_label}</td><td><button className="row-action" type="button" onClick={() => onOpen(item)}>Open section</button></td></tr>)}</tbody>
+      <tbody>{result.results.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.type_label}</td><td><button className="row-action" type="button" onClick={() => onOpen(item)}>{translate('networks.openSection')}</button></td></tr>)}</tbody>
     </table>
     {result.results.length === 0 && <p className="empty-state">No network records match this workspace and search.</p>}
-    {result.count > result.page_size && <nav className="pagination" aria-label="Network search pages"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page} · {result.count} records</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => setPage((value) => value + 1)}>Next</button></nav>}
+    {result.count > result.page_size && <nav className="pagination" aria-label="Network search pages"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>{translate('common.previous')}</button><span>Page {page} · {result.count} records</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => setPage((value) => value + 1)}>{translate('common.next')}</button></nav>}
   </div>
 }

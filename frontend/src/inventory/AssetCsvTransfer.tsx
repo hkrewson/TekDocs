@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Download, Upload, X } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import type { AssetCsvPreview, InventoryClient } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
 
@@ -43,7 +44,7 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
   return <>
     <div className="asset-transfer-actions">
       <a className="secondary-button" href={client.assetCsvExportUrl(workspace)} download><Download size={15} />Export CSV</a>
-      {canManage && <button className="secondary-button" type="button" onClick={() => setOpen(true)}><Upload size={15} />Import CSV</button>}
+      {canManage && <button className="secondary-button" type="button" onClick={() => setOpen(true)}><Upload size={15} />{translate('inventory.importCsv')}</button>}
     </div>
     {open && <section className="content-section asset-csv-panel" aria-labelledby="asset-csv-heading">
       <div className="section-heading"><div><h2 id="asset-csv-heading">Import assets from CSV</h2><p>Preview is required. Applying a valid file is atomic and safe to retry.</p></div><button className="icon-button" type="button" aria-label="Close CSV import" disabled={busy} onClick={close}><X size={16} /></button></div>
@@ -57,7 +58,7 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
         <dl><div><dt>Create</dt><dd>{preview.summary.create}</dd></div><div><dt>Update</dt><dd>{preview.summary.update}</dd></div><div><dt>Unchanged</dt><dd>{preview.summary.skip}</dd></div><div><dt>Errors</dt><dd>{preview.summary.errors}</dd></div></dl>
         {preview.errors.length > 0 && <ul className="asset-csv-errors" aria-label="CSV validation errors">{preview.errors.map((item) => <li key={`${item.row}-${item.message}`}><strong>Row {item.row}</strong><span>{item.message}</span></li>)}</ul>}
         {preview.rows.length > 0 && <div className="asset-csv-table-wrap"><table><thead><tr><th>Row</th><th>Asset</th><th>Type</th><th>Action</th><th>Fields</th></tr></thead><tbody>{preview.rows.map((item) => <tr key={item.row}><td>{item.row}</td><td>{item.name}</td><td>{item.kind}</td><td>{item.action}</td><td>{item.changes.join(', ') || '—'}</td></tr>)}</tbody></table></div>}
-        <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !preview.preview_token} onClick={() => { void applyFile() }}>{busy ? 'Importing…' : 'Apply import'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setPreview(null); setFile(null) }}>Choose another file</button></div>
+        <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !preview.preview_token} onClick={() => { void applyFile() }}>{busy ? 'Importing…' : 'Apply import'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setPreview(null); setFile(null) }}>{translate('inventory.chooseAnotherFile')}</button></div>
       </div>}
     </section>}
   </>

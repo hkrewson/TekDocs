@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, UserPlus, X } from 'lucide-react'
-import { translate } from '../i18n/localization'
+import { translate} from '../i18n/localization'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import type { InventoryClient, SoftwareChoices, SoftwareLicense } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -175,7 +175,7 @@ function LicenseDetail({ record, canManage, choices, mode, setMode, seat, setSea
   return <>
     <div className="section-heading"><div><h2>{record.name}</h2><p>{record.supplier_name} / {record.product_name}{record.model_name ? ` / ${record.model_name}` : ''}</p></div><span className="lifecycle-state">{record.status}</span></div>
     <dl className="inventory-provenance"><div><dt>License</dt><dd>{record.kind}</dd></div><div><dt>Seats</dt><dd>{record.active_seats} assigned · {record.seat_limit} total</dd></div><div><dt>Renewal</dt><dd>{record.renews_on || 'Not scheduled'}{record.auto_renew ? ' · auto-renew' : ''}</dd></div><div><dt>Term</dt><dd>{record.starts_on || 'Open'} – {record.ends_on || 'Open'}</dd></div><div><dt>Reference</dt><dd>{record.reference || 'Not recorded'}</dd></div></dl>
-    {canManage && mode === 'read' && <div className="form-actions"><button type="button" className="secondary-button" onClick={beginEdit}><Pencil size={15} />Edit license</button><button type="button" className="secondary-button" onClick={() => setMode('seat')}><UserPlus size={15} />Assign seat</button><button type="button" className="secondary-button" onClick={() => setMode('link')}>Link installation</button></div>}
+    {canManage && mode === 'read' && <div className="form-actions"><button type="button" className="secondary-button" onClick={beginEdit}><Pencil size={15} />{translate('inventory.editLicense')}</button><button type="button" className="secondary-button" onClick={() => setMode('seat')}><UserPlus size={15} />{translate('inventory.assignSeat')}</button><button type="button" className="secondary-button" onClick={() => setMode('link')}>{translate('inventory.linkInstallation')}</button></div>}
     {mode === 'seat' && <form className="hardware-form" onSubmit={(event) => { event.preventDefault(); void perform(() => client.assignLicenseSeat(workspace, record.id, { person_id: seat.person_id || null, installation_id: seat.installation_id || null })) }}><h3>Assign seat</h3><div className="field-grid"><Choice label="Person" value={seat.person_id} onChange={(value) => setSeat((current) => ({ ...current, person_id: value }))} items={choices.people} /><Choice label="Installation" value={seat.installation_id} onChange={(value) => setSeat((current) => ({ ...current, installation_id: value }))} items={record.installations} /></div><Actions busy={busy || (!seat.person_id && !seat.installation_id)} cancel={() => setMode('read')} label="Assign seat" /></form>}
     {mode === 'link' && <form className="hardware-form" onSubmit={(event) => { event.preventDefault(); void perform(() => client.linkLicenseInstallation(workspace, record.id, linkId)) }}><h3>Link installation</h3><Choice label="Software installation" value={linkId} onChange={setLinkId} items={availableInstallations} /><Actions busy={busy || !linkId} cancel={() => setMode('read')} label="Link installation" /></form>}
     <section className="license-section"><h3>Seat assignments</h3>{activeSeats.length === 0 ? <p className="empty-state">No seats are assigned.</p> : <ul className="license-seat-list">{activeSeats.map((item) => <li key={item.id}><div><strong>Seat {item.seat_number}</strong><span>{[item.person_name, item.installation_name].filter(Boolean).join(' · ')}</span></div>{canManage && <button type="button" className="icon-button" aria-label={`Revoke seat ${item.seat_number}`} onClick={() => void perform(() => client.revokeLicenseSeat(workspace, record.id, item.id))}><X size={15} /></button>}</li>)}</ul>}</section>
@@ -220,5 +220,5 @@ function Choice({ label, value, onChange, items }: { label: string; value: strin
 }
 
 function Actions({ busy, cancel, label }: { busy: boolean; cancel: () => void; label: string }) {
-  return <div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Saving…' : label}</button><button type="button" className="secondary-button" onClick={cancel}>Cancel</button></div>
+  return <div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Saving…' : label}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div>
 }

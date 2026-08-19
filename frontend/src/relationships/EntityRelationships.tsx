@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link2, Search, Trash2 } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import { Link } from 'react-router'
 import { browserRelationshipsClient } from './api'
 import type { EntityLinkType, EntityReference, EntityRelationship, LinkTypeDefinition, RelationshipsClient } from './api'
@@ -149,8 +150,8 @@ export function EntityRelationships({ organizationId, organizationName, client =
                 : <span>{relationship.related_entity.display_name}</span>}
               <span className="relationship-scope">{relationship.direction === 'incoming' ? 'Backlink' : 'Outgoing'} · {relationship.related_entity.visibility === 'client_visible' ? 'Client visible' : 'MSP private'}</span>
               {archivingId === relationship.id
-                ? <span className="relationship-confirm"><button className="row-action danger" type="button" disabled={saving} onClick={() => { void archive(relationship) }}>Confirm archive</button><button className="row-action" type="button" disabled={saving} onClick={() => setArchivingId(null)}>Cancel</button></span>
-                : <button className="row-action danger relationship-archive" type="button" aria-label={`Archive relationship with ${relationship.related_entity.display_name}`} onClick={() => setArchivingId(relationship.id)}><Trash2 size={14} aria-hidden="true" />Archive</button>}
+                ? <span className="relationship-confirm"><button className="row-action danger" type="button" disabled={saving} onClick={() => { void archive(relationship) }}>{translate('relationships.confirmArchive')}</button><button className="row-action" type="button" disabled={saving} onClick={() => setArchivingId(null)}>{translate('common.cancel')}</button></span>
+                : <button className="row-action danger relationship-archive" type="button" aria-label={`Archive relationship with ${relationship.related_entity.display_name}`} onClick={() => setArchivingId(relationship.id)}><Trash2 size={14} aria-hidden="true" />{translate('common.archive')}</button>}
             </li>
           ))}
         </ul>

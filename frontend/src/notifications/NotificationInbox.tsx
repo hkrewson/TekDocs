@@ -1,6 +1,6 @@
 import { Bell, Check, Mail } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { formatDateTime, formatHour, runtimeTimeZone } from '../i18n/localization'
+import { formatDateTime, formatHour, runtimeTimeZone, translate} from '../i18n/localization'
 
 import type { InboxNotification, NotificationPreferences, NotificationsClient, NotificationTarget } from './api'
 
@@ -137,9 +137,9 @@ export function NotificationInbox({ client, onOpen }: {
       {open && <section id="notification-popover" className="notification-popover" role="dialog" aria-labelledby="notification-popover-heading" aria-busy={phase === 'loading' || loadingMore}>
         <header><h2 id="notification-popover-heading" ref={headingRef} tabIndex={-1}>{view === 'inbox' ? 'Notifications' : 'Email preferences'}</h2>{view === 'inbox' && phase === 'ready' && <span>{unreadCount} unread</span>}</header>
         {view === 'inbox' && <>
-          <div className="notification-toolbar"><button type="button" onClick={() => { void loadPreferences() }}>Email preferences</button></div>
+          <div className="notification-toolbar"><button type="button" onClick={() => { void loadPreferences() }}>{translate('notifications.emailPreferences')}</button></div>
           {phase === 'loading' && <p className="notification-state" role="status">Loading notifications…</p>}
-          {phase === 'error' && <div className="notification-state" role="alert"><p>{error}</p><button type="button" onClick={() => { void load() }}>Try again</button></div>}
+          {phase === 'error' && <div className="notification-state" role="alert"><p>{error}</p><button type="button" onClick={() => { void load() }}>{translate('notifications.tryAgain')}</button></div>}
           {phase === 'ready' && notifications.length === 0 && <p className="notification-state">No notifications yet.</p>}
           {phase === 'ready' && notifications.length > 0 && <ul className="notification-list">{notifications.map((notification) => <li key={notification.id} className={notification.read ? '' : 'unread'}>
           <button className="notification-content" type="button" disabled={!notification.target} onClick={() => { void activate(notification) }}>
@@ -154,9 +154,9 @@ export function NotificationInbox({ client, onOpen }: {
           {phase === 'ready' && nextCursor && <div className="notification-history-action"><button type="button" disabled={loadingMore} onClick={() => { void load(nextCursor) }}>{loadingMore ? 'Loading…' : 'Load older notifications'}</button></div>}
         </>}
         {view === 'preferences' && <>
-          <div className="notification-toolbar"><button type="button" onClick={() => setView('inbox')}>Back to notifications</button></div>
+          <div className="notification-toolbar"><button type="button" onClick={() => setView('inbox')}>{translate('notifications.backToNotifications')}</button></div>
           {preferencesPhase === 'loading' && <p className="notification-state" role="status">Loading email preferences…</p>}
-          {preferencesPhase === 'error' && <div className="notification-state" role="alert"><p>Email preferences could not be loaded.</p><button type="button" onClick={() => { void loadPreferences() }}>Try again</button></div>}
+          {preferencesPhase === 'error' && <div className="notification-state" role="alert"><p>Email preferences could not be loaded.</p><button type="button" onClick={() => { void loadPreferences() }}>{translate('notifications.tryAgain')}</button></div>}
           {preferencesPhase === 'ready' && <form className="notification-preferences" onSubmit={(event) => { event.preventDefault(); void savePreferences() }}>
             <label><input type="checkbox" checked={preferences.email_enabled} onChange={(event) => setPreferences((current) => ({ ...current, email_enabled: event.target.checked }))} />Send notification email</label>
             <label><input type="checkbox" disabled={!preferences.email_enabled} checked={preferences.invitation_events} onChange={(event) => setPreferences((current) => ({ ...current, invitation_events: event.target.checked }))} />Client invitation activity</label>

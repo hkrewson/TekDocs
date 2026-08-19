@@ -146,7 +146,7 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
             <td><code>{record.range_start}–{record.range_end}</code></td>
             <td><code>{record.gateway}</code></td>
             <td>{[record.primary_dns, record.secondary_dns].filter(Boolean).join(', ') || '—'}</td>
-            <td>{canManage && <button className="row-action" type="button" onClick={() => beginEdit(record)}><Pencil size={14} aria-hidden="true" />Edit</button>}</td>
+            <td>{canManage && <button className="row-action" type="button" onClick={() => beginEdit(record)}><Pencil size={14} aria-hidden="true" />{translate('common.edit')}</button>}</td>
           </tr>)}</tbody>
         </table>
       </div>}
@@ -175,7 +175,7 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
         </div>}
         <label><span>Description</span><input maxLength={4000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Guest Wi-Fi, voice, office LAN…" /></label>
         <label><span>Notes</span><textarea rows={5} maxLength={8000} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-        <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save network'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError('') }}>Cancel</button></div>
+        <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save network'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError('') }}>{translate('common.cancel')}</button></div>
       </form>
     </section>}
   </>

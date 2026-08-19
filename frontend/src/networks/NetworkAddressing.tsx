@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { translate } from '../i18n/localization'
 import type { FormEvent } from "react";
 import { Pencil, Plus } from "lucide-react";
 import type { WorkspaceContext } from "../workspaces/api";
@@ -353,7 +354,7 @@ export function NetworkAddressing({
               type="button"
               onClick={() => setForm(null)}
             >
-              Cancel
+              {translate('common.cancel')}
             </button>
           </div>
         </form>
@@ -445,7 +446,7 @@ function Table<T extends { id: string }>({
                     onClick={() => onEdit(item)}
                   >
                     <Pencil size={14} />
-                    Edit
+                    {translate('common.edit')}
                   </button>
                 )}
               </td>

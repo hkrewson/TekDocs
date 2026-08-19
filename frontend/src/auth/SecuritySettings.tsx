@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
 import { ApiTokenSettings } from './ApiTokenSettings'
-import { formatDateTime } from '../i18n/localization'
+import { formatDateTime, translate } from '../i18n/localization'
 
 function sessionName(userAgent: string): string {
   const browser = userAgent.includes('Edg/') ? 'Edge' : userAgent.includes('Chrome/') ? 'Chrome' : userAgent.includes('Firefox/') ? 'Firefox' : userAgent.includes('Safari/') ? 'Safari' : 'Browser'
@@ -218,7 +218,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             <label>Authentication code<input value={activationCode} onChange={(event) => setActivationCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
             <div className="settings-actions">
               <button className="primary-button" type="submit" disabled={working}>{working ? 'Verifying…' : 'Enable two-factor authentication'}</button>
-              <button className="secondary-button" type="button" disabled={working} onClick={() => { setSetup(null); setActivationCode('') }}>Cancel</button>
+              <button className="secondary-button" type="button" disabled={working} onClick={() => { setSetup(null); setActivationCode('') }}>{translate('common.cancel')}</button>
             </div>
           </form>
         )}
@@ -226,8 +226,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
           <div className="security-row">
             <div><strong>Recovery codes</strong><p>{mfa.recoveryCodeUnused} of {mfa.recoveryCodeTotal} codes remain. Each code works once.</p></div>
             <div className="settings-actions">
-              <button className="secondary-button" type="button" onClick={() => setSensitiveAction('replace-codes')}>Replace codes</button>
-              <button className="danger-button" type="button" onClick={() => setSensitiveAction('disable')}>Disable</button>
+              <button className="secondary-button" type="button" onClick={() => setSensitiveAction('replace-codes')}>{translate('auth.replaceCodes')}</button>
+              <button className="danger-button" type="button" onClick={() => setSensitiveAction('disable')}>{translate('auth.disable')}</button>
             </div>
           </div>
         )}
@@ -235,7 +235,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
           <div className="recovery-codes" role="region" aria-labelledby="recovery-codes-heading">
             <div><strong id="recovery-codes-heading">Save these recovery codes now</strong><p>They will not be shown again. Store them somewhere separate from your password.</p></div>
             <ul>{recoveryCodes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
-            <button className="primary-button" type="button" onClick={() => setRecoveryCodes(null)}>I saved these codes</button>
+            <button className="primary-button" type="button" onClick={() => setRecoveryCodes(null)}>{translate('auth.iSavedTheseCodes')}</button>
           </div>
         )}
         {sensitiveAction && (
@@ -245,7 +245,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             <label>Current password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
             <div className="settings-actions">
               <button className="primary-button" type="submit" disabled={working}>{working ? 'Confirming…' : 'Confirm change'}</button>
-              <button className="secondary-button" type="button" disabled={working} onClick={() => { setSensitiveAction(null); setPassword('') }}>Cancel</button>
+              <button className="secondary-button" type="button" disabled={working} onClick={() => { setSensitiveAction(null); setPassword('') }}>{translate('common.cancel')}</button>
             </div>
           </form>
         )}
@@ -253,7 +253,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       <section className="content-section" aria-labelledby="active-sessions-heading">
         <div className="section-heading settings-heading">
           <div><h2 id="active-sessions-heading">Active sessions</h2><p>Revoke any browser you no longer recognize or use.</p></div>
-          <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSessions() }}><RefreshCw size={15} aria-hidden="true" />Refresh</button>
+          <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSessions() }}><RefreshCw size={15} aria-hidden="true" />{translate('common.refresh')}</button>
         </div>
         {sessions === null && !error && <p className="settings-state" role="status">Loading active sessions…</p>}
         {sessions?.length === 0 && <p className="settings-state">No active sessions were found.</p>}

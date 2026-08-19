@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
-import { translate } from '../i18n/localization'
+import { translate} from '../i18n/localization'
 import { Link } from 'react-router'
 import { browserOrganizationClient } from './api'
 import type { Organization, OrganizationClassification, OrganizationClient, OrganizationInput } from './api'
@@ -68,7 +68,7 @@ function OrganizationForm({ organization, saving, onCancel, onSave }: {
         </fieldset>
         <div className="form-actions">
           <button className="primary-button" type="submit" disabled={saving || input.classifications.length === 0}>{saving ? 'Saving…' : 'Save organization'}</button>
-          <button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>Cancel</button>
+          <button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button>
           {input.classifications.length === 0 && <span className="field-guidance" role="alert">Select at least one classification.</span>}
         </div>
       </form>
@@ -167,7 +167,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
         {archiving && (
           <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-confirmation-heading">
             <div><strong id="archive-confirmation-heading">Archive {archiving.name}?</strong><p>It will leave active organization lists. Recovery arrives with the recycle-bin workflow.</p></div>
-            <div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive organization'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>Cancel</button></div>
+            <div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive organization'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div>
           </div>
         )}
       </section>

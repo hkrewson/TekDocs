@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { translate } from '../i18n/localization'
+import { translate} from '../i18n/localization'
 import { History, Plus, Search, Trash2 } from "lucide-react";
 
 import { CollectionPagination } from "../CollectionPagination";
@@ -147,7 +147,7 @@ function CatalogForm({
           }
         >
           <Plus size={15} />
-          Add control
+          {translate('compliance.addControl')}
         </button>
       </div>
       {draft.controls.length === 0 ? (
@@ -237,7 +237,7 @@ function CatalogForm({
           disabled={saving}
           onClick={onCancel}
         >
-          Cancel
+          {translate('common.cancel')}
         </button>
       </div>
     </>
@@ -679,7 +679,7 @@ export function Compliance({
                     onClick={startVersion}
                   >
                     <Plus size={15} />
-                    New version
+                    {translate('compliance.newVersion')}
                   </button>
                 )}
               </div>
@@ -793,7 +793,7 @@ export function Compliance({
                               );
                             }}
                           >
-                            Review control
+                            {translate('compliance.reviewControl')}
                           </button>
                         )}
                         {reviewingControl === control.control_id && (
@@ -907,14 +907,14 @@ export function Compliance({
                                   void saveAssignment();
                                 }}
                               >
-                                Save review
+                                {translate('compliance.saveReview')}
                               </button>
                               <button
                                 type="button"
                                 className="secondary-button"
                                 onClick={() => setReviewingControl(null)}
                               >
-                                Cancel
+                                {translate('common.cancel')}
                               </button>
                             </div>
                           </div>
@@ -940,7 +940,7 @@ export function Compliance({
           </div>
           {canManage && (
             <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(true)}>
-              <Plus size={15} /> Add or link evidence
+              <Plus size={15} /> {translate('compliance.addOrLinkEvidence')}
             </button>
           )}
         </div>
@@ -971,7 +971,7 @@ export function Compliance({
             </>}
             <div className="form-actions wide-field">
               <button type="button" className="primary-button" disabled={saving || (!existingEvidenceId && (!evidenceDraft.title || !evidenceDecision))} onClick={() => { void saveEvidence(); }}>{existingEvidenceId ? "Link evidence" : "Save evidence"}</button>
-              <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(false)}>Cancel</button>
+              <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(false)}>{translate('common.cancel')}</button>
             </div>
           </div>
         )}
@@ -985,7 +985,7 @@ export function Compliance({
             <h2 id="compliance-risks-heading">Risk register</h2>
             <p>Workspace risks with consistent scoring, accountable treatment, deadlines, and retained decisions.</p>
           </div>
-          {canManage && <button type="button" className="secondary-button" onClick={() => { setEditingRiskId(null); setRiskDraft(EMPTY_RISK); setRiskFormOpen(true); }}><Plus size={15} /> Add risk</button>}
+          {canManage && <button type="button" className="secondary-button" onClick={() => { setEditingRiskId(null); setRiskDraft(EMPTY_RISK); setRiskFormOpen(true); }}><Plus size={15} /> {translate('compliance.addRisk')}</button>}
         </div>
         <div className="compliance-risk-summary" aria-label="Risk reporting summary">
           <span><strong>{riskSummary.total}</strong> total</span>
@@ -1007,12 +1007,12 @@ export function Compliance({
           <label className="wide-field"><span>Decision</span><input maxLength={120} value={riskDraft.decision} onChange={(event) => setRiskDraft({ ...riskDraft, decision: event.target.value })} /></label>
           <label className="wide-field"><span>Review note</span><textarea rows={2} value={riskDraft.note} onChange={(event) => setRiskDraft({ ...riskDraft, note: event.target.value })} /></label>
           {riskDraft.status === "accepted" && <p className="form-note wide-field">Saving records you as the accepting actor. Acceptance is a retained decision, not deletion or remediation.</p>}
-          <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>Cancel</button></div>
+          <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>{translate('common.cancel')}</button></div>
         </div>}
-        {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>Review</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
+        {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>{translate('common.review')}</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
       </section>
       <section className="content-section compliance-risks" aria-labelledby="compliance-bundles-heading">
-        <div className="section-heading"><div><h2 id="compliance-bundles-heading">Evidence bundles</h2><p>Immutable signed snapshots of the current controls, evidence, and risks.</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : "The evidence bundle could not be created."); } finally { setSaving(false); } })(); }}>Create signed bundle</button>}</div>
+        <div className="section-heading"><div><h2 id="compliance-bundles-heading">Evidence bundles</h2><p>Immutable signed snapshots of the current controls, evidence, and risks.</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : "The evidence bundle could not be created."); } finally { setSaving(false); } })(); }}>{translate('compliance.createSignedBundle')}</button>}</div>
         {bundles.length === 0 ? <p className="empty-state">No signed evidence bundles have been created.</p> : <div className="network-table-wrap"><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Integrity</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>SHA-256 {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
       </section>
     </>

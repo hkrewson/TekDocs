@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { translate } from '../i18n/localization'
 import type { AccessCatalog, AccessControlClient, AssignedStaff, BuiltInRole, Member, OrganizationAccess, OrganizationAccessMode, TenantRole } from './api'
 import { browserAccessControlClient } from './api'
 import { CustomRolesPanel } from './CustomRolesPanel'
@@ -103,7 +104,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
                   : <label><span className="sr-only">Role for {member.display_name}</span><select value={selectedRoles[member.id]} onChange={(event) => setSelectedRoles((current) => ({ ...current, [member.id]: event.target.value as TenantRole }))}>{tenantRoles.map((role) => <option key={role} value={role}>{roleByValue.get(role as BuiltInRole)?.label ?? role}</option>)}</select></label>}</span>
                 <span role="cell">{member.is_owner
                   ? <span>Bootstrap identity</span>
-                  : <button className="secondary-button" type="button" disabled={selectedRoles[member.id] === member.role} onClick={() => setPending({ kind: 'role', member, role: selectedRoles[member.id] })}>Review change</button>}</span>
+                  : <button className="secondary-button" type="button" disabled={selectedRoles[member.id] === member.role} onClick={() => setPending({ kind: 'role', member, role: selectedRoles[member.id] })}>{translate('accessControl.reviewChange')}</button>}</span>
               </div>)}
             </div>}
           </section>
@@ -115,7 +116,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
               {organizations.map((organization) => <div className="access-row" role="row" key={organization.id}>
                 <span role="cell"><strong>{organization.name}</strong></span>
                 <span role="cell"><label><span className="sr-only">Access mode for {organization.name}</span><select value={selectedModes[organization.id]} onChange={(event) => setSelectedModes((current) => ({ ...current, [organization.id]: event.target.value as OrganizationAccessMode }))}><option value="all_authorized">All authorized MSP staff</option><option value="assigned_only">Assigned MSP staff only</option></select></label></span>
-                <span role="cell"><button className="secondary-button" type="button" disabled={selectedModes[organization.id] === organization.access_mode} onClick={() => setPending({ kind: 'access', organization, accessMode: selectedModes[organization.id] })}>Review change</button></span>
+                <span role="cell"><button className="secondary-button" type="button" disabled={selectedModes[organization.id] === organization.access_mode} onClick={() => setPending({ kind: 'access', organization, accessMode: selectedModes[organization.id] })}>{translate('accessControl.reviewChange')}</button></span>
               </div>)}
             </div>}
           </section>
@@ -130,10 +131,10 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
                   <div><h3 id={`staff-${organization.id}`}>{organization.name}</h3><p>{organization.access_mode === 'assigned_only' ? 'Restricted to the staff listed here.' : 'Assignments are retained if this organization becomes assigned-only.'}</p></div>
                   {organization.assigned_staff.length === 0
                     ? <p className="settings-state">No MSP staff are explicitly assigned.</p>
-                    : <ul>{organization.assigned_staff.map((member) => <li key={member.id}><span><strong>{member.display_name}</strong><span>{member.email}</span></span><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'remove', organization, member })}>Remove</button></li>)}</ul>}
+                    : <ul>{organization.assigned_staff.map((member) => <li key={member.id}><span><strong>{member.display_name}</strong><span>{member.email}</span></span><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'remove', organization, member })}>{translate('common.remove')}</button></li>)}</ul>}
                   <div className="staff-assignment-form">
                     <label><span>MSP staff member</span><select aria-label={`Staff member for ${organization.name}`} value={selectedStaff[organization.id] ?? ''} onChange={(event) => setSelectedStaff((current) => ({ ...current, [organization.id]: event.target.value }))}><option value="">Select a member</option>{available.map((member) => <option key={member.id} value={member.id}>{member.display_name} · {roleByValue.get(member.role)?.label ?? member.role}</option>)}</select></label>
-                    <button className="secondary-button" type="button" disabled={!selectedMember} onClick={() => { if (selectedMember) setPending({ kind: 'assign', organization, member: selectedMember }) }}>Review assignment</button>
+                    <button className="secondary-button" type="button" disabled={!selectedMember} onClick={() => { if (selectedMember) setPending({ kind: 'assign', organization, member: selectedMember }) }}>{translate('accessControl.reviewAssignment')}</button>
                   </div>
                 </section>
               })}
@@ -151,7 +152,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
             : pending.kind === 'assign'
               ? `Assign ${pending.member.display_name} to ${pending.organization.name}? Their MSP role still determines what they can do.`
               : `Remove ${pending.member.display_name} from ${pending.organization.name}? They will lose access if this organization is assigned-only.`}</p></div>
-        <div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? 'Saving…' : 'Confirm change'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>Cancel</button></div>
+        <div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? 'Saving…' : 'Confirm change'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div>
       </div>}
     </section>
   )

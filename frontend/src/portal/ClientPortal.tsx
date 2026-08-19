@@ -1,4 +1,5 @@
 import { ArrowLeft, Download, FileText, LogOut } from 'lucide-react'
+import { translate } from '../i18n/localization'
 import { useCallback, useEffect, useState } from 'react'
 import type { AuthenticatedContext } from '../auth/api'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
@@ -97,7 +98,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         {error && <div className="form-error" role="alert">{error}</div>}
         {selected ? <article className="content-section portal-document-detail">
           <div className="portal-document-actions">
-            <button className="secondary-button" type="button" onClick={() => setSelected(null)}><ArrowLeft size={16} aria-hidden="true" />All documents</button>
+            <button className="secondary-button" type="button" onClick={() => setSelected(null)}><ArrowLeft size={16} aria-hidden="true" />{translate('portal.allDocuments')}</button>
             <span className="visibility-label client-visible">Client visible</span>
           </div>
           <header><p className="eyebrow">STATIC {selected.category}</p><h2>{selected.title}</h2><p>{selected.reason}</p></header>
@@ -107,7 +108,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         </article> : <section className="content-section" aria-labelledby="portal-documents-heading">
           <div className="section-heading"><div><h2 id="portal-documents-heading">Published documentation</h2><p>Only approved, current client-visible STATIC publications appear here.</p></div><span>{documents.length}</span></div>
           {phase === 'loading' && <p role="status">Loading published documentation…</p>}
-          {phase === 'error' && <button className="secondary-button" type="button" onClick={() => { void loadDocuments() }}>Try again</button>}
+          {phase === 'error' && <button className="secondary-button" type="button" onClick={() => { void loadDocuments() }}>{translate('portal.tryAgain')}</button>}
           {phase === 'ready' && documents.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>No documentation has been published to your organization.</p></div>}
           {phase === 'ready' && documents.length > 0 && <ul className="portal-document-list">{documents.map((document) => <li key={document.id}><button type="button" disabled={detailLoading} onClick={() => { void openDocument(document) }}><span><strong>{document.title}</strong><small>{document.category} · Published {new Date(document.published_at).toLocaleDateString()}</small></span><span className="visibility-label client-visible">Client visible</span></button></li>)}</ul>}
           {phase === 'ready' && nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadDocuments(nextCursor) }}>{loadingMore ? 'Loading…' : 'Load more documents'}</button></div>}

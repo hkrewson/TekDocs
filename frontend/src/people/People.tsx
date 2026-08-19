@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
-import { translate } from '../i18n/localization'
+import { translate} from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserSitesClient } from '../sites/api'
 import type { SiteRecord, SitesClient } from '../sites/api'
@@ -106,7 +106,7 @@ function PersonForm({ person, workspaceName, sites, sitesUnavailable, saving, on
         <label>Office label <span>Retained fallback text</span><input maxLength={120} value={input.office} onChange={(event) => setInput({ ...input, office: event.target.value })} /></label>
         <label>Phone <span>Optional</span><input type="tel" maxLength={64} value={input.phone} onChange={(event) => setInput({ ...input, phone: event.target.value })} /></label>
         <label>Email <span>Optional</span><input type="email" maxLength={254} value={input.email} onChange={(event) => setInput({ ...input, email: event.target.value })} /></label>
-        <div className="form-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save person'}</button><button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>Cancel</button></div>
+        <div className="form-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save person'}</button><button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button></div>
       </form>
     </section>
   )
@@ -249,8 +249,8 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
             </table>
           </div>
         )}
-        {visiblePhase === 'ready' && result && result.count > result.page_size && <nav className="people-pagination" aria-label="People pages"><button className="secondary-button" type="button" disabled={result.page === 1} onClick={() => changeQuery({ page: result.page - 1 })}><ChevronLeft size={15} />Previous</button><span>Page {result.page}</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => changeQuery({ page: result.page + 1 })}>Next<ChevronRight size={15} /></button></nav>}
-        {archiving && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-person-heading"><div><strong id="archive-person-heading">Archive {archiving.full_name}?</strong><p>This removes the relationship from {workspaceName}. Other future associations to the same person identity are unaffected.</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive person'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>Cancel</button></div></div>}
+        {visiblePhase === 'ready' && result && result.count > result.page_size && <nav className="people-pagination" aria-label="People pages"><button className="secondary-button" type="button" disabled={result.page === 1} onClick={() => changeQuery({ page: result.page - 1 })}><ChevronLeft size={15} />{translate('common.previous')}</button><span>Page {result.page}</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => changeQuery({ page: result.page + 1 })}>{translate('common.next')}<ChevronRight size={15} /></button></nav>}
+        {archiving && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-person-heading"><div><strong id="archive-person-heading">Archive {archiving.full_name}?</strong><p>This removes the relationship from {workspaceName}. Other future associations to the same person identity are unaffected.</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive person'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div></div>}
       </section>
     </>
   )

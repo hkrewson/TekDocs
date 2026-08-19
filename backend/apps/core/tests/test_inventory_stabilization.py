@@ -15,9 +15,9 @@ from apps.core.organizations import create_organization
 from apps.core.software_inventory import create_license
 from apps.core.tests.test_stabilization_performance import (
     P95_SAMPLES,
-    P95_TARGET_SECONDS,
     _create_reference_fixture,
     _p95,
+    assert_p95_within_budget,
 )
 
 PRIVATE_LINK = (
@@ -167,8 +167,7 @@ def test_inventory_reference_pages_are_bounded_policy_scoped_and_fast():
         ),
     )
     for url, params, query_budget in paths:
-        p95 = _p95_get(browser, url, params)
-        assert p95 < P95_TARGET_SECONDS, f"{url} p95 was {p95:.3f}s"
+        assert_p95_within_budget(url, _p95_get(browser, url, params))
         with CaptureQueriesContext(connection) as queries:
             response = browser.get(url, params)
         assert response.status_code == 200

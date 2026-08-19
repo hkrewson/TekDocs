@@ -27,6 +27,7 @@ from apps.core.models import (
 from apps.core.outbox import OutboxTopic
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
+from apps.core.tests.test_stabilization_performance import P95_SAMPLES, assert_p95_within_budget
 
 pytest_plugins = ("apps.core.tests.test_portal_documents",)
 
@@ -35,8 +36,6 @@ NOTIFICATION_QUERY_BUDGET = 32
 PORTAL_DOCUMENT_HISTORY_SIZE = 125
 # Includes the exact-organization membership lookup performed before portal data is resolved.
 PORTAL_DOCUMENT_QUERY_BUDGET = 33
-P95_TARGET_SECONDS = 0.5
-P95_SAMPLES = 40
 
 
 def _p95(samples: list[float]) -> float:
@@ -210,7 +209,7 @@ def test_portal_document_history_has_fixed_queries_and_scope_bound_seek_pages(po
         response = client.get(url)
         samples.append(time.perf_counter() - started)
         assert response.status_code == 200
-    assert _p95(samples) < P95_TARGET_SECONDS
+    assert_p95_within_budget(url, _p95(samples))
 
 
 @pytest.mark.django_db(transaction=True)
@@ -298,7 +297,7 @@ def test_portal_notification_history_is_bounded_seek_paginated_and_scope_bound(p
         response = client.get(url)
         samples.append(time.perf_counter() - started)
         assert response.status_code == 200
-    assert _p95(samples) < P95_TARGET_SECONDS
+    assert_p95_within_budget(url, _p95(samples))
 
     Authenticator.objects.create(
         user=result.owner,

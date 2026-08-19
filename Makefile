@@ -173,6 +173,7 @@ test-stabilization:
 
 test-public-beta-performance:
 	docker compose run --rm migrate pytest apps/core/tests/test_public_beta_capacity.py -m performance -q -s
+	docker compose run --rm -e TEKDOCS_ENFORCE_LATENCY_BUDGETS=true migrate pytest apps/core/tests/test_stabilization_performance.py apps/core/tests/test_inventory_stabilization.py apps/core/tests/test_portal_notification_stabilization.py -q -s
 	./scripts/frontend-gate.sh check
 	./tests/rehearsals/rehearse-browser-performance.sh
 

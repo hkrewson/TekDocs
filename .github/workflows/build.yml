@@ -191,7 +191,7 @@ jobs:
 
   browser:
     name: Chromium regression
-    needs: prepare
+    needs: [prepare, frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -207,7 +207,7 @@ jobs:
 
   live-workspace:
     name: Live browser-to-PostgreSQL journey
-    needs: prepare
+    needs: [prepare, frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

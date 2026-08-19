@@ -18,6 +18,7 @@ from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Flowable, Image, Paragraph, Preformatted, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .diagram_exports import DiagramExportArtifact
+from .document_keys import KEY_TARGET_SCHEME
 
 CALLOUT_TYPES = frozenset({"note", "tip", "important", "warning", "caution"})
 _CALLOUT_PATTERN = re.compile(r"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]*\n|[ \t]+)?")
@@ -36,6 +37,21 @@ class RenderedEntityMention(TypedDict):
     display_name: str
     entity_type: str
     workspace_label: str
+
+
+class RenderedKey(TypedDict):
+    """A key resolution as the renderer consumes it.
+
+    The renderer performs no authorization. It receives an already-authorized
+    projection built by ``apps.core.document_key_resolution`` for one reader, exactly
+    as it receives entity mentions and attachments, so there is one place where a
+    reader's access is decided rather than one per output surface.
+    """
+
+    state: str
+    label: str
+    value: NotRequired[str]
+    provenance: NotRequired[str]
 
 
 class RenderedAttachment(TypedDict):
@@ -257,6 +273,85 @@ def _attachment_reference_cards(markdown: MarkdownIt):  # type: ignore[no-untype
     markdown.core.ruler.after("tekdocs_entity_reference_cards", "tekdocs_attachment_reference_cards", transform)
 
 
+def _resolved_key_values(markdown: MarkdownIt):  # type: ignore[no-untyped-def]
+    """Replace every key autolink with its resolution.
+
+    Every ``tekdocs://key/`` link is consumed, including one with no resolution at
+    all. A key that fell through would render as a live link carrying the raw
+    expression, which is both a syntax leak and a target the sanitizer permits
+    because ``tekdocs`` is an allowed scheme.
+    """
+
+    def transform(state):  # type: ignore[no-untyped-def]
+        resolutions = state.env.get("key_resolutions", {})
+        if not isinstance(resolutions, Mapping):
+            resolutions = {}
+        for token in state.tokens:
+            if token.type != "inline" or not token.children:
+                continue
+            children = token.children
+            index = 0
+            while index < len(children):
+                opening = children[index]
+                if opening.type != "link_open":
+                    index += 1
+                    continue
+                target = opening.attrGet("href") or ""
+                if not target.startswith(KEY_TARGET_SCHEME):
+                    index += 1
+                    continue
+                closing_index = next(
+                    (
+                        candidate
+                        for candidate in range(index + 1, len(children))
+                        if children[candidate].type == "link_close"
+                    ),
+                    None,
+                )
+                if closing_index is None:
+                    index += 1
+                    continue
+                resolution = resolutions.get(target)
+                expression = target[len(KEY_TARGET_SCHEME) :]
+                opening.type = "span_open"
+                opening.tag = "span"
+                opening.attrs = {}
+                label = Token("text", "", 0)
+                state_name = str(resolution.get("state", "")) if isinstance(resolution, Mapping) else ""
+                field_label = (
+                    str(resolution.get("label", expression)) if isinstance(resolution, Mapping) else expression
+                )
+                if state_name == "resolved":
+                    provenance = (
+                        str(resolution.get("provenance", "local")) if isinstance(resolution, Mapping) else "local"
+                    )
+                    opening.attrSet("class", "resolved-key")
+                    opening.attrSet("data-key", expression)
+                    opening.attrSet("data-key-state", "resolved")
+                    opening.attrSet("data-key-provenance", provenance)
+                    opening.attrSet("aria-label", f"{field_label}, resolved from linked record")
+                    label.content = str(resolution.get("value", "")) if isinstance(resolution, Mapping) else ""
+                elif state_name == "withheld":
+                    opening.attrSet("class", "resolved-key resolved-key-withheld")
+                    opening.attrSet("data-key", expression)
+                    opening.attrSet("data-key-state", "withheld")
+                    opening.attrSet("aria-label", f"{field_label} withheld")
+                    label.content = "Withheld"
+                else:
+                    opening.attrSet("class", "resolved-key resolved-key-unresolvable")
+                    opening.attrSet("data-key", expression)
+                    opening.attrSet("data-key-state", "unresolvable")
+                    opening.attrSet("aria-label", f"{field_label} could not be resolved")
+                    label.content = "Unresolved key"
+                closing = children[closing_index]
+                closing.type = "span_close"
+                closing.tag = "span"
+                children[index + 1 : closing_index] = [label]
+                index += 3
+
+    markdown.core.ruler.after("tekdocs_attachment_reference_cards", "tekdocs_resolved_key_values", transform)
+
+
 _MARKDOWN = (
     MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
     .enable(("table", "strikethrough"))
@@ -264,6 +359,7 @@ _MARKDOWN = (
     .use(_semantic_blocks)
     .use(_entity_reference_cards)
     .use(_attachment_reference_cards)
+    .use(_resolved_key_values)
 )
 _REFERENCE_SCAN_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
 _TAGS = {
@@ -304,7 +400,16 @@ _ATTRIBUTES = {
     "li": {"id", "class"},
     "ol": {"class"},
     "strong": {"class"},
-    "span": {"class", "data-entity-id", "data-entity-type", "data-attachment-id", "aria-label"},
+    "span": {
+        "class",
+        "data-entity-id",
+        "data-entity-type",
+        "data-attachment-id",
+        "data-key",
+        "data-key-state",
+        "data-key-provenance",
+        "aria-label",
+    },
     "th": {"class"},
 }
 _URL_SCHEMES = {"http", "https", "mailto", "tekdocs"}
@@ -390,10 +495,15 @@ def render_markdown(
     *,
     entity_mentions: Mapping[str, RenderedEntityMention] | None = None,
     attachments: Mapping[str, RenderedAttachment] | None = None,
+    key_resolutions: Mapping[str, RenderedKey] | None = None,
 ) -> str:
     rendered = _MARKDOWN.render(
         markdown,
-        {"entity_mentions": entity_mentions or {}, "attachments": attachments or {}},
+        {
+            "entity_mentions": entity_mentions or {},
+            "attachments": attachments or {},
+            "key_resolutions": key_resolutions or {},
+        },
     )
     return nh3.clean(rendered, tags=_TAGS, attributes=_ATTRIBUTES, url_schemes=_URL_SCHEMES)
 
@@ -517,9 +627,7 @@ def render_pdf(
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         footer = (
-            f"TekDocs STATIC {publication_id} | Page {doc.page}"
-            if publication_id
-            else f"TekDocs | Page {doc.page}"
+            f"TekDocs STATIC {publication_id} | Page {doc.page}" if publication_id else f"TekDocs | Page {doc.page}"
         )
         canvas.drawString(54, 28, footer)
         canvas.restoreState()

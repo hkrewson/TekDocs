@@ -128,6 +128,7 @@ DOCUMENT_RLS_TABLES = {
     "core_certificatemonitoralert",
     "core_relationshipgraphview",
     "core_relationshipgraphsnapshot",
+    "core_documentkeybinding",
 }
 
 

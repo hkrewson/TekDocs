@@ -710,6 +710,18 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .markdown-preview .resolved-key-withheld, .markdown-preview .resolved-key-unresolvable { display: inline-flex; align-items: center; padding: .08em .38em; border-radius: 4px; font-size: .92em; font-weight: 650; border-bottom: 0; }
 .markdown-preview .resolved-key-withheld { color: #5c4934; background: #f0ebe1; border: 1px solid #d3c6b5; }
 .markdown-preview .resolved-key-unresolvable { color: #7a3b34; background: #f6e9e7; border: 1px solid #dcc2bd; }
+/* The keys panel: bindings are configuration, the report below them is diagnosis.
+   An unresolved row is marked so a document with a broken key reads as broken. */
+.document-keys .key-bindings ul, .document-keys .key-report ul { margin: 10px 0 0; padding: 0; list-style: none; }
+.document-keys .key-bindings li, .document-keys .key-report li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.document-keys .key-bindings li > div { display: flex; align-items: center; gap: 6px; }
+.document-keys small { display: block; color: var(--muted); font-size: 11px; }
+.document-keys .key-report li[data-key-state='unresolvable'] strong { color: #7a3b34; }
+.document-keys .key-report li[data-key-state='withheld'] strong { color: #5c4934; }
+.document-keys .key-where-used { color: #4a5c6b; }
+.document-keys .key-browser { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.document-keys .key-browser ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.document-keys .key-browser li { padding: 7px 0; border-bottom: 1px solid var(--border); }
 .markdown-preview pre { padding: 14px; overflow-x: auto; color: #e7e5df; background: #242622; border-radius: 6px; }
 .markdown-preview code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: .9em; }
 .markdown-preview :not(pre) > code { padding: .1em .3em; background: #efede7; border-radius: 3px; }

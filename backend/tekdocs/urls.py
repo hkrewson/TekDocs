@@ -96,6 +96,16 @@ from apps.core.custom_field_views import (
     OrganizationEntityCustomFieldDetailView,
     OrganizationEntityCustomFieldListView,
 )
+from apps.core.document_key_views import (
+    MSPDocumentKeyBindingDetailView,
+    MSPDocumentKeyBindingListCreateView,
+    MSPDocumentKeyReportView,
+    MSPKeyBindingBrowserView,
+    OrganizationDocumentKeyBindingDetailView,
+    OrganizationDocumentKeyBindingListCreateView,
+    OrganizationDocumentKeyReportView,
+    OrganizationKeyBindingBrowserView,
+)
 from apps.core.document_source_views import (
     MSPDocumentRemoteObservationApplyView,
     MSPDocumentRemoteObservationView,
@@ -501,6 +511,7 @@ urlpatterns = [
         "api/v1/documents/mention-entities", MSPDocumentMentionSearchView.as_view(), name="msp-document-mention-search"
     ),
     path("api/v1/documents/block-library", MSPDocumentBlockLibraryView.as_view(), name="msp-document-block-library"),
+    path("api/v1/key-bindings", MSPKeyBindingBrowserView.as_view(), name="msp-key-bindings"),
     path(
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
@@ -520,6 +531,21 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>/remote-source",
         MSPDocumentRemoteSourceView.as_view(),
         name="msp-document-remote-source",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/key-bindings",
+        MSPDocumentKeyBindingListCreateView.as_view(),
+        name="msp-document-key-binding-list-create",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/key-bindings/<uuid:binding_id>",
+        MSPDocumentKeyBindingDetailView.as_view(),
+        name="msp-document-key-binding-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/keys",
+        MSPDocumentKeyReportView.as_view(),
+        name="msp-document-keys",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/remote-source/observations",
@@ -1615,6 +1641,11 @@ urlpatterns = [
         name="organization-document-block-library",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/key-bindings",
+        OrganizationKeyBindingBrowserView.as_view(),
+        name="organization-key-bindings",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
@@ -1633,6 +1664,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/remote-source",
         OrganizationDocumentRemoteSourceView.as_view(),
         name="organization-document-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/key-bindings",
+        OrganizationDocumentKeyBindingListCreateView.as_view(),
+        name="organization-document-key-binding-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/key-bindings/<uuid:binding_id>",
+        OrganizationDocumentKeyBindingDetailView.as_view(),
+        name="organization-document-key-binding-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/keys",
+        OrganizationDocumentKeyReportView.as_view(),
+        name="organization-document-keys",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/remote-source/observations",

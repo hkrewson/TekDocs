@@ -62,6 +62,8 @@ from .document_key_fields import (
 )
 from .document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT, DocumentKey, keys_in_markdown
 from .models import Document, DocumentKeyBinding, Entity, NetBoxReference, Organization
+from .rendering import RenderedKey
+from .workspaces import ResolvedWorkspace
 
 
 class ResolutionState(StrEnum):
@@ -322,3 +324,65 @@ def resolve_markdown_keys(
             reason=UnresolvableReason.NOT_ADDRESSABLE,
         )
     return resolutions
+
+
+def audience_for(context: InstallationMemberContext) -> DataAudience:
+    """The audience a member's own reads belong to.
+
+    A client-portal member reads as the portal audience even when the underlying
+    record would be visible to staff, so a key resolves against what this reader may
+    see rather than what the author could see when they wrote it.
+    """
+    return DataAudience.CLIENT_PORTAL if context.surface == "client_portal" else DataAudience.MSP_STAFF
+
+
+def resolve_rendered_keys(
+    *, workspace: ResolvedWorkspace, document: Document | None, markdown: str
+) -> dict[str, RenderedKey]:
+    """The renderer's view of every key in ``markdown``, authorized for this reader.
+
+    This mirrors ``resolve_entity_mentions`` and ``resolve_rendered_attachments``: the
+    view builds an authorized projection and the renderer consumes it without making
+    any access decision of its own.
+
+    A scratch preview has no document and therefore no bindings, so every key is
+    unresolvable rather than resolved against some other document's bindings.
+    """
+    keys, unparsable = keys_in_markdown(markdown)
+    if not keys and not unparsable:
+        return {}
+
+    resolutions: dict[str, ResolvedKey] = {}
+    if document is not None:
+        resolutions = resolve_keys(
+            keys,
+            context=workspace.member,
+            document=document,
+            audience=audience_for(workspace.member),
+            organization=workspace.organization,
+        )
+    for key in keys:
+        resolutions.setdefault(
+            key.target,
+            _unresolvable(key, key.expression, UnresolvableReason.NO_BINDING),
+        )
+    for target in unparsable:
+        expression = target.removeprefix(KEY_TARGET_SCHEME)
+        resolutions.setdefault(
+            target,
+            ResolvedKey(
+                expression=expression,
+                state=ResolutionState.UNRESOLVABLE,
+                label=expression,
+                reason=UnresolvableReason.NOT_ADDRESSABLE,
+            ),
+        )
+
+    rendered: dict[str, RenderedKey] = {}
+    for target, resolution in resolutions.items():
+        projection: RenderedKey = {"state": resolution.state.value, "label": resolution.label}
+        if resolution.state == ResolutionState.RESOLVED:
+            projection["value"] = resolution.value
+            projection["provenance"] = (resolution.provenance or ValueProvenance.LOCAL).value
+        rendered[target] = projection
+    return rendered

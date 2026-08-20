@@ -6015,6 +6015,7 @@ class DocumentKeyBinding(TimestampedModel):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_document_key_bindings"
     )
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -6029,8 +6030,20 @@ class DocumentKeyBinding(TimestampedModel):
                 condition=models.Q(name__regex=BINDING_NAME_PATTERN),
                 name="document_key_binding_name_valid",
             ),
-            models.UniqueConstraint(fields=("document", "name"), name="document_key_binding_name_unique"),
+            # Uniqueness applies to live bindings only, so a name can be re-declared
+            # against a different record after the previous binding is retired.
+            models.UniqueConstraint(
+                fields=("document", "name"),
+                condition=models.Q(archived_at__isnull=True),
+                name="document_key_binding_name_unique",
+            ),
         ]
 
     def __str__(self) -> str:
         return self.name
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        # Retained rather than removed: a retired binding is the record of what a
+        # document's keys used to resolve against, which is the first question asked
+        # when a document's values change meaning.
+        raise ValidationError("Document key bindings must be archived")

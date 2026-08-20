@@ -30,6 +30,7 @@ from .diagram_exports import (
     render_diagram_exports,
 )
 from .document_attachments import copy_attachment_content
+from .document_keys import KEY_TARGET_SCHEME, keys_in_markdown
 from .documents import resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import Document, DocumentAttachment
@@ -118,6 +119,20 @@ def resolve_export_snapshot(
         .get(pk=document.pk)
     )
     resolved = resolve_document(locked_document)
+    # Exports follow publication rather than the live view (ADR 0089): an exported
+    # document has left the authorization boundary, so it may not carry a value that
+    # was resolved for whoever happened to request the file. Until publish-time
+    # resolution exists, a document with keys is refused rather than exported with
+    # unresolved markers baked into bytes that outlive the request.
+    keys, unparsable = keys_in_markdown(resolved.markdown)
+    named = [key.expression for key in keys] + [
+        target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable
+    ]
+    if named:
+        raise ExportConflict(
+            "This document resolves keys from linked records, which cannot yet be exported: "
+            f"{', '.join(sorted(set(named)))}."
+        )
     requested_entities = entity_ids_in_markdown(resolved.markdown)
     entity_mentions = resolve_entity_mentions(workspace=workspace, markdown=resolved.markdown)
     if {UUID(entity_id) for entity_id in entity_mentions} != requested_entities:

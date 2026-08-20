@@ -532,6 +532,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/key-bindings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_key_bindings_msp_list"];
+        readonly put?: never;
+        readonly post: operations["document_key_bindings_msp_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documents/{document_entity_id}/key-bindings/{binding_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["document_key_bindings_msp_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documents/{document_entity_id}/keys": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_keys_msp_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/placements": {
         readonly parameters: {
             readonly query?: never;
@@ -1134,6 +1182,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["invitations_accept_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/key-bindings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["key_bindings_msp_browse"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -4100,6 +4164,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/key-bindings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_key_bindings_organization_list"];
+        readonly put?: never;
+        readonly post: operations["document_key_bindings_organization_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/key-bindings/{binding_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["document_key_bindings_organization_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/keys": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_keys_organization_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements": {
         readonly parameters: {
             readonly query?: never;
@@ -4958,6 +5070,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_organizations_integrations_webhooks_endpoints_rotate_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/key-bindings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["key_bindings_organization_browse"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -6215,6 +6343,11 @@ export interface components {
             readonly id: string;
             readonly name: string;
         };
+        readonly BoundDocument: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+        };
         readonly Bundle: {
             /** Format: uuid */
             readonly id: string;
@@ -7328,6 +7461,17 @@ export interface components {
             /** @default false */
             readonly library_visible: boolean;
         };
+        readonly DocumentKey: {
+            readonly expression: string;
+            readonly state: string;
+            readonly label: string;
+            readonly reason: string | null;
+        };
+        readonly DocumentKeyReport: {
+            readonly results: readonly components["schemas"]["DocumentKey"][];
+            readonly count: number;
+            readonly unresolved_count: number;
+        };
         readonly DocumentPlacement: {
             /** Format: uuid */
             readonly id: string;
@@ -8417,6 +8561,28 @@ export interface components {
         readonly JobStart: {
             /** Format: uuid */
             readonly connection_id: string;
+        };
+        readonly KeyBindingList: {
+            readonly results: readonly components["schemas"]["KeyBindingResult"][];
+            readonly count: number;
+        };
+        readonly KeyBindingResult: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            /** Format: uuid */
+            readonly target_entity_id: string;
+            readonly target_display_name: string;
+            readonly target_entity_type: string;
+            readonly addressable_fields: readonly string[];
+            readonly also_bound_by: readonly components["schemas"]["BoundDocument"][];
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly KeyBindingWrite: {
+            readonly name: string;
+            /** Format: uuid */
+            readonly target_entity_id: string;
         };
         readonly LicenseResult: {
             readonly results: readonly components["schemas"]["SoftwareLicense"][];
@@ -10640,6 +10806,23 @@ export interface components {
             readonly capabilities: readonly string[];
             readonly organization: components["schemas"]["Organization"] | null;
         };
+        readonly WorkspaceKeyBinding: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            /** Format: uuid */
+            readonly document_id: string;
+            readonly document_title: string;
+            /** Format: uuid */
+            readonly target_entity_id: string;
+            readonly target_display_name: string;
+            readonly target_entity_type: string;
+        };
+        readonly WorkspaceKeyBindingList: {
+            readonly results: readonly components["schemas"]["WorkspaceKeyBinding"][];
+            readonly count: number;
+            readonly has_more: boolean;
+        };
         readonly WorkspaceOption: {
             /** Format: uuid */
             readonly id: string;
@@ -12135,6 +12318,115 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": string;
+                };
+            };
+        };
+    };
+    readonly document_key_bindings_msp_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["KeyBindingList"];
+                };
+            };
+        };
+    };
+    readonly document_key_bindings_msp_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["KeyBindingWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["KeyBindingWrite"];
+                readonly "multipart/form-data": components["schemas"]["KeyBindingWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["KeyBindingResult"];
+                };
+            };
+            /** @description Binding name already declared */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly document_key_bindings_msp_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly binding_id: string;
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly document_keys_msp_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentKeyReport"];
                 };
             };
         };
@@ -13884,6 +14176,27 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly key_bindings_msp_browse: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WorkspaceKeyBindingList"];
                 };
             };
         };
@@ -21551,6 +21864,119 @@ export interface operations {
             };
         };
     };
+    readonly document_key_bindings_organization_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["KeyBindingList"];
+                };
+            };
+        };
+    };
+    readonly document_key_bindings_organization_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["KeyBindingWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["KeyBindingWrite"];
+                readonly "multipart/form-data": components["schemas"]["KeyBindingWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["KeyBindingResult"];
+                };
+            };
+            /** @description Binding name already declared */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly document_key_bindings_organization_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly binding_id: string;
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly document_keys_organization_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentKeyReport"];
+                };
+            };
+        };
+    };
     readonly document_placements_organization_create: {
         readonly parameters: {
             readonly query?: never;
@@ -23787,6 +24213,29 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["IssuedWebhookEndpoint"];
+                };
+            };
+        };
+    };
+    readonly key_bindings_organization_browse: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WorkspaceKeyBindingList"];
                 };
             };
         };

@@ -292,7 +292,38 @@ export interface DocumentsClient {
   attachmentDownloadUrl(scope: DocumentScope, id: string, attachmentId: string): string
   archive(scope: DocumentScope, id: string): Promise<void>
   addReference(documentId: string, organizationId: string): Promise<void>
+  listKeyBindings(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentKeyBindingResult>
+  declareKeyBinding(scope: DocumentScope, id: string, name: string, targetEntityId: string): Promise<DocumentKeyBinding>
+  archiveKeyBinding(scope: DocumentScope, id: string, bindingId: string): Promise<void>
+  listDocumentKeys(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentKeyReport>
+  browseKeyBindings(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<WorkspaceKeyBindingResult>
 }
+
+export type BoundDocument = { id: string; title: string }
+export type DocumentKeyBinding = {
+  id: string
+  name: string
+  target_entity_id: string
+  target_display_name: string
+  target_entity_type: string
+  addressable_fields: readonly string[]
+  also_bound_by: readonly BoundDocument[]
+  created_at: string
+}
+export type WorkspaceKeyBinding = {
+  id: string
+  name: string
+  document_id: string
+  document_title: string
+  target_entity_id: string
+  target_display_name: string
+  target_entity_type: string
+}
+export type WorkspaceKeyBindingResult = { results: WorkspaceKeyBinding[]; count: number; has_more: boolean }
+export type DocumentKeyBindingResult = { results: DocumentKeyBinding[]; count: number }
+export type DocumentKeyState = 'resolved' | 'withheld' | 'unresolvable'
+export type DocumentKeyRow = { expression: string; state: DocumentKeyState; label: string; reason: string | null }
+export type DocumentKeyReport = { results: DocumentKeyRow[]; count: number; unresolved_count: number }
 
 export type ExportFormat = 'md' | 'html' | 'pdf' | 'docx' | 'bundle'
 export type PublicationExportFormat = Exclude<ExportFormat, 'bundle'>
@@ -389,6 +420,22 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   updateSharedBlock: (scope, id, placementId, markdown, baseRevisionId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/reuse`, 'PUT', { markdown, base_revision_id: baseRevisionId }),
   detachPlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/detach`, 'POST'),
+  async listKeyBindings(scope, id, signal) {
+    return parse<DocumentKeyBindingResult>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/key-bindings`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  declareKeyBinding: (scope, id, name, targetEntityId) => mutate<DocumentKeyBinding>(`${collectionPath(scope)}/${encodeURIComponent(id)}/key-bindings`, 'POST', { name, target_entity_id: targetEntityId }),
+  archiveKeyBinding: async (scope, id, bindingId) => { await mutate<void>(`${collectionPath(scope)}/${encodeURIComponent(id)}/key-bindings/${encodeURIComponent(bindingId)}`, 'DELETE') },
+  async listDocumentKeys(scope, id, signal) {
+    return parse<DocumentKeyReport>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/keys`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async browseKeyBindings(scope, query, signal) {
+    const parameters = new URLSearchParams(query ? { q: query } : {})
+    const suffix = parameters.toString() ? `?${parameters}` : ''
+    const base = scope.organizationId
+      ? `/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}/key-bindings`
+      : '/api/v1/key-bindings'
+    return parse<WorkspaceKeyBindingResult>(await fetch(`${base}${suffix}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
   async searchMentionEntities(scope, query, signal) {
     return parse<EntityMentionResult>(await fetch(`${collectionPath(scope)}/mention-entities?q=${encodeURIComponent(query)}&page_size=20`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },

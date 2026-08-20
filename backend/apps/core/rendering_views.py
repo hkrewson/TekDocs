@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, require_installation_member, require_permission
 
 from .document_attachments import resolve_rendered_attachments
+from .document_key_resolution import resolve_rendered_keys
 from .documents import documents_for_scope
 from .entity_mentions import resolve_entity_mentions
 from .rendering import render_markdown
@@ -56,6 +57,11 @@ class MarkdownRenderView(APIView):
                     markdown,
                     entity_mentions=resolve_entity_mentions(workspace=workspace, markdown=markdown),
                     attachments=resolve_rendered_attachments(
+                        workspace=workspace,
+                        document=document,
+                        markdown=markdown,
+                    ),
+                    key_resolutions=resolve_rendered_keys(
                         workspace=workspace,
                         document=document,
                         markdown=markdown,

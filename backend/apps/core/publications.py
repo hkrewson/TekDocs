@@ -29,6 +29,7 @@ from .diagram_exports import (
     render_diagram_exports,
 )
 from .document_attachments import copy_attachment_content
+from .document_keys import KEY_TARGET_SCHEME, keys_in_markdown
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import (
@@ -122,6 +123,27 @@ def _encoded_public_key(key: Ed25519PrivateKey) -> tuple[str, str]:
 
 def _timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _refuse_unfrozen_keys(markdown: str) -> None:
+    """Refuse to publish content that still contains unresolved key expressions.
+
+    Publication signs and retains exactly what a reader will see. Until publish-time
+    resolution exists (ADR 0089, `0.8.39`), a key would be frozen into signed evidence
+    as a visible "unresolved" marker — a permanent record of a value that was never
+    resolved, in the artifact TekDocs offers as proof. Refusing is the fail-closed
+    behaviour the record already commits to; the refusal disappears when the freeze
+    lands, without weakening anything in the meantime.
+    """
+    keys, unparsable = keys_in_markdown(markdown)
+    named = [key.expression for key in keys] + [
+        target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable
+    ]
+    if named:
+        raise PublicationConflict(
+            "This document resolves keys from linked records, which cannot yet be frozen into a "
+            f"STATIC publication: {', '.join(sorted(set(named)))}."
+        )
 
 
 def _resolved_attachments(
@@ -243,6 +265,7 @@ def publish_document(
                 ):
                     raise PublicationConflict("The selected STATIC publication cannot be superseded.")
 
+            _refuse_unfrozen_keys(resolved.markdown)
             entity_projections = _resolved_entities(workspace=workspace, markdown=resolved.markdown)
             attachment_records, rendered_attachments, source_attachments = _resolved_attachments(
                 document=locked_document,

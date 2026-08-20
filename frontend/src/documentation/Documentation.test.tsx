@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
@@ -23,6 +23,29 @@ function clients() {
   const previewRestructure = vi.fn().mockResolvedValue(restructurePreview)
   const applyRestructure = vi.fn().mockResolvedValue({ status: 'restructured', section_count: 2, document: restructuredDocument })
   const addReference = vi.fn(() => Promise.resolve())
+  const keyBinding = {
+    id: 'binding-1',
+    name: 'subject',
+    target_entity_id: 'entity-1',
+    target_display_name: 'Edge firewall',
+    target_entity_type: 'client_asset',
+    addressable_fields: ['name', 'serial_number'],
+    also_bound_by: [{ id: 'doc-2', title: 'Escalation guide' }],
+    created_at: '2026-08-15T00:00:00Z',
+  }
+  const listKeyBindings = vi.fn().mockResolvedValue({ results: [keyBinding], count: 1 })
+  const declareKeyBinding = vi.fn().mockResolvedValue(keyBinding)
+  const archiveKeyBinding = vi.fn(() => Promise.resolve())
+  const browseKeyBindings = vi.fn().mockResolvedValue({
+    results: [{ id: 'binding-1', name: 'subject', document_id: 'doc-1', document_title: 'Firewall standard', target_entity_id: 'entity-1', target_display_name: 'Edge firewall', target_entity_type: 'client_asset' }],
+    count: 1,
+    has_more: false,
+  })
+  const listDocumentKeys = vi.fn().mockResolvedValue({
+    results: [{ expression: 'subject.serial_number', state: 'unresolvable', label: 'Serial number', reason: 'empty' }],
+    count: 1,
+    unresolved_count: 1,
+  })
   const reusedPlacement = { ...sourceDocument.placements[0], id: 'placement-reused', is_primary: false }
   const composed = { ...document, resolved_markdown: '# Firewall\n\nShared content\n', placements: [primaryPlacement, reusedPlacement], placement_count: 2 }
   const addPlacement = vi.fn(() => Promise.resolve(composed))
@@ -31,7 +54,11 @@ function clients() {
   const getReuseImpact = vi.fn().mockResolvedValue({ block_id: 'block-1', block_name: 'Firewall standard — content', revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', markdown: '# Firewall', audiences: [], live_audience_count: 1, pinned_audience_count: 0, can_edit_shared: true, can_detach: false, requires_mfa: true, truncated: false })
   const updateSharedBlock = vi.fn().mockResolvedValue(document)
   const detachPlacement = vi.fn().mockResolvedValue(document)
-  const searchMentionEntities = vi.fn().mockResolvedValue({ results: [], count: 0, has_more: false })
+  const searchMentionEntities = vi.fn().mockResolvedValue({
+    results: [{ id: 'entity-1', display_name: 'Router A', entity_type: 'client_asset', workspace_label: 'Acme Dental' }],
+    count: 1,
+    has_more: false,
+  })
   const searchBlockLibrary = vi.fn().mockResolvedValue({ results: [], count: 0 })
   const instantiateTemplate = vi.fn().mockResolvedValue({ ...document, id: 'doc-from-template', title: 'New from Firewall standard', is_template: false })
   const importMarkdown = vi.fn().mockResolvedValue({ ...document, id: 'doc-imported', title: 'imported', category: 'general' })
@@ -94,12 +121,17 @@ function clients() {
     attachmentDownloadUrl: (_scope, id, attachmentId) => `/documents/${id}/attachments/${attachmentId}/download`,
     archive: vi.fn().mockResolvedValue(undefined),
     addReference,
+    listKeyBindings,
+    declareKeyBinding,
+    archiveKeyBinding,
+    listDocumentKeys,
+    browseKeyBindings,
   }
   const workspaces: WorkspaceClient = {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication }
+  return { documents, workspaces, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -475,4 +507,53 @@ it('shows pending client publication audiences and records an approval decision'
   await waitFor(() => expect(approvePublication).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', 'publication-1', 'Independent approval'))
   expect(await screen.findByText('Publication approved for its intended audience.')).toBeVisible()
   expect(screen.getByText('Client portal').parentElement).toHaveTextContent('Available')
+})
+
+it('declares a key binding, inserts a key, and reports what has not resolved', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, declareKeyBinding, archiveKeyBinding, searchMentionEntities } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+
+  // The unresolved count is on the control itself, so an author sees there is
+  // something to fix without opening the panel.
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+  expect(await screen.findByRole('button', { name: 'Keys (1)' })).toBeInTheDocument()
+
+  await user.type(screen.getByLabelText('Declare'), 'subject')
+  await user.type(screen.getByRole('searchbox', { name: /TekDocs record/ }), 'Edge')
+  await waitFor(() => expect(searchMentionEntities).toHaveBeenCalled())
+  await user.click(await screen.findByRole('button', { name: /Router A/ }))
+  await waitFor(() => expect(declareKeyBinding).toHaveBeenCalledWith({}, 'doc-1', 'subject', 'entity-1'))
+
+  // The report names the key and why it did not resolve, rather than leaving a blank.
+  expect(screen.getByText('subject.serial_number')).toBeInTheDocument()
+  expect(screen.getByText(/Serial number · empty/)).toBeInTheDocument()
+
+  // Inserting writes the same autolink shape the dialect already understands, into
+  // whichever editor is open.
+  await user.click(screen.getByRole('button', { name: 'Edit this content' }))
+  await user.selectOptions(screen.getByLabelText('subject'), 'serial_number')
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value)
+    .toContain('<tekdocs://key/subject.serial_number>')
+
+  await user.click(screen.getByRole('button', { name: 'Retire subject' }))
+  expect(archiveKeyBinding).toHaveBeenCalledWith({}, 'doc-1', 'binding-1')
+})
+
+it('shows the blast radius of a bound record and finds bindings across the workspace', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, browseKeyBindings } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+
+  // Where-used: the other document that quotes this record is named while binding,
+  // not discovered after an edit has already changed it.
+  expect(await screen.findByText(/Also used by: Escalation guide/)).toBeInTheDocument()
+
+  await user.type(screen.getByRole('searchbox', { name: /Find bindings/ }), 'Edge')
+  await waitFor(() => expect(browseKeyBindings).toHaveBeenCalledWith({}, 'Edge', expect.anything()))
+  const browser = within(await screen.findByRole('list', { name: 'Bindings across this workspace' }))
+  expect(browser.getByText('Edge firewall')).toBeInTheDocument()
 })

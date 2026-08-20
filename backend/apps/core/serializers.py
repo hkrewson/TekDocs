@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .document_attachments import resolve_rendered_attachments
+from .document_key_resolution import resolve_rendered_keys
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import (
@@ -859,6 +860,7 @@ class DocumentPlacementSerializer(serializers.Serializer):
             obj.revision.markdown,
             entity_mentions=self.context.get("entity_mentions", {}),
             attachments=self.context.get("attachments", {}),
+            key_resolutions=self.context.get("key_resolutions", {}),
         )
 
 
@@ -1050,6 +1052,7 @@ class DocumentSerializer(serializers.Serializer):
             context = {
                 "entity_mentions": resolve_entity_mentions(workspace=workspace, markdown=markdown),
                 "attachments": resolve_rendered_attachments(workspace=workspace, document=obj, markdown=markdown),
+                "key_resolutions": resolve_rendered_keys(workspace=workspace, document=obj, markdown=markdown),
             }
         return cast(
             list[dict[str, object]],

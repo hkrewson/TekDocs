@@ -1,17 +1,21 @@
 import secrets
 import uuid
+from dataclasses import dataclass
+from typing import cast
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.accounts.policy import DataAudience, require_installation_member
+from apps.accounts.policy import DataAudience, InstallationMemberContext, require_installation_member
 from apps.core.document_key_fields import RESOLVABLE_RECORDS
 from apps.core.document_key_resolution import (
     ResolutionState,
     UnresolvableReason,
     ValueProvenance,
+    audience_for,
     resolve_markdown_keys,
 )
 from apps.core.document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT
@@ -28,6 +32,7 @@ from apps.core.models import (
     workspace_for_owner,
 )
 from apps.core.rendering import render_markdown
+from apps.core.workspaces import resolve_organization_workspace
 
 from .network_asset_fixtures import create_network_hardware_asset
 
@@ -486,3 +491,162 @@ def test_a_document_beyond_the_key_limit_reports_the_excess_rather_than_dropping
     excess = [result for result in resolutions.values() if result.reason == UnresolvableReason.LIMIT_EXCEEDED]
     assert len(excess) == 5
     assert all(result.state == ResolutionState.UNRESOLVABLE for result in excess)
+
+
+# ---------------------------------------------------------------------------
+# The live read paths resolve; the evidence paths refuse.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_the_preview_endpoint_resolves_a_key_for_the_requesting_member(installation, client):
+    organization = _organization(installation.tenant, "Preview client")
+    asset = _asset_with_serial(installation, organization, name="Preview firewall", serial="PRE-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Preview runbook", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+    client.force_login(installation.owner)
+
+    response = client.post(
+        reverse("markdown-render"),
+        {
+            "markdown": markdown,
+            "organization_id": str(organization.entity_id),
+            "document_id": str(document.entity_id),
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    html = response.json()["html"]
+    assert "PRE-0001" in html
+    assert KEY_TARGET_SCHEME not in html
+
+
+@pytest.mark.django_db
+def test_a_preview_without_a_document_cannot_borrow_another_documents_bindings(installation, client):
+    organization = _organization(installation.tenant, "Scratch client")
+    asset = _asset_with_serial(installation, organization, name="Scratch firewall", serial="SCR-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Scratch runbook", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+    client.force_login(installation.owner)
+
+    # The same markdown, previewed with no document: bindings belong to a document, so
+    # a scratch buffer resolves nothing rather than picking up a nearby binding.
+    response = client.post(
+        reverse("markdown-render"),
+        {"markdown": markdown, "organization_id": str(organization.entity_id)},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    html = response.json()["html"]
+    assert "SCR-0001" not in html
+    assert 'data-key-state="unresolvable"' in html
+
+
+@pytest.mark.django_db
+def test_publication_refuses_a_document_whose_keys_cannot_yet_be_frozen(installation):
+    from apps.core.publications import PublicationConflict, publish_document
+
+    organization = _organization(installation.tenant, "Publishing client")
+    asset = _asset_with_serial(installation, organization, name="Publishing firewall", serial="PUB-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Publishing runbook", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+
+    with pytest.raises(PublicationConflict, match="subject.serial_number"):
+        publish_document(
+            workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+            document=document,
+            actor_id=installation.owner.pk,
+            reason="Key freeze is not implemented yet",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+
+    # Nothing partial is retained: the refusal happens before any artifact exists.
+    assert document.publications.count() == 0
+
+
+@pytest.mark.django_db
+def test_export_refuses_a_document_whose_keys_cannot_yet_be_frozen(installation):
+    from apps.core.document_exports import ExportConflict, resolve_export_snapshot
+
+    organization = _organization(installation.tenant, "Exporting client")
+    asset = _asset_with_serial(installation, organization, name="Exporting firewall", serial="EXP-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Exporting runbook", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+
+    with pytest.raises(ExportConflict, match="subject.serial_number"):
+        resolve_export_snapshot(
+            workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+            document=document,
+        )
+
+
+@pytest.mark.django_db
+def test_a_document_without_keys_still_publishes(installation):
+    from apps.core.publications import publish_document
+
+    organization = _organization(installation.tenant, "Ordinary client")
+    document = _document(installation, organization, "Ordinary runbook", "No keys in this document.")
+
+    publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+        actor_id=installation.owner.pk,
+        reason="Unchanged behaviour for documents without keys",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+
+    assert publication is not None
+
+
+def test_the_audience_follows_the_members_own_surface():
+    """A reader's surface decides the audience, so the author's cannot leak into it.
+
+    Live document reads are MSP-staff-only today: the client portal is served
+    publications, not live compositions. This mapping is what makes the portal branch
+    correct in advance of the portal reaching a live path, rather than an untested
+    assumption discovered later.
+    """
+
+    @dataclass
+    class _Surface:
+        surface: str
+
+    assert audience_for(cast(InstallationMemberContext, _Surface("msp"))) == DataAudience.MSP_STAFF
+    assert audience_for(cast(InstallationMemberContext, _Surface("client_portal"))) == DataAudience.CLIENT_PORTAL
+
+
+@pytest.mark.django_db
+def test_the_document_api_returns_a_resolved_value_in_its_rendered_html(installation, client):
+    organization = _organization(installation.tenant, "API client")
+    asset = _asset_with_serial(installation, organization, name="API firewall", serial="API-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "API runbook", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+    client.force_login(installation.owner)
+
+    response = client.get(
+        reverse(
+            "organization-document-detail",
+            kwargs={
+                "organization_entity_id": organization.entity_id,
+                "document_entity_id": document.entity_id,
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    html = " ".join(placement["resolved_html"] for placement in response.json()["placements"])
+    assert "API-0001" in html
+    assert KEY_TARGET_SCHEME not in html
+    # The stored source is untouched: only the rendered projection carries the value.
+    assert "<tekdocs://key/subject.serial_number>" in response.json()["resolved_markdown"]

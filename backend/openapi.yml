@@ -1739,6 +1739,143 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/key-bindings:
+    get:
+      operationId: document_key_bindings_msp_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyBindingList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: document_key_bindings_msp_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyBindingResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Binding name already declared
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/documents/{document_entity_id}/key-bindings/{binding_id}:
+    delete:
+      operationId: document_key_bindings_msp_archive
+      parameters:
+      - in: path
+        name: binding_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/{document_entity_id}/keys:
+    get:
+      operationId: document_keys_msp_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentKeyReport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/placements:
     post:
       operationId: document_placements_msp_create
@@ -4004,6 +4141,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/key-bindings:
+    get:
+      operationId: key_bindings_msp_browse
+      tags:
+      - key-bindings
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceKeyBindingList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/markdown/render:
     post:
       operationId: markdown_render_create
@@ -14093,6 +14251,167 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/key-bindings:
+    get:
+      operationId: document_key_bindings_organization_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyBindingList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: document_key_bindings_organization_create
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/KeyBindingWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyBindingResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Binding name already declared
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/key-bindings/{binding_id}:
+    delete:
+      operationId: document_key_bindings_organization_archive
+      parameters:
+      - in: path
+        name: binding_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/keys:
+    get:
+      operationId: document_keys_organization_list
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentKeyReport'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements:
     post:
       operationId: document_placements_organization_create
@@ -17349,6 +17668,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IssuedWebhookEndpoint'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/key-bindings:
+    get:
+      operationId: key_bindings_organization_browse
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceKeyBindingList'
           description: ''
           headers:
             X-Request-ID:
@@ -22135,6 +22482,17 @@ components:
       required:
       - id
       - name
+    BoundDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+      required:
+      - id
+      - title
     Bundle:
       type: object
       properties:
@@ -24847,6 +25205,38 @@ components:
           default: false
       required:
       - title
+    DocumentKey:
+      type: object
+      properties:
+        expression:
+          type: string
+        state:
+          type: string
+        label:
+          type: string
+        reason:
+          type: string
+          nullable: true
+      required:
+      - expression
+      - label
+      - reason
+      - state
+    DocumentKeyReport:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentKey'
+        count:
+          type: integer
+        unresolved_count:
+          type: integer
+      required:
+      - count
+      - results
+      - unresolved_count
     DocumentPlacement:
       type: object
       properties:
@@ -27412,6 +27802,68 @@ components:
           format: uuid
       required:
       - connection_id
+    KeyBindingList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyBindingResult'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    KeyBindingResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        target_entity_id:
+          type: string
+          format: uuid
+        target_display_name:
+          type: string
+        target_entity_type:
+          type: string
+        addressable_fields:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        also_bound_by:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoundDocument'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - addressable_fields
+      - also_bound_by
+      - created_at
+      - id
+      - name
+      - target_display_name
+      - target_entity_id
+      - target_entity_type
+    KeyBindingWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 40
+          pattern: ^[a-z][a-z0-9_]{0,39}$
+        target_entity_id:
+          type: string
+          format: uuid
+      required:
+      - name
+      - target_entity_id
     LicenseResult:
       type: object
       properties:
@@ -32469,6 +32921,49 @@ components:
       - kind
       - name
       - organization
+    WorkspaceKeyBinding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        document_id:
+          type: string
+          format: uuid
+        document_title:
+          type: string
+        target_entity_id:
+          type: string
+          format: uuid
+        target_display_name:
+          type: string
+        target_entity_type:
+          type: string
+      required:
+      - document_id
+      - document_title
+      - id
+      - name
+      - target_display_name
+      - target_entity_id
+      - target_entity_type
+    WorkspaceKeyBindingList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceKeyBinding'
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - results
     WorkspaceOption:
       type: object
       properties:

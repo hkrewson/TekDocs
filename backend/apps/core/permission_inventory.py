@@ -84,6 +84,15 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-document-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-remote-source", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW, (PermissionKey.DOCUMENTS_EDIT,)),
     route(
+        "msp-document-key-binding-list-create",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route("msp-document-key-binding-detail", ("DELETE",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-keys", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-key-bindings", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route(
         "msp-document-remote-observations",
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
@@ -1038,6 +1047,31 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "PUT"),
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-key-binding-list-create",
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-key-binding-detail",
+        ("DELETE",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-keys",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-key-bindings",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,
     ),
     route(

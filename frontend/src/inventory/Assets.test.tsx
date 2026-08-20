@@ -1,7 +1,8 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Assets } from './Assets'
+import type { HardwareLifecycleEvent } from './api'
 import type { ClientAsset, InventoryClient } from './api'
 
 const workspace = { id: 'client-1', name: 'Contoso', classifications: ['client'] } as never
@@ -169,6 +170,29 @@ describe('Assets', () => {
       'asset-1',
       expect.objectContaining({ serial_number: 'SN-002', lifecycle_state: 'in_service' }),
     ))
+  })
+
+  // A slow history load must not discard what is being typed.
+  it('keeps an open hardware edit when a background history refresh lands', async () => {
+    let releaseHistory: (events: HardwareLifecycleEvent[]) => void = () => {}
+    const listHardwareLifecycle = vi.fn(
+      () => new Promise<HardwareLifecycleEvent[]>((resolve) => { releaseHistory = resolve }),
+    )
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ listHardwareLifecycle })} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    await user.clear(screen.getByLabelText('Serial number'))
+    await user.type(screen.getByLabelText('Serial number'), 'SN-IN-PROGRESS')
+
+    // The history request that was already in flight now resolves. Before this was
+    // fixed it also reset the form and forced read mode, so a half-typed serial
+    // vanished and the rest of the form went with it.
+    await act(() => { releaseHistory([]); return Promise.resolve() })
+
+    expect(screen.getByLabelText('Serial number')).toHaveValue('SN-IN-PROGRESS')
+    expect(screen.getByLabelText('Acquired on')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save details' })).toBeInTheDocument()
   })
 
   it('maintains software installation status and version', async () => {

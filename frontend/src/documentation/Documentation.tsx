@@ -87,6 +87,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [keyBindings, setKeyBindings] = useState<DocumentKeyBinding[]>([])
   const [keyReport, setKeyReport] = useState<DocumentKeyReport | null>(null)
   const [bindingName, setBindingName] = useState('')
+  const [addressableTypes, setAddressableTypes] = useState<string[]>([])
   const [bindingQuery, setBindingQuery] = useState('')
   const [bindingMatches, setBindingMatches] = useState<WorkspaceKeyBinding[]>([])
   const [blockLibraryQuery, setBlockLibraryQuery] = useState('')
@@ -194,7 +195,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
-  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setBlockLibraryQuery(''); setBlockLibrary([]); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setBindingQuery(''); setBindingMatches([]) }
+  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setBlockLibraryQuery(''); setBlockLibrary([]); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setAddressableTypes([]); setBindingQuery(''); setBindingMatches([]) }
   const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live'); setExportAttachmentIds([]); if (document.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) }) }
   const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setNewDocumentMode('write'); setNewPrimaryFile(null); setTitle(''); setMarkdown(''); setCategory('general'); setIsTemplate(false); setLibraryVisible(false); setMessage(null); setError(null) }
   const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
@@ -429,10 +430,14 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       client.listKeyBindings(scope, selected.id),
       client.listDocumentKeys(scope, selected.id),
     ])
-    setKeyBindings([...bindings.results]); setKeyReport(report)
+    setKeyBindings([...bindings.results]); setKeyReport(report); setAddressableTypes([...bindings.addressable_entity_types])
   }
+  // The server enforces this grammar and refuses anything else. Checking it here means
+  // a capitalised word is answered as you type instead of by a failed request.
+  const bindingNameValid = /^[a-z][a-z0-9_]{0,39}$/.test(bindingName)
+  const bindingTargetable = (entityType: string) => addressableTypes.length === 0 || addressableTypes.includes(entityType)
   const declareBinding = async (entity: EntityMentionOption) => {
-    if (!selected || selected === 'new' || !bindingName.trim()) return
+    if (!selected || selected === 'new' || !bindingNameValid) return
     setSaving(true); setError(null)
     try {
       await client.declareKeyBinding(scope, selected.id, bindingName.trim(), entity.id)
@@ -736,9 +741,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
             <button className="icon-button" type="button" aria-label={translate('documentation.closeKeys')} onClick={() => setActivePanel(null)}><X size={16} /></button>
           </div>
           <div className="entity-mention-picker">
-            <label><span>{translate('documentation.declareBinding')}</span><input type="text" value={bindingName} onChange={(event) => setBindingName(event.target.value)} placeholder="subject" aria-label={translate('documentation.declareBinding')} /></label>
+            <label><span>{translate('documentation.declareBinding')}</span><input type="text" value={bindingName} onChange={(event) => setBindingName(event.target.value.toLowerCase())} placeholder="subject" aria-label={translate('documentation.declareBinding')} aria-describedby="binding-name-rule" aria-invalid={bindingName.length > 0 && !bindingNameValid} /></label>
+            <p id="binding-name-rule" className="field-hint" role={bindingName.length > 0 && !bindingNameValid ? 'alert' : undefined}>{translate('documentation.bindingNameRule')}</p>
             <label><Search size={15} /><span>{translate('documentation.tekdocsRecord')}</span><input type="search" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>
-            {mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" disabled={saving || !bindingName.trim()} onClick={() => { void declareBinding(entity) }}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}
+            {mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" disabled={saving || !bindingNameValid || !bindingTargetable(entity.entity_type)} onClick={() => { void declareBinding(entity) }}><strong>{entity.display_name}</strong><small>{bindingTargetable(entity.entity_type) ? `${entity.entity_type.replaceAll('_', ' ')} · ${entity.workspace_label}` : translate('documentation.recordNotAddressable')}</small></button></li>)}</ul>}
           </div>
           {keyBindings.length > 0 && <div className="key-bindings" role="group" aria-label={translate('documentation.keyBindingsTable')}>
             <ul>{keyBindings.map((binding) => <li key={binding.id}>

@@ -46,8 +46,16 @@ MAXIMUM_RELATED_DOCUMENTS = 50
 BROWSER_PAGE_SIZE = 100
 
 
+#: Rejecting a name is common — an author types a capitalised word before knowing the
+#: grammar — so the refusal states the rule rather than reporting a pattern mismatch.
+BINDING_NAME_HELP = (
+    "A binding name uses lowercase letters, digits and underscores, and starts with a "
+    "letter. For example: subject, primary_switch."
+)
+
+
 class KeyBindingWriteSerializer(serializers.Serializer):
-    name = serializers.RegexField(BINDING_NAME_PATTERN, max_length=40)
+    name = serializers.RegexField(BINDING_NAME_PATTERN, max_length=40, error_messages={"invalid": BINDING_NAME_HELP})
     target_entity_id = serializers.UUIDField()
 
 
@@ -88,6 +96,10 @@ class KeyBindingResultSerializer(serializers.Serializer):
 class KeyBindingListSerializer(serializers.Serializer):
     results = KeyBindingResultSerializer(many=True)
     count = serializers.IntegerField()
+    #: The record kinds a binding may target. The authoring surface reads this rather
+    #: than carrying its own copy of the registry, so adding a resolvable record kind
+    #: stays a single change on the server.
+    addressable_entity_types = serializers.ListField(child=serializers.CharField())
 
 
 class DocumentKeySerializer(serializers.Serializer):
@@ -143,7 +155,11 @@ def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: R
         page = list(records)
         context = {"also_bound_by": _also_bound_by(page)}
         return Response(
-            {"results": KeyBindingResultSerializer(page, many=True, context=context).data, "count": len(page)}
+            {
+                "results": KeyBindingResultSerializer(page, many=True, context=context).data,
+                "count": len(page),
+                "addressable_entity_types": sorted(RESOLVABLE_RECORDS),
+            }
         )
 
     serializer = KeyBindingWriteSerializer(data=request.data)

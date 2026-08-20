@@ -156,6 +156,8 @@
   "documentation.keys": "Keys",
   "documentation.keysPanel": "Resolved keys",
   "documentation.declareBinding": "Declare",
+  "documentation.bindingNameRule": "Use lowercase letters, digits and underscores, starting with a letter.",
+  "documentation.recordNotAddressable": "Keys cannot read fields from this kind of record yet",
   "documentation.insertKey": "Insert key",
   "documentation.retireBinding": "Retire",
   "documentation.closeKeys": "Close keys",

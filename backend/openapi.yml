@@ -27811,7 +27811,12 @@ components:
             $ref: '#/components/schemas/KeyBindingResult'
         count:
           type: integer
+        addressable_entity_types:
+          type: array
+          items:
+            type: string
       required:
+      - addressable_entity_types
       - count
       - results
     KeyBindingResult:

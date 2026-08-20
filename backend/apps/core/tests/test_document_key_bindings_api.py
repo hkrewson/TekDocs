@@ -182,6 +182,24 @@ def test_a_binding_name_that_could_never_appear_in_a_key_is_refused_by_the_api(i
             content_type="application/json",
         )
         assert response.status_code == 400, rejected
+        # The refusal must state the rule. A pattern-mismatch message sends an author
+        # back to the documentation to learn what they typed wrong; this one does not.
+        explanation = " ".join(response.json()["error"]["fields"]["name"])
+        assert "lowercase" in explanation, rejected
+
+
+@pytest.mark.django_db
+def test_the_binding_list_names_the_record_kinds_a_key_can_read(installation, owner_client):
+    organization = _organization(installation.tenant, "Addressable client")
+    document = _document(installation, organization, "Addressable runbook", "Text.")
+
+    body = owner_client.get(_bindings_url(organization, document)).json()
+
+    # The authoring surface offers only records a binding can actually target, and it
+    # learns which those are from here rather than from its own copy of the registry.
+    assert "client_asset" in body["addressable_entity_types"]
+    assert "document" not in body["addressable_entity_types"]
+    assert body["addressable_entity_types"] == sorted(body["addressable_entity_types"])
 
 
 @pytest.mark.django_db

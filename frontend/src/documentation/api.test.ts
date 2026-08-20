@@ -141,4 +141,35 @@ describe('documentation placement API client', () => {
     expect(browserDocumentsClient.publicationArtifactUrl(scope, 'doc', 'publication', 'artifact')).toContain('/publications/publication/artifacts/artifact/download')
     expect(browserDocumentsClient.publicationExportUrl(scope, 'doc', 'publication', 'docx')).toContain('/publications/publication/export?export_format=docx')
   })
+
+  it('repeats the field message a rejected request came back with', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+      error: { status: 400, code: 'validation_error', message: 'The request is invalid.', fields: { name: ['A binding name uses lowercase letters, digits and underscores, and starts with a letter.'] } },
+    }), { status: 400, headers: { 'Content-Type': 'application/json' } })))
+
+    await expect(browserDocumentsClient.declareKeyBinding({}, 'doc', 'Network', 'entity')).rejects.toThrow(
+      'A binding name uses lowercase letters, digits and underscores, and starts with a letter.',
+    )
+  })
+
+  it('repeats a coded refusal a view returned directly', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+      code: 'target_not_addressable', detail: 'Keys cannot yet read fields from this kind of record.',
+    }), { status: 400, headers: { 'Content-Type': 'application/json' } })))
+
+    await expect(browserDocumentsClient.declareKeyBinding({}, 'doc', 'subject', 'entity')).rejects.toThrow(
+      'Keys cannot yet read fields from this kind of record.',
+    )
+  })
+
+  it('stays generic when a rejected request explains nothing', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('<html>Bad Request</html>', { status: 400 })))
+
+    await expect(browserDocumentsClient.declareKeyBinding({}, 'doc', 'subject', 'entity')).rejects.toThrow(
+      'The documentation request was not completed.',
+    )
+  })
 })

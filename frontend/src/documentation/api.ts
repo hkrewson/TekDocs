@@ -320,7 +320,7 @@ export type WorkspaceKeyBinding = {
   target_entity_type: string
 }
 export type WorkspaceKeyBindingResult = { results: WorkspaceKeyBinding[]; count: number; has_more: boolean }
-export type DocumentKeyBindingResult = { results: DocumentKeyBinding[]; count: number }
+export type DocumentKeyBindingResult = { results: DocumentKeyBinding[]; count: number; addressable_entity_types: string[] }
 export type DocumentKeyState = 'resolved' | 'withheld' | 'unresolvable'
 export type DocumentKeyRow = { expression: string; state: DocumentKeyState; label: string; reason: string | null }
 export type DocumentKeyReport = { results: DocumentKeyRow[]; count: number; unresolved_count: number }
@@ -344,13 +344,44 @@ async function csrfToken() {
   return token
 }
 
+/** The sentence the server offered about why it refused, if it offered one.
+ *
+ * A refusal the server took the trouble to explain should reach the author rather
+ * than be replaced by a generic failure line one layer above. Two shapes carry an
+ * explanation: the API error envelope, whose `fields` map holds per-field validation
+ * messages, and a coded refusal returned directly by a view as `{ code, detail }`.
+ * Anything else stays generic, because an unrecognised body is as likely to be a
+ * proxy error page as a message worth showing.
+ */
+async function refusalDetail(response: Response): Promise<string | null> {
+  let payload: unknown
+  try {
+    payload = await response.clone().json()
+  } catch {
+    return null
+  }
+  if (typeof payload !== 'object' || payload === null) return null
+  const body = payload as { error?: { fields?: Record<string, string[]>; detail?: unknown }; detail?: unknown }
+  for (const messages of Object.values(body.error?.fields ?? {})) {
+    const first = messages.find((message) => typeof message === 'string' && message.trim())
+    if (first) return first
+  }
+  if (typeof body.error?.detail === 'string' && body.error.detail.trim()) return body.error.detail
+  if (typeof body.detail === 'string' && body.detail.trim()) return body.detail
+  return null
+}
+
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 409) {
-      const payload = await response.json() as RevisionConflictPayload | PlacementConflictPayload | PublicationConflictPayload
+      const payload = await response.clone().json() as RevisionConflictPayload | PlacementConflictPayload | PublicationConflictPayload
       if (payload.code === 'revision_conflict') throw new RevisionConflictError(payload)
       if (payload.code === 'placement_conflict') throw new AuthRequestError(payload.detail, 409)
       if (payload.code === 'publication_conflict') throw new AuthRequestError(payload.detail, 409)
+    }
+    if (response.status === 400) {
+      const detail = await refusalDetail(response)
+      if (detail) throw new AuthRequestError(detail, 400)
     }
     const message = response.status === 403
       ? 'Your account is not authorized to change documentation in this workspace.'

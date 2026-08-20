@@ -33,7 +33,7 @@ function clients() {
     also_bound_by: [{ id: 'doc-2', title: 'Escalation guide' }],
     created_at: '2026-08-15T00:00:00Z',
   }
-  const listKeyBindings = vi.fn().mockResolvedValue({ results: [keyBinding], count: 1 })
+  const listKeyBindings = vi.fn().mockResolvedValue({ results: [keyBinding], count: 1, addressable_entity_types: ['client_asset', 'network_device'] })
   const declareKeyBinding = vi.fn().mockResolvedValue(keyBinding)
   const archiveKeyBinding = vi.fn(() => Promise.resolve())
   const browseKeyBindings = vi.fn().mockResolvedValue({
@@ -539,6 +539,49 @@ it('declares a key binding, inserts a key, and reports what has not resolved', a
 
   await user.click(screen.getByRole('button', { name: 'Retire subject' }))
   expect(archiveKeyBinding).toHaveBeenCalledWith({}, 'doc-1', 'binding-1')
+})
+
+it('answers a binding name the server would refuse before the request is made', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, declareKeyBinding, searchMentionEntities } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+
+  // A capitalised word is the natural first guess and the grammar forbids it. Taking
+  // the capital out as it is typed keeps the field always in a state the server accepts.
+  await user.type(screen.getByLabelText('Declare'), 'Network')
+  expect(screen.getByLabelText<HTMLInputElement>('Declare').value).toBe('network')
+
+  await user.clear(screen.getByLabelText('Declare'))
+  await user.type(screen.getByLabelText('Declare'), '9 gateway')
+  expect(screen.getByLabelText('Declare')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByRole('alert')).toHaveTextContent('Use lowercase letters, digits and underscores')
+
+  await user.type(screen.getByRole('searchbox', { name: /TekDocs record/ }), 'Edge')
+  await waitFor(() => expect(searchMentionEntities).toHaveBeenCalled())
+  expect(await screen.findByRole('button', { name: /Router A/ })).toBeDisabled()
+  expect(declareKeyBinding).not.toHaveBeenCalled()
+})
+
+it('does not offer a record no key could read', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, searchMentionEntities } = clients()
+  searchMentionEntities.mockResolvedValue({
+    results: [{ id: 'entity-9', display_name: 'Onboarding guide', entity_type: 'document', workspace_label: 'Acme Dental' }],
+    page: 1, page_size: 20, count: 1, has_more: false,
+  })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+  await user.type(screen.getByLabelText('Declare'), 'guide')
+  await user.type(screen.getByRole('searchbox', { name: /TekDocs record/ }), 'Onboarding')
+
+  // The server names the record kinds a binding may target; the picker says so in place
+  // rather than letting the author discover it from a rejected request.
+  const option = await screen.findByRole('button', { name: /Onboarding guide/ })
+  expect(option).toBeDisabled()
+  expect(option).toHaveTextContent('Keys cannot read fields from this kind of record yet')
 })
 
 it('shows the blast radius of a bound record and finds bindings across the workspace', async () => {

@@ -8565,6 +8565,7 @@ export interface components {
         readonly KeyBindingList: {
             readonly results: readonly components["schemas"]["KeyBindingResult"][];
             readonly count: number;
+            readonly addressable_entity_types: readonly string[];
         };
         readonly KeyBindingResult: {
             /** Format: uuid */

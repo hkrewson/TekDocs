@@ -465,6 +465,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .entity-mention-picker button { width: 100%; display: grid; gap: 2px; padding: 9px; text-align: left; color: var(--text); background: transparent; border: 0; border-radius: 5px; cursor: pointer; }
 .entity-mention-picker button:hover { background: #eceae4; }
 .entity-mention-picker small { color: var(--muted); }
+.entity-mention-picker button:disabled { color: var(--muted); cursor: not-allowed; }
+.entity-mention-picker button:disabled:hover { background: transparent; }
+.entity-mention-picker .field-hint { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.entity-mention-picker .field-hint[role='alert'] { color: #6f2d22; }
 .reuse-impact { margin-top: 14px; padding: 14px; background: #f7f5ef; border: 1px solid var(--border-strong); border-radius: 8px; }
 .reuse-impact > ul { max-height: 260px; overflow: auto; margin: 0 0 12px; padding: 0; list-style: none; border-top: 1px solid var(--border); }
 .reuse-impact > ul li { min-height: 48px; }

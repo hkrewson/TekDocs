@@ -389,39 +389,39 @@ jobs:
             echo "renderer-digest=$renderer_digest"
           } >> "$GITHUB_OUTPUT"
       - name: Attest backend build provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.BACKEND_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.backend-digest }}
           push-to-registry: true
       - name: Attest frontend build provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.FRONTEND_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.frontend-digest }}
           push-to-registry: true
       - name: Attest diagram renderer build provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.RENDERER_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.renderer-digest }}
           push-to-registry: true
       - name: Attest backend SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.BACKEND_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.backend-digest }}
           sbom-path: backend-sbom.cdx.json
           push-to-registry: true
       - name: Attest frontend SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.FRONTEND_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.frontend-digest }}
           sbom-path: frontend-sbom.cdx.json
           push-to-registry: true
       - name: Attest diagram renderer SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.RENDERER_IMAGE }}
           subject-digest: ${{ steps.publish.outputs.renderer-digest }}

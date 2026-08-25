@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { vi } from 'vitest'
+import { afterAll, beforeAll, vi } from 'vitest'
 import { AuthRequestError } from '../auth/api'
 import type { Member } from '../access-control/api'
 import type { StaffAdministrationClient, StaffInvitation } from './api'
@@ -26,6 +26,13 @@ function client(overrides: Partial<StaffAdministrationClient> = {}): StaffAdmini
 }
 
 describe('staff administration', () => {
+  // These fixtures state absolute times, and a pending invitation stops offering
+  // Resend once it expires. Without a pinned clock the suite passes until the fixture
+  // date goes by and then fails on an unrelated commit, so freeze the clock rather
+  // than making the fixtures relative and untraceable.
+  beforeAll(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(new Date('2026-08-14T12:00:00Z')) })
+  afterAll(() => { vi.useRealTimers() })
+
   it('lists MSP members separately from invitation history and links to access control', async () => {
     render(<MemoryRouter><StaffAdministration client={client()} /></MemoryRouter>)
 

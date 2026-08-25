@@ -188,6 +188,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
 .section-heading h2 { margin: 0; font-size: 16px; }
 .section-heading span { color: var(--muted); font-size: 12px; }
+/* A heading's muted span colour must not reach a button placed in that heading: on a
+   filled button it lands as muted-on-accent, which fails contrast at 1.57:1. A button
+   always carries its own colour. */
+.section-heading button span { color: inherit; font-size: inherit; }
 .capability-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
 .capability-list li { padding: 12px 2px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .capability-list li:last-child { border-bottom: 0; }
@@ -1092,6 +1096,15 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .compliance-risk-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
 .compliance-risk-form label { display: grid; gap: 5px; }
 .compliance-risk-form .wide-field { grid-column: 1 / -1; }
+.compliance-data-flows .data-flow-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.compliance-data-flows .data-flow-history { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.data-flow-provenance { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; color: var(--muted); background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 999px; font-size: 10px; font-weight: 650; }
+.data-flow-provenance.recorded_fact { color: #45613c; background: #edf4e9; border-color: #b7ccb0; }
+.data-flow-provenance.imported_observation { color: #5a4a22; background: #f6f0e2; border-color: #d6c9a6; }
+/* A draft is the state a reader must not mistake for evidence, so it is the loudest
+   of the three and is never distinguished by colour alone: the pill also carries a
+   warning icon and the words "not evidence". */
+.data-flow-provenance.unverified_draft { color: #7a3328; background: #f8eae5; border-color: #dfb7aa; }
 .compliance-risk-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .compliance-risk-summary span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); }
 .compliance-risks td small { display: block; margin-top: 3px; color: var(--muted); }

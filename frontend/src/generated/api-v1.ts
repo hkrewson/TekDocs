@@ -2004,6 +2004,102 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/compliance/data-flow-snapshots": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flow_snapshots_list"];
+        readonly put?: never;
+        readonly post: operations["msp_data_flow_snapshots_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/data-flow-snapshots/{snapshot_id}/export/{export_format}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flow_snapshot_export"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/data-flows": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flows_list"];
+        readonly put?: never;
+        readonly post: operations["msp_data_flows_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/data-flows/{data_flow_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flow_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["msp_data_flow_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["msp_data_flow_revise"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/data-flows/{data_flow_entity_id}/revisions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flow_revisions_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/compliance/data-flows/choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_data_flow_choices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/compliance/evidence": {
         readonly parameters: {
             readonly query?: never;
@@ -3742,6 +3838,102 @@ export interface paths {
         readonly get: operations["organization_compliance_bundle_list"];
         readonly put?: never;
         readonly post: operations["organization_compliance_bundle_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flow-snapshots": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flow_snapshots_list"];
+        readonly put?: never;
+        readonly post: operations["organization_data_flow_snapshots_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flow-snapshots/{snapshot_id}/export/{export_format}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flow_snapshot_export"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flows_list"];
+        readonly put?: never;
+        readonly post: operations["organization_data_flows_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/{data_flow_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flow_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["organization_data_flow_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["organization_data_flow_revise"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/{data_flow_entity_id}/revisions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flow_revisions_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_data_flow_choices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -7352,6 +7544,165 @@ export interface components {
             readonly scope: "tenant" | "organization" | "collection";
             readonly permissions: readonly string[];
         };
+        readonly DataFlow: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly revision_count: number;
+            readonly current_revision: components["schemas"]["DataFlowRevision"] | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly DataFlowChoice: {
+            readonly value: string;
+            readonly label: string;
+        };
+        readonly DataFlowChoices: {
+            readonly endpoint_kinds: readonly components["schemas"]["DataFlowChoice"][];
+            readonly directions: readonly components["schemas"]["DataFlowChoice"][];
+            readonly transfer_mechanisms: readonly components["schemas"]["DataFlowChoice"][];
+            readonly data_classifications: readonly components["schemas"]["DataFlowChoice"][];
+            readonly protections: readonly components["schemas"]["DataFlowChoice"][];
+            readonly provenance_states: readonly components["schemas"]["DataFlowChoice"][];
+        };
+        readonly DataFlowResult: {
+            readonly results: readonly components["schemas"]["DataFlow"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
+        };
+        readonly DataFlowRevision: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly revision_number: number;
+            readonly source_kind: string;
+            /** Format: uuid */
+            readonly source_entity_id: string | null;
+            readonly source_display_name: string;
+            readonly source_label: string;
+            readonly destination_kind: string;
+            /** Format: uuid */
+            readonly destination_entity_id: string | null;
+            readonly destination_display_name: string;
+            readonly destination_label: string;
+            readonly direction: string;
+            readonly transfer_mechanism: string;
+            readonly data_classification: string;
+            readonly purpose: string;
+            readonly crosses_trust_boundary: boolean;
+            readonly protection: string;
+            /** Format: uuid */
+            readonly owner_entity_id: string | null;
+            readonly owner_display_name: string;
+            /** Format: date */
+            readonly review_due_on: string | null;
+            readonly provenance: string;
+            readonly content_digest: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly DataFlowRevisionResult: {
+            readonly results: readonly components["schemas"]["DataFlowRevision"][];
+            readonly count: number;
+        };
+        readonly DataFlowSnapshot: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly reason: string;
+            readonly flow_count: number;
+            readonly content_digest: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly DataFlowSnapshotResult: {
+            readonly results: readonly components["schemas"]["DataFlowSnapshot"][];
+            readonly count: number;
+            readonly can_manage: boolean;
+        };
+        readonly DataFlowSnapshotWrite: {
+            readonly title: string;
+            /** @default  */
+            readonly reason: string;
+        };
+        readonly DataFlowWrite: {
+            readonly name: string;
+            /**
+             * @description * `internal` - internal
+             *     * `external` - external
+             * @enum {string}
+             */
+            readonly source_kind: "internal" | "external";
+            /** Format: uuid */
+            readonly source_entity_id?: string | null;
+            /** @default  */
+            readonly source_label: string;
+            /**
+             * @description * `internal` - internal
+             *     * `external` - external
+             * @enum {string}
+             */
+            readonly destination_kind: "internal" | "external";
+            /** Format: uuid */
+            readonly destination_entity_id?: string | null;
+            /** @default  */
+            readonly destination_label: string;
+            /**
+             * @description * `one_way` - one_way
+             *     * `bidirectional` - bidirectional
+             * @enum {string}
+             */
+            readonly direction: "one_way" | "bidirectional";
+            /**
+             * @description * `api` - api
+             *     * `file_transfer` - file_transfer
+             *     * `database_replication` - database_replication
+             *     * `message_queue` - message_queue
+             *     * `email` - email
+             *     * `physical_media` - physical_media
+             *     * `manual_entry` - manual_entry
+             *     * `backup` - backup
+             *     * `other` - other
+             * @enum {string}
+             */
+            readonly transfer_mechanism: "api" | "file_transfer" | "database_replication" | "message_queue" | "email" | "physical_media" | "manual_entry" | "backup" | "other";
+            /**
+             * @description * `public` - public
+             *     * `internal` - internal
+             *     * `confidential` - confidential
+             *     * `restricted` - restricted
+             *     * `personal_data` - personal_data
+             *     * `special_category` - special_category
+             * @enum {string}
+             */
+            readonly data_classification: "public" | "internal" | "confidential" | "restricted" | "personal_data" | "special_category";
+            readonly purpose: string;
+            readonly crosses_trust_boundary: boolean;
+            /**
+             * @description * `none` - none
+             *     * `in_transit` - in_transit
+             *     * `at_rest` - at_rest
+             *     * `in_transit_and_at_rest` - in_transit_and_at_rest
+             *     * `unknown` - unknown
+             * @enum {string}
+             */
+            readonly protection: "none" | "in_transit" | "at_rest" | "in_transit_and_at_rest" | "unknown";
+            /** Format: uuid */
+            readonly owner_entity_id?: string | null;
+            /** Format: date */
+            readonly review_due_on?: string | null;
+            /**
+             * @description * `recorded_fact` - recorded_fact
+             *     * `imported_observation` - imported_observation
+             *     * `unverified_draft` - unverified_draft
+             * @enum {string}
+             */
+            readonly provenance: "recorded_fact" | "imported_observation" | "unverified_draft";
+        };
         readonly DefinitionVersionWrite: {
             readonly schema: unknown;
         };
@@ -8065,9 +8416,10 @@ export interface components {
              *     * `dns_record` - dns_record
              *     * `network_circuit` - network_circuit
              *     * `network_circuit_handoff` - network_circuit_handoff
+             *     * `data_flow` - data_flow
              * @enum {string}
              */
-            readonly entity_type: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff";
+            readonly entity_type: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "data_flow";
             /**
              * @description * `msp_private` - MSP private
              *     * `client_visible` - Client visible
@@ -9357,6 +9709,80 @@ export interface components {
             /** @default  */
             readonly description: string;
             readonly permissions?: readonly string[];
+        };
+        readonly PatchedDataFlowWrite: {
+            readonly name?: string;
+            /**
+             * @description * `internal` - internal
+             *     * `external` - external
+             * @enum {string}
+             */
+            readonly source_kind?: "internal" | "external";
+            /** Format: uuid */
+            readonly source_entity_id?: string | null;
+            /** @default  */
+            readonly source_label: string;
+            /**
+             * @description * `internal` - internal
+             *     * `external` - external
+             * @enum {string}
+             */
+            readonly destination_kind?: "internal" | "external";
+            /** Format: uuid */
+            readonly destination_entity_id?: string | null;
+            /** @default  */
+            readonly destination_label: string;
+            /**
+             * @description * `one_way` - one_way
+             *     * `bidirectional` - bidirectional
+             * @enum {string}
+             */
+            readonly direction?: "one_way" | "bidirectional";
+            /**
+             * @description * `api` - api
+             *     * `file_transfer` - file_transfer
+             *     * `database_replication` - database_replication
+             *     * `message_queue` - message_queue
+             *     * `email` - email
+             *     * `physical_media` - physical_media
+             *     * `manual_entry` - manual_entry
+             *     * `backup` - backup
+             *     * `other` - other
+             * @enum {string}
+             */
+            readonly transfer_mechanism?: "api" | "file_transfer" | "database_replication" | "message_queue" | "email" | "physical_media" | "manual_entry" | "backup" | "other";
+            /**
+             * @description * `public` - public
+             *     * `internal` - internal
+             *     * `confidential` - confidential
+             *     * `restricted` - restricted
+             *     * `personal_data` - personal_data
+             *     * `special_category` - special_category
+             * @enum {string}
+             */
+            readonly data_classification?: "public" | "internal" | "confidential" | "restricted" | "personal_data" | "special_category";
+            readonly purpose?: string;
+            readonly crosses_trust_boundary?: boolean;
+            /**
+             * @description * `none` - none
+             *     * `in_transit` - in_transit
+             *     * `at_rest` - at_rest
+             *     * `in_transit_and_at_rest` - in_transit_and_at_rest
+             *     * `unknown` - unknown
+             * @enum {string}
+             */
+            readonly protection?: "none" | "in_transit" | "at_rest" | "in_transit_and_at_rest" | "unknown";
+            /** Format: uuid */
+            readonly owner_entity_id?: string | null;
+            /** Format: date */
+            readonly review_due_on?: string | null;
+            /**
+             * @description * `recorded_fact` - recorded_fact
+             *     * `imported_observation` - imported_observation
+             *     * `unverified_draft` - unverified_draft
+             * @enum {string}
+             */
+            readonly provenance?: "recorded_fact" | "imported_observation" | "unverified_draft";
         };
         readonly PatchedDocumentPlacementUpdate: {
             /**
@@ -13421,8 +13847,9 @@ export interface operations {
                  *     * `dns_record` - dns_record
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
+                 *     * `data_flow` - data_flow
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "data_flow" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -13704,8 +14131,9 @@ export interface operations {
                  *     * `dns_record` - dns_record
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
+                 *     * `data_flow` - data_flow
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "data_flow" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -16343,6 +16771,246 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Bundle"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_snapshots_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowSnapshotResult"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_snapshots_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DataFlowSnapshotWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DataFlowSnapshotWrite"];
+                readonly "multipart/form-data": components["schemas"]["DataFlowSnapshotWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowSnapshot"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_snapshot_export: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly export_format: string;
+                readonly snapshot_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Retained snapshot download */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly msp_data_flows_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowResult"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flows_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DataFlowWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DataFlowWrite"];
+                readonly "multipart/form-data": components["schemas"]["DataFlowWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly msp_data_flow_revise: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedDataFlowWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedDataFlowWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedDataFlowWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_revisions_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowRevisionResult"];
+                };
+            };
+        };
+    };
+    readonly msp_data_flow_choices_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowChoices"];
                 };
             };
         };
@@ -20719,6 +21387,261 @@ export interface operations {
             };
         };
     };
+    readonly organization_data_flow_snapshots_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowSnapshotResult"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_snapshots_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DataFlowSnapshotWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DataFlowSnapshotWrite"];
+                readonly "multipart/form-data": components["schemas"]["DataFlowSnapshotWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowSnapshot"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_snapshot_export: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly export_format: string;
+                readonly organization_entity_id: string;
+                readonly snapshot_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Retained snapshot download */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly organization_data_flows_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowResult"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flows_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DataFlowWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DataFlowWrite"];
+                readonly "multipart/form-data": components["schemas"]["DataFlowWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly organization_data_flow_revise: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedDataFlowWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedDataFlowWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedDataFlowWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlow"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_revisions_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly data_flow_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowRevisionResult"];
+                };
+            };
+        };
+    };
+    readonly organization_data_flow_choices_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DataFlowChoices"];
+                };
+            };
+        };
+    };
     readonly organization_compliance_evidence_list: {
         readonly parameters: {
             readonly query?: {
@@ -22914,8 +23837,9 @@ export interface operations {
                  *     * `dns_record` - dns_record
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
+                 *     * `data_flow` - data_flow
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "data_flow" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -23589,8 +24513,9 @@ export interface operations {
                  *     * `dns_record` - dns_record
                  *     * `network_circuit` - network_circuit
                  *     * `network_circuit_handoff` - network_circuit_handoff
+                 *     * `data_flow` - data_flow
                  */
-                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "";
+                readonly entity_type?: "organization" | "person" | "site" | "location" | "document" | "document_attachment" | "client_asset" | "catalog_product" | "catalog_model" | "software_license" | "commercial_contract" | "credential_reference" | "registered_domain" | "certificate_endpoint" | "network_rack" | "network_device" | "network_vrf" | "network_vlan" | "network_subnet" | "network_interface" | "network_ip_address" | "network_mac_address" | "wireless_network" | "dns_zone" | "dns_record" | "network_circuit" | "network_circuit_handoff" | "data_flow" | "";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

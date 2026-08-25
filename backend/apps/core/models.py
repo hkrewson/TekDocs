@@ -6047,3 +6047,262 @@ class DocumentKeyBinding(TimestampedModel):
         # document's keys used to resolve against, which is the first question asked
         # when a document's values change meaning.
         raise ValidationError("Document key bindings must be archived")
+
+
+class DataFlowEndpointKind(models.TextChoices):
+    INTERNAL = "internal", "Internal record"
+    EXTERNAL = "external", "External party"
+
+
+class DataFlowDirection(models.TextChoices):
+    ONE_WAY = "one_way", "One way"
+    BIDIRECTIONAL = "bidirectional", "Bidirectional"
+
+
+class DataFlowTransfer(models.TextChoices):
+    API = "api", "API"
+    FILE_TRANSFER = "file_transfer", "File transfer"
+    DATABASE_REPLICATION = "database_replication", "Database replication"
+    MESSAGE_QUEUE = "message_queue", "Message queue"
+    EMAIL = "email", "Email"
+    PHYSICAL_MEDIA = "physical_media", "Physical media"
+    MANUAL_ENTRY = "manual_entry", "Manual entry"
+    BACKUP = "backup", "Backup"
+    OTHER = "other", "Other"
+
+
+class DataFlowClassification(models.TextChoices):
+    PUBLIC = "public", "Public"
+    INTERNAL = "internal", "Internal"
+    CONFIDENTIAL = "confidential", "Confidential"
+    RESTRICTED = "restricted", "Restricted"
+    PERSONAL_DATA = "personal_data", "Personal data"
+    SPECIAL_CATEGORY = "special_category", "Special category personal data"
+
+
+class DataFlowProtection(models.TextChoices):
+    NONE = "none", "No protection recorded"
+    IN_TRANSIT = "in_transit", "Encrypted in transit"
+    AT_REST = "at_rest", "Encrypted at rest"
+    IN_TRANSIT_AND_AT_REST = "in_transit_and_at_rest", "Encrypted in transit and at rest"
+    UNKNOWN = "unknown", "Unknown"
+
+
+class DataFlowProvenance(models.TextChoices):
+    """How much weight a reader may place on a flow record.
+
+    ADR 0088 requires views to distinguish recorded fact from imported observation and
+    unverified draft, because a plausible diagram is otherwise mistaken for evidence.
+    """
+
+    RECORDED_FACT = "recorded_fact", "Recorded fact"
+    IMPORTED_OBSERVATION = "imported_observation", "Imported observation"
+    UNVERIFIED_DRAFT = "unverified_draft", "Unverified draft"
+
+
+class DataFlow(TimestampedModel):
+    """Stable addressable identity for one Workspace-owned data flow."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="data_flows")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="data_flows")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="data_flows",
+        null=True,
+        blank=True,
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="data_flow_record")
+    current_revision = models.ForeignKey(
+        "DataFlowRevision",
+        on_delete=models.PROTECT,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_data_flows",
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "id")
+        indexes = [models.Index(fields=("workspace", "archived_at"), name="core_dataflow_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "data_flow"
+        ):
+            raise ValidationError("Data flow entity identity and scope must match")
+
+
+class DataFlowRevision(models.Model):
+    """One immutable statement of what a flow carried, between whom, and how.
+
+    Every field a reader would rely on lives here rather than on `DataFlow`, so a
+    changed classification or protection posture produces a new revision instead of
+    silently rewriting what earlier evidence asserted.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="data_flow_revisions")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="data_flow_revisions")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="data_flow_revisions",
+        null=True,
+        blank=True,
+    )
+    data_flow = models.ForeignKey(DataFlow, on_delete=models.PROTECT, related_name="revisions")
+    revision_number = models.PositiveIntegerField()
+    source_kind = models.CharField(max_length=16, choices=DataFlowEndpointKind.choices)
+    source_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="data_flow_sources", null=True, blank=True
+    )
+    source_label = models.CharField(max_length=240, blank=True)
+    destination_kind = models.CharField(max_length=16, choices=DataFlowEndpointKind.choices)
+    destination_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="data_flow_destinations", null=True, blank=True
+    )
+    destination_label = models.CharField(max_length=240, blank=True)
+    direction = models.CharField(max_length=16, choices=DataFlowDirection.choices)
+    transfer_mechanism = models.CharField(max_length=32, choices=DataFlowTransfer.choices)
+    data_classification = models.CharField(max_length=24, choices=DataFlowClassification.choices)
+    purpose = models.CharField(max_length=1000)
+    crosses_trust_boundary = models.BooleanField()
+    protection = models.CharField(max_length=32, choices=DataFlowProtection.choices)
+    owner_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="owned_data_flows", null=True, blank=True
+    )
+    review_due_on = models.DateField(null=True, blank=True)
+    provenance = models.CharField(max_length=24, choices=DataFlowProvenance.choices)
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_data_flow_revisions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-revision_number", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("data_flow", "revision_number"), name="data_flow_revision_unique"),
+            models.CheckConstraint(condition=models.Q(revision_number__gte=1), name="data_flow_revision_positive"),
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"), name="data_flow_revision_digest_valid"
+            ),
+            # An endpoint is either a record in this Workspace or a named outside party.
+            # Permitting both would let a label contradict the record it sits beside.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(source_kind="internal", source_entity__isnull=False, source_label="")
+                    | (models.Q(source_kind="external", source_entity__isnull=True) & ~models.Q(source_label=""))
+                ),
+                name="data_flow_revision_source_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(destination_kind="internal", destination_entity__isnull=False, destination_label="")
+                    | (
+                        models.Q(destination_kind="external", destination_entity__isnull=True)
+                        & ~models.Q(destination_label="")
+                    )
+                ),
+                name="data_flow_revision_destination_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(direction__in=DataFlowDirection.values), name="data_flow_revision_direction_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(transfer_mechanism__in=DataFlowTransfer.values),
+                name="data_flow_revision_transfer_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(data_classification__in=DataFlowClassification.values),
+                name="data_flow_revision_classification_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(protection__in=DataFlowProtection.values),
+                name="data_flow_revision_protection_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(provenance__in=DataFlowProvenance.values),
+                name="data_flow_revision_provenance_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_dataflowrev_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.data_flow_id} revision {self.revision_number}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Data flow revisions are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Data flow revisions are retained")
+
+
+class DataFlowSnapshot(models.Model):
+    """An immutable capture of the flows in force at one moment.
+
+    The payload holds each flow's exact revision identifier and asserted values rather
+    than a reference to its flow, so a later revision cannot change what a retained
+    snapshot said. This is the same guarantee `DocumentPublication` gives a document.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="data_flow_snapshots")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="data_flow_snapshots")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="data_flow_snapshots", null=True, blank=True
+    )
+    title = models.CharField(max_length=240)
+    reason = models.CharField(max_length=1000, blank=True)
+    flows = models.JSONField()
+    flow_count = models.PositiveIntegerField()
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_data_flow_snapshots"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"), name="data_flow_snapshot_digest_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_dataflowsnap_idx")]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Data flow snapshots are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Data flow snapshots are retained")

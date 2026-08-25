@@ -20,7 +20,32 @@ MAX_SOURCE_CHARACTERS = 50_000
 MAX_SVG_BYTES = 2 * 1024 * 1024
 MAX_PNG_BYTES = 5 * 1024 * 1024
 MAX_ACTIVE_JOBS = 8
-RENDERER_VERSION = "@mermaid-js/mermaid-cli@11.16.0"
+#: The renderer identifies its own version; this module does not keep a second copy to
+#: compare against. A duplicated constant cannot be updated by a dependency bump, so it
+#: would silently attest the wrong renderer in a signed manifest while every check still
+#: passed. What is enforced here is the shape of the report, not its value.
+RENDERER_REPORT = re.compile(r"^@mermaid-js/mermaid-cli@[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$")
+
+#: Recorded when no renderer ran. Naming a version here would claim a render that did
+#: not happen.
+UNRENDERED_VERSION = "not-rendered"
+
+#: The failures the isolated renderer can report. The code is matched against this set
+#: before it reaches an error message: the renderer is a separate process writing a file,
+#: so its output is input, and unvalidated input does not get interpolated into text an
+#: operator will read as authoritative.
+RENDERER_FAILURE_CODES = frozenset(
+    {
+        "invalid_request",
+        "render_failed",
+        "renderer_timeout",
+        "incomplete_render",
+        "oversized_render",
+        "raster_failed",
+        "incomplete_raster",
+        "oversized_raster",
+    }
+)
 _MARKDOWN = MarkdownIt("commonmark", {"html": False})
 _TITLE = re.compile(r"^\s*accTitle:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 _DESCRIPTION = re.compile(r"^\s*accDescr:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
@@ -150,7 +175,7 @@ def diagram_sources(markdown: str) -> tuple[DiagramSource, ...]:
     return tuple(values)
 
 
-def _sanitize_svg(content: bytes) -> bytes:
+def sanitize_svg(content: bytes) -> bytes:
     if len(content) > MAX_SVG_BYTES:
         raise DiagramRenderError("A rendered diagram exceeds the SVG size limit.")
     try:
@@ -186,9 +211,28 @@ def _sanitize_svg(content: bytes) -> bytes:
     return encoded
 
 
+def _rejected_detail(result: object, *, expected_count: int) -> str | None:
+    """What to report about a renderer result, or None when it is a successful render.
+
+    The renderer is a separate process writing a file, so its result is input. A code is
+    repeated only when it is one this module knows; anything else is reported as
+    unrecognised rather than interpolated into a message an operator reads as
+    authoritative.
+    """
+
+    if not isinstance(result, dict):
+        return "unrecognised result"
+    if result.get("status") != "ok" or result.get("count") != expected_count:
+        reported = result.get("code")
+        return reported if reported in RENDERER_FAILURE_CODES else "unrecognised result"
+    if not RENDERER_REPORT.fullmatch(str(result.get("renderer", ""))):
+        return "unrecognised renderer version"
+    return None
+
+
 def _fallback(sources: tuple[DiagramSource, ...]) -> tuple[DiagramExportArtifact, ...]:
     return tuple(
-        DiagramExportArtifact(source=source, state="text_fallback", renderer_version=RENDERER_VERSION)
+        DiagramExportArtifact(source=source, state="text_fallback", renderer_version=UNRENDERED_VERSION)
         for source in sources
     )
 
@@ -235,11 +279,14 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
         if not result_path.is_file():
             raise DiagramRenderError("The isolated diagram renderer timed out.")
         result = json.loads(result_path.read_text(encoding="utf-8"))
-        if result != {"status": "ok", "count": len(sources), "renderer": RENDERER_VERSION}:
-            raise DiagramRenderError("The isolated diagram renderer rejected the diagram.")
+        detail = _rejected_detail(result, expected_count=len(sources))
+        if detail is not None:
+            raise DiagramRenderError(f"The isolated diagram renderer rejected the diagram: {detail}.")
+        # Validated above, so this is the version that actually produced the bytes below.
+        renderer_version = str(result["renderer"])
         artifacts: list[DiagramExportArtifact] = []
         for source in sources:
-            svg = _sanitize_svg((job / f"output-{source.index}.svg").read_bytes())
+            svg = sanitize_svg((job / f"output-{source.index}.svg").read_bytes())
             png = (job / f"output-{source.index}.png").read_bytes()
             if not png.startswith(b"\x89PNG\r\n\x1a\n") or len(png) > MAX_PNG_BYTES:
                 raise DiagramRenderError("The diagram renderer returned invalid PNG output.")
@@ -247,15 +294,23 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
                 DiagramExportArtifact(
                     source=source,
                     state="rendered",
-                    renderer_version=RENDERER_VERSION,
+                    renderer_version=renderer_version,
                     svg=svg,
                     png=png,
                 )
             )
         return tuple(artifacts)
-    except (DiagramRenderError, OSError, ValueError, json.JSONDecodeError):
+    except (DiagramRenderError, OSError, ValueError, json.JSONDecodeError) as error:
         if required:
-            raise DiagramRenderError("A required diagram could not be rendered reproducibly.") from None
+            # This catches five operationally different failures — the renderer timing
+            # out, rejecting the diagram, returning invalid PNG or unsafe SVG, and plain
+            # I/O. Collapsing them into one sentence sends an operator to read the source
+            # to find out which happened. A DiagramRenderError already carries curated
+            # text; anything else is named by type only, so a filesystem path from an
+            # OSError never reaches the caller. The cause is still suppressed rather than
+            # chained, because exception text must not reach logs.
+            cause = str(error) if isinstance(error, DiagramRenderError) else type(error).__name__
+            raise DiagramRenderError(f"A required diagram could not be rendered: {cause}") from None
         return _fallback(sources)
     finally:
         shutil.rmtree(job, ignore_errors=True)

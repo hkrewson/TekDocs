@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from importlib import import_module
 
 import psycopg
@@ -18,11 +19,14 @@ from apps.accounts.models import (
     User,
 )
 from apps.core.custom_fields import create_definition
+from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
 from apps.core.documents import create_document
 from apps.core.models import (
     AuditEvent,
     BlockRevision,
     CustomFieldDefinition,
+    DataFlowRevision,
+    DataFlowSnapshot,
     Entity,
     EntityLink,
     InstallationState,
@@ -38,6 +42,7 @@ from apps.core.people import create_person
 from apps.core.rls_contract import RLS_TABLES
 from apps.core.scoping import DataScope
 from apps.core.sites import archive_site, create_location, create_site
+from apps.core.workspaces import resolve_organization_workspace
 
 legacy_scope_helper_migration = import_module("apps.core.migrations.0109_restrict_legacy_scope_helpers")
 LEGACY_SCOPE_FUNCTIONS = legacy_scope_helper_migration.LEGACY_SCOPE_FUNCTIONS
@@ -129,6 +134,9 @@ DOCUMENT_RLS_TABLES = {
     "core_relationshipgraphview",
     "core_relationshipgraphsnapshot",
     "core_documentkeybinding",
+    "core_dataflow",
+    "core_dataflowrevision",
+    "core_dataflowsnapshot",
 }
 
 
@@ -450,8 +458,7 @@ def test_legacy_scope_helper_privileges_reverse_and_reapply():
     with connection.cursor() as cursor:
         cursor.execute(
             sql.SQL(
-                "CREATE ROLE {} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-                "NOINHERIT NOBYPASSRLS PASSWORD %s"
+                "CREATE ROLE {} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD %s"
             ).format(sql.Identifier(role_name)),
             [password],
         )
@@ -503,3 +510,97 @@ def test_legacy_scope_helper_privileges_reverse_and_reapply():
             cursor.execute(LEGACY_SCOPE_HELPERS_FORWARD_SQL)
             cursor.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(role_name)))
             cursor.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role_name)))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_newest_guard_migration_reverses_and_reapplies_without_losing_retained_evidence(
+    migration_head_restored,
+):
+    """Reverse only the newest guard migration, not the whole history.
+
+    The deep reversal above targets `core 0019`, which predates the data-flow tables, so
+    it drops them by design and can say nothing about their contents. What can be
+    proven — and is the operationally relevant case, since it is what a failed upgrade
+    actually rolls back — is that un-applying the newest guard migration and reapplying
+    it leaves retained evidence byte-identical and its protections restored.
+    """
+
+    if connection.vendor != "postgresql":
+        pytest.skip("Migration guard validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Guard Cycle MSP",
+        owner_email=f"guard-cycle-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Guard Cycle Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = create_organization(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        name="Guard Cycle Client",
+        legal_name="Guard Cycle Client, Inc.",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    workspace = resolve_organization_workspace(result.owner, entity_id=organization.entity_id)
+    flow = create_data_flow(
+        workspace=workspace,
+        actor_id=result.owner.id,
+        value=DataFlowInput(
+            name="Guarded billing export",
+            source_kind="external",
+            source_label="Practice vendor",
+            destination_kind="external",
+            destination_label="Payment processor",
+            direction="one_way",
+            transfer_mechanism="api",
+            data_classification="personal_data",
+            purpose="Settle billing.",
+            crosses_trust_boundary=True,
+            protection="in_transit_and_at_rest",
+            provenance="recorded_fact",
+        ),
+    )
+    snapshot = create_data_flow_snapshot(workspace=workspace, actor_id=result.owner.id, title="Guarded snapshot")
+    retained = {
+        "revision_digest": DataFlowRevision.objects.get(data_flow=flow).content_digest,
+        "snapshot_digest": snapshot.content_digest,
+        "snapshot_flows": snapshot.flows,
+    }
+
+    call_command("migrate", "core", "0122_data_flow_snapshots", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM pg_trigger WHERE tgname = 'core_dataflowsnap_validate'",
+        )
+        assert cursor.fetchone() == (0,)
+        cursor.execute(
+            "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'core_dataflowsnapshot'",
+        )
+        # Both flags, not just one: `DISABLE ROW LEVEL SECURITY` alone leaves FORCE set,
+        # which is drift a fresh install at this revision would not carry.
+        assert cursor.fetchone() == (False, False)
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+
+    preserved_revision = DataFlowRevision.objects.get(data_flow__entity_id=flow.entity_id)
+    preserved_snapshot = DataFlowSnapshot.objects.get(id=snapshot.id)
+    assert preserved_revision.content_digest == retained["revision_digest"]
+    assert preserved_revision.data_classification == "personal_data"
+    assert preserved_revision.protection == "in_transit_and_at_rest"
+    assert preserved_revision.crosses_trust_boundary is True
+    # A snapshot that survives with a digest no longer matching its payload is worse
+    # than one that is missing: it still reads as authoritative.
+    assert preserved_snapshot.content_digest == retained["snapshot_digest"]
+    assert preserved_snapshot.flows == retained["snapshot_flows"]
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM pg_trigger WHERE tgname = 'core_dataflowsnap_validate'")
+        assert cursor.fetchone() == (1,)
+        cursor.execute(
+            "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE relname = 'core_dataflowsnapshot'"
+        )
+        assert cursor.fetchone() == (True,)
+    with pytest.raises(DatabaseError), transaction.atomic():
+        DataFlowSnapshot.objects.filter(id=snapshot.id).update(title="Rewritten after reapply")

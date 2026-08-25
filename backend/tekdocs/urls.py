@@ -96,6 +96,20 @@ from apps.core.custom_field_views import (
     OrganizationEntityCustomFieldDetailView,
     OrganizationEntityCustomFieldListView,
 )
+from apps.core.data_flow_views import (
+    MSPDataFlowChoicesView,
+    MSPDataFlowDetailView,
+    MSPDataFlowListCreateView,
+    MSPDataFlowRevisionListView,
+    MSPDataFlowSnapshotExportView,
+    MSPDataFlowSnapshotListCreateView,
+    OrganizationDataFlowChoicesView,
+    OrganizationDataFlowDetailView,
+    OrganizationDataFlowListCreateView,
+    OrganizationDataFlowRevisionListView,
+    OrganizationDataFlowSnapshotExportView,
+    OrganizationDataFlowSnapshotListCreateView,
+)
 from apps.core.document_key_views import (
     MSPDocumentKeyBindingDetailView,
     MSPDocumentKeyBindingListCreateView,
@@ -809,6 +823,36 @@ urlpatterns = [
         "api/v1/workspaces/msp/compliance/evidence",
         MSPComplianceEvidenceListCreateView.as_view(),
         name="msp-compliance-evidence-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flows",
+        MSPDataFlowListCreateView.as_view(),
+        name="msp-data-flows",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flows/choices",
+        MSPDataFlowChoicesView.as_view(),
+        name="msp-data-flow-choices",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flows/<uuid:data_flow_entity_id>",
+        MSPDataFlowDetailView.as_view(),
+        name="msp-data-flow-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flows/<uuid:data_flow_entity_id>/revisions",
+        MSPDataFlowRevisionListView.as_view(),
+        name="msp-data-flow-revisions",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flow-snapshots",
+        MSPDataFlowSnapshotListCreateView.as_view(),
+        name="msp-data-flow-snapshots",
+    ),
+    path(
+        "api/v1/workspaces/msp/compliance/data-flow-snapshots/<uuid:snapshot_id>/export/<str:export_format>",
+        MSPDataFlowSnapshotExportView.as_view(),
+        name="msp-data-flow-snapshot-export",
     ),
     path(
         "api/v1/workspaces/msp/compliance/evidence/<uuid:evidence_entity_id>/review",
@@ -1894,6 +1938,36 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/evidence",
         OrganizationComplianceEvidenceListCreateView.as_view(),
         name="organization-compliance-evidence-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flows",
+        OrganizationDataFlowListCreateView.as_view(),
+        name="organization-data-flows",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flows/choices",
+        OrganizationDataFlowChoicesView.as_view(),
+        name="organization-data-flow-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flows/<uuid:data_flow_entity_id>",
+        OrganizationDataFlowDetailView.as_view(),
+        name="organization-data-flow-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flows/<uuid:data_flow_entity_id>/revisions",
+        OrganizationDataFlowRevisionListView.as_view(),
+        name="organization-data-flow-revisions",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flow-snapshots",
+        OrganizationDataFlowSnapshotListCreateView.as_view(),
+        name="organization-data-flow-snapshots",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/data-flow-snapshots/<uuid:snapshot_id>/export/<str:export_format>",
+        OrganizationDataFlowSnapshotExportView.as_view(),
+        name="organization-data-flow-snapshot-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/evidence/<uuid:evidence_entity_id>/review",

@@ -52,6 +52,7 @@ SEARCHABLE_ENTITY_TYPES = (
     "dns_record",
     "network_circuit",
     "network_circuit_handoff",
+    "data_flow",
 )
 
 ENTITY_TYPE_VIEW_PERMISSION = {
@@ -82,6 +83,9 @@ ENTITY_TYPE_VIEW_PERMISSION = {
     "dns_record": PermissionKey.NETWORKS_VIEW,
     "network_circuit": PermissionKey.NETWORKS_VIEW,
     "network_circuit_handoff": PermissionKey.NETWORKS_VIEW,
+    # Data flows carry their own delegable permission rather than borrowing
+    # compliance's, so citing one as evidence cannot widen who can read it.
+    "data_flow": PermissionKey.DATA_FLOWS_VIEW,
 }
 
 

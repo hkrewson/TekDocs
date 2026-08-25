@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.32
+  version: 0.8.38
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -3185,9 +3185,10 @@ paths:
           - dns_record
           - network_circuit
           - network_circuit_handoff
+          - data_flow
           - ''
           type: string
-          x-spec-enum-id: dba9bff246645ca2
+          x-spec-enum-id: b3e6e21d777f2bd8
           default: ''
         description: |-
           * `organization` - organization
@@ -3217,6 +3218,7 @@ paths:
           * `dns_record` - dns_record
           * `network_circuit` - network_circuit
           * `network_circuit_handoff` - network_circuit_handoff
+          * `data_flow` - data_flow
       - in: query
         name: page
         schema:
@@ -3573,9 +3575,10 @@ paths:
           - dns_record
           - network_circuit
           - network_circuit_handoff
+          - data_flow
           - ''
           type: string
-          x-spec-enum-id: dba9bff246645ca2
+          x-spec-enum-id: b3e6e21d777f2bd8
           default: ''
         description: |-
           * `organization` - organization
@@ -3605,6 +3608,7 @@ paths:
           * `dns_record` - dns_record
           * `network_circuit` - network_circuit
           * `network_circuit_handoff` - network_circuit_handoff
+          * `data_flow` - data_flow
       - in: query
         name: page
         schema:
@@ -6801,6 +6805,294 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Bundle'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flow-snapshots:
+    get:
+      operationId: msp_data_flow_snapshots_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowSnapshotResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_data_flow_snapshots_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flow-snapshots/{snapshot_id}/export/{export_format}:
+    get:
+      operationId: msp_data_flow_snapshot_export
+      parameters:
+      - in: path
+        name: export_format
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: snapshot_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Retained snapshot download
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flows:
+    get:
+      operationId: msp_data_flows_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: msp_data_flows_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flows/{data_flow_entity_id}:
+    get:
+      operationId: msp_data_flow_retrieve
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    patch:
+      operationId: msp_data_flow_revise
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: msp_data_flow_archive
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flows/{data_flow_entity_id}/revisions:
+    get:
+      operationId: msp_data_flow_revisions_list
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowRevisionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/compliance/data-flows/choices:
+    get:
+      operationId: msp_data_flow_choices_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowChoices'
           description: ''
           headers:
             X-Request-ID:
@@ -12576,6 +12868,358 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flow-snapshots:
+    get:
+      operationId: organization_data_flow_snapshots_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowSnapshotResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_data_flow_snapshots_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataFlowSnapshotWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowSnapshot'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flow-snapshots/{snapshot_id}/export/{export_format}
+  : get:
+      operationId: organization_data_flow_snapshot_export
+      parameters:
+      - in: path
+        name: export_format
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: snapshot_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Retained snapshot download
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows:
+    get:
+      operationId: organization_data_flows_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: organization_data_flows_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataFlowWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/{data_flow_entity_id}:
+    get:
+      operationId: organization_data_flow_retrieve
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    patch:
+      operationId: organization_data_flow_revise
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDataFlowWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: organization_data_flow_archive
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/{data_flow_entity_id}/revisions:
+    get:
+      operationId: organization_data_flow_revisions_list
+      parameters:
+      - in: path
+        name: data_flow_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowRevisionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/compliance/data-flows/choices:
+    get:
+      operationId: organization_data_flow_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFlowChoices'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/compliance/evidence:
     get:
       operationId: organization_compliance_evidence_list
@@ -15788,9 +16432,10 @@ paths:
           - dns_record
           - network_circuit
           - network_circuit_handoff
+          - data_flow
           - ''
           type: string
-          x-spec-enum-id: dba9bff246645ca2
+          x-spec-enum-id: b3e6e21d777f2bd8
           default: ''
         description: |-
           * `organization` - organization
@@ -15820,6 +16465,7 @@ paths:
           * `dns_record` - dns_record
           * `network_circuit` - network_circuit
           * `network_circuit_handoff` - network_circuit_handoff
+          * `data_flow` - data_flow
       - in: path
         name: organization_entity_id
         schema:
@@ -16763,9 +17409,10 @@ paths:
           - dns_record
           - network_circuit
           - network_circuit_handoff
+          - data_flow
           - ''
           type: string
-          x-spec-enum-id: dba9bff246645ca2
+          x-spec-enum-id: b3e6e21d777f2bd8
           default: ''
         description: |-
           * `organization` - organization
@@ -16795,6 +17442,7 @@ paths:
           * `dns_record` - dns_record
           * `network_circuit` - network_circuit
           * `network_circuit_handoff` - network_circuit_handoff
+          * `data_flow` - data_flow
       - in: path
         name: organization_entity_id
         schema:
@@ -24918,6 +25566,387 @@ components:
       - name
       - permissions
       - scope
+    DataFlow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        revision_count:
+          type: integer
+          readOnly: true
+        current_revision:
+          allOf:
+          - $ref: '#/components/schemas/DataFlowRevision'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - current_revision
+      - id
+      - name
+      - revision_count
+      - updated_at
+    DataFlowChoice:
+      type: object
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+      required:
+      - label
+      - value
+    DataFlowChoices:
+      type: object
+      properties:
+        endpoint_kinds:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+        directions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+        transfer_mechanisms:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+        data_classifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+        protections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+        provenance_states:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowChoice'
+      required:
+      - data_classifications
+      - directions
+      - endpoint_kinds
+      - protections
+      - provenance_states
+      - transfer_mechanisms
+    DataFlowResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlow'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    DataFlowRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+        source_kind:
+          type: string
+        source_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_display_name:
+          type: string
+          readOnly: true
+        source_label:
+          type: string
+        destination_kind:
+          type: string
+        destination_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        destination_display_name:
+          type: string
+          readOnly: true
+        destination_label:
+          type: string
+        direction:
+          type: string
+        transfer_mechanism:
+          type: string
+        data_classification:
+          type: string
+        purpose:
+          type: string
+        crosses_trust_boundary:
+          type: boolean
+        protection:
+          type: string
+        owner_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_display_name:
+          type: string
+          readOnly: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        provenance:
+          type: string
+        content_digest:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - content_digest
+      - created_at
+      - crosses_trust_boundary
+      - data_classification
+      - destination_display_name
+      - destination_entity_id
+      - destination_kind
+      - destination_label
+      - direction
+      - id
+      - owner_display_name
+      - owner_entity_id
+      - protection
+      - provenance
+      - purpose
+      - review_due_on
+      - revision_number
+      - source_display_name
+      - source_entity_id
+      - source_kind
+      - source_label
+      - transfer_mechanism
+    DataFlowRevisionResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowRevision'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    DataFlowSnapshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        reason:
+          type: string
+        flow_count:
+          type: integer
+        content_digest:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - content_digest
+      - created_at
+      - flow_count
+      - id
+      - reason
+      - title
+    DataFlowSnapshotResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFlowSnapshot'
+        count:
+          type: integer
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - results
+    DataFlowSnapshotWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        reason:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - title
+    DataFlowWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        source_kind:
+          enum:
+          - internal
+          - external
+          type: string
+          description: |-
+            * `internal` - internal
+            * `external` - external
+          x-spec-enum-id: 686043d1f4a6ac24
+        source_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_label:
+          type: string
+          default: ''
+          maxLength: 240
+        destination_kind:
+          enum:
+          - internal
+          - external
+          type: string
+          description: |-
+            * `internal` - internal
+            * `external` - external
+          x-spec-enum-id: 686043d1f4a6ac24
+        destination_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        destination_label:
+          type: string
+          default: ''
+          maxLength: 240
+        direction:
+          enum:
+          - one_way
+          - bidirectional
+          type: string
+          description: |-
+            * `one_way` - one_way
+            * `bidirectional` - bidirectional
+          x-spec-enum-id: 26b2a543c1809edf
+        transfer_mechanism:
+          enum:
+          - api
+          - file_transfer
+          - database_replication
+          - message_queue
+          - email
+          - physical_media
+          - manual_entry
+          - backup
+          - other
+          type: string
+          description: |-
+            * `api` - api
+            * `file_transfer` - file_transfer
+            * `database_replication` - database_replication
+            * `message_queue` - message_queue
+            * `email` - email
+            * `physical_media` - physical_media
+            * `manual_entry` - manual_entry
+            * `backup` - backup
+            * `other` - other
+          x-spec-enum-id: 1b98619e509d9845
+        data_classification:
+          enum:
+          - public
+          - internal
+          - confidential
+          - restricted
+          - personal_data
+          - special_category
+          type: string
+          description: |-
+            * `public` - public
+            * `internal` - internal
+            * `confidential` - confidential
+            * `restricted` - restricted
+            * `personal_data` - personal_data
+            * `special_category` - special_category
+          x-spec-enum-id: 031d28efcd5a2bff
+        purpose:
+          type: string
+          maxLength: 1000
+        crosses_trust_boundary:
+          type: boolean
+        protection:
+          enum:
+          - none
+          - in_transit
+          - at_rest
+          - in_transit_and_at_rest
+          - unknown
+          type: string
+          description: |-
+            * `none` - none
+            * `in_transit` - in_transit
+            * `at_rest` - at_rest
+            * `in_transit_and_at_rest` - in_transit_and_at_rest
+            * `unknown` - unknown
+          x-spec-enum-id: b0d315911f3d19f2
+        owner_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        provenance:
+          enum:
+          - recorded_fact
+          - imported_observation
+          - unverified_draft
+          type: string
+          description: |-
+            * `recorded_fact` - recorded_fact
+            * `imported_observation` - imported_observation
+            * `unverified_draft` - unverified_draft
+          x-spec-enum-id: bbd05ef93f5e6e5a
+      required:
+      - crosses_trust_boundary
+      - data_classification
+      - destination_kind
+      - direction
+      - name
+      - protection
+      - provenance
+      - purpose
+      - source_kind
+      - transfer_mechanism
     DefinitionVersionWrite:
       type: object
       properties:
@@ -26577,6 +27606,7 @@ components:
           - dns_record
           - network_circuit
           - network_circuit_handoff
+          - data_flow
           type: string
           description: |-
             * `organization` - organization
@@ -26606,7 +27636,8 @@ components:
             * `dns_record` - dns_record
             * `network_circuit` - network_circuit
             * `network_circuit_handoff` - network_circuit_handoff
-          x-spec-enum-id: dba9bff246645ca2
+            * `data_flow` - data_flow
+          x-spec-enum-id: b3e6e21d777f2bd8
         visibility:
           enum:
           - msp_private
@@ -29676,6 +30707,134 @@ components:
           items:
             type: string
             maxLength: 80
+    PatchedDataFlowWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        source_kind:
+          enum:
+          - internal
+          - external
+          type: string
+          description: |-
+            * `internal` - internal
+            * `external` - external
+          x-spec-enum-id: 686043d1f4a6ac24
+        source_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_label:
+          type: string
+          default: ''
+          maxLength: 240
+        destination_kind:
+          enum:
+          - internal
+          - external
+          type: string
+          description: |-
+            * `internal` - internal
+            * `external` - external
+          x-spec-enum-id: 686043d1f4a6ac24
+        destination_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        destination_label:
+          type: string
+          default: ''
+          maxLength: 240
+        direction:
+          enum:
+          - one_way
+          - bidirectional
+          type: string
+          description: |-
+            * `one_way` - one_way
+            * `bidirectional` - bidirectional
+          x-spec-enum-id: 26b2a543c1809edf
+        transfer_mechanism:
+          enum:
+          - api
+          - file_transfer
+          - database_replication
+          - message_queue
+          - email
+          - physical_media
+          - manual_entry
+          - backup
+          - other
+          type: string
+          description: |-
+            * `api` - api
+            * `file_transfer` - file_transfer
+            * `database_replication` - database_replication
+            * `message_queue` - message_queue
+            * `email` - email
+            * `physical_media` - physical_media
+            * `manual_entry` - manual_entry
+            * `backup` - backup
+            * `other` - other
+          x-spec-enum-id: 1b98619e509d9845
+        data_classification:
+          enum:
+          - public
+          - internal
+          - confidential
+          - restricted
+          - personal_data
+          - special_category
+          type: string
+          description: |-
+            * `public` - public
+            * `internal` - internal
+            * `confidential` - confidential
+            * `restricted` - restricted
+            * `personal_data` - personal_data
+            * `special_category` - special_category
+          x-spec-enum-id: 031d28efcd5a2bff
+        purpose:
+          type: string
+          maxLength: 1000
+        crosses_trust_boundary:
+          type: boolean
+        protection:
+          enum:
+          - none
+          - in_transit
+          - at_rest
+          - in_transit_and_at_rest
+          - unknown
+          type: string
+          description: |-
+            * `none` - none
+            * `in_transit` - in_transit
+            * `at_rest` - at_rest
+            * `in_transit_and_at_rest` - in_transit_and_at_rest
+            * `unknown` - unknown
+          x-spec-enum-id: b0d315911f3d19f2
+        owner_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        provenance:
+          enum:
+          - recorded_fact
+          - imported_observation
+          - unverified_draft
+          type: string
+          description: |-
+            * `recorded_fact` - recorded_fact
+            * `imported_observation` - imported_observation
+            * `unverified_draft` - unverified_draft
+          x-spec-enum-id: bbd05ef93f5e6e5a
     PatchedDocumentPlacementUpdate:
       type: object
       properties:

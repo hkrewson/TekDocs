@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
+from .data_flows import data_flow_projection
 from .diagram_exports import (
     DiagramExportArtifact,
     diagram_manifest,
@@ -136,9 +137,7 @@ def _refuse_unfrozen_keys(markdown: str) -> None:
     lands, without weakening anything in the meantime.
     """
     keys, unparsable = keys_in_markdown(markdown)
-    named = [key.expression for key in keys] + [
-        target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable
-    ]
+    named = [key.expression for key in keys] + [target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable]
     if named:
         raise PublicationConflict(
             "This document resolves keys from linked records, which cannot yet be frozen into a "
@@ -277,7 +276,10 @@ def publish_document(
             try:
                 diagrams = render_diagram_exports(resolved.markdown, required=True)
             except ValueError as exc:
-                raise PublicationConflict("A required diagram could not be rendered reproducibly.") from exc
+                # `render_diagram_exports` now names which of its failures occurred;
+                # repeating that is what lets an author tell a renderer timeout from a
+                # diagram the sanitizer refused.
+                raise PublicationConflict(str(exc)) from exc
             sanitized_html = render_markdown(
                 resolved.markdown,
                 entity_mentions=rendered_entities,  # type: ignore[arg-type]
@@ -366,6 +368,16 @@ def publish_document(
                 )
 
             organization = locked_document.organization
+            # Retained evidence states where data went at the moment of publication.
+            # A client-visible artifact carries only flows whose anchor is itself
+            # client-visible; flows are anchored MSP-private on creation, so this
+            # excludes by default rather than including by default.
+            data_flows_projection = data_flow_projection(
+                workspace=workspace,
+                related_visibility=(
+                    EntityVisibility.CLIENT_VISIBLE if audience == PublicationAudience.CLIENT_VISIBLE else None
+                ),
+            )
             relationship_graph = relationship_graph_projection(
                 workspace=workspace,
                 family="document",
@@ -373,9 +385,7 @@ def publish_document(
                 depth=3,
                 edge_limit=200,
                 related_visibility=(
-                    EntityVisibility.CLIENT_VISIBLE
-                    if audience == PublicationAudience.CLIENT_VISIBLE
-                    else None
+                    EntityVisibility.CLIENT_VISIBLE if audience == PublicationAudience.CLIENT_VISIBLE else None
                 ),
             )
             manifest: dict[str, Any] = {
@@ -414,6 +424,7 @@ def publish_document(
                 "attachments": attachment_records,
                 "diagrams": diagram_records,
                 "relationship_graph": relationship_graph,
+                "data_flows": data_flows_projection,
                 "artifacts": [_artifact_descriptor(artifact) for artifact in pending_artifacts],
             }
             payload = snapshot_payload(manifest=manifest, markdown=resolved.markdown, sanitized_html=sanitized_html)

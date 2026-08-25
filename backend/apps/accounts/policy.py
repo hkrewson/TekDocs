@@ -91,6 +91,8 @@ class PermissionKey(StrEnum):
     CREDENTIAL_REFERENCES_OPEN = "credential_references.open"
     COMPLIANCE_VIEW = "compliance.view"
     COMPLIANCE_EDIT = "compliance.edit"
+    DATA_FLOWS_VIEW = "data_flows.view"
+    DATA_FLOWS_EDIT = "data_flows.edit"
     DEADLINES_VIEW = "deadlines.view"
     DEADLINES_EDIT = "deadlines.edit"
     DOMAINS_VIEW = "domains.view"
@@ -187,6 +189,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.CREDENTIAL_REFERENCES_OPEN, "Open credential references", "Credential references"),
     _permission(PermissionKey.COMPLIANCE_VIEW, "View compliance evidence", "Compliance"),
     _permission(PermissionKey.COMPLIANCE_EDIT, "Edit compliance evidence", "Compliance", mfa=True),
+    _permission(PermissionKey.DATA_FLOWS_VIEW, "View data flows", "Compliance"),
+    _permission(PermissionKey.DATA_FLOWS_EDIT, "Edit data flows", "Compliance", mfa=True),
     _permission(PermissionKey.DEADLINES_VIEW, "View deadline schedules", "Deadlines"),
     _permission(PermissionKey.DEADLINES_EDIT, "Manage deadline schedules", "Deadlines", mfa=True),
     _permission(PermissionKey.DOMAINS_VIEW, "View domains", "Domains"),
@@ -210,6 +214,7 @@ IMPLEMENTED_READS = frozenset(
         PermissionKey.ASSETS_VIEW,
         PermissionKey.NETWORKS_VIEW,
         PermissionKey.COMPLIANCE_VIEW,
+        PermissionKey.DATA_FLOWS_VIEW,
         PermissionKey.DEADLINES_VIEW,
         PermissionKey.DOMAINS_VIEW,
         PermissionKey.INTEGRATIONS_VIEW,
@@ -232,6 +237,7 @@ TECHNICIAN_MUTATIONS = frozenset(
         PermissionKey.ASSETS_EDIT,
         PermissionKey.NETWORKS_EDIT,
         PermissionKey.COMPLIANCE_EDIT,
+        PermissionKey.DATA_FLOWS_EDIT,
         PermissionKey.DEADLINES_EDIT,
         PermissionKey.DOMAINS_EDIT,
     }

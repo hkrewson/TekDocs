@@ -78,6 +78,27 @@ production_compose exec -T backend python manage.py migrate --check
 production_compose exec -T backend python -c 'import importlib.util; assert importlib.util.find_spec("pytest") is None'
 production_compose exec -T backend python -c 'import os; from django.conf import settings; assert os.environ["TEKDOCS_IMAGE_VARIANT"] == "production"; assert settings.TEKDOCS_ATTACHMENT_SCANNER == "apps.core.attachment_security.ClamAVAttachmentScanner"; assert settings.TEKDOCS_CLAMAV_HOST'
 production_compose exec -T backend python -c 'from apps.core.attachment_security import attachment_scanner; assert attachment_scanner().scan(filename="probe.txt", media_type="text/plain", content=b"TekDocs production scanner probe").engine == "clamav/instream"'
+# Every file a service reads must be readable by the user that service runs as. Docker
+# COPY carries the source file's mode into the image, so a file that happens to be 0600
+# on the machine running the build becomes root-owned and unreadable to a non-root
+# runtime user. That failure is invisible to git, which records only the executable bit,
+# and it surfaces only as an unrelated-looking runtime error deep inside a dependency.
+echo "Verifying the renderer reports the browser and renderer it actually runs"
+if ! production_compose exec -T diagram-renderer sh -c 'test -r /chromium-version && /usr/bin/chromium-browser --version | cmp -s - /chromium-version'; then
+  echo "The diagram renderer is running a different Chromium than the one recorded at build time" >&2
+  exit 1
+fi
+
+echo "Verifying copied files are readable by each non-root runtime user"
+if ! production_compose exec -T diagram-renderer node -e 'const {accessSync,constants}=require("node:fs"); for (const file of ["/renderer/package.json","/renderer/worker.mjs","/renderer/mermaid-config.json","/renderer/puppeteer-config.json"]) accessSync(file, constants.R_OK)'; then
+  echo "The diagram renderer cannot read its own configuration files as its runtime user" >&2
+  exit 1
+fi
+if ! production_compose exec -T backend python -c 'from pathlib import Path; [Path(name).read_bytes() for name in ("/app/manage.py", "/app/pyproject.toml")]'; then
+  echo "The backend cannot read its own application files as its runtime user" >&2
+  exit 1
+fi
+
 production_compose exec -T backend python -c 'from apps.core.diagram_exports import render_diagram_exports; value=render_diagram_exports("```mermaid\nflowchart LR\nA-->B\n```\n", required=True)[0]; assert value.svg and value.png and value.state == "rendered"'
 backend_id=$(production_compose ps -q backend)
 backend_user=$(docker inspect --format '{{.Config.User}}' "$backend_id")

@@ -5,14 +5,35 @@ ENV NODE_ENV=production \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     PUPPETEER_SKIP_DOWNLOAD=true
 
+# Chromium comes from Alpine's repositories, which move independently of the pinned
+# base image digest above. Left alone, the browser silently changes version between
+# builds of the one service whose output is meant to be reproducible.
+#
+# The version is asserted rather than constrained: a constraint would quietly install an
+# older browser when the repository moves, whereas this fails the build and asks for a
+# deliberate decision. To bump, raise CHROMIUM_SERIES, rebuild, and re-run
+# `make production-image-rehearsal`.
+ARG CHROMIUM_SERIES=151
+
 RUN apk add --no-cache chromium rsvg-convert \
+    && installed="$(/usr/bin/chromium-browser --version)" \
+    && case "$installed" in \
+         "Chromium ${CHROMIUM_SERIES}."*) : ;; \
+         *) echo "Renderer expected Chromium ${CHROMIUM_SERIES}.x but Alpine provided: $installed" >&2; exit 1 ;; \
+       esac \
+    && printf '%s\n' "$installed" > /chromium-version \
+    && chmod 0444 /chromium-version \
     && addgroup --system --gid 10001 renderer \
     && adduser --system --uid 10001 --ingroup renderer --home /renderer renderer
 
+# `COPY --chmod` is stated on every copy below: Docker otherwise carries the source
+# file's mode into the image, so a 0600 file on the build host becomes unreadable to
+# the 10001 runtime user. The `chown` further down covers /renderer itself, not the
+# files in it, so nothing else would repair that.
 WORKDIR /renderer
-COPY package.json package-lock.json ./
+COPY --chmod=0644 package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
-COPY check-licenses.mjs mermaid-config.json puppeteer-config.json worker.mjs ./
+COPY --chmod=0644 check-licenses.mjs mermaid-config.json puppeteer-config.json worker.mjs ./
 RUN mkdir -p /jobs \
     && chown renderer:renderer /renderer /jobs \
     && rm -rf \

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { translate} from '../i18n/localization'
+import { DataFlows } from './DataFlows'
+import type { DataFlowClient } from './dataFlowApi'
 import { History, Plus, Search, Trash2 } from "lucide-react";
 
 import { CollectionPagination } from "../CollectionPagination";
@@ -247,9 +249,11 @@ function CatalogForm({
 export function Compliance({
   workspace,
   client,
+  dataFlowClient,
 }: {
   workspace: WorkspaceContext | null;
   client: ComplianceClient;
+  dataFlowClient?: DataFlowClient;
 }) {
   const [frameworks, setFrameworks] = useState<ComplianceFramework[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -1015,6 +1019,7 @@ export function Compliance({
         <div className="section-heading"><div><h2 id="compliance-bundles-heading">Evidence bundles</h2><p>Immutable signed snapshots of the current controls, evidence, and risks.</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : "The evidence bundle could not be created."); } finally { setSaving(false); } })(); }}>{translate('compliance.createSignedBundle')}</button>}</div>
         {bundles.length === 0 ? <p className="empty-state">No signed evidence bundles have been created.</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.bundleTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Integrity</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>SHA-256 {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
       </section>
+      <DataFlows workspace={workspace} client={dataFlowClient} />
     </>
   );
 }

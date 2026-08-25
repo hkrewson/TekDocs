@@ -5,12 +5,45 @@ import path from 'node:path'
 
 const execFileAsync = promisify(execFile)
 const jobRoot = '/jobs'
-const rendererVersion = '@mermaid-js/mermaid-cli@11.16.0'
+// Read from the package that is actually installed rather than restating it here. A
+// hardcoded copy drifts the moment a dependency update lands, and this value is recorded
+// in signed publication manifests — a stale constant would attest a renderer that never
+// ran, which is worse than no attestation at all.
+const rendererVersion = (() => {
+  const manifest = JSON.parse(readFileSync('/renderer/node_modules/@mermaid-js/mermaid-cli/package.json', 'utf8'))
+  return `${manifest.name}@${manifest.version}`
+})()
 const jobPattern = /^[0-9a-f]{32}$/
 const maximumOutputBytes = 2 * 1024 * 1024
 const maximumPngBytes = 5 * 1024 * 1024
 const maximumJobs = 8
 const staleMilliseconds = 5 * 60 * 1000
+
+// A job can fail six operationally different ways. Reporting one flat code for all of
+// them means an operator reading container logs cannot tell a Chromium launch failure
+// from a diagram that renders too large, which is exactly the position this renderer
+// put us in once.
+//
+// The code is all that is reported. Renderer stderr can echo the diagram source, and
+// that source is customer content, so it never reaches the log or the result file.
+const failureCodesByMessage = new Map([
+  ['invalid request', 'invalid_request'],
+  ['incomplete render', 'incomplete_render'],
+  ['oversized render', 'oversized_render'],
+  ['incomplete raster', 'incomplete_raster'],
+  ['oversized raster', 'oversized_raster'],
+])
+
+function failureCode(error) {
+  const message = error && typeof error.message === 'string' ? error.message : ''
+  const mapped = failureCodesByMessage.get(message)
+  if (mapped) return mapped
+  if (error && (error.killed === true || error.signal === 'SIGTERM' || error.code === 'ETIMEDOUT')) {
+    return 'renderer_timeout'
+  }
+  if (error && typeof error.cmd === 'string' && error.cmd.includes('rsvg-convert')) return 'raster_failed'
+  return 'render_failed'
+}
 
 function atomicJson(jobDirectory, payload) {
   const temporary = path.join(jobDirectory, '.result.json')
@@ -64,8 +97,11 @@ async function processJob(jobName) {
     }
     if (safeFiles(jobDirectory, '.png').length !== request.count) throw new Error('incomplete raster')
     atomicJson(jobDirectory, { status: 'ok', count: request.count, renderer: rendererVersion })
-  } catch {
-    atomicJson(jobDirectory, { status: 'error', code: 'render_failed' })
+  } catch (error) {
+    const code = failureCode(error)
+    const status = error && Number.isInteger(error.code) ? ` exit=${error.code}` : ''
+    process.stderr.write(`diagram render failed: ${code}${status}\n`)
+    atomicJson(jobDirectory, { status: 'error', code })
   }
 }
 

@@ -82,6 +82,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_relationshipgraphview",
     "core_relationshipgraphsnapshot",
     "core_documentkeybinding",
+    "core_dataflow",
+    "core_dataflowrevision",
+    "core_dataflowsnapshot",
 )
 
 TENANT_SCOPED_TABLES = (

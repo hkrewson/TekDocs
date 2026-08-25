@@ -11,14 +11,16 @@ import pytest
 from django.test import override_settings
 
 from apps.core.diagram_exports import (
+    UNRENDERED_VERSION,
     DiagramExportArtifact,
     DiagramRenderError,
     DiagramSource,
-    _sanitize_svg,
+    _rejected_detail,
     diagram_manifest,
     diagram_sources,
     embed_diagrams_in_html,
     render_diagram_exports,
+    sanitize_svg,
 )
 from apps.core.document_exports import (
     DocumentExportSnapshot,
@@ -70,9 +72,9 @@ def test_editable_render_falls_back_but_required_render_fails_closed():
 
 def test_svg_sanitizer_rejects_active_and_external_content():
     with pytest.raises(DiagramRenderError, match="unsafe"):
-        _sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+        sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
     with pytest.raises(DiagramRenderError, match="unsafe"):
-        _sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><style>.x{fill:url(https://bad)}</style></svg>')
+        sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><style>.x{fill:url(https://bad)}</style></svg>')
 
 
 def test_exported_html_has_graphic_alt_text_and_source_fallback():
@@ -148,3 +150,53 @@ def test_isolated_renderer_is_deterministic_when_runtime_is_requested(settings):
     assert first.png_checksum == second.png_checksum
     assert first.svg == second.svg
     assert first.png == second.png
+
+
+@pytest.mark.parametrize(
+    ("reported", "expected"),
+    (
+        ({"status": "error", "code": "renderer_timeout"}, "renderer_timeout"),
+        ({"status": "error", "code": "oversized_render"}, "oversized_render"),
+        ({"status": "error", "code": "raster_failed"}, "raster_failed"),
+        # A renderer result is input. An unrecognised code is reported as such rather
+        # than repeated into a message an operator would read as authoritative.
+        ({"status": "error", "code": "<script>alert(1)</script>"}, "unrecognised result"),
+        ({"status": "error"}, "unrecognised result"),
+        ({"status": "ok", "count": 99, "renderer": "@mermaid-js/mermaid-cli@11.16.0"}, "unrecognised result"),
+        # A version this module cannot recognise is refused rather than recorded: the
+        # value ends up in a signed manifest, so unvalidated renderer text must not reach it.
+        ({"status": "ok", "count": 1, "renderer": "totally-different-renderer"}, "unrecognised renderer version"),
+        (
+            {"status": "ok", "count": 1, "renderer": "@mermaid-js/mermaid-cli@not.a.version"},
+            "unrecognised renderer version",
+        ),
+        ({"status": "ok", "count": 1}, "unrecognised renderer version"),
+        ("not a mapping at all", "unrecognised result"),
+    ),
+)
+def test_a_rejected_render_names_which_failure_the_renderer_reported(reported, expected):
+    assert _rejected_detail(reported, expected_count=1) == expected
+
+
+def test_a_successful_render_result_is_not_reported_as_a_failure():
+    ok = {"status": "ok", "count": 2, "renderer": "@mermaid-js/mermaid-cli@11.16.0"}
+
+    assert _rejected_detail(ok, expected_count=2) is None
+    # A count that disagrees with what was asked for is a failure, not a success.
+    assert _rejected_detail(ok, expected_count=3) == "unrecognised result"
+
+
+def test_a_newer_renderer_version_is_accepted_without_a_code_change():
+    # The point of reading the version from the renderer: a dependency bump must not
+    # require editing this module, and must not silently attest the old version.
+    later = {"status": "ok", "count": 1, "renderer": "@mermaid-js/mermaid-cli@11.17.3"}
+
+    assert _rejected_detail(later, expected_count=1) is None
+
+
+def test_an_artifact_that_never_rendered_claims_no_renderer():
+    from apps.core.diagram_exports import _fallback, diagram_sources
+
+    sources = diagram_sources("```mermaid\nflowchart LR\nA-->B\n```\n")
+
+    assert _fallback(sources)[0].renderer_version == UNRENDERED_VERSION

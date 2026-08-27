@@ -365,7 +365,7 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "key_fingerprint_valid": True,
             "trusted_key": True,
         }
-        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v2"
+        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v3"
         assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
         assert publication_payload["manifest"]["entities"][0]["display_name"] == "Static Client"
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
@@ -874,6 +874,41 @@ def test_static_publication_is_append_only_in_django_and_postgresql(owner_client
             )
         with pytest.raises(DatabaseError, match="publication"), transaction.atomic():
             DocumentPublication.objects.bulk_create([malformed])
+        malformed_v3_id = uuid.uuid4()
+        malformed_v3_entity = Entity.objects.create_owned(
+            tenant=publication.tenant,
+            entity_type="document_publication",
+            display_name="Malformed v3 publication",
+        )
+        malformed_v3_manifest = json.loads(json.dumps(publication.manifest))
+        malformed_v3_manifest["publication_id"] = str(malformed_v3_id)
+        malformed_v3_manifest["publication_entity_id"] = str(malformed_v3_entity.id)
+        malformed_v3_manifest["key_resolutions"] = [{"kind": "field"}]
+        malformed_v3 = DocumentPublication(
+            id=malformed_v3_id,
+            tenant=publication.tenant,
+            organization=publication.organization,
+            document=publication.document,
+            entity=malformed_v3_entity,
+            title=publication.title,
+            category=publication.category,
+            reason=publication.reason,
+            audience=publication.audience,
+            retention=publication.retention,
+            retention_review_on=publication.retention_review_on,
+            canonical_markdown=publication.canonical_markdown,
+            sanitized_html=publication.sanitized_html,
+            manifest=malformed_v3_manifest,
+            content_digest=publication.content_digest,
+            signature=publication.signature,
+            signature_algorithm=publication.signature_algorithm,
+            public_key=publication.public_key,
+            key_fingerprint=publication.key_fingerprint,
+            published_by=publication.published_by,
+            published_at=publication.published_at,
+        )
+        with pytest.raises(DatabaseError, match="key resolution"), transaction.atomic():
+            DocumentPublication.objects.bulk_create([malformed_v3])
 
 
 @pytest.mark.django_db
@@ -2424,7 +2459,7 @@ def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clea
     document = Document.objects.get(entity_id=created["id"])
     resolved_placement = document.placements.get()
     resolved_revision = resolved_placement.block.current_revision
-    assert manifest["format"] == "tekdocs-portable-document/v1"
+    assert manifest["format"] == "tekdocs-portable-document/v2"
     assert manifest["export_class"] == "editable_revision_snapshot"
     assert manifest["immutable_publication"] is False
     assert manifest["content_digest"] == first["X-TekDocs-Content-Digest"]
@@ -2465,14 +2500,15 @@ def test_export_snapshot_serializes_with_concurrent_document_edit(installation, 
     detail_route = reverse("msp-document-detail", kwargs={"document_entity_id": created["id"]})
     export_holds_lock = threading.Event()
     release_export = threading.Event()
-    original_resolve = document_exports.resolve_document
+    original_lock = document_exports.lock_document_composition
 
-    def paused_resolve(document):  # type: ignore[no-untyped-def]
+    def paused_lock(document):  # type: ignore[no-untyped-def]
+        result = original_lock(document)
         export_holds_lock.set()
         assert release_export.wait(timeout=10)
-        return original_resolve(document)
+        return result
 
-    monkeypatch.setattr("apps.core.document_exports.resolve_document", paused_resolve)
+    monkeypatch.setattr("apps.core.document_exports.lock_document_composition", paused_lock)
     results: dict[str, Any] = {}
 
     def run_export() -> None:
@@ -2514,7 +2550,7 @@ def test_export_snapshot_serializes_with_concurrent_document_edit(installation, 
     assert results["export"].status_code == 200
     assert results["export"].content == b"Revision one\n"
     assert results["edit"].status_code == 200
-    monkeypatch.setattr("apps.core.document_exports.resolve_document", original_resolve)
+    monkeypatch.setattr("apps.core.document_exports.lock_document_composition", original_lock)
     assert client.get(route, {"export_format": "md"}).content == b"Revision two\n"
 
 

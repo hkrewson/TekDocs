@@ -198,6 +198,20 @@ RESOLVABLE_RECORDS: Mapping[str, ResolvableRecord] = {
     ),
 }
 
+# Content keys use the same document binding table but resolve one exact immutable
+# block revision rather than a scalar model field. Keeping the reserved path here
+# gives the authoring API one source of truth for every addressable target kind.
+CONTENT_KEY_ENTITY_TYPE = "document_block"
+CONTENT_KEY_PATH = "content"
+ADDRESSABLE_ENTITY_TYPES = frozenset((*RESOLVABLE_RECORDS, CONTENT_KEY_ENTITY_TYPE))
+
+
+def addressable_fields(entity_type: str) -> list[str]:
+    if entity_type == CONTENT_KEY_ENTITY_TYPE:
+        return [CONTENT_KEY_PATH]
+    record = RESOLVABLE_RECORDS.get(entity_type)
+    return sorted(record.fields) if record is not None else []
+
 
 def resolvable_field(entity_type: str, path: tuple[str, ...]) -> tuple[ResolvableRecord, ResolvableField] | None:
     """Return the record and field a key path names, or ``None`` when unregistered."""

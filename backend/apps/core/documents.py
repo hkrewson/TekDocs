@@ -243,6 +243,31 @@ def resolve_document(document: Document) -> ResolvedDocument:
     return ResolvedDocument(markdown=markdown, placements=tuple(resolved))
 
 
+def lock_document_composition(document: Document) -> tuple[Document, ResolvedDocument]:
+    """Lock one document, its placements, blocks, and selected immutable revisions."""
+    locked = (
+        Document.objects.select_for_update(of=("self",))
+        .select_related("tenant", "organization", "organization__entity", "entity")
+        .get(pk=document.pk)
+    )
+    placements = list(
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .filter(document=locked)
+        .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
+        .order_by("id")
+    )
+    block_ids = sorted({placement.block_id for placement in placements}, key=str)
+    list(Block.objects.select_for_update().filter(id__in=block_ids).order_by("id"))
+    placements = list(
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .filter(document=locked)
+        .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
+        .order_by("id")
+    )
+    locked.__dict__["active_placements"] = placements
+    return locked, resolve_document(locked)
+
+
 def primary_placement(document: Document) -> DocumentPlacement:
     placements = cast(tuple[DocumentPlacement, ...], getattr(document, "active_placements", ()))
     for placement in placements:

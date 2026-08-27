@@ -30,8 +30,9 @@ from .diagram_exports import (
     render_diagram_exports,
 )
 from .document_attachments import copy_attachment_content
-from .document_keys import KEY_TARGET_SCHEME, keys_in_markdown
-from .documents import resolve_document
+from .document_key_freeze import KeyFreezeConflict, freeze_document_keys
+from .document_key_resolution import audience_for
+from .documents import lock_document_composition
 from .entity_mentions import resolve_entity_mentions
 from .models import Document, DocumentAttachment
 from .rendering import (
@@ -44,7 +45,7 @@ from .rendering import (
 from .workspaces import ResolvedWorkspace
 
 EXPORT_FORMATS = frozenset({"md", "html", "pdf", "docx", "bundle"})
-BUNDLE_FORMAT = "tekdocs-portable-document/v1"
+BUNDLE_FORMAT = "tekdocs-portable-document/v2"
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 _MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable(("table", "strikethrough"))
@@ -113,32 +114,27 @@ def resolve_export_snapshot(
     if len(set(attachment_ids)) != len(attachment_ids):
         raise ExportConflict("Each selected file may appear only once.")
 
-    locked_document = (
-        Document.objects.select_for_update(of=("self",))
-        .select_related("entity", "organization", "organization__entity")
-        .get(pk=document.pk)
-    )
-    resolved = resolve_document(locked_document)
-    # Exports follow publication rather than the live view (ADR 0089): an exported
-    # document has left the authorization boundary, so it may not carry a value that
-    # was resolved for whoever happened to request the file. Until publish-time
-    # resolution exists, a document with keys is refused rather than exported with
-    # unresolved markers baked into bytes that outlive the request.
-    keys, unparsable = keys_in_markdown(resolved.markdown)
-    named = [key.expression for key in keys] + [
-        target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable
-    ]
-    if named:
-        raise ExportConflict(
-            "This document resolves keys from linked records, which cannot yet be exported: "
-            f"{', '.join(sorted(set(named)))}."
+    locked_document, resolved = lock_document_composition(document)
+    try:
+        frozen_keys = freeze_document_keys(
+            workspace=workspace,
+            document=locked_document,
+            markdown=resolved.markdown,
+            audience=audience_for(workspace.member),
+            # Use the newest retained input-state timestamp. Unlike wall-clock export
+            # time, it changes with resolved state and keeps an unchanged portable
+            # snapshot byte-deterministic.
+            resolved_at=None,
         )
-    requested_entities = entity_ids_in_markdown(resolved.markdown)
-    entity_mentions = resolve_entity_mentions(workspace=workspace, markdown=resolved.markdown)
+    except KeyFreezeConflict as exc:
+        raise ExportConflict(str(exc)) from exc
+    frozen_markdown = frozen_keys.markdown
+    requested_entities = entity_ids_in_markdown(frozen_markdown)
+    entity_mentions = resolve_entity_mentions(workspace=workspace, markdown=frozen_markdown, lock=True)
     if {UUID(entity_id) for entity_id in entity_mentions} != requested_entities:
         raise ExportConflict("The document contains an unavailable entity reference.")
 
-    referenced_attachment_ids = attachment_ids_in_markdown(resolved.markdown)
+    referenced_attachment_ids = attachment_ids_in_markdown(frozen_markdown)
     requested_files = set(attachment_ids)
     needed_attachment_ids = referenced_attachment_ids | requested_files
     attachment_records = list(
@@ -188,17 +184,17 @@ def resolve_export_snapshot(
             )
         )
 
-    diagrams = render_diagram_exports(resolved.markdown)
+    diagrams = render_diagram_exports(frozen_markdown)
     sanitized_html = render_markdown(
-        resolved.markdown,
+        frozen_markdown,
         entity_mentions=entity_mentions,
         attachments=rendered_attachments,
     )
     sanitized_html = embed_diagrams_in_html(sanitized_html, diagrams)
-    markdown_bytes = resolved.markdown.encode("utf-8")
+    markdown_bytes = frozen_markdown.encode("utf-8")
     html_bytes = export_html(
         title=locked_document.entity.display_name,
-        markdown=resolved.markdown,
+        markdown=frozen_markdown,
         retained_html=sanitized_html,
     )
     attachment_manifest = [
@@ -245,6 +241,7 @@ def resolve_export_snapshot(
         },
         "title": locked_document.entity.display_name,
         "category": locked_document.category,
+        "key_resolutions": list(frozen_keys.manifest_records),
         "placements": [
             {
                 "id": str(item.placement.id),
@@ -268,7 +265,7 @@ def resolve_export_snapshot(
     manifest["content_digest"] = digest
     return DocumentExportSnapshot(
         title=locked_document.entity.display_name,
-        markdown=resolved.markdown,
+        markdown=frozen_markdown,
         sanitized_html=sanitized_html,
         manifest=manifest,
         digest=digest,

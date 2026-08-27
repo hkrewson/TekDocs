@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .document_attachments import resolve_rendered_attachments
+from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .entity_mentions import resolve_entity_mentions
@@ -856,8 +857,9 @@ class DocumentPlacementSerializer(serializers.Serializer):
         return placement.parent_id is None and placement.position == 0
 
     def get_resolved_html(self, obj: ResolvedPlacement) -> str:
+        expanded: dict[UUID, str] = self.context.get("expanded_markdown", {})
         return render_markdown(
-            obj.revision.markdown,
+            expanded.get(obj.revision.id, obj.revision.markdown),
             entity_mentions=self.context.get("entity_mentions", {}),
             attachments=self.context.get("attachments", {}),
             key_resolutions=self.context.get("key_resolutions", {}),
@@ -1049,10 +1051,26 @@ class DocumentSerializer(serializers.Serializer):
         workspace = self.context.get("workspace")
         if workspace is not None:
             markdown = self._resolved(obj).markdown
+            expanded_markdown = expand_rendered_content_keys(
+                workspace=workspace, document=obj, markdown=markdown
+            )
+            expanded_placements = {
+                placement.revision.id: expand_rendered_content_keys(
+                    workspace=workspace,
+                    document=obj,
+                    markdown=placement.revision.markdown,
+                )
+                for placement in self._resolved(obj).placements
+            }
             context = {
-                "entity_mentions": resolve_entity_mentions(workspace=workspace, markdown=markdown),
-                "attachments": resolve_rendered_attachments(workspace=workspace, document=obj, markdown=markdown),
-                "key_resolutions": resolve_rendered_keys(workspace=workspace, document=obj, markdown=markdown),
+                "entity_mentions": resolve_entity_mentions(workspace=workspace, markdown=expanded_markdown),
+                "attachments": resolve_rendered_attachments(
+                    workspace=workspace, document=obj, markdown=expanded_markdown
+                ),
+                "key_resolutions": resolve_rendered_keys(
+                    workspace=workspace, document=obj, markdown=expanded_markdown
+                ),
+                "expanded_markdown": expanded_placements,
             }
         return cast(
             list[dict[str, object]],

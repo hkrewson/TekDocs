@@ -15,6 +15,7 @@ The security review currently recorded by the project used Claude Opus 5 (High) 
 - MSP, client, vendor, manufacturer, and partner workspaces
 - Markdown-first documentation with visual editing, raw Markdown, secure preview, and revision history
 - Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references
+- Permission-aware field and content keys with exact-revision export and publication snapshots
 - Immutable STATIC publications with signed manifests and retained PDF artifacts
 - People, sites, locations, custom fields, and typed entity relationships
 - Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history

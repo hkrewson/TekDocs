@@ -21,6 +21,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
+from apps.accounts.policy import DataAudience
+
 from .data_flows import data_flow_projection
 from .diagram_exports import (
     DiagramExportArtifact,
@@ -30,15 +32,13 @@ from .diagram_exports import (
     render_diagram_exports,
 )
 from .document_attachments import copy_attachment_content
-from .document_keys import KEY_TARGET_SCHEME, keys_in_markdown
-from .documents import PlacementConflict, resolve_document
+from .document_key_freeze import KeyFreezeConflict, freeze_document_keys
+from .documents import PlacementConflict, lock_document_composition
 from .entity_mentions import resolve_entity_mentions
 from .models import (
     AuditEvent,
-    Block,
     Document,
     DocumentAttachment,
-    DocumentPlacement,
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
@@ -59,7 +59,7 @@ from .rendering import (
 )
 from .workspaces import ResolvedWorkspace
 
-MANIFEST_VERSION = "tekdocs-static-publication/v2"
+MANIFEST_VERSION = "tekdocs-static-publication/v3"
 SIGNATURE_ALGORITHM = "Ed25519"
 MAX_PUBLICATION_MARKDOWN_BYTES = 2 * 1024 * 1024
 MAX_RETAINED_ATTACHMENTS = 50
@@ -126,25 +126,6 @@ def _timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
-def _refuse_unfrozen_keys(markdown: str) -> None:
-    """Refuse to publish content that still contains unresolved key expressions.
-
-    Publication signs and retains exactly what a reader will see. Until publish-time
-    resolution exists (ADR 0089, `0.8.39`), a key would be frozen into signed evidence
-    as a visible "unresolved" marker — a permanent record of a value that was never
-    resolved, in the artifact TekDocs offers as proof. Refusing is the fail-closed
-    behaviour the record already commits to; the refusal disappears when the freeze
-    lands, without weakening anything in the meantime.
-    """
-    keys, unparsable = keys_in_markdown(markdown)
-    named = [key.expression for key in keys] + [target.removeprefix(KEY_TARGET_SCHEME) for target in unparsable]
-    if named:
-        raise PublicationConflict(
-            "This document resolves keys from linked records, which cannot yet be frozen into a "
-            f"STATIC publication: {', '.join(sorted(set(named)))}."
-        )
-
-
 def _resolved_attachments(
     *, document: Document, markdown: str
 ) -> tuple[list[dict[str, object]], dict[str, RenderedAttachment], list[DocumentAttachment]]:
@@ -177,7 +158,7 @@ def _resolved_attachments(
 
 def _resolved_entities(*, workspace: ResolvedWorkspace, markdown: str) -> list[dict[str, str]]:
     requested = entity_ids_in_markdown(markdown)
-    projections = resolve_entity_mentions(workspace=workspace, markdown=markdown)
+    projections = resolve_entity_mentions(workspace=workspace, markdown=markdown, lock=True)
     if {UUID(entity_id) for entity_id in projections} != requested:
         raise PublicationConflict("The document contains an unavailable entity reference.")
     return [
@@ -220,31 +201,31 @@ def publish_document(
     stored_artifacts: list[tuple[object, str]] = []
     try:
         with transaction.atomic():
-            locked_document = (
-                Document.objects.select_for_update(of=("self",))
-                .select_related("tenant", "organization", "organization__entity", "entity")
-                .get(pk=document.pk)
-            )
-            placements = list(
-                DocumentPlacement.objects.select_for_update(of=("self",))
-                .filter(document=locked_document)
-                .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
-                .order_by("id")
-            )
-            block_ids = sorted({placement.block_id for placement in placements}, key=str)
-            list(Block.objects.select_for_update().filter(id__in=block_ids).order_by("id"))
-            placements = list(
-                DocumentPlacement.objects.select_for_update(of=("self",))
-                .filter(document=locked_document)
-                .select_related("block", "block__entity", "block__current_revision", "parent", "pinned_revision")
-                .order_by("id")
-            )
-            locked_document.__dict__["active_placements"] = placements
             try:
-                resolved = resolve_document(locked_document)
+                locked_document, resolved = lock_document_composition(document)
             except PlacementConflict as exc:
                 raise PublicationConflict(str(exc)) from exc
             if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
+                raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
+
+            published_at = timezone.now()
+            encoded_timestamp = _timestamp(published_at)
+            try:
+                frozen_keys = freeze_document_keys(
+                    workspace=workspace,
+                    document=locked_document,
+                    markdown=resolved.markdown,
+                    audience=(
+                        DataAudience.CLIENT_PORTAL
+                        if audience == PublicationAudience.CLIENT_VISIBLE
+                        else DataAudience.MSP_STAFF
+                    ),
+                    resolved_at=encoded_timestamp,
+                )
+            except KeyFreezeConflict as exc:
+                raise PublicationConflict(str(exc)) from exc
+            frozen_markdown = frozen_keys.markdown
+            if len(frozen_markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
                 raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
 
             supersedes = None
@@ -264,24 +245,23 @@ def publish_document(
                 ):
                     raise PublicationConflict("The selected STATIC publication cannot be superseded.")
 
-            _refuse_unfrozen_keys(resolved.markdown)
-            entity_projections = _resolved_entities(workspace=workspace, markdown=resolved.markdown)
+            entity_projections = _resolved_entities(workspace=workspace, markdown=frozen_markdown)
             attachment_records, rendered_attachments, source_attachments = _resolved_attachments(
                 document=locked_document,
-                markdown=resolved.markdown,
+                markdown=frozen_markdown,
             )
             if len(source_attachments) > MAX_RETAINED_ATTACHMENTS:
                 raise PublicationConflict("A publication may retain at most 50 referenced attachments.")
             rendered_entities = {record["id"]: record for record in entity_projections}
             try:
-                diagrams = render_diagram_exports(resolved.markdown, required=True)
+                diagrams = render_diagram_exports(frozen_markdown, required=True)
             except ValueError as exc:
                 # `render_diagram_exports` now names which of its failures occurred;
                 # repeating that is what lets an author tell a renderer timeout from a
                 # diagram the sanitizer refused.
                 raise PublicationConflict(str(exc)) from exc
             sanitized_html = render_markdown(
-                resolved.markdown,
+                frozen_markdown,
                 entity_mentions=rendered_entities,  # type: ignore[arg-type]
                 attachments=rendered_attachments,
             )
@@ -289,10 +269,8 @@ def publish_document(
 
             publication_id = uuid4()
             publication_entity_id = uuid4()
-            published_at = timezone.now()
-            encoded_timestamp = _timestamp(published_at)
             pdf_content = render_pdf(
-                resolved.markdown,
+                frozen_markdown,
                 title=locked_document.entity.display_name,
                 publication_id=str(publication_entity_id),
                 published_at=encoded_timestamp,
@@ -406,6 +384,7 @@ def publish_document(
                 "supersedes_id": str(supersedes.entity_id) if supersedes is not None else None,
                 "published_by": str(actor_id),
                 "published_at": encoded_timestamp,
+                "key_resolutions": list(frozen_keys.manifest_records),
                 "placements": [
                     {
                         "id": str(item.placement.id),
@@ -427,7 +406,7 @@ def publish_document(
                 "data_flows": data_flows_projection,
                 "artifacts": [_artifact_descriptor(artifact) for artifact in pending_artifacts],
             }
-            payload = snapshot_payload(manifest=manifest, markdown=resolved.markdown, sanitized_html=sanitized_html)
+            payload = snapshot_payload(manifest=manifest, markdown=frozen_markdown, sanitized_html=sanitized_html)
             digest_bytes = hashlib.sha256(payload).digest()
             key = publication_signing_key()
             public_key, key_fingerprint = _encoded_public_key(key)
@@ -458,7 +437,7 @@ def publish_document(
                 retention=retention,
                 retention_review_on=retention_review_on,
                 supersedes=supersedes,
-                canonical_markdown=resolved.markdown,
+                canonical_markdown=frozen_markdown,
                 sanitized_html=sanitized_html,
                 manifest=manifest,
                 content_digest=digest_bytes.hex(),

@@ -38,9 +38,11 @@ than the reader would be the disclosure this module exists to prevent.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -61,7 +63,7 @@ from .document_key_fields import (
     resolvable_field,
 )
 from .document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT, DocumentKey, keys_in_markdown
-from .models import Document, DocumentKeyBinding, Entity, NetBoxReference, Organization
+from .models import Block, BlockRevision, Document, DocumentKeyBinding, Entity, NetBoxReference, Organization
 from .rendering import RenderedKey
 from .workspaces import ResolvedWorkspace
 
@@ -86,6 +88,11 @@ class ValueProvenance(StrEnum):
     OBSERVED = "observed"
 
 
+class KeyResolutionKind(StrEnum):
+    FIELD = "field"
+    CONTENT = "content"
+
+
 class UnresolvableReason(StrEnum):
     NO_BINDING = "no_binding"
     NOT_ADDRESSABLE = "not_addressable"
@@ -101,9 +108,15 @@ class ResolvedKey:
     expression: str
     state: ResolutionState
     label: str
+    kind: KeyResolutionKind = KeyResolutionKind.FIELD
     value: str = ""
     provenance: ValueProvenance | None = None
     source_entity_id: UUID | None = None
+    source_entity_type: str = ""
+    source_fingerprint: str = ""
+    source_state_at: datetime | None = None
+    source_revision_id: UUID | None = None
+    source_revision_number: int | None = None
     reason: UnresolvableReason | None = None
 
 
@@ -149,16 +162,25 @@ def _read(record: object, field: ResolvableField) -> str:
     return str(value).strip()
 
 
-def _bindings(document: Document, names: set[str]) -> dict[str, DocumentKeyBinding]:
-    return {
-        binding.name: binding
-        for binding in DocumentKeyBinding.objects.filter(document=document, name__in=names).select_related(
-            "target_entity"
+def _bindings(document: Document, names: set[str], *, lock: bool) -> dict[str, DocumentKeyBinding]:
+    queryset = (
+        DocumentKeyBinding.objects.filter(document=document, name__in=names)
+        .select_related("target_entity")
+        .order_by("name", "id")
+    )
+    if lock:
+        queryset = queryset.select_for_update(of=("self",))
+    records = list(queryset)
+    if lock:
+        list(
+            Entity.objects.select_for_update()
+            .filter(id__in=[record.target_entity_id for record in records])
+            .order_by("id")
         )
-    }
+    return {binding.name: binding for binding in records}
 
 
-def _records_by_entity(entities: Sequence[Entity]) -> dict[UUID, object]:
+def _records_by_entity(entities: Sequence[Entity], *, lock: bool) -> dict[UUID, object]:
     """Load each bound record once, grouped by record type so relations pre-join.
 
     One query per distinct record type, not one per key: a document that quotes
@@ -170,6 +192,26 @@ def _records_by_entity(entities: Sequence[Entity]) -> dict[UUID, object]:
             by_type.setdefault(entity.entity_type, []).append(entity)
 
     records: dict[UUID, object] = {}
+    content_entities = [entity for entity in entities if entity.entity_type == "document_block"]
+    if content_entities:
+        content = (
+            Block.objects.filter(entity__in=content_entities)
+            .select_related("entity", "current_revision")
+            .order_by("id")
+        )
+        if lock:
+            content = content.select_for_update(of=("self",))
+            list(
+                BlockRevision.objects.select_for_update()
+                .filter(
+                    id__in=[
+                        block.current_revision_id for block in content if block.current_revision_id is not None
+                    ]
+                )
+                .order_by("id")
+            )
+        for block in content:
+            records[block.entity_id] = block
     for entity_type, group in by_type.items():
         specification = RESOLVABLE_RECORDS[entity_type]
         related_model = Entity._meta.get_field(specification.record_accessor).related_model
@@ -178,20 +220,60 @@ def _records_by_entity(entities: Sequence[Entity]) -> dict[UUID, object]:
         queryset = related_model._default_manager.filter(entity__in=group)
         if specification.select_related:
             queryset = queryset.select_related(*specification.select_related)
+        queryset = queryset.order_by("id")
+        if lock:
+            candidates = list(queryset)
+            rows_by_model: dict[type[Model], set[object]] = {related_model: {record.pk for record in candidates}}
+            for record in candidates:
+                for path in specification.select_related:
+                    related: object = record
+                    for hop in path.split("__"):
+                        try:
+                            related = getattr(related, hop)
+                        except ObjectDoesNotExist:
+                            break
+                        if isinstance(related, Model):
+                            rows_by_model.setdefault(type(related), set()).add(related.pk)
+                        else:
+                            break
+            for model, primary_keys in sorted(rows_by_model.items(), key=lambda item: item[0]._meta.label_lower):
+                list(model._default_manager.select_for_update().filter(pk__in=primary_keys).order_by("pk"))
         for record in queryset:
             # Every addressable record is entity-anchored; the base Model type is not.
             records[record.entity_id] = record  # type: ignore[attr-defined]
     return records
 
 
-def _observed_entity_ids(entity_ids: set[UUID]) -> set[UUID]:
+def _observed_fingerprints(entity_ids: set[UUID], *, lock: bool) -> dict[UUID, tuple[str, datetime]]:
     if not entity_ids:
-        return set()
-    return set(
-        NetBoxReference.objects.filter(entity_id__in=entity_ids, archived_at__isnull=True).values_list(
-            "entity_id", flat=True
-        )
-    )
+        return {}
+    queryset = NetBoxReference.objects.filter(
+        entity_id__in=entity_ids,
+        archived_at__isnull=True,
+    ).exclude(observed_fingerprint="").order_by("entity_id", "id")
+    if lock:
+        queryset = queryset.select_for_update(of=("self",))
+    fingerprints: dict[UUID, tuple[str, datetime]] = {}
+    for entity_id, fingerprint, updated_at in queryset.values_list(
+        "entity_id", "observed_fingerprint", "updated_at"
+    ):
+        fingerprints.setdefault(entity_id, (fingerprint, updated_at))
+    return fingerprints
+
+
+def _value_fingerprint(*, key: DocumentKey, entity: Entity, value: str) -> str:
+    payload = json.dumps(
+        {
+            "expression": key.expression,
+            "source_entity_id": str(entity.id),
+            "source_entity_type": entity.entity_type,
+            "value": value,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def resolve_keys(
@@ -201,6 +283,7 @@ def resolve_keys(
     document: Document,
     audience: DataAudience,
     organization: Organization | None,
+    lock: bool = False,
 ) -> dict[str, ResolvedKey]:
     """Resolve ``keys`` for one reader, keyed by the ``tekdocs://key/`` target.
 
@@ -217,15 +300,15 @@ def resolve_keys(
             resolutions[key.target] = _unresolvable(key, key.expression, UnresolvableReason.LIMIT_EXCEEDED)
         requested = requested[:MAXIMUM_KEYS_PER_DOCUMENT]
 
-    bindings = _bindings(document, {key.binding for key in requested})
+    bindings = _bindings(document, {key.binding for key in requested}, lock=lock)
     entities = list({binding.target_entity_id: binding.target_entity for binding in bindings.values()}.values())
     visible = {
         entity.id
         for entity in entities
         if entity_visible_to_audience(context, entity, audience=audience, organization=organization)
     }
-    records = _records_by_entity([entity for entity in entities if entity.id in visible])
-    observed = _observed_entity_ids(visible)
+    records = _records_by_entity([entity for entity in entities if entity.id in visible], lock=lock)
+    observed = _observed_fingerprints(visible, lock=lock)
 
     for key in requested:
         resolutions[key.target] = _resolve_one(
@@ -235,6 +318,7 @@ def resolve_keys(
             records=records,
             visible=visible,
             observed=observed,
+            audience=audience,
             organization=organization,
         )
     return resolutions
@@ -247,7 +331,8 @@ def _resolve_one(
     binding: DocumentKeyBinding | None,
     records: Mapping[UUID, object],
     visible: set[UUID],
-    observed: set[UUID],
+    observed: Mapping[UUID, tuple[str, datetime]],
+    audience: DataAudience,
     organization: Organization | None,
 ) -> ResolvedKey:
     if binding is None:
@@ -260,14 +345,37 @@ def _resolve_one(
         # what kind of record the binding points at, which a direct denial does not.
         return _withheld(key, key.expression)
 
+    if entity.entity_type == "document_block" and key.path == ("content",):
+        block = records.get(entity.id)
+        if not isinstance(block, Block) or block.archived_at is not None or block.current_revision is None:
+            return _unresolvable(key, "Content", UnresolvableReason.ARCHIVED)
+        revision = block.current_revision
+        if not revision.markdown.strip():
+            return _unresolvable(key, "Content", UnresolvableReason.EMPTY)
+        return ResolvedKey(
+            expression=key.expression,
+            state=ResolutionState.RESOLVED,
+            label="Content",
+            kind=KeyResolutionKind.CONTENT,
+            value=revision.markdown,
+            provenance=ValueProvenance.LOCAL,
+            source_entity_id=entity.id,
+            source_entity_type=entity.entity_type,
+            source_fingerprint=revision.checksum,
+            source_state_at=max(binding.updated_at, entity.updated_at, block.updated_at, revision.created_at),
+            source_revision_id=revision.id,
+            source_revision_number=revision.revision_number,
+        )
+
     registered = resolvable_field(entity.entity_type, key.path)
     if registered is None:
         return _unresolvable(key, key.expression, UnresolvableReason.NOT_ADDRESSABLE)
 
     _, field = registered
     label = field.label
-    if field.sensitivity is not None and not context_has_field_access(
-        context, field.sensitivity, organization=organization
+    if field.sensitivity is not None and (
+        audience == DataAudience.CLIENT_PORTAL
+        or not context_has_field_access(context, field.sensitivity, organization=organization)
     ):
         return _withheld(key, label)
 
@@ -281,6 +389,13 @@ def _resolve_one(
     if not value:
         return _unresolvable(key, label, UnresolvableReason.EMPTY)
 
+    observed_source = observed.get(entity.id)
+    source_times = [binding.updated_at, entity.updated_at]
+    record_updated_at = getattr(record, "updated_at", None)
+    if isinstance(record_updated_at, datetime):
+        source_times.append(record_updated_at)
+    if observed_source is not None:
+        source_times.append(observed_source[1])
     return ResolvedKey(
         expression=key.expression,
         state=ResolutionState.RESOLVED,
@@ -288,6 +403,13 @@ def _resolve_one(
         value=value,
         provenance=ValueProvenance.OBSERVED if entity.id in observed else ValueProvenance.LOCAL,
         source_entity_id=entity.id,
+        source_entity_type=entity.entity_type,
+        source_fingerprint=(
+            observed_source[0]
+            if observed_source is not None
+            else _value_fingerprint(key=key, entity=entity, value=value)
+        ),
+        source_state_at=max(source_times),
     )
 
 
@@ -298,6 +420,7 @@ def resolve_markdown_keys(
     document: Document,
     audience: DataAudience,
     organization: Organization | None,
+    lock: bool = False,
 ) -> dict[str, ResolvedKey]:
     """Resolve every key in ``markdown``, including ones that are not valid keys.
 
@@ -311,6 +434,7 @@ def resolve_markdown_keys(
         document=document,
         audience=audience,
         organization=organization,
+        lock=lock,
     )
     for target in unresolvable:
         # The scheme is stripped from the label: the marker names the expression the
@@ -380,6 +504,9 @@ def resolve_rendered_keys(
 
     rendered: dict[str, RenderedKey] = {}
     for target, resolution in resolutions.items():
+        if resolution.kind == KeyResolutionKind.CONTENT:
+            rendered[target] = {"state": ResolutionState.UNRESOLVABLE.value, "label": resolution.label}
+            continue
         projection: RenderedKey = {"state": resolution.state.value, "label": resolution.label}
         if resolution.state == ResolutionState.RESOLVED:
             projection["value"] = resolution.value

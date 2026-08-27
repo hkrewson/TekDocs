@@ -27,6 +27,7 @@ from apps.core.models import (
     CustomFieldDefinition,
     DataFlowRevision,
     DataFlowSnapshot,
+    DocumentPublication,
     Entity,
     EntityLink,
     InstallationState,
@@ -39,6 +40,7 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.people import create_person
+from apps.core.publications import publish_document, verify_publication
 from apps.core.rls_contract import RLS_TABLES
 from apps.core.scoping import DataScope
 from apps.core.sites import archive_site, create_location, create_site
@@ -604,3 +606,63 @@ def test_the_newest_guard_migration_reverses_and_reapplies_without_losing_retain
         assert cursor.fetchone() == (True,)
     with pytest.raises(DatabaseError), transaction.atomic():
         DataFlowSnapshot.objects.filter(id=snapshot.id).update(title="Rewritten after reapply")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_evidence(
+    migration_head_restored,
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Migration guard validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Publication Guard MSP",
+        owner_email=f"publication-guard-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Publication Guard Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = create_organization(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        name="Publication Guard Client",
+        legal_name="Publication Guard Client, Inc.",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    document = create_document(
+        tenant=result.tenant,
+        organization=organization,
+        actor_id=result.owner.id,
+        title="Guarded publication",
+        markdown="Retained publication content.",
+    )
+    publication = publish_document(
+        workspace=resolve_organization_workspace(result.owner, entity_id=organization.entity_id),
+        document=document,
+        actor_id=result.owner.id,
+        reason="Exercise the manifest guard migration",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+    retained_digest = publication.content_digest
+    assert publication.manifest["format"] == "tekdocs-static-publication/v3"
+
+    call_command("migrate", "core", "0123_data_flow_snapshot_guards", verbosity=0, interactive=False)
+    retained = DocumentPublication.objects.get(pk=publication.pk)
+    assert retained.content_digest == retained_digest
+    assert retained.manifest["format"] == "tekdocs-static-publication/v3"
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_document_publication'::regproc)")
+        assert "tekdocs-static-publication/v2" in cursor.fetchone()[0]
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    retained = DocumentPublication.objects.get(pk=publication.pk)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_document_publication'::regproc)")
+        guard = cursor.fetchone()[0]
+    assert "tekdocs-static-publication/v3" in guard
+    assert "key_resolutions" in guard
+    assert retained.content_digest == retained_digest
+    assert all(verify_publication(retained).values())

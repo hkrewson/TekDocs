@@ -198,8 +198,32 @@ def test_the_binding_list_names_the_record_kinds_a_key_can_read(installation, ow
     # The authoring surface offers only records a binding can actually target, and it
     # learns which those are from here rather than from its own copy of the registry.
     assert "client_asset" in body["addressable_entity_types"]
+    assert "document_block" in body["addressable_entity_types"]
     assert "document" not in body["addressable_entity_types"]
     assert body["addressable_entity_types"] == sorted(body["addressable_entity_types"])
+
+
+@pytest.mark.django_db
+def test_an_author_can_bind_an_exact_document_block_content_key(installation, owner_client):
+    organization = _organization(installation.tenant, "Content key client")
+    source = _document(installation, organization, "Reusable recovery", "Restore from the retained backup.")
+    destination = _document(
+        installation,
+        organization,
+        "Recovery runbook",
+        "<tekdocs://key/recovery.content>",
+    )
+    source_block = source.placements.select_related("block__entity").get().block
+
+    response = owner_client.post(
+        _bindings_url(organization, destination),
+        {"name": "recovery", "target_entity_id": str(source_block.entity_id)},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["target_entity_type"] == "document_block"
+    assert response.json()["addressable_fields"] == ["content"]
 
 
 @pytest.mark.django_db

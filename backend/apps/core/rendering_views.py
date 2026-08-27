@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, require_installation_member, require_permission
 
 from .document_attachments import resolve_rendered_attachments
+from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
 from .documents import documents_for_scope
 from .entity_mentions import resolve_entity_mentions
@@ -51,20 +52,23 @@ class MarkdownRenderView(APIView):
             if document_id is not None
             else None
         )
+        rendered_markdown = expand_rendered_content_keys(
+            workspace=workspace, document=document, markdown=markdown
+        )
         response = MarkdownRenderResponseSerializer(
             {
                 "html": render_markdown(
-                    markdown,
-                    entity_mentions=resolve_entity_mentions(workspace=workspace, markdown=markdown),
+                    rendered_markdown,
+                    entity_mentions=resolve_entity_mentions(workspace=workspace, markdown=rendered_markdown),
                     attachments=resolve_rendered_attachments(
                         workspace=workspace,
                         document=document,
-                        markdown=markdown,
+                        markdown=rendered_markdown,
                     ),
                     key_resolutions=resolve_rendered_keys(
                         workspace=workspace,
                         document=document,
-                        markdown=markdown,
+                        markdown=rendered_markdown,
                     ),
                 )
             }

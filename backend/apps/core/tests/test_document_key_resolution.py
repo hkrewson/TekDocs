@@ -1,10 +1,14 @@
 import secrets
+import threading
+import time
 import uuid
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.db import close_old_connections
+from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -21,6 +25,7 @@ from apps.core.document_key_resolution import (
 from apps.core.document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT
 from apps.core.documents import create_document
 from apps.core.models import (
+    AuditEvent,
     DocumentKeyBinding,
     Entity,
     EntityVisibility,
@@ -443,6 +448,42 @@ def test_many_keys_on_one_record_read_that_record_once(installation, django_asse
 
 
 @pytest.mark.django_db
+def test_many_content_keys_read_their_block_revisions_in_one_batch(installation, django_assert_num_queries):
+    client = _organization(installation.tenant, "Content batching client")
+    document = _document(installation, client, "Content batching runbook", "Initial content.")
+    targets = []
+    for index in range(8):
+        source = _document(installation, client, f"Shared procedure {index}", f"Procedure {index}.")
+        block = source.placements.get(parent__isnull=True).block
+        name = f"procedure_{index}"
+        _bind(
+            installation,
+            document=document,
+            target=block.entity,
+            organization=client,
+            name=name,
+        )
+        targets.append(f"<tekdocs://key/{name}.content>")
+    markdown = "\n\n".join(targets)
+    context = require_installation_member(installation.owner)
+
+    # Binding targets, every block/current revision in one batch, and provenance.
+    # The query count stays fixed as distinct content keys are added.
+    with django_assert_num_queries(3):
+        resolutions = resolve_markdown_keys(
+            markdown,
+            context=context,
+            document=document,
+            audience=DataAudience.MSP_STAFF,
+            organization=client,
+        )
+
+    assert {resolution.value for resolution in resolutions.values()} == {
+        f"Procedure {index}." for index in range(8)
+    }
+
+
+@pytest.mark.django_db
 def test_a_binding_declared_on_another_document_does_not_resolve(installation):
     """Bindings are per document, so the same name means different things elsewhere."""
     client = _organization(installation.tenant, "Namespace client")
@@ -494,7 +535,7 @@ def test_a_document_beyond_the_key_limit_reports_the_excess_rather_than_dropping
 
 
 # ---------------------------------------------------------------------------
-# The live read paths resolve; the evidence paths refuse.
+# The live read paths resolve dynamically; evidence paths freeze one exact result.
 # ---------------------------------------------------------------------------
 
 
@@ -547,8 +588,8 @@ def test_a_preview_without_a_document_cannot_borrow_another_documents_bindings(i
 
 
 @pytest.mark.django_db
-def test_publication_refuses_a_document_whose_keys_cannot_yet_be_frozen(installation):
-    from apps.core.publications import PublicationConflict, publish_document
+def test_publication_freezes_a_resolved_key_and_its_provenance(installation):
+    from apps.core.publications import publish_document, verify_publication
 
     organization = _organization(installation.tenant, "Publishing client")
     asset = _asset_with_serial(installation, organization, name="Publishing firewall", serial="PUB-0001")
@@ -556,36 +597,490 @@ def test_publication_refuses_a_document_whose_keys_cannot_yet_be_frozen(installa
     document = _document(installation, organization, "Publishing runbook", markdown)
     _bind(installation, document=document, target=asset.entity, organization=organization)
 
-    with pytest.raises(PublicationConflict, match="subject.serial_number"):
-        publish_document(
-            workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
-            document=document,
-            actor_id=installation.owner.pk,
-            reason="Key freeze is not implemented yet",
-            audience="msp_internal",
-            retention="permanent",
-            retention_review_on=None,
-        )
+    publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+        actor_id=installation.owner.pk,
+        reason="Freeze the resolved key",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
 
-    # Nothing partial is retained: the refusal happens before any artifact exists.
-    assert document.publications.count() == 0
+    assert publication.manifest["format"] == "tekdocs-static-publication/v3"
+    assert KEY_TARGET_SCHEME not in publication.canonical_markdown
+    assert publication.canonical_markdown == "Serial PUB\\-0001.\n"
+    assert "PUB-0001" in publication.sanitized_html
+    assert publication.manifest["key_resolutions"] == [
+        {
+            "kind": "field",
+            "expression": "subject.serial_number",
+            "value": "PUB-0001",
+            "source_entity_id": str(asset.entity_id),
+            "source_entity_type": "client_asset",
+            "source_fingerprint": publication.manifest["key_resolutions"][0]["source_fingerprint"],
+            "provenance": "local",
+            "resolved_at": publication.manifest["published_at"],
+            "source_revision_id": None,
+            "source_revision_number": None,
+            "dependency_chain": [],
+        }
+    ]
+    assert len(publication.manifest["key_resolutions"][0]["source_fingerprint"]) == 64
+    assert all(verify_publication(publication).values())
+
+    # Authored immutable source remains unresolved; only retained evidence freezes it.
+    source = document.placements.get(parent__isnull=True).block.current_revision
+    assert source is not None
+    assert KEY_TARGET_SCHEME in source.markdown
+
+    asset.hardware.serial_number = "PUB-CHANGED"
+    asset.hardware.save(update_fields=["serial_number"])
+    publication.refresh_from_db()
+    assert publication.canonical_markdown == "Serial PUB\\-0001.\n"
+    assert "PUB-CHANGED" not in publication.canonical_markdown
+    assert all(verify_publication(publication).values())
 
 
 @pytest.mark.django_db
-def test_export_refuses_a_document_whose_keys_cannot_yet_be_frozen(installation):
-    from apps.core.document_exports import ExportConflict, resolve_export_snapshot
+def test_publication_only_freezes_keys_outside_markdown_code(installation):
+    from apps.core.publications import publish_document
+
+    organization = _organization(installation.tenant, "Key example client")
+    asset = _asset_with_serial(installation, organization, name="Example firewall", serial="EX-0001")
+    target = "<tekdocs://key/subject.serial_number>"
+    markdown = f"Example: `{target}`\n\nResolved: {target}."
+    document = _document(installation, organization, "Key example", markdown)
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+
+    publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+        actor_id=installation.owner.pk,
+        reason="Preserve the authored key example",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+
+    assert f"`{target}`" in publication.canonical_markdown
+    assert "Resolved: EX\\-0001." in publication.canonical_markdown
+    assert publication.manifest["key_resolutions"][0]["expression"] == "subject.serial_number"
+
+
+@pytest.mark.django_db
+def test_export_freezes_the_same_resolved_key_and_provenance(installation):
+    from apps.core.document_exports import resolve_export_snapshot
 
     organization = _organization(installation.tenant, "Exporting client")
     asset = _asset_with_serial(installation, organization, name="Exporting firewall", serial="EXP-0001")
     markdown = "Serial <tekdocs://key/subject.serial_number>."
     document = _document(installation, organization, "Exporting runbook", markdown)
+    binding = _bind(installation, document=document, target=asset.entity, organization=organization)
+
+    snapshot = resolve_export_snapshot(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+    )
+    repeated = resolve_export_snapshot(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+    )
+
+    assert KEY_TARGET_SCHEME not in snapshot.markdown
+    assert snapshot.markdown == "Serial EXP\\-0001.\n"
+    assert "EXP-0001" in snapshot.sanitized_html
+    assert snapshot.manifest["key_resolutions"][0]["expression"] == "subject.serial_number"
+    assert snapshot.manifest["key_resolutions"][0]["value"] == "EXP-0001"
+    assert snapshot.manifest["key_resolutions"][0]["source_entity_id"] == str(asset.entity_id)
+    assert snapshot.manifest["key_resolutions"] == repeated.manifest["key_resolutions"]
+    assert snapshot.manifest["key_resolutions"][0]["resolved_at"] == max(
+        document.updated_at,
+        binding.updated_at,
+        asset.entity.updated_at,
+        asset.hardware.updated_at,
+    ).isoformat()
+
+
+@pytest.mark.django_db
+def test_export_refusal_creates_neither_output_audit_nor_partial_evidence(installation, client):
+    organization = _organization(installation.tenant, "Unresolved export client")
+    document = _document(
+        installation,
+        organization,
+        "Unresolved export runbook",
+        "Serial <tekdocs://key/missing.serial_number>.",
+    )
+    client.force_login(installation.owner)
+
+    response = client.get(
+        reverse(
+            "organization-document-export",
+            kwargs={
+                "organization_entity_id": organization.entity_id,
+                "document_entity_id": document.entity_id,
+            },
+        ),
+        {"export_format": "bundle"},
+    )
+
+    assert response.status_code == 409
+    assert response.content == b"One or more document keys could not be resolved for the selected audience."
+    assert document.publications.count() == 0
+    assert not AuditEvent.objects.filter(action="document.exported", entity_id=document.entity_id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_export_holds_resolved_field_rows_until_the_snapshot_is_complete(installation, monkeypatch):
+    from apps.core import document_exports
+
+    organization = _organization(installation.tenant, "Concurrent field client")
+    asset = _asset_with_serial(installation, organization, name="Concurrent firewall", serial="OLD-0001")
+    document = _document(
+        installation,
+        organization,
+        "Concurrent field runbook",
+        "Serial <tekdocs://key/subject.serial_number>.",
+    )
+    _bind(installation, document=document, target=asset.entity, organization=organization)
+    route = reverse(
+        "organization-document-export",
+        kwargs={
+            "organization_entity_id": organization.entity_id,
+            "document_entity_id": document.entity_id,
+        },
+    )
+    snapshot_holds_source = threading.Event()
+    release_snapshot = threading.Event()
+    original_freeze = document_exports.freeze_document_keys
+
+    def paused_freeze(**kwargs):  # type: ignore[no-untyped-def]
+        frozen = original_freeze(**kwargs)
+        snapshot_holds_source.set()
+        assert release_snapshot.wait(timeout=10)
+        return frozen
+
+    monkeypatch.setattr("apps.core.document_exports.freeze_document_keys", paused_freeze)
+    results: dict[str, Any] = {}
+
+    def run_export() -> None:
+        close_old_connections()
+        worker = Client()
+        worker.force_login(installation.owner)
+        results["export"] = worker.get(route, {"export_format": "md"})
+        close_old_connections()
+
+    def run_source_edit() -> None:
+        close_old_connections()
+        hardware_type = type(asset.hardware)
+        results["updated"] = hardware_type.objects.filter(pk=asset.hardware.pk).update(serial_number="NEW-0002")
+        close_old_connections()
+
+    export_thread = threading.Thread(target=run_export)
+    edit_thread = threading.Thread(target=run_source_edit)
+    export_thread.start()
+    assert snapshot_holds_source.wait(timeout=10)
+    edit_thread.start()
+    time.sleep(0.2)
+    try:
+        assert edit_thread.is_alive()
+    finally:
+        release_snapshot.set()
+    export_thread.join(timeout=10)
+    edit_thread.join(timeout=10)
+
+    assert not export_thread.is_alive()
+    assert not edit_thread.is_alive()
+    assert results["export"].status_code == 200
+    assert results["export"].content == b"Serial OLD\\-0001.\n"
+    assert results["updated"] == 1
+
+
+@pytest.mark.django_db
+def test_client_visible_publication_refuses_a_key_withheld_from_that_audience(installation):
+    from apps.core.publications import PublicationConflict, publish_document
+
+    organization = _organization(installation.tenant, "Withheld publishing client")
+    asset = _asset_with_serial(installation, organization, name="Private firewall", serial="PRIVATE-0001")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Client runbook", markdown)
     _bind(installation, document=document, target=asset.entity, organization=organization)
 
-    with pytest.raises(ExportConflict, match="subject.serial_number"):
-        resolve_export_snapshot(
+    with pytest.raises(PublicationConflict, match="could not be resolved for the selected audience"):
+        publish_document(
             workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
             document=document,
+            actor_id=installation.owner.pk,
+            reason="Must not use publisher authority",
+            audience="client_visible",
+            retention="permanent",
+            retention_review_on=None,
         )
+
+    assert document.publications.count() == 0
+
+
+@pytest.mark.django_db
+def test_publication_freezes_a_content_key_to_one_exact_block_revision(installation):
+    from apps.core.document_exports import resolve_export_snapshot
+    from apps.core.publications import publish_document, verify_publication
+
+    organization = _organization(installation.tenant, "Content publishing client")
+    source = _document(
+        installation,
+        organization,
+        "Shared restart procedure",
+        "## Restart safely\n\nUse **maintenance mode** before restarting.",
+    )
+    source_block = source.placements.get(parent__isnull=True).block
+    source_revision = source_block.current_revision
+    assert source_revision is not None
+    markdown = "Before.\n\n<tekdocs://key/procedure.content>\n\nAfter."
+    document = _document(installation, organization, "Content-key runbook", markdown)
+    _bind(
+        installation,
+        document=document,
+        target=source_block.entity,
+        organization=organization,
+        name="procedure",
+    )
+
+    publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+        actor_id=installation.owner.pk,
+        reason="Freeze shared content",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+
+    assert KEY_TARGET_SCHEME not in publication.canonical_markdown
+    assert "## Restart safely" in publication.canonical_markdown
+    assert "<strong>maintenance mode</strong>" in publication.sanitized_html
+    resolution = publication.manifest["key_resolutions"][0]
+    assert resolution["kind"] == "content"
+    assert resolution["expression"] == "procedure.content"
+    assert resolution["source_entity_id"] == str(source_block.entity_id)
+    assert resolution["source_revision_id"] == str(source_revision.id)
+    assert resolution["source_revision_number"] == source_revision.revision_number
+    assert resolution["source_fingerprint"] == source_revision.checksum
+    assert resolution["dependency_chain"] == [str(source_block.entity_id)]
+    assert all(verify_publication(publication).values())
+
+    exported = resolve_export_snapshot(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+        document=document,
+    )
+    assert "## Restart safely" in exported.markdown
+    assert "<strong>maintenance mode</strong>" in exported.sanitized_html
+    assert exported.manifest["key_resolutions"][0]["source_revision_id"] == str(source_revision.id)
+
+
+@pytest.mark.django_db
+def test_client_visible_publication_resolves_only_explicitly_client_visible_content(installation):
+    from apps.core.publications import PublicationConflict, publish_document
+
+    organization = _organization(installation.tenant, "Client content audience")
+    source = _document(installation, organization, "Client recovery step", "Use the client recovery vault.")
+    source_block = source.placements.get(parent__isnull=True).block
+    document = _document(
+        installation,
+        organization,
+        "Client recovery runbook",
+        "<tekdocs://key/recovery.content>",
+    )
+    _bind(
+        installation,
+        document=document,
+        target=source_block.entity,
+        organization=organization,
+        name="recovery",
+    )
+    workspace = resolve_organization_workspace(installation.owner, entity_id=organization.entity_id)
+
+    with pytest.raises(PublicationConflict, match="could not be resolved for the selected audience"):
+        publish_document(
+            workspace=workspace,
+            document=document,
+            actor_id=installation.owner.pk,
+            reason="Private source must remain withheld",
+            audience="client_visible",
+            retention="permanent",
+            retention_review_on=None,
+        )
+
+    source_block.entity.visibility = EntityVisibility.CLIENT_VISIBLE
+    source_block.entity.save(update_fields=("visibility", "updated_at"))
+    publication = publish_document(
+        workspace=workspace,
+        document=document,
+        actor_id=installation.owner.pk,
+        reason="Publish authorized client content",
+        audience="client_visible",
+        retention="permanent",
+        retention_review_on=None,
+    )
+
+    assert publication.lifecycle_state == "pending_approval"
+    assert publication.canonical_markdown == "Use the client recovery vault.\n"
+    assert publication.manifest["key_resolutions"][0]["kind"] == "content"
+
+
+@pytest.mark.django_db
+def test_content_key_cycles_and_inline_expansion_fail_before_publication(installation):
+    from apps.core.publications import PublicationConflict, publish_document
+
+    organization = _organization(installation.tenant, "Content refusal client")
+    cyclic_source = _document(
+        installation,
+        organization,
+        "Cyclic shared content",
+        "<tekdocs://key/procedure.content>",
+    )
+    source_block = cyclic_source.placements.get(parent__isnull=True).block
+
+    safe_source = _document(installation, organization, "Safe shared content", "Restart safely.")
+    safe_source_block = safe_source.placements.get(parent__isnull=True).block
+    for title, markdown, message, target in (
+        (
+            "Cyclic runbook",
+            "<tekdocs://key/procedure.content>",
+            "Circular content-key expansion",
+            source_block.entity,
+        ),
+        (
+            "Inline runbook",
+            "Before <tekdocs://key/procedure.content> after.",
+            "Content keys must appear on a line by themselves",
+            safe_source_block.entity,
+        ),
+    ):
+        document = _document(installation, organization, title, markdown)
+        _bind(
+            installation,
+            document=document,
+            target=target,
+            organization=organization,
+            name="procedure",
+        )
+        with pytest.raises(PublicationConflict, match=message):
+            publish_document(
+                workspace=resolve_organization_workspace(installation.owner, entity_id=organization.entity_id),
+                document=document,
+                actor_id=installation.owner.pk,
+                reason="Exercise content-key refusal",
+                audience="msp_internal",
+                retention="permanent",
+                retention_review_on=None,
+            )
+        assert document.publications.count() == 0
+
+
+@pytest.mark.django_db
+def test_content_key_depth_and_resolved_size_limits_fail_before_publication(installation, monkeypatch):
+    from apps.core.publications import PublicationConflict, publish_document
+
+    organization = _organization(installation.tenant, "Bounded content client")
+    leaf = _document(installation, organization, "Leaf content", "Leaf procedure.")
+    leaf_block = leaf.placements.get(parent__isnull=True).block
+    parent = _document(
+        installation,
+        organization,
+        "Parent content",
+        "<tekdocs://key/leaf.content>",
+    )
+    parent_block = parent.placements.get(parent__isnull=True).block
+    destination = _document(
+        installation,
+        organization,
+        "Depth-limited runbook",
+        "<tekdocs://key/parent.content>",
+    )
+    _bind(installation, document=destination, target=parent_block.entity, organization=organization, name="parent")
+    _bind(installation, document=destination, target=leaf_block.entity, organization=organization, name="leaf")
+    workspace = resolve_organization_workspace(installation.owner, entity_id=organization.entity_id)
+
+    monkeypatch.setattr("apps.core.document_key_freeze.MAXIMUM_CONTENT_KEY_DEPTH", 2)
+    with pytest.raises(PublicationConflict, match="2-level expansion limit"):
+        publish_document(
+            workspace=workspace,
+            document=destination,
+            actor_id=installation.owner.pk,
+            reason="Exercise the content depth bound",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+    assert destination.publications.count() == 0
+
+    sized = _document(installation, organization, "Size-limited runbook", "<tekdocs://key/leaf.content>")
+    _bind(installation, document=sized, target=leaf_block.entity, organization=organization, name="leaf")
+    monkeypatch.setattr("apps.core.document_key_freeze.MAXIMUM_CONTENT_KEY_DEPTH", 32)
+    monkeypatch.setattr("apps.core.document_key_freeze.MAXIMUM_FROZEN_MARKDOWN_BYTES", 8)
+    with pytest.raises(PublicationConflict, match="2 MiB rendering limit"):
+        publish_document(
+            workspace=workspace,
+            document=sized,
+            actor_id=installation.owner.pk,
+            reason="Exercise the content size bound",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+    assert sized.publications.count() == 0
+
+
+@pytest.mark.django_db
+def test_live_preview_expands_a_standalone_content_key_through_the_markdown_pipeline(installation, client):
+    organization = _organization(installation.tenant, "Live content client")
+    source = _document(
+        installation,
+        organization,
+        "Live shared content",
+        "## Shared heading\n\nUse **safe mode**.",
+    )
+    source_block = source.placements.get(parent__isnull=True).block
+    markdown = "Before.\n\n<tekdocs://key/shared.content>\n\nAfter."
+    document = _document(installation, organization, "Live content runbook", markdown)
+    _bind(
+        installation,
+        document=document,
+        target=source_block.entity,
+        organization=organization,
+        name="shared",
+    )
+    client.force_login(installation.owner)
+
+    response = client.post(
+        reverse("markdown-render"),
+        {
+            "markdown": markdown,
+            "organization_id": str(organization.entity_id),
+            "document_id": str(document.entity_id),
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    html = response.json()["html"]
+    assert "<h2>Shared heading</h2>" in html
+    assert "<strong>safe mode</strong>" in html
+    assert KEY_TARGET_SCHEME not in html
+
+    detail = client.get(
+        reverse(
+            "organization-document-detail",
+            kwargs={
+                "organization_entity_id": organization.entity_id,
+                "document_entity_id": document.entity_id,
+            },
+        )
+    )
+    assert detail.status_code == 200
+    placement_html = " ".join(item["resolved_html"] for item in detail.json()["placements"])
+    assert "<h2>Shared heading</h2>" in placement_html
+    assert "<strong>safe mode</strong>" in placement_html
 
 
 @pytest.mark.django_db

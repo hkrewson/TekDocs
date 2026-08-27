@@ -834,7 +834,7 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
             canonical_markdown="Reference content\n",
             sanitized_html="<p>Reference content</p>",
             manifest={
-                "format": "tekdocs-static-publication/v2",
+                "format": "tekdocs-static-publication/v3",
                 "publication_id": str(publication_id),
                 "publication_entity_id": str(publication_entity.id),
                 "source_document_id": str(document.entity_id),
@@ -844,6 +844,8 @@ def test_runtime_document_projection_exposes_only_the_referenced_client():
                 "retention": "permanent",
                 "retention_review_on": None,
                 "supersedes_id": None,
+                "published_at": "2026-08-09T12:00:00Z",
+                "key_resolutions": [],
                 "artifacts": [
                     {
                         "id": str(artifact_id),

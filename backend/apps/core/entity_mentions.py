@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from .models import Entity
 from .relationships import entities_for_mentions
 from .rendering import entity_ids_in_markdown
 from .workspaces import ResolvedWorkspace
@@ -14,9 +15,18 @@ class EntityMention(TypedDict):
     workspace_label: str
 
 
-def resolve_entity_mentions(*, workspace: ResolvedWorkspace, markdown: str) -> dict[str, EntityMention]:
+def resolve_entity_mentions(
+    *, workspace: ResolvedWorkspace, markdown: str, lock: bool = False
+) -> dict[str, EntityMention]:
     entity_ids = entity_ids_in_markdown(markdown)
     records = entities_for_mentions(workspace=workspace, entity_ids=entity_ids)
+    if lock and records:
+        locked_ids = {entity.id for entity in records}
+        locked_ids.update(
+            entity.organization.entity_id for entity in records if entity.organization is not None
+        )
+        list(Entity.objects.select_for_update().filter(id__in=locked_ids).order_by("id"))
+        records = entities_for_mentions(workspace=workspace, entity_ids=entity_ids)
     mentions: dict[str, EntityMention] = {}
     for entity in records:
         organization = entity.organization

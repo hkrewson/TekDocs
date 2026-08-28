@@ -1,0 +1,7 @@
+services:
+  migrate:
+    build:
+      target: production
+  backend:
+    build:
+      target: production

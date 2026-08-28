@@ -30,7 +30,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, entity_visible_to_audience
 
-from .document_key_fields import RESOLVABLE_RECORDS
+from .document_key_fields import ADDRESSABLE_ENTITY_TYPES, addressable_fields
 from .document_key_resolution import ResolutionState, audience_for, resolve_markdown_keys
 from .document_keys import BINDING_NAME_PATTERN
 from .document_views import _document, _msp_workspace, _organization_workspace
@@ -77,8 +77,7 @@ class KeyBindingResultSerializer(serializers.Serializer):
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_addressable_fields(self, binding: DocumentKeyBinding) -> list[str]:
         """Every key path this binding can resolve, so an author need not guess."""
-        record = RESOLVABLE_RECORDS.get(binding.target_entity.entity_type)
-        return sorted(record.fields) if record is not None else []
+        return addressable_fields(binding.target_entity.entity_type)
 
     @extend_schema_field(BoundDocumentSerializer(many=True))
     def get_also_bound_by(self, binding: DocumentKeyBinding) -> list[dict[str, str]]:
@@ -158,7 +157,7 @@ def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: R
             {
                 "results": KeyBindingResultSerializer(page, many=True, context=context).data,
                 "count": len(page),
-                "addressable_entity_types": sorted(RESOLVABLE_RECORDS),
+                "addressable_entity_types": sorted(ADDRESSABLE_ENTITY_TYPES),
             }
         )
 
@@ -177,13 +176,13 @@ def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: R
         workspace.member, target, audience=audience_for(workspace.member), organization=workspace.organization
     ):
         return Response({"code": "target_unavailable", "detail": "The selected record is not available."}, status=404)
-    if target.entity_type not in RESOLVABLE_RECORDS:
+    if target.entity_type not in ADDRESSABLE_ENTITY_TYPES:
         return Response(
             {
                 "code": "target_not_addressable",
                 "detail": (
                     "Keys cannot yet read fields from this kind of record. Addressable kinds: "
-                    f"{', '.join(sorted(RESOLVABLE_RECORDS))}."
+                    f"{', '.join(sorted(ADDRESSABLE_ENTITY_TYPES))}."
                 ),
             },
             status=400,

@@ -15,7 +15,8 @@ ENV NODE_ENV=production \
 # `make production-image-rehearsal`.
 ARG CHROMIUM_SERIES=151
 
-RUN apk add --no-cache chromium rsvg-convert \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache chromium rsvg-convert \
     && installed="$(/usr/bin/chromium-browser --version)" \
     && case "$installed" in \
          "Chromium ${CHROMIUM_SERIES}."*) : ;; \

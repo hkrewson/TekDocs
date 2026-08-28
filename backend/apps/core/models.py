@@ -1,3 +1,4 @@
+import re
 import uuid
 from pathlib import PurePosixPath
 
@@ -3388,6 +3389,7 @@ class DocumentPublication(models.Model):
         if not isinstance(self.manifest, dict) or self.manifest.get("format") not in {
             "tekdocs-static-publication/v1",
             "tekdocs-static-publication/v2",
+            "tekdocs-static-publication/v3",
         }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
@@ -3419,7 +3421,7 @@ class DocumentPublication(models.Model):
             or supersedes.audience != self.audience
         ):
             raise ValidationError("A correction may supersede only a publication of the same document and workspace")
-        if self.manifest.get("format") == "tekdocs-static-publication/v2":
+        if self.manifest.get("format") in {"tekdocs-static-publication/v2", "tekdocs-static-publication/v3"}:
             expected_lifecycle = {
                 "reason": self.reason,
                 "audience": self.audience,
@@ -3429,6 +3431,60 @@ class DocumentPublication(models.Model):
             }
             if any(self.manifest.get(key) != value for key, value in expected_lifecycle.items()):
                 raise ValidationError("Publication manifest lifecycle metadata does not match the publication")
+        if self.manifest.get("format") == "tekdocs-static-publication/v3":
+            key_resolutions = self.manifest.get("key_resolutions")
+            if not isinstance(key_resolutions, list):
+                raise ValidationError("Publication key resolutions are invalid")
+            expressions: list[str] = []
+            required = {
+                "kind",
+                "expression",
+                "value",
+                "source_entity_id",
+                "source_entity_type",
+                "source_fingerprint",
+                "provenance",
+                "resolved_at",
+                "source_revision_id",
+                "source_revision_number",
+                "dependency_chain",
+            }
+            for resolution in key_resolutions:
+                if not isinstance(resolution, dict) or set(resolution) != required:
+                    raise ValidationError("Publication key resolutions are invalid")
+                string_fields = required - {"source_revision_id", "source_revision_number", "dependency_chain"}
+                if not all(isinstance(resolution[key], str) for key in string_fields):
+                    raise ValidationError("Publication key resolutions are invalid")
+                if (
+                    resolution["kind"] not in {"field", "content"}
+                    or not resolution["expression"]
+                    or not resolution["value"]
+                    or re.fullmatch(r"[0-9a-f]{64}", resolution["source_fingerprint"]) is None
+                    or resolution["provenance"] not in {"local", "observed"}
+                    or resolution["resolved_at"] != self.manifest.get("published_at")
+                ):
+                    raise ValidationError("Publication key resolutions are invalid")
+                revision_id = resolution["source_revision_id"]
+                revision_number = resolution["source_revision_number"]
+                dependency_chain = resolution["dependency_chain"]
+                if not isinstance(dependency_chain, list) or not all(
+                    isinstance(item, str) for item in dependency_chain
+                ):
+                    raise ValidationError("Publication key resolutions are invalid")
+                if resolution["kind"] == "field" and (
+                    revision_id is not None or revision_number is not None or dependency_chain
+                ):
+                    raise ValidationError("Field-key revision metadata is invalid")
+                if resolution["kind"] == "content" and (
+                    not isinstance(revision_id, str)
+                    or not isinstance(revision_number, int)
+                    or revision_number < 1
+                    or not dependency_chain
+                ):
+                    raise ValidationError("Content-key revision metadata is invalid")
+                expressions.append(resolution["expression"])
+            if expressions != sorted(set(expressions)):
+                raise ValidationError("Publication key resolutions must be unique and ordered")
 
     @property
     def lifecycle_state(self) -> str:

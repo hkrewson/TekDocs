@@ -224,7 +224,7 @@ jobs:
       FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
       RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
       COMMIT_TAG: sha-${{ github.sha }}
-      MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0ecd93c3c9d2a392d63d65722edff5cfc1c67b8484118b39051dc67e6fa8d6df
+      MAILPIT_IMAGE: axllent/mailpit:edge@sha256:8ff5eae4b0873bbfe047f408e681a4e59885f819dcb891e5f424b46135191e1b
       TRIVY_IMAGE: aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
       TRIVY_CACHE_DIR: /tmp/tekdocs-trivy-cache
     steps:

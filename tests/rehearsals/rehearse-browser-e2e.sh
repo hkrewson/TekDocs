@@ -21,7 +21,7 @@ cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
     echo "Browser rehearsal failed; recent service logs follow." >&2
-    browser_compose logs --no-color --tail=100 backend frontend >&2 || true
+    browser_compose logs --no-color --tail=100 db migrate backend frontend >&2 || true
   fi
   browser_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   docker image rm -f "$playwright_image" >/dev/null 2>&1 || true

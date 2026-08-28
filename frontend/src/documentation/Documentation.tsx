@@ -453,7 +453,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const insertKey = (binding: DocumentKeyBinding, path: string) => {
     // A key is an autolink on the scheme the dialect already understands, so this is
     // the same insertion shape as a record reference rather than new editor syntax.
-    const append = (current: string) => `${current}${current && !current.endsWith('\n') ? ' ' : ''}<tekdocs://key/${binding.name}.${path}>`
+    const target = `<tekdocs://key/${binding.name}.${path}>`
+    const append = (current: string) => {
+      if (path === 'content') return `${current}${current && !current.endsWith('\n\n') ? (current.endsWith('\n') ? '\n' : '\n\n') : ''}${target}\n`
+      return `${current}${current && !current.endsWith('\n') ? ' ' : ''}${target}`
+    }
     if (editingBlock) setEditingBlock({ ...editingBlock, draft: append(editingBlock.draft) })
     else if (newBlockOpen) setNewBlockMarkdown(append(newBlockMarkdown))
     else setMarkdown(append)

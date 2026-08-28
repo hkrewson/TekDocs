@@ -9,28 +9,16 @@
 # specific scan it was reasoned about, never to every scan, so an exception cannot
 # drift onto an image it was never argued for.
 #
-# Before renewing an entry, re-check the upstream dependency first. For the entries
-# below that means reading https://github.com/axllent/mailpit/blob/develop/go.mod
-# and confirming whether `golang.org/x/mod` has moved to v0.40.0 or later.
+# Before renewing an entry, re-check the current pinned Mailpit image first and
+# confirm whether its Alpine packages include OpenSSL 3.5.8-r0 or later.
 
 vulnerabilities:
-  - id: CVE-2026-56864
-    purls:
-      - "pkg:golang/golang.org/x/mod"
-    expired_at: 2026-10-18
+  - id: CVE-2026-14456
+    expired_at: 2026-09-10
     statement: >-
-      golang.org/x/mod is an indirect dependency of axllent/mailpit, pinned upstream
-      at v0.38.0 as of 2026-08-19; no newer mailpit digest carries the fix. The
-      affected symbol is golang.org/x/mod/sumdb.Client.Lookup, reachable only when a
-      Go toolchain resolves modules against an untrusted GOPROXY or GOSUMDB. Mailpit
-      fetches no Go modules at runtime, and its SMTP port is not published outside
-      the internal Compose network. Re-evaluate on expiry; see TD-RISK-062.
-  - id: CVE-2026-56865
-    purls:
-      - "pkg:golang/golang.org/x/mod"
-    expired_at: 2026-10-18
-    statement: >-
-      Same component and reasoning as CVE-2026-56864. The affected symbol is the
-      transparency-log tile verification in golang.org/x/mod/sumdb, reachable only
-      during Go module resolution against an untrusted GOPROXY. Fixed upstream in
-      golang.org/x/mod v0.40.0. Re-evaluate on expiry; see TD-RISK-062.
+      The current Mailpit edge digest fixes its previously excepted Go module
+      findings but still contains Alpine's libcrypto3 and libssl3 3.5.7-r0. Mailpit
+      is a statically linked Go binary (ldd reports it is not a dynamic program), so
+      it does not load either library; TekDocs exposes no OpenSSL QUIC server, the
+      vulnerable path. Mailpit's UI is bound to localhost and SMTP remains on the
+      internal Compose network. Re-evaluate on expiry; see TD-RISK-062.

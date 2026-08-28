@@ -541,6 +541,25 @@ it('declares a key binding, inserts a key, and reports what has not resolved', a
   expect(archiveKeyBinding).toHaveBeenCalledWith({}, 'doc-1', 'binding-1')
 })
 
+it('inserts a content key on its own Markdown line', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, listKeyBindings, keyBinding } = clients()
+  listKeyBindings.mockResolvedValue({
+    results: [{ ...keyBinding, name: 'procedure', target_entity_type: 'document_block', addressable_fields: ['content'] }],
+    count: 1,
+    addressable_entity_types: ['client_asset', 'document_block', 'network_device'],
+  })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+  await user.click(screen.getByRole('button', { name: 'Edit this content' }))
+
+  await user.selectOptions(screen.getByLabelText('procedure'), 'content')
+
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value)
+    .toBe('# Firewall\n\n<tekdocs://key/procedure.content>\n')
+})
+
 it('answers a binding name the server would refuse before the request is made', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, declareKeyBinding, searchMentionEntities } = clients()

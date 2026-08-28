@@ -50,7 +50,8 @@ function placementAudienceLabel(profile: PlacementAudienceProfile): string {
   return translate('documentation.audienceShared')
 }
 
-export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient, relationshipsClient }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient; relationshipsClient?: RelationshipsClient }) {
+export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient, relationshipsClient, initialDocumentId }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient; relationshipsClient?: RelationshipsClient; initialDocumentId?: string | null }) {
+  const requestedDocumentId = initialDocumentId ?? null
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
   const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[] } | null>(null)
@@ -126,6 +127,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const replacementFileInput = useRef<HTMLInputElement>(null)
   const insertionMenu = useRef<HTMLDivElement>(null)
   const restoreInsertionPosition = useRef<number | null>(null)
+  const openedDeepLink = useRef<string | null>(null)
 
   useEffect(() => {
     if (inserterOpen) insertionMenu.current?.querySelector<HTMLButtonElement>('.document-insert-types button')?.focus()
@@ -143,10 +145,38 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   useEffect(() => {
     const controller = new AbortController()
     client.list(scope, controller.signal, { q: documentQuery, category: categoryFilter, template: templateFilter })
-      .then((result) => { if (!controller.signal.aborted) { setLoaded({ key: scopeKey, results: result.results }); setPhase('ready'); setError(null) } })
+      .then(async (result) => {
+        if (controller.signal.aborted) return
+        setLoaded({ key: scopeKey, results: result.results })
+        setPhase('ready')
+        const deepLinkKey = requestedDocumentId ? `${scopeKey}:${requestedDocumentId}` : null
+        let deepLinked = requestedDocumentId ? result.results.find((item) => item.id === requestedDocumentId) : null
+        if (requestedDocumentId && deepLinkKey && openedDeepLink.current !== deepLinkKey) {
+          openedDeepLink.current = deepLinkKey
+          if (!deepLinked) {
+            try {
+              deepLinked = await client.get(scope, requestedDocumentId, controller.signal)
+            } catch {
+              if (!controller.signal.aborted) setError('That document is not available in this workspace.')
+              return
+            }
+          }
+          if (controller.signal.aborted) return
+          setSelected(deepLinked)
+          setTitle(deepLinked.title)
+          setMarkdown(deepLinked.markdown)
+          setCategory(deepLinked.category)
+          setIsTemplate(deepLinked.is_template)
+          setLibraryVisible(deepLinked.library_visible)
+          if (deepLinked.primary_file?.media_type === 'application/pdf') {
+            setViewedPdf({ filename: deepLinked.primary_file.filename, url: client.attachmentDownloadUrl(scope, deepLinked.id, deepLinked.primary_file.id) })
+          }
+        }
+        setError(null)
+      })
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
-  }, [categoryFilter, client, documentQuery, revision, scope, scopeKey, templateFilter])
+  }, [categoryFilter, client, documentQuery, requestedDocumentId, revision, scope, scopeKey, templateFilter])
 
   useEffect(() => {
     if (!workspace) return

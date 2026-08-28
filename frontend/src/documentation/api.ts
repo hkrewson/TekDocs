@@ -258,6 +258,7 @@ export class RevisionConflictError extends AuthRequestError {
 
 export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
+  get(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentRecord>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
@@ -426,6 +427,9 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.template && filters.template !== 'all') query.set('template', filters.template)
     const response = await fetch(`${collectionPath(scope)}${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
+  },
+  async get(scope, id, signal) {
+    return parse<DocumentRecord>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
   async createFileBacked(scope, input) {

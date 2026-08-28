@@ -16,6 +16,7 @@ const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owne
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
+  const getDocument = vi.fn().mockResolvedValue(document)
   const createDocument = vi.fn((_scope: object, input: DocumentInput) => Promise.resolve({ ...document, ...input, id: 'doc-2' }))
   const updateDocument = vi.fn((_scope: object, _id: string, input: DocumentUpdateInput) => Promise.resolve({ ...document, ...input, current_revision_id: 'revision-2', revision_number: 2 }))
   const restructurePreview = { eligible: true, base_revision_id: 'revision-1', base_checksum: 'abc123', section_count: 2, sections: [{ position: 0, kind: 'heading' as const, name: 'Firewall standard — Firewall', markdown: '# Firewall', checksum: 'section-1' }, { position: 1, kind: 'rich_text' as const, name: 'Firewall standard — Require MFA', markdown: 'Require MFA.', checksum: 'section-2' }], blockers: [], warnings: [], dependencies: { publication_count: 0, attachment_count: 0, template_managed: false, remote_managed: false, shared_placement_count: 0 } }
@@ -77,6 +78,7 @@ function clients() {
   const applyRemoteObservation = vi.fn().mockResolvedValue({ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-08-15T00:00:00Z', canonical_markdown: '# Setup\n', diff: '+# Setup' })
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
+    get: getDocument,
     create: createDocument,
     createFileBacked,
     update: updateDocument,
@@ -131,7 +133,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
+  return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
 
 it('lists titles and persists an independently edited block', async () => {
@@ -148,6 +150,22 @@ it('lists titles and persists an independently edited block', async () => {
   await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(updateSharedBlock).toHaveBeenCalledWith({}, 'doc-1', 'placement-1', '# Updated', 'revision-1'))
   expect(screen.getByRole('status')).toHaveTextContent('Content saved.')
+})
+
+it('opens an authorized document supplied by a workspace deep link', async () => {
+  const { documents, workspaces } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" />)
+
+  expect(await screen.findByRole('heading', { name: 'Firewall' })).toBeVisible()
+})
+
+it('retrieves an authorized deep-linked document that is outside the first list page', async () => {
+  const { documents, workspaces, getDocument } = clients()
+  documents.list = vi.fn().mockResolvedValue({ results: [], count: 51 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" />)
+
+  expect(await screen.findByRole('heading', { name: 'Firewall' })).toBeVisible()
+  expect(getDocument).toHaveBeenCalledWith({}, 'doc-1', expect.any(AbortSignal))
 })
 
 it('loads revision history and a selected diff', async () => {

@@ -105,7 +105,21 @@ describe('application shell', () => {
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Compliance' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+    expect(screen.getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files')
+    expect(screen.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/certificates')
+    expect(screen.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Activity' })).not.toBeInTheDocument()
+    expect(screen.getByText('Reusable documentation and templates')).toBeInTheDocument()
+    expect(screen.getByText('TekDocs 0.8.41')).toBeInTheDocument()
+  })
+
+  it('does not attach a stale release promise to the hidden activity placeholder', () => {
+    render(app('/activity'))
+
+    expect(screen.getByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Not scheduled' })).toBeInTheDocument()
+    expect(screen.queryByText('Planned 0.1.0')).not.toBeInTheDocument()
   })
 
   it('provides stable page-level help without loading remote content', async () => {
@@ -188,6 +202,7 @@ describe('application shell', () => {
     await screen.findByRole('heading', { name: 'Acme Dental' })
     const sidebar = within(screen.getByRole('complementary'))
     expect(sidebar.getByRole('link', { name: 'Assets' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
+    expect(sidebar.getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/files')
     expect(sidebar.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/certificates')
     expect(sidebar.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
     expect(sidebar.queryByRole('link', { name: 'Products' })).not.toBeInTheDocument()
@@ -236,7 +251,7 @@ describe('application shell', () => {
     expect(document.title).toBe('Example MSP · Overview · TekDocs')
     const sidebar = within(screen.getByRole('complementary'))
     expect(sidebar.getByRole('link', { name: 'Organizations' })).toHaveAttribute('href', '/organizations')
-    expect(sidebar.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+    expect(sidebar.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     for (const link of sidebar.getAllByRole('link')) expect(link.getAttribute('href')).not.toMatch(/^\/workspaces\/organizations\//)
   })
 })

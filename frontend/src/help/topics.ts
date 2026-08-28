@@ -9,6 +9,7 @@ export const WIKI_PUBLISHED = false
 
 const topics: Record<string, HelpTopic> = {
   overview: { title: 'Workspace overview', summary: 'Understand MSP and organization ownership, navigation, and workspace boundaries.', slug: 'Workspaces-and-organizations' },
+  search: { title: 'Workspace search', summary: 'Find records through the active workspace and its permission boundary.', slug: 'Workspaces-and-organizations' },
   organizations: { title: 'Organizations', summary: 'Create clients and suppliers, classify them, and enter their isolated workspaces.', slug: 'Organizations' },
   people: { title: 'People', summary: 'Manage MSP employees and organization contacts, locations, and access assignments.', slug: 'People-and-access' },
   sites: { title: 'Sites and locations', summary: 'Represent buildings and nested physical locations without mixing organization ownership.', slug: 'Sites-and-locations' },

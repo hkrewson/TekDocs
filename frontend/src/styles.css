@@ -198,6 +198,31 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .status-table { border-top: 1px solid var(--border); }
 .status-row { display: grid; grid-template-columns: 1fr minmax(160px, 30%); gap: 24px; padding: 12px 2px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .status-row span:last-child { color: var(--muted); }
+.exposure-heading { align-items: end; }
+.exposure-heading p, .search-results-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.exposure-search { width: min(320px, 100%); min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 10px; color: var(--muted); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.exposure-search input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--text); background: transparent; }
+.compact-button { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding-inline: 10px; font-size: 12px; text-decoration: none; }
+.record-selector { display: grid; border-top: 1px solid var(--border); }
+.record-selector > button { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 8px 2px; color: var(--text); background: transparent; border: 0; border-bottom: 1px solid var(--border); text-align: left; cursor: pointer; }
+.record-selector > button:hover, .record-selector > button.selected { background: var(--surface-subtle); }
+.record-selector > button > span:first-child { display: grid; gap: 3px; }
+.record-selector small, .record-selector > button > span:last-child { color: var(--muted); font-size: 12px; }
+.exposure-link-list, .search-result-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.exposure-link-list li { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.exposure-link-list li > span { display: grid; gap: 3px; }
+.exposure-link-list small { color: var(--muted); font-size: 12px; }
+.exposure-link-list a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.page-search { margin-bottom: 20px; }
+.page-search > label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.page-search > div { display: flex; align-items: center; gap: 8px; max-width: 720px; padding-left: 10px; color: var(--muted); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.page-search input { min-width: 0; flex: 1; min-height: 38px; border: 0; outline: 0; color: var(--text); background: transparent; }
+.page-search button { margin: -1px; border-radius: 0 7px 7px 0; }
+.search-results-heading { margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--border); }
+.search-result-list a { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 2px; color: var(--text); border-bottom: 1px solid var(--border); text-decoration: none; }
+.search-result-list a:hover { color: var(--accent); background: var(--surface-subtle); }
+.search-result-list a > span { display: grid; gap: 3px; }
+.search-result-list small { color: var(--muted); font-size: 12px; }
 .organization-form-section { margin-bottom: 18px; }
 .organization-form-section .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .organization-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -1369,6 +1394,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .certificate-history { border-top: 1px solid var(--border); margin-top: 22px; padding-top: 18px; }
 
 @media (max-width: 720px) {
+  .exposure-heading { align-items: stretch; flex-direction: column; }
+  .exposure-search { width: 100%; }
+  .exposure-link-list li { align-items: flex-start; flex-direction: column; }
+  .record-selector > button { align-items: flex-start; flex-direction: column; gap: 4px; }
   .staff-invitation-form { align-items: stretch; flex-direction: column; }
   .staff-invitation-form label { max-width: none; }
   .staff-member-row { grid-template-columns: 1fr; gap: 3px; padding-block: 12px; }

@@ -106,7 +106,7 @@ def _create_portal_document_history(*, result, organization, source, count: int)
             created_at=publication.published_at,
         )
         publication.manifest = {
-            "format": "tekdocs-static-publication/v3",
+            "format": "tekdocs-static-publication/v4",
             "publication_id": str(publication.id),
             "publication_entity_id": str(entity.id),
             "source_document_id": str(source.document.entity_id),
@@ -119,6 +119,7 @@ def _create_portal_document_history(*, result, organization, source, count: int)
             "supersedes_id": None,
             "published_at": publication.published_at.isoformat(),
             "key_resolutions": [],
+            "placements": [{"audience_profile": "shared"}],
             "artifacts": [
                 {
                     "id": str(artifact.id),

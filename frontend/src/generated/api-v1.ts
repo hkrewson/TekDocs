@@ -7850,6 +7850,13 @@ export interface components {
              * @enum {string}
              */
             readonly resolution_mode: "live" | "pinned";
+            /**
+             * @description * `shared` - Shared
+             *     * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience_profile: "shared" | "msp_internal" | "client_visible";
             /** Format: uuid */
             readonly pinned_revision_id: string | null;
             /** Format: uuid */
@@ -7880,6 +7887,14 @@ export interface components {
              * @enum {string}
              */
             readonly resolution_mode: "live" | "pinned";
+            /**
+             * @description * `shared` - Shared
+             *     * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @default shared
+             * @enum {string}
+             */
+            readonly audience_profile: "shared" | "msp_internal" | "client_visible";
             /** Format: uuid */
             readonly pinned_revision_id?: string | null;
             /** Format: uuid */
@@ -9793,6 +9808,13 @@ export interface components {
             readonly resolution_mode?: "live" | "pinned";
             /** Format: uuid */
             readonly pinned_revision_id?: string | null;
+            /**
+             * @description * `shared` - Shared
+             *     * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience_profile?: "shared" | "msp_internal" | "client_visible";
         };
         readonly PatchedHandoffWrite: {
             readonly name?: string;

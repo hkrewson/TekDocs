@@ -122,7 +122,7 @@ def verify_fixture():
         assert "<tekdocs://key/" not in snapshot.markdown
         assert "# Retained publication" in snapshot.markdown
         assert "Created by 0.8.38." in snapshot.markdown
-        assert snapshot.manifest["format"] == "tekdocs-portable-document/v2"
+        assert snapshot.manifest["format"] == "tekdocs-portable-document/v3"
         assert snapshot.manifest["key_resolutions"][0]["value"] == (
             "# Retained publication\n\nCreated by 0.8.38.\n"
         )
@@ -144,11 +144,11 @@ def verify_fixture():
             retention="permanent",
             retention_review_on=None,
         )
-        assert publication.manifest["format"] == "tekdocs-static-publication/v3"
+        assert publication.manifest["format"] == "tekdocs-static-publication/v4"
         assert publication.canonical_markdown == snapshot.markdown
         assert publication.manifest["key_resolutions"][0]["kind"] == "content"
         assert all(verify_publication(publication).values())
-        print("Prior v2 evidence and new v3 resolved output survived the production-image upgrade")
+        print("Prior v2 evidence and new v4 audience-aware output survived the production-image upgrade")
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

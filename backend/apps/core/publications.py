@@ -59,7 +59,7 @@ from .rendering import (
 )
 from .workspaces import ResolvedWorkspace
 
-MANIFEST_VERSION = "tekdocs-static-publication/v3"
+MANIFEST_VERSION = "tekdocs-static-publication/v4"
 SIGNATURE_ALGORITHM = "Ed25519"
 MAX_PUBLICATION_MARKDOWN_BYTES = 2 * 1024 * 1024
 MAX_RETAINED_ATTACHMENTS = 50
@@ -202,7 +202,7 @@ def publish_document(
     try:
         with transaction.atomic():
             try:
-                locked_document, resolved = lock_document_composition(document)
+                locked_document, resolved = lock_document_composition(document, audience=audience)
             except PlacementConflict as exc:
                 raise PublicationConflict(str(exc)) from exc
             if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
@@ -393,6 +393,7 @@ def publish_document(
                         "depth": item.depth,
                         "block_id": str(item.placement.block.entity_id),
                         "resolution_mode": item.placement.resolution_mode,
+                        "audience_profile": item.placement.audience_profile,
                         "revision_id": str(item.revision.id),
                         "revision_number": item.revision.revision_number,
                         "checksum": item.revision.checksum,

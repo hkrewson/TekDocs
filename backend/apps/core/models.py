@@ -3390,6 +3390,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v1",
             "tekdocs-static-publication/v2",
             "tekdocs-static-publication/v3",
+            "tekdocs-static-publication/v4",
         }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
@@ -3421,7 +3422,11 @@ class DocumentPublication(models.Model):
             or supersedes.audience != self.audience
         ):
             raise ValidationError("A correction may supersede only a publication of the same document and workspace")
-        if self.manifest.get("format") in {"tekdocs-static-publication/v2", "tekdocs-static-publication/v3"}:
+        if self.manifest.get("format") in {
+            "tekdocs-static-publication/v2",
+            "tekdocs-static-publication/v3",
+            "tekdocs-static-publication/v4",
+        }:
             expected_lifecycle = {
                 "reason": self.reason,
                 "audience": self.audience,
@@ -3431,7 +3436,10 @@ class DocumentPublication(models.Model):
             }
             if any(self.manifest.get(key) != value for key, value in expected_lifecycle.items()):
                 raise ValidationError("Publication manifest lifecycle metadata does not match the publication")
-        if self.manifest.get("format") == "tekdocs-static-publication/v3":
+        if self.manifest.get("format") in {
+            "tekdocs-static-publication/v3",
+            "tekdocs-static-publication/v4",
+        }:
             key_resolutions = self.manifest.get("key_resolutions")
             if not isinstance(key_resolutions, list):
                 raise ValidationError("Publication key resolutions are invalid")
@@ -3485,6 +3493,17 @@ class DocumentPublication(models.Model):
                 expressions.append(resolution["expression"])
             if expressions != sorted(set(expressions)):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
+        if self.manifest.get("format") == "tekdocs-static-publication/v4":
+            placements = self.manifest.get("placements")
+            if not isinstance(placements, list) or not placements:
+                raise ValidationError("Publication placements are invalid")
+            allowed_profiles = {PlacementAudienceProfile.SHARED, self.audience}
+            if any(
+                not isinstance(placement, dict)
+                or placement.get("audience_profile") not in allowed_profiles
+                for placement in placements
+            ):
+                raise ValidationError("Publication placement audiences are invalid")
 
     @property
     def lifecycle_state(self) -> str:
@@ -3812,6 +3831,12 @@ class PlacementResolutionMode(models.TextChoices):
     PINNED = "pinned", "Pinned"
 
 
+class PlacementAudienceProfile(models.TextChoices):
+    SHARED = "shared", "Shared"
+    MSP_INTERNAL = "msp_internal", "MSP internal"
+    CLIENT_VISIBLE = "client_visible", "Client visible"
+
+
 class DocumentPlacement(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_placements")
@@ -3826,6 +3851,11 @@ class DocumentPlacement(TimestampedModel):
         max_length=12,
         choices=PlacementResolutionMode.choices,
         default=PlacementResolutionMode.LIVE,
+    )
+    audience_profile = models.CharField(
+        max_length=24,
+        choices=PlacementAudienceProfile.choices,
+        default=PlacementAudienceProfile.SHARED,
     )
     pinned_revision = models.ForeignKey(
         BlockRevision,
@@ -3858,6 +3888,18 @@ class DocumentPlacement(TimestampedModel):
                 ),
                 name="document_placement_resolution_target",
             ),
+            models.CheckConstraint(
+                condition=models.Q(audience_profile__in=PlacementAudienceProfile.values),
+                name="document_placement_audience_profile",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(parent__isnull=False)
+                    | ~models.Q(position=0)
+                    | models.Q(audience_profile=PlacementAudienceProfile.SHARED)
+                ),
+                name="document_primary_placement_shared",
+            ),
         ]
         indexes = [
             models.Index(
@@ -3887,6 +3929,13 @@ class DocumentPlacement(TimestampedModel):
             or parent.organization_id != self.organization_id
         ):
             raise ValidationError("Placement parent must belong to the same document")
+        if self.parent_id is None and self.position == 0 and self.audience_profile != PlacementAudienceProfile.SHARED:
+            raise ValidationError("The primary document placement must be shared")
+        if parent is not None and (
+            parent.audience_profile != PlacementAudienceProfile.SHARED
+            and parent.audience_profile != self.audience_profile
+        ):
+            raise ValidationError("A child placement cannot widen its parent's audience")
         if self.resolution_mode == PlacementResolutionMode.LIVE and self.pinned_revision_id is not None:
             raise ValidationError("Live placements cannot pin a revision")
         if self.resolution_mode == PlacementResolutionMode.PINNED and self.pinned_revision_id is None:

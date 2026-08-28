@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.39
+  version: 0.8.40
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -26320,6 +26320,18 @@ components:
             * `pinned` - Pinned
           x-spec-enum-id: 64514791a3b82619
           readOnly: true
+        audience_profile:
+          enum:
+          - shared
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `shared` - Shared
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: bc4d62aeea8b32d0
+          readOnly: true
         pinned_revision_id:
           type: string
           format: uuid
@@ -26344,6 +26356,7 @@ components:
           type: boolean
           readOnly: true
       required:
+      - audience_profile
       - block_id
       - block_kind
       - block_name
@@ -26390,6 +26403,18 @@ components:
             * `pinned` - Pinned
           x-spec-enum-id: 64514791a3b82619
           default: live
+        audience_profile:
+          enum:
+          - shared
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `shared` - Shared
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: bc4d62aeea8b32d0
+          default: shared
         pinned_revision_id:
           type: string
           format: uuid
@@ -30851,6 +30876,17 @@ components:
           type: string
           format: uuid
           nullable: true
+        audience_profile:
+          enum:
+          - shared
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `shared` - Shared
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: bc4d62aeea8b32d0
     PatchedHandoffWrite:
       type: object
       properties:

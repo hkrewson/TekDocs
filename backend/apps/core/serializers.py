@@ -29,6 +29,7 @@ from .models import (
     OrganizationAccessMode,
     OrganizationKind,
     PersonAssociationKind,
+    PlacementAudienceProfile,
     PlacementResolutionMode,
     PublicationAudience,
     PublicationRetention,
@@ -639,6 +640,10 @@ class DocumentPlacementWriteSerializer(serializers.Serializer):
     source_document_id = serializers.UUIDField(required=False)
     source_block_id = serializers.UUIDField(required=False)
     resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices, default="live")
+    audience_profile = serializers.ChoiceField(
+        choices=PlacementAudienceProfile.choices,
+        default=PlacementAudienceProfile.SHARED,
+    )
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
     parent_id = serializers.UUIDField(required=False, allow_null=True)
     position = serializers.IntegerField(min_value=0, required=False, allow_null=True)
@@ -699,8 +704,14 @@ class DocumentPlacementWriteSerializer(serializers.Serializer):
 
 
 class DocumentPlacementUpdateSerializer(serializers.Serializer):
-    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices)
+    resolution_mode = serializers.ChoiceField(choices=PlacementResolutionMode.choices, required=False)
     pinned_revision_id = serializers.UUIDField(required=False, allow_null=True)
+    audience_profile = serializers.ChoiceField(choices=PlacementAudienceProfile.choices, required=False)
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        if not attrs:
+            raise serializers.ValidationError("Provide a resolution mode or audience profile to update.")
+        return attrs
 
 
 class BlockLibraryQuerySerializer(serializers.Serializer):
@@ -797,6 +808,7 @@ class DocumentPlacementSerializer(serializers.Serializer):
     position = serializers.SerializerMethodField()
     depth = serializers.IntegerField()
     resolution_mode = serializers.SerializerMethodField()
+    audience_profile = serializers.SerializerMethodField()
     pinned_revision_id = serializers.SerializerMethodField()
     resolved_revision_id = serializers.SerializerMethodField()
     resolved_revision_number = serializers.SerializerMethodField()
@@ -835,6 +847,10 @@ class DocumentPlacementSerializer(serializers.Serializer):
     @extend_schema_field(serializers.ChoiceField(choices=PlacementResolutionMode.choices))
     def get_resolution_mode(self, obj: ResolvedPlacement) -> str:
         return self._placement(obj).resolution_mode
+
+    @extend_schema_field(serializers.ChoiceField(choices=PlacementAudienceProfile.choices))
+    def get_audience_profile(self, obj: ResolvedPlacement) -> str:
+        return self._placement(obj).audience_profile
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_pinned_revision_id(self, obj: ResolvedPlacement) -> UUID | None:

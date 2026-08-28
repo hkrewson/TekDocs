@@ -647,12 +647,12 @@ def test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_
         retention_review_on=None,
     )
     retained_digest = publication.content_digest
-    assert publication.manifest["format"] == "tekdocs-static-publication/v3"
+    assert publication.manifest["format"] == "tekdocs-static-publication/v4"
 
     call_command("migrate", "core", "0123_data_flow_snapshot_guards", verbosity=0, interactive=False)
     retained = DocumentPublication.objects.get(pk=publication.pk)
     assert retained.content_digest == retained_digest
-    assert retained.manifest["format"] == "tekdocs-static-publication/v3"
+    assert retained.manifest["format"] == "tekdocs-static-publication/v4"
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_document_publication'::regproc)")
         assert "tekdocs-static-publication/v2" in cursor.fetchone()[0]
@@ -662,7 +662,8 @@ def test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_document_publication'::regproc)")
         guard = cursor.fetchone()[0]
-    assert "tekdocs-static-publication/v3" in guard
+    assert "tekdocs-static-publication/v4" in guard
     assert "key_resolutions" in guard
+    assert "audience_profile" in guard
     assert retained.content_digest == retained_digest
     assert all(verify_publication(retained).values())

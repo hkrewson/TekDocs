@@ -11,7 +11,7 @@ import { RevisionConflictError } from './api'
 import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClient } from './api'
 import type { WorkspaceClient } from '../workspaces/api'
 
-const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
+const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, audience_profile: 'shared' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
 const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
@@ -139,7 +139,7 @@ it('lists titles and persists an independently edited block', async () => {
   const { documents, workspaces, updateSharedBlock } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  expect(await screen.findByRole('heading', { name: 'Firewall' })).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Firewall' })).toBeVisible())
   expect(screen.queryByText('Document blocks')).not.toBeInTheDocument()
   expect(screen.queryByText(/Select a block to edit/)).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Edit this content' }))
@@ -286,9 +286,40 @@ it('adds a visible document block live and can pin its resolved revision', async
   await user.click(screen.getByRole('button', { name: 'Existing content' }))
   await user.selectOptions(screen.getByLabelText('Link a document'), 'doc-source')
   await user.click(screen.getByRole('button', { name: 'Insert document' }))
-  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null, position: 1 }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null, position: 1, audience_profile: 'shared' }))
   await user.click(screen.getByRole('button', { name: 'Keep this version' }))
   expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused', { resolution_mode: 'pinned', pinned_revision_id: 'revision-source' })
+})
+
+it('shows explicit placement audiences, previews each publication, and updates a profile', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, updatePlacement } = clients()
+  const audienceDocument: DocumentRecord = {
+    ...document,
+    placements: [
+      primaryPlacement,
+      { ...primaryPlacement, id: 'placement-internal', block_id: 'block-internal', position: 1, is_primary: false, audience_profile: 'msp_internal', resolved_html: '<p>Operator sentinel</p>', resolved_markdown: 'Operator sentinel' },
+      { ...primaryPlacement, id: 'placement-client', block_id: 'block-client', position: 2, is_primary: false, audience_profile: 'client_visible', resolved_html: '<p>Client sentinel</p>', resolved_markdown: 'Client sentinel' },
+    ],
+    placement_count: 3,
+  }
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [audienceDocument], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+
+  expect(screen.getByText('MSP and client')).toBeVisible()
+  expect(screen.getByText('MSP only')).toBeVisible()
+  expect(screen.getByText('Client only')).toBeVisible()
+  await user.selectOptions(screen.getByLabelText('Preview'), 'client_visible')
+  expect(screen.queryByText('Operator sentinel')).not.toBeInTheDocument()
+  expect(screen.getByText('Client sentinel')).toBeVisible()
+  expect(screen.getByText('2 visible sections')).toBeVisible()
+
+  await user.selectOptions(screen.getByLabelText('Preview'), 'all')
+  const internalSection = screen.getByText('Operator sentinel').closest('li')
+  expect(internalSection).not.toBeNull()
+  await user.click(within(internalSection!).getByRole('button', { name: 'Include for client only' }))
+  expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-internal', { audience_profile: 'client_visible' })
 })
 
 it('creates a typed local block at an explicit document position', async () => {
@@ -308,6 +339,7 @@ it('creates a typed local block at an explicit document position', async () => {
     markdown: '## Addressing',
     position: 1,
     library_visible: false,
+    audience_profile: 'shared',
   }))
 })
 
@@ -325,7 +357,7 @@ it('discovers and reuses an explicitly available MSP block from a client workspa
   expect(await screen.findByText('Printer isolation rationale')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Insert' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', {
-    operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null, position: 1,
+    operation: 'reuse_block', source_block_id: 'block-shared', resolution_mode: 'live', pinned_revision_id: null, position: 1, audience_profile: 'shared',
   }))
 })
 

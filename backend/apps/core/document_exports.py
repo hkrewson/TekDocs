@@ -45,7 +45,7 @@ from .rendering import (
 from .workspaces import ResolvedWorkspace
 
 EXPORT_FORMATS = frozenset({"md", "html", "pdf", "docx", "bundle"})
-BUNDLE_FORMAT = "tekdocs-portable-document/v2"
+BUNDLE_FORMAT = "tekdocs-portable-document/v3"
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 _MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable(("table", "strikethrough"))
@@ -250,6 +250,7 @@ def resolve_export_snapshot(
                 "depth": item.depth,
                 "block_id": str(item.placement.block.entity_id),
                 "resolution_mode": item.placement.resolution_mode,
+                "audience_profile": item.placement.audience_profile,
                 "revision_id": str(item.revision.id),
                 "revision_number": item.revision.revision_number,
                 "checksum": item.revision.checksum,

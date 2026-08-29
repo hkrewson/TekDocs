@@ -283,7 +283,7 @@ test('client context routes every menu item to that client and searches clients 
   for (const link of await navigationLinks.all()) {
     await expect(link).toHaveAttribute('href', new RegExp(`^/workspaces/organizations/${clientWorkspace.id}/`))
   }
-  await expect(page.getByRole('link', { name: 'Accounting' })).not.toBeVisible()
+  await expect(page.getByRole('link', { name: 'Accounting' })).toHaveCount(0)
 
   await page.getByRole('button', { name: /Current workspace: Acme Dental/ }).click()
   const search = page.getByRole('textbox', { name: 'Find a client' })
@@ -300,7 +300,7 @@ test('client context routes every menu item to that client and searches clients 
   for (const link of await page.locator('aside nav a').all()) {
     await expect(link).not.toHaveAttribute('href', /^\/workspaces\/organizations\//)
   }
-  await expect(page.getByRole('link', { name: 'Accounting' })).toHaveAttribute('href', '/accounting')
+  await expect(page.getByRole('link', { name: 'Accounting' })).toHaveCount(0)
 })
 
 test('client People directory supports field controls and remains accessible', async ({ page }) => {

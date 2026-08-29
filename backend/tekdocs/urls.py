@@ -250,6 +250,15 @@ from apps.core.inventory_views import (
     ClientHardwareLifecycleView,
     ClientVendorListView,
 )
+from apps.core.invoice_views import (
+    InvoiceDetailView,
+    InvoiceLineDetailView,
+    InvoiceLineListCreateView,
+    InvoiceListCreateView,
+    InvoiceOriginChoiceView,
+    ServiceRateDetailView,
+    ServiceRateListCreateView,
+)
 from apps.core.netbox_reconciliation_views import (
     NetBoxReconciliationPreviewView,
     NetBoxReferenceChoiceView,
@@ -1330,6 +1339,31 @@ urlpatterns = [
         name="organization-catalog-specification-definition-version-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices",
+        InvoiceListCreateView.as_view(),
+        name="organization-invoice-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/origin-choices",
+        InvoiceOriginChoiceView.as_view(),
+        name="organization-invoice-origin-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>",
+        InvoiceDetailView.as_view(),
+        name="organization-invoice-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/lines",
+        InvoiceLineListCreateView.as_view(),
+        name="organization-invoice-line-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/lines/<uuid:line_id>",
+        InvoiceLineDetailView.as_view(),
+        name="organization-invoice-line-detail",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/credential-references",
         OrganizationCredentialReferenceListCreateView.as_view(),
         name="organization-credential-reference-list-create",
@@ -1499,6 +1533,16 @@ urlpatterns = [
         CommercialContractListCreateView.as_view(),
         {"organization_entity_id": None},
         name="msp-commercial-contract-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/service-rates",
+        ServiceRateListCreateView.as_view(),
+        name="msp-service-rate-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/service-rates/<uuid:rate_id>",
+        ServiceRateDetailView.as_view(),
+        name="msp-service-rate-detail",
     ),
     path(
         "api/v1/workspaces/msp/contracts/providers",

@@ -158,6 +158,184 @@ class TaxRate(models.Model):
             raise ValidationError({"effective_to": "Effective end cannot precede effective start"})
 
 
+class ServiceRate(TimestampedModel):
+    """A reusable tenant-owned sell rate; invoice lines retain a snapshot."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="service_rates")
+    name = models.CharField(max_length=160)
+    description = models.CharField(max_length=1000, blank=True)
+    unit_amount = models.DecimalField(max_digits=18, decimal_places=4)
+    currency = models.CharField(max_length=3)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(unit_amount__gte=0), name="service_rate_amount_nonnegative"),
+            models.UniqueConstraint(
+                Lower("name"),
+                "tenant",
+                condition=models.Q(archived_at__isnull=True),
+                name="service_rate_name_active_unique",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "archived_at", "name"), name="core_servicerate_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        from .money import MoneyError, normalize_currency, validate_amount
+
+        try:
+            self.currency = normalize_currency(self.currency)
+            validate_amount(self.unit_amount, self.currency)
+        except MoneyError as exc:
+            raise ValidationError({"unit_amount": str(exc)}) from exc
+
+
+class InvoiceState(models.TextChoices):
+    DRAFT = "draft", "Draft"
+
+
+class Invoice(TimestampedModel):
+    """An unnumbered, exact-Workspace invoice draft."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoices")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoices")
+    entity = models.OneToOneField("Entity", on_delete=models.PROTECT, related_name="invoice")
+    state = models.CharField(max_length=16, choices=InvoiceState.choices, default=InvoiceState.DRAFT)
+    currency = models.CharField(max_length=3)
+    invoice_date = models.DateField()
+    due_date = models.DateField()
+    reference = models.CharField(max_length=240, blank=True)
+    notes = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-invoice_date", "-created_at", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(state=InvoiceState.DRAFT), name="invoice_draft_state_only"),
+            models.CheckConstraint(
+                condition=models.Q(due_date__gte=models.F("invoice_date")), name="invoice_due_date_valid"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "state", "invoice_date"), name="core_invoice_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+    def clean(self) -> None:
+        from .money import MoneyError, normalize_currency
+
+        if self.entity_id and (
+            self.entity.tenant_id != self.tenant_id
+            or self.entity.organization_id != self.organization_id
+            or self.entity.entity_type != "invoice"
+            or self.entity.visibility != "msp_private"
+        ):
+            raise ValidationError("Invoice entity identity, scope, and visibility must match")
+        if self.organization_id and self.organization.tenant_id != self.tenant_id:
+            raise ValidationError("Invoice organization must belong to its tenant")
+        if self.due_date and self.invoice_date and self.due_date < self.invoice_date:
+            raise ValidationError({"due_date": "Due date cannot precede invoice date"})
+        try:
+            self.currency = normalize_currency(self.currency)
+        except MoneyError as exc:
+            raise ValidationError({"currency": str(exc)}) from exc
+
+
+class InvoiceLine(TimestampedModel):
+    """A draft line whose sell values never resolve through its optional origin."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_lines")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoice_lines")
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
+    position = models.PositiveSmallIntegerField(default=1)
+    description = models.CharField(max_length=1000)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=1)
+    unit_amount = models.DecimalField(max_digits=18, decimal_places=4)
+    currency = models.CharField(max_length=3)
+    tax_rate_name = models.CharField(max_length=120, blank=True)
+    tax_rate_value = models.DecimalField(max_digits=9, decimal_places=6, default=0)
+    tax_inclusive = models.BooleanField(default=False)
+    catalog_product = models.ForeignKey(
+        "CatalogProduct", on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
+    )
+    service_rate = models.ForeignKey(
+        ServiceRate, on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
+    )
+    contract_cost = models.ForeignKey(
+        "ContractCost", on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("position", "created_at", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(position__gte=1), name="invoice_line_position_positive"),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name="invoice_line_quantity_positive"),
+            models.CheckConstraint(condition=models.Q(tax_rate_value__gte=0), name="invoice_line_tax_nonnegative"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(catalog_product__isnull=True, service_rate__isnull=True)
+                    | models.Q(catalog_product__isnull=True, contract_cost__isnull=True)
+                    | models.Q(service_rate__isnull=True, contract_cost__isnull=True)
+                ),
+                name="invoice_line_one_origin",
+            ),
+            models.UniqueConstraint(fields=("invoice", "position"), name="invoice_line_position_unique"),
+        ]
+        indexes = [models.Index(fields=("tenant", "organization", "invoice"), name="core_invline_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.description
+
+    def clean(self) -> None:
+        from .money import MoneyError, calculate_line, normalize_currency
+
+        if self.invoice_id and (
+            self.invoice.tenant_id != self.tenant_id or self.invoice.organization_id != self.organization_id
+        ):
+            raise ValidationError("Invoice line must use its invoice scope")
+        origins = tuple(
+            origin for origin in (self.catalog_product, self.service_rate, self.contract_cost) if origin is not None
+        )
+        if len(origins) > 1:
+            raise ValidationError("Invoice line may retain only one origin")
+        for origin in origins:
+            if origin.tenant_id != self.tenant_id:
+                raise ValidationError("Invoice line origin must belong to its tenant")
+        contract_cost = self.contract_cost if self.contract_cost_id else None
+        if contract_cost is not None and contract_cost.organization_id != self.organization_id:
+            raise ValidationError("Contract cost origin must belong to the invoice Workspace")
+        try:
+            self.currency = normalize_currency(self.currency)
+            if self.invoice_id and self.currency != self.invoice.currency:
+                raise MoneyError("Invoice line currency must match the invoice currency")
+            calculate_line(
+                quantity=self.quantity,
+                unit_amount=self.unit_amount,
+                currency=self.currency,
+                tax_rate=self.tax_rate_value,
+                tax_inclusive=self.tax_inclusive,
+            )
+        except MoneyError as exc:
+            raise ValidationError({"unit_amount": str(exc)}) from exc
+
+
 class InstallationState(models.Model):
     """The single, migration-created installation bootstrap record."""
 
@@ -421,6 +599,8 @@ class CatalogProduct(TimestampedModel):
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="catalog_product")
     kind = models.CharField(max_length=16, choices=CatalogProductKind.choices)
     description = models.CharField(max_length=1000, blank=True)
+    unit_amount = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    currency = models.CharField(max_length=3, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
@@ -428,6 +608,15 @@ class CatalogProduct(TimestampedModel):
 
     class Meta:
         ordering = ("entity__display_name", "entity_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(unit_amount__isnull=True, currency="")
+                    | models.Q(unit_amount__isnull=False) & ~models.Q(currency="")
+                ),
+                name="catalog_product_price_pair",
+            )
+        ]
         indexes = [
             models.Index(fields=("tenant", "organization", "kind", "archived_at"), name="core_catprod_scope_idx")
         ]
@@ -436,12 +625,22 @@ class CatalogProduct(TimestampedModel):
         return self.entity.display_name
 
     def clean(self) -> None:
+        from .money import MoneyError, normalize_currency, validate_amount
+
         if self.entity_id and (
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Catalog product and entity scopes must match")
         if self.organization_id and self.organization.tenant_id != self.tenant_id:
             raise ValidationError("Catalog product organization must belong to its tenant")
+        if (self.unit_amount is None) != (not self.currency):
+            raise ValidationError("Catalog product price and currency must be provided together")
+        if self.unit_amount is not None:
+            try:
+                self.currency = normalize_currency(self.currency)
+                validate_amount(self.unit_amount, self.currency)
+            except MoneyError as exc:
+                raise ValidationError({"unit_amount": str(exc)}) from exc
 
 
 class CatalogSpecificationDefinition(TimestampedModel):

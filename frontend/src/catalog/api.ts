@@ -76,11 +76,13 @@ export type CatalogProduct = {
   name: string
   kind: ProductKind
   description: string
+  unit_amount?: string | null
+  currency?: string
   updated_at: string
   models: CatalogModel[]
   documents: CatalogProductDocument[]
 }
-export type ProductDraft = { name: string; kind: ProductKind; description: string }
+export type ProductDraft = { name: string; kind: ProductKind; description: string; unit_amount?: string | null; currency?: string }
 export type DefinitionDraft = { name: string; product_kind: ProductKind; schema: SpecificationSchema }
 export type ModelDraft = {
   name: string

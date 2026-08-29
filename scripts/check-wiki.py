@@ -18,8 +18,8 @@ LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 def validate(wiki: Path | None) -> None:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     pages = data.get("pages")
-    if not isinstance(pages, list) or len(pages) != 29:
-        raise ValueError("Wiki manifest must define exactly 29 public pages")
+    if not isinstance(pages, list) or len(pages) != 30:
+        raise ValueError("Wiki manifest must define exactly 30 public pages")
 
     slugs: set[str] = set()
     contextual: set[str] = set()

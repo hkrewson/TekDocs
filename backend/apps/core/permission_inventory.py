@@ -490,6 +490,49 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.ASSETS_EDIT,),
         organization_scoped=True,
     ),
+    route(
+        "organization-invoice-list-create",
+        ("GET", "POST"),
+        PermissionKey.INVOICES_VIEW,
+        (PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-origin-choices",
+        ("GET",),
+        PermissionKey.INVOICES_EDIT,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-detail",
+        ("GET", "PATCH", "DELETE"),
+        PermissionKey.INVOICES_VIEW,
+        (PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-line-list-create",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-line-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
+        organization_scoped=True,
+    ),
+    route(
+        "msp-service-rate-list-create",
+        ("GET", "POST"),
+        PermissionKey.INVOICES_VIEW,
+        (PermissionKey.INVOICES_EDIT,),
+    ),
+    route(
+        "msp-service-rate-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
+    ),
     route("msp-asset-list-create", ("GET", "POST"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-bulk", ("POST",), mutations=(PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-csv-template", ("GET",), PermissionKey.ASSETS_VIEW),
@@ -1027,9 +1070,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
     ),
-    route(
-        "organization-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True
-    ),
+    route("organization-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route(
         "organization-document-operations-choices",
         ("GET",),

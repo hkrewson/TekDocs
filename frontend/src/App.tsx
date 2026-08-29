@@ -24,6 +24,7 @@ import {
   Network,
   Package,
   Plug,
+  ReceiptText,
   Search,
   Settings,
   ShieldCheck,
@@ -54,6 +55,7 @@ import { browserDomainsClient } from './domains/api'
 import type { DomainsClient } from './domains/api'
 import { browserInventoryClient } from './inventory/api'
 import { browserCommercialClient } from './commercial/api'
+import { browserInvoiceClient } from './accounting/api'
 import type { InventoryClient } from './inventory/api'
 import { browserWebhooksClient } from './integrations/api'
 import type { WebhooksClient } from './integrations/api'
@@ -97,6 +99,7 @@ const StaffAdministration = lazy(async () => ({ default: (await import('./staff/
 const Sites = lazy(async () => ({ default: (await import('./sites/Sites')).Sites }))
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
+const Invoices = lazy(async () => ({ default: (await import('./accounting/Invoices')).Invoices }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
 const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
@@ -148,6 +151,9 @@ const navigationSections: NavigationSection[] = [
   { label: 'Relationships', items: [
     { label: 'Vendors', path: '/vendors', area: 'vendors', icon: Handshake },
     { label: 'Products', path: '/products', area: 'products', icon: Package },
+  ] },
+  { label: 'Business', items: [
+    { label: 'Accounting', path: '/accounting', area: 'accounting', icon: ReceiptText },
   ] },
   { label: 'Governance', items: [
     { label: 'Custom fields', path: '/custom-fields', area: 'custom_fields', icon: ListPlus },
@@ -203,7 +209,9 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   const availableSections = navigationSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !workspace || workspace.capabilities.includes(item.area)),
+      items: section.items.filter((item) => workspace
+        ? workspace.capabilities.includes(item.area)
+        : item.area !== 'accounting'),
     }))
     .filter((section) => section.items.length > 0)
   return (
@@ -392,6 +400,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
   deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
   activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },
+  accounting: { title: 'Accounting', description: 'Unnumbered invoice drafts scoped to this client organization.', release: '0.8.44' },
 }
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
@@ -417,6 +426,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'deadlines') return <Reminders workspace={state.workspace} relationshipsClient={relationshipsClient} />
   if (area === 'activity') return <ActivityLog workspace={state.workspace} />
+  if (area === 'accounting') return <Suspense fallback={<section className="content-section" role="status">Loading invoice drafts…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
   if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />

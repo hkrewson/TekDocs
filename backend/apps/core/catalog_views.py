@@ -60,11 +60,15 @@ class ProductWriteSerializer(StrictSerializer):
     name = serializers.CharField(max_length=240, trim_whitespace=True)
     kind = serializers.ChoiceField(choices=CatalogProductKind.choices)
     description = serializers.CharField(max_length=1000, allow_blank=True, required=False, default="")
+    unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, allow_null=True)
+    currency = serializers.CharField(max_length=3, allow_blank=True, required=False, default="")
 
 
 class ProductUpdateSerializer(StrictSerializer):
     name = serializers.CharField(max_length=240, trim_whitespace=True)
     description = serializers.CharField(max_length=1000, allow_blank=True, required=False, default="")
+    unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, allow_null=True)
+    currency = serializers.CharField(max_length=3, allow_blank=True, required=False)
 
 
 class DefinitionWriteSerializer(StrictSerializer):
@@ -174,6 +178,8 @@ class CatalogProductSerializer(serializers.Serializer):
     name = serializers.CharField(source="entity.display_name")
     kind = serializers.ChoiceField(choices=CatalogProductKind.choices)
     description = serializers.CharField()
+    unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, allow_null=True)
+    currency = serializers.CharField()
     updated_at = serializers.DateTimeField()
     models = CatalogModelSerializer(many=True)
     documents = serializers.SerializerMethodField()

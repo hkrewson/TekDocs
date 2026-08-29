@@ -87,7 +87,7 @@ describe('Products', () => {
     await user.type(within(editor).getByLabelText('Description'), 'Cloud-managed gateway')
     await user.click(within(editor).getByRole('button', { name: 'Create product' }))
     await waitFor(() => expect(createProduct).toHaveBeenCalledWith(workspace, {
-      name: 'Cloud Gateway', kind: 'software', description: 'Cloud-managed gateway',
+      name: 'Cloud Gateway', kind: 'software', description: 'Cloud-managed gateway', unit_amount: null, currency: '',
     }))
   })
 

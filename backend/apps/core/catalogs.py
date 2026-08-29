@@ -4,7 +4,8 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
+from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
 from django.db import transaction
@@ -45,6 +46,9 @@ SPECIFICATION_KEY = re.compile(r"^[a-z][a-z0-9_]{0,79}$")
 
 class CatalogError(ValueError):
     pass
+
+
+_UNSET = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +196,15 @@ def definitions_for_scope(scope: DataScope) -> QuerySet[CatalogSpecificationDefi
 
 @transaction.atomic
 def create_product(
-    *, tenant: Tenant, organization: Organization, actor_id: UUID, name: str, kind: str, description: str
+    *,
+    tenant: Tenant,
+    organization: Organization,
+    actor_id: UUID,
+    name: str,
+    kind: str,
+    description: str,
+    unit_amount: Decimal | None = None,
+    currency: str = "",
 ) -> CatalogProduct:
     require_supplier(organization)
     entity = Entity.objects.create(
@@ -203,9 +215,17 @@ def create_product(
         display_name=name,
         visibility=EntityVisibility.MSP_PRIVATE,
     )
-    product = CatalogProduct.objects.create(
-        tenant=tenant, organization=organization, entity=entity, kind=kind, description=description
+    product = CatalogProduct(
+        tenant=tenant,
+        organization=organization,
+        entity=entity,
+        kind=kind,
+        description=description,
+        unit_amount=unit_amount,
+        currency=currency,
     )
+    product.full_clean()
+    product.save()
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="catalog.product.created", entity_id=entity.id, metadata={}
     )
@@ -213,12 +233,25 @@ def create_product(
 
 
 @transaction.atomic
-def update_product(*, product: CatalogProduct, actor_id: UUID, name: str, description: str) -> CatalogProduct:
+def update_product(
+    *,
+    product: CatalogProduct,
+    actor_id: UUID,
+    name: str,
+    description: str,
+    unit_amount: Decimal | None | object = _UNSET,
+    currency: str | object = _UNSET,
+) -> CatalogProduct:
     locked = CatalogProduct.objects.select_for_update().select_related("entity").get(pk=product.pk)
     locked.entity.display_name = name
     locked.entity.save(update_fields=("display_name", "updated_at"))
     locked.description = description
-    locked.save(update_fields=("description", "updated_at"))
+    if unit_amount is not _UNSET:
+        locked.unit_amount = cast(Decimal | None, unit_amount)
+    if currency is not _UNSET:
+        locked.currency = cast(str, currency)
+    locked.full_clean()
+    locked.save(update_fields=("description", "unit_amount", "currency", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,

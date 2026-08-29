@@ -85,11 +85,14 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_dataflow",
     "core_dataflowrevision",
     "core_dataflowsnapshot",
+    "core_invoice",
+    "core_invoiceline",
 )
 
 TENANT_SCOPED_TABLES = (
     "core_tenantbillingprofile",
     "core_taxrate",
+    "core_servicerate",
     "core_organization",
     "core_organizationclassification",
     "core_customfielddefinitionversion",

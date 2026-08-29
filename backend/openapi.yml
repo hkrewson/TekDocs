@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.43
+  version: 0.8.44
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -11270,6 +11270,123 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/service-rates:
+    get:
+      operationId: workspaces_msp_service_rates_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceRate'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_service_rates_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRateWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ServiceRateWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ServiceRateWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRate'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/service-rates/{rate_id}:
+    patch:
+      operationId: workspaces_msp_service_rates_partial_update
+      parameters:
+      - in: path
+        name: rate_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedServiceRateWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedServiceRateWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedServiceRateWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRate'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_msp_service_rates_destroy
+      parameters:
+      - in: path
+        name: rate_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Service rate archived
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/vendors:
     get:
       operationId: workspaces_msp_vendors_retrieve
@@ -18730,6 +18847,343 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices:
+    get:
+      operationId: organization_invoices_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_invoices_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}:
+    get:
+      operationId: organization_invoices_retrieve
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    patch:
+      operationId: workspaces_organizations_invoices_partial_update
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_organizations_invoices_destroy
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Draft deleted
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines:
+    post:
+      operationId: workspaces_organizations_invoices_lines_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceLineWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceLineWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceLineWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines/{line_id}:
+    patch:
+      operationId: workspaces_organizations_invoices_lines_partial_update
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: line_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceLineUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceLineUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceLineUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_organizations_invoices_lines_destroy
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: line_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/origin-choices:
+    get:
+      operationId: workspaces_organizations_invoices_origin_choices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginChoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/key-bindings:
     get:
       operationId: key_bindings_organization_browse
@@ -23843,6 +24297,13 @@ components:
           x-spec-enum-id: 07b0be7458d639de
         description:
           type: string
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        currency:
+          type: string
         updated_at:
           type: string
           format: date-time
@@ -23856,12 +24317,14 @@ components:
             $ref: '#/components/schemas/CatalogProductDocument'
           readOnly: true
       required:
+      - currency
       - description
       - documents
       - id
       - kind
       - models
       - name
+      - unit_amount
       - updated_at
     CatalogProductDocument:
       type: object
@@ -29533,6 +29996,189 @@ components:
           maxLength: 254
       required:
       - email
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          type: string
+        currency:
+          type: string
+        invoice_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        reference:
+          type: string
+        notes:
+          type: string
+        subtotal:
+          type: string
+          readOnly: true
+        tax_total:
+          type: string
+          readOnly: true
+        total:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLine'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - currency
+      - due_date
+      - id
+      - invoice_date
+      - lines
+      - notes
+      - reference
+      - state
+      - subtotal
+      - tax_total
+      - total
+      - updated_at
+    InvoiceLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        position:
+          type: integer
+        description:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit_amount:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+        tax_rate_name:
+          type: string
+        tax_rate_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        tax_inclusive:
+          type: boolean
+        net:
+          type: string
+          readOnly: true
+        tax:
+          type: string
+          readOnly: true
+        total:
+          type: string
+          readOnly: true
+        origin_type:
+          type: string
+          readOnly: true
+        origin_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+      required:
+      - currency
+      - description
+      - id
+      - net
+      - origin_id
+      - origin_type
+      - position
+      - quantity
+      - tax
+      - tax_inclusive
+      - tax_rate_name
+      - tax_rate_value
+      - total
+      - unit_amount
+    InvoiceLineWrite:
+      type: object
+      properties:
+        origin_type:
+          enum:
+          - catalog_product
+          - service_rate
+          - contract_cost
+          - ''
+          type: string
+          description: |-
+            * `catalog_product` - catalog_product
+            * `service_rate` - service_rate
+            * `contract_cost` - contract_cost
+          x-spec-enum-id: b8ef6baac959073f
+          default: ''
+        origin_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          maxLength: 1000
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_rate_id:
+          type: string
+          format: uuid
+          nullable: true
+    InvoiceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - results
+    InvoiceWrite:
+      type: object
+      properties:
+        currency:
+          type: string
+          maxLength: 3
+        invoice_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        reference:
+          type: string
+          default: ''
+          maxLength: 240
+        notes:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - currency
+      - due_date
+      - invoice_date
     IssuedAPIToken:
       type: object
       properties:
@@ -31298,6 +31944,47 @@ components:
       required:
       - classifications
       - name
+    OriginChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        origin_type:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        unit_amount:
+          type: string
+        currency:
+          type: string
+        quantity:
+          type: string
+      required:
+      - currency
+      - description
+      - id
+      - name
+      - origin_type
+      - quantity
+      - unit_amount
+    OriginChoiceResult:
+      type: object
+      properties:
+        origins:
+          type: array
+          items:
+            $ref: '#/components/schemas/OriginChoice'
+        tax_rates:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - origins
+      - tax_rates
     OwnerBootstrap:
       type: object
       properties:
@@ -31986,6 +32673,47 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedInvoiceLineUpdate:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 1000
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_rate_name:
+          type: string
+          maxLength: 120
+        tax_rate_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        tax_inclusive:
+          type: boolean
+    PatchedInvoiceUpdate:
+      type: object
+      properties:
+        currency:
+          type: string
+          maxLength: 3
+        invoice_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        reference:
+          type: string
+          maxLength: 240
+        notes:
+          type: string
+          maxLength: 4000
     PatchedLicenseWrite:
       type: object
       properties:
@@ -32420,6 +33148,14 @@ components:
           type: string
           default: ''
           maxLength: 1000
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        currency:
+          type: string
+          maxLength: 3
     PatchedProfileUpdate:
       type: object
       properties:
@@ -32526,6 +33262,23 @@ components:
           additionalProperties:
             type: object
             additionalProperties: {}
+    PatchedServiceRateWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        currency:
+          type: string
+          maxLength: 3
     PatchedSiteWrite:
       type: object
       properties:
@@ -33091,6 +33844,15 @@ components:
           type: string
           default: ''
           maxLength: 1000
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        currency:
+          type: string
+          default: ''
+          maxLength: 3
       required:
       - kind
       - name
@@ -34025,6 +34787,56 @@ components:
           type: string
           format: uuid
           nullable: true
+    ServiceRate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 1000
+        unit_amount:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+          maxLength: 3
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - currency
+      - id
+      - name
+      - unit_amount
+      - updated_at
+    ServiceRateWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        currency:
+          type: string
+          maxLength: 3
+      required:
+      - currency
+      - name
+      - unit_amount
     SharedBlockUpdate:
       type: object
       properties:

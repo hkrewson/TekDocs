@@ -67,6 +67,7 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "activity",
         "recycle_bin",
         "integrations",
+        "accounting",
     ),
     "vendor": (
         "overview",
@@ -131,7 +132,7 @@ CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
     "activity": PermissionKey.ACTIVITY_VIEW,
     "recycle_bin": PermissionKey.RECYCLE_BIN_VIEW,
     "integrations": PermissionKey.INTEGRATIONS_VIEW,
-    "accounting": PermissionKey.COSTS_VIEW,
+    "accounting": PermissionKey.INVOICES_VIEW,
 }
 
 

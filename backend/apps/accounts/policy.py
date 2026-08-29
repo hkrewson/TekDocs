@@ -86,6 +86,8 @@ class PermissionKey(StrEnum):
     NETWORKS_VIEW = "networks.view"
     NETWORKS_EDIT = "networks.edit"
     COSTS_VIEW = "costs.view"
+    INVOICES_VIEW = "invoices.view"
+    INVOICES_EDIT = "invoices.edit"
     CREDENTIAL_REFERENCES_VIEW = "credential_references.view"
     CREDENTIAL_REFERENCES_MANAGE = "credential_references.manage"
     CREDENTIAL_REFERENCES_OPEN = "credential_references.open"
@@ -180,6 +182,8 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.NETWORKS_VIEW, "View networks", "Networks"),
     _permission(PermissionKey.NETWORKS_EDIT, "Edit networks", "Networks", mfa=True),
     _permission(PermissionKey.COSTS_VIEW, "View costs", "Sensitive data"),
+    _permission(PermissionKey.INVOICES_VIEW, "View invoice drafts", "Accounting"),
+    _permission(PermissionKey.INVOICES_EDIT, "Edit invoice drafts", "Accounting", mfa=True),
     _permission(PermissionKey.CREDENTIAL_REFERENCES_VIEW, "View credential references", "Credential references"),
     _permission(
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
@@ -220,6 +224,7 @@ IMPLEMENTED_READS = frozenset(
         PermissionKey.DEADLINES_VIEW,
         PermissionKey.DOMAINS_VIEW,
         PermissionKey.INTEGRATIONS_VIEW,
+        PermissionKey.INVOICES_VIEW,
     }
 )
 TECHNICIAN_MUTATIONS = frozenset(
@@ -278,6 +283,7 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.DOCUMENTS_APPROVE,
         PermissionKey.DOCUMENTS_WITHDRAW,
         PermissionKey.COSTS_VIEW,
+        PermissionKey.INVOICES_EDIT,
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
         PermissionKey.CREDENTIAL_REFERENCES_OPEN,

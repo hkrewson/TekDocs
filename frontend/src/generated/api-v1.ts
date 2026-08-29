@@ -3412,6 +3412,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/service-rates": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_service_rates_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_service_rates_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/service-rates/{rate_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["workspaces_msp_service_rates_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_msp_service_rates_partial_update"];
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/vendors": {
         readonly parameters: {
             readonly query?: never;
@@ -5460,6 +5492,86 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_invoices_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_invoices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["workspaces_organizations_invoices_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_invoices_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_lines_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines/{line_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["workspaces_organizations_invoices_lines_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_invoices_lines_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/origin-choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_invoices_origin_choices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/key-bindings": {
         readonly parameters: {
             readonly query?: never;
@@ -6848,6 +6960,9 @@ export interface components {
              */
             readonly kind: "hardware" | "software";
             readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount: string | null;
+            readonly currency: string;
             /** Format: date-time */
             readonly updated_at: string;
             readonly models: readonly components["schemas"]["CatalogModel"][];
@@ -9208,6 +9323,80 @@ export interface components {
             /** Format: email */
             readonly email: string;
         };
+        readonly Invoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly state: string;
+            readonly currency: string;
+            /** Format: date */
+            readonly invoice_date: string;
+            /** Format: date */
+            readonly due_date: string;
+            readonly reference: string;
+            readonly notes: string;
+            readonly subtotal: string;
+            readonly tax_total: string;
+            readonly total: string;
+            readonly lines: readonly components["schemas"]["InvoiceLine"][];
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly InvoiceLine: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly position: number;
+            readonly description: string;
+            /** Format: decimal */
+            readonly quantity: string;
+            readonly unit_amount: string;
+            readonly currency: string;
+            readonly tax_rate_name: string;
+            /** Format: decimal */
+            readonly tax_rate_value: string;
+            readonly tax_inclusive: boolean;
+            readonly net: string;
+            readonly tax: string;
+            readonly total: string;
+            readonly origin_type: string;
+            /** Format: uuid */
+            readonly origin_id: string | null;
+        };
+        readonly InvoiceLineWrite: {
+            /**
+             * @description * `catalog_product` - catalog_product
+             *     * `service_rate` - service_rate
+             *     * `contract_cost` - contract_cost
+             * @default
+             * @enum {string}
+             */
+            readonly origin_type: "catalog_product" | "service_rate" | "contract_cost" | "";
+            /** Format: uuid */
+            readonly origin_id?: string | null;
+            readonly description?: string;
+            /** Format: decimal */
+            readonly quantity?: string;
+            /** Format: decimal */
+            readonly unit_amount?: string;
+            /** Format: uuid */
+            readonly tax_rate_id?: string | null;
+        };
+        readonly InvoiceResult: {
+            readonly results: readonly components["schemas"]["Invoice"][];
+            readonly can_manage: boolean;
+        };
+        readonly InvoiceWrite: {
+            readonly currency: string;
+            /** Format: date */
+            readonly invoice_date: string;
+            /** Format: date */
+            readonly due_date: string;
+            /** @default  */
+            readonly reference: string;
+            /** @default  */
+            readonly notes: string;
+        };
         readonly IssuedAPIToken: {
             /** Format: uuid */
             readonly id: string;
@@ -9935,6 +10124,22 @@ export interface components {
             readonly website?: string;
             readonly classifications: readonly ("client" | "vendor" | "manufacturer" | "partner")[];
         };
+        readonly OriginChoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly origin_type: string;
+            readonly name: string;
+            readonly description: string;
+            readonly unit_amount: string;
+            readonly currency: string;
+            readonly quantity: string;
+        };
+        readonly OriginChoiceResult: {
+            readonly origins: readonly components["schemas"]["OriginChoice"][];
+            readonly tax_rates: readonly {
+                readonly [key: string]: unknown;
+            }[];
+        };
         readonly OwnerBootstrap: {
             readonly tenant_name: string;
             /** Format: email */
@@ -10301,6 +10506,26 @@ export interface components {
             /** @default  */
             readonly description: string;
         };
+        readonly PatchedInvoiceLineUpdate: {
+            readonly description?: string;
+            /** Format: decimal */
+            readonly quantity?: string;
+            /** Format: decimal */
+            readonly unit_amount?: string;
+            readonly tax_rate_name?: string;
+            /** Format: decimal */
+            readonly tax_rate_value?: string;
+            readonly tax_inclusive?: boolean;
+        };
+        readonly PatchedInvoiceUpdate: {
+            readonly currency?: string;
+            /** Format: date */
+            readonly invoice_date?: string;
+            /** Format: date */
+            readonly due_date?: string;
+            readonly reference?: string;
+            readonly notes?: string;
+        };
         readonly PatchedLicenseWrite: {
             readonly name?: string;
             /** Format: uuid */
@@ -10516,6 +10741,9 @@ export interface components {
             readonly name?: string;
             /** @default  */
             readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount?: string | null;
+            readonly currency?: string;
         };
         readonly PatchedProfileUpdate: {
             readonly display_name?: string;
@@ -10568,6 +10796,14 @@ export interface components {
                     readonly [key: string]: unknown;
                 };
             };
+        };
+        readonly PatchedServiceRateWrite: {
+            readonly name?: string;
+            /** @default  */
+            readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount?: string;
+            readonly currency?: string;
         };
         readonly PatchedSiteWrite: {
             readonly name?: string;
@@ -10826,6 +11062,10 @@ export interface components {
             readonly kind: "hardware" | "software";
             /** @default  */
             readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount?: string | null;
+            /** @default  */
+            readonly currency: string;
         };
         readonly Provider: {
             readonly key: string;
@@ -11238,6 +11478,24 @@ export interface components {
             readonly person_id?: string | null;
             /** Format: uuid */
             readonly installation_id?: string | null;
+        };
+        readonly ServiceRate: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly description?: string;
+            readonly unit_amount: string;
+            readonly currency: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly ServiceRateWrite: {
+            readonly name: string;
+            /** @default  */
+            readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount: string;
+            readonly currency: string;
         };
         readonly SharedBlockUpdate: {
             readonly markdown: string;
@@ -20667,6 +20925,105 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_service_rates_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["ServiceRate"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_service_rates_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ServiceRateWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ServiceRateWrite"];
+                readonly "multipart/form-data": components["schemas"]["ServiceRateWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ServiceRate"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_service_rates_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly rate_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Service rate archived */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly workspaces_msp_service_rates_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly rate_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedServiceRateWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedServiceRateWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedServiceRateWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ServiceRate"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_vendors_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -25840,6 +26197,244 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["IssuedWebhookEndpoint"];
+                };
+            };
+        };
+    };
+    readonly organization_invoices_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvoiceResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceWrite"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly organization_invoices_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Draft deleted */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedInvoiceUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedInvoiceUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedInvoiceUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_lines_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceLineWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceLineWrite"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceLineWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_lines_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly line_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_lines_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly line_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedInvoiceLineUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedInvoiceLineUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedInvoiceLineUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_origin_choices_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OriginChoiceResult"];
                 };
             };
         };

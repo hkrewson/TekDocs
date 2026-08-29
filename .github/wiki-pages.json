@@ -17,6 +17,7 @@
     {"slug": "Credential-references", "audience": "end_user", "contextual": true},
     {"slug": "Services-and-contracts", "audience": "end_user", "contextual": true},
     {"slug": "Vendors-and-products", "audience": "end_user", "contextual": true},
+    {"slug": "Invoice-drafts", "audience": "end_user", "contextual": true},
     {"slug": "Custom-fields", "audience": "end_user", "contextual": true},
     {"slug": "Compliance", "audience": "end_user", "contextual": true},
     {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true},

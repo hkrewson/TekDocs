@@ -5524,6 +5524,22 @@ export interface paths {
         readonly patch: operations["workspaces_organizations_invoices_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/issue": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_issue_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines": {
         readonly parameters: {
             readonly query?: never;
@@ -5554,6 +5570,22 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch: operations["workspaces_organizations_invoices_lines_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/issue-settings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_invoices_issue_settings_retrieve"];
+        readonly put: operations["workspaces_organizations_invoices_issue_settings_update"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/origin-choices": {
@@ -9327,6 +9359,7 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             readonly state: string;
+            readonly number: string;
             readonly currency: string;
             /** Format: date */
             readonly invoice_date: string;
@@ -9342,6 +9375,51 @@ export interface components {
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
+            /** Format: date-time */
+            readonly issued_at: string | null;
+            readonly content_digest: string;
+            readonly signature_algorithm: string;
+            readonly key_fingerprint: string;
+        };
+        readonly InvoiceIssueSettings: {
+            readonly legal_name: string;
+            readonly address_line_1: string;
+            /** @default  */
+            readonly address_line_2: string;
+            readonly city: string;
+            /** @default  */
+            readonly region: string;
+            readonly postal_code: string;
+            readonly country_code: string;
+            /** Format: email */
+            readonly billing_email: string;
+            /** @default  */
+            readonly phone: string;
+            /** @default  */
+            readonly tax_registration: string;
+            readonly default_currency: string;
+            readonly payment_terms_days: number;
+            readonly invoice_prefix: string;
+            /** @default false */
+            readonly yearly_reset: boolean;
+        };
+        readonly InvoiceIssueSettingsResult: {
+            readonly configured: boolean;
+            readonly issue_ready: boolean;
+            readonly legal_name: string;
+            readonly address_line_1: string;
+            readonly address_line_2: string;
+            readonly city: string;
+            readonly region: string;
+            readonly postal_code: string;
+            readonly country_code: string;
+            readonly billing_email: string;
+            readonly phone: string;
+            readonly tax_registration: string;
+            readonly default_currency: string;
+            readonly payment_terms_days: number;
+            readonly invoice_prefix: string;
+            readonly yearly_reset: boolean;
         };
         readonly InvoiceLine: {
             /** Format: uuid */
@@ -9385,6 +9463,7 @@ export interface components {
         readonly InvoiceResult: {
             readonly results: readonly components["schemas"]["Invoice"][];
             readonly can_manage: boolean;
+            readonly can_issue: boolean;
         };
         readonly InvoiceWrite: {
             readonly currency: string;
@@ -26330,6 +26409,30 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_invoices_issue_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_invoices_lines_create: {
         readonly parameters: {
             readonly query?: never;
@@ -26412,6 +26515,58 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_issue_settings_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_issue_settings_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceIssueSettings"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceIssueSettings"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceIssueSettings"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
                 };
             };
         };

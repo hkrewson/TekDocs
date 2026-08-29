@@ -252,6 +252,8 @@ from apps.core.inventory_views import (
 )
 from apps.core.invoice_views import (
     InvoiceDetailView,
+    InvoiceIssueSettingsView,
+    InvoiceIssueView,
     InvoiceLineDetailView,
     InvoiceLineListCreateView,
     InvoiceListCreateView,
@@ -1349,9 +1351,19 @@ urlpatterns = [
         name="organization-invoice-origin-choices",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/issue-settings",
+        InvoiceIssueSettingsView.as_view(),
+        name="organization-invoice-issue-settings",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>",
         InvoiceDetailView.as_view(),
         name="organization-invoice-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/issue",
+        InvoiceIssueView.as_view(),
+        name="organization-invoice-issue",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/lines",

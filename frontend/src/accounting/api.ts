@@ -19,7 +19,8 @@ export type InvoiceLine = {
 
 export type InvoiceDraft = {
   id: string
-  state: 'draft'
+  state: 'draft' | 'issued'
+  number?: string
   currency: string
   invoice_date: string
   due_date: string
@@ -31,6 +32,10 @@ export type InvoiceDraft = {
   lines: InvoiceLine[]
   created_at: string
   updated_at: string
+  issued_at?: string
+  content_digest?: string
+  signature_algorithm?: string
+  key_fingerprint?: string
 }
 
 export type InvoiceOrigin = {
@@ -45,8 +50,27 @@ export type InvoiceOrigin = {
 
 export type TaxRateChoice = { id: string; name: string; rate: string; inclusive: boolean }
 
+export type InvoiceIssueSettings = {
+  configured: boolean
+  issue_ready: boolean
+  legal_name: string
+  address_line_1: string
+  address_line_2: string
+  city: string
+  region: string
+  postal_code: string
+  country_code: string
+  billing_email: string
+  phone: string
+  tax_registration: string
+  default_currency: string
+  payment_terms_days: number
+  invoice_prefix: string
+  yearly_reset: boolean
+}
+
 export interface InvoiceClient {
-  list(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: InvoiceDraft[]; can_manage: boolean }>
+  list(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: InvoiceDraft[]; can_manage: boolean; can_issue: boolean }>
   choices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ origins: InvoiceOrigin[]; tax_rates: TaxRateChoice[] }>
   create(workspace: WorkspaceContext, values: object): Promise<InvoiceDraft>
   update(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
@@ -54,6 +78,9 @@ export interface InvoiceClient {
   addLine(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
   updateLine(workspace: WorkspaceContext, invoiceId: string, lineId: string, values: object): Promise<InvoiceDraft>
   removeLine(workspace: WorkspaceContext, invoiceId: string, lineId: string): Promise<InvoiceDraft>
+  issueSettings(workspace: WorkspaceContext, signal?: AbortSignal): Promise<InvoiceIssueSettings>
+  saveIssueSettings(workspace: WorkspaceContext, values: object): Promise<InvoiceIssueSettings>
+  issue(workspace: WorkspaceContext, invoiceId: string): Promise<InvoiceDraft>
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -74,13 +101,17 @@ function errorText(value: unknown): string | undefined {
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as Record<string, unknown>
-    throw new Error(errorText(body) ?? 'The invoice request failed.')
+    throw new Error(errorText(body) || 'The invoice request failed.')
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
-async function mutate<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object): Promise<T> {
+async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return parse(await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+}
+
+async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: object): Promise<T> {
   await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
   return parse(await fetch(path, {
     method,
@@ -99,4 +130,7 @@ export const browserInvoiceClient: InvoiceClient = {
   addLine: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines`, 'POST', values),
   updateLine: (workspace, invoiceId, lineId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines/${encodeURIComponent(lineId)}`, 'PATCH', values),
   removeLine: (workspace, invoiceId, lineId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines/${encodeURIComponent(lineId)}`, 'DELETE'),
+  issueSettings: (workspace, signal) => read(`${basePath(workspace)}/issue-settings`, signal),
+  saveIssueSettings: (workspace, values) => mutate(`${basePath(workspace)}/issue-settings`, 'PUT', values),
+  issue: (workspace, invoiceId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/issue`, 'POST'),
 }

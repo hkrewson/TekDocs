@@ -504,6 +504,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-invoice-issue-settings",
+        ("GET", "PUT"),
+        PermissionKey.INVOICES_ISSUE,
+        (PermissionKey.INVOICES_ISSUE,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-invoice-detail",
         ("GET", "PATCH", "DELETE"),
         PermissionKey.INVOICES_VIEW,
@@ -514,6 +521,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-invoice-line-list-create",
         ("POST",),
         mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-issue",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_ISSUE,),
         organization_scoped=True,
     ),
     route(

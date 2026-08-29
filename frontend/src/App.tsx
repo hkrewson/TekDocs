@@ -400,7 +400,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
   deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
   activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },
-  accounting: { title: 'Accounting', description: 'Unnumbered invoice drafts scoped to this client organization.', release: '0.8.44' },
+  accounting: { title: 'Accounting', description: 'Draft and issue immutable signed invoices for this client organization.', release: '0.8.45' },
 }
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {

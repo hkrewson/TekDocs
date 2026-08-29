@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from allauth.account.internal.flows.reauthentication import did_recently_authenticate
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import Q
@@ -17,17 +18,28 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 
 from .invoicing import (
     InvoiceError,
+    configure_issue_settings,
     create_invoice,
     create_line,
     delete_invoice,
     delete_line,
     invoice_amounts,
     invoices_for_scope,
+    issue_invoice,
     line_amounts,
     update_invoice,
     update_line,
 )
-from .models import CatalogProduct, ContractCost, Invoice, InvoiceLine, ServiceRate, TaxRate
+from .models import (
+    CatalogProduct,
+    ContractCost,
+    Invoice,
+    InvoiceLine,
+    InvoiceNumberSeries,
+    ServiceRate,
+    TaxRate,
+    TenantBillingProfile,
+)
 from .money import render_amount
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
@@ -131,6 +143,7 @@ class InvoiceLineSerializer(serializers.Serializer):
 class InvoiceSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     state = serializers.CharField()
+    number = serializers.CharField(allow_blank=True)
     currency = serializers.CharField()
     invoice_date = serializers.DateField()
     due_date = serializers.DateField()
@@ -142,6 +155,17 @@ class InvoiceSerializer(serializers.Serializer):
     lines = InvoiceLineSerializer(many=True)
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    issued_at = serializers.DateTimeField(allow_null=True)
+    content_digest = serializers.CharField(allow_blank=True)
+    signature_algorithm = serializers.CharField(allow_blank=True)
+    key_fingerprint = serializers.CharField(allow_blank=True)
+
+    def to_representation(self, instance):  # type: ignore[no-untyped-def]
+        rendered = super().to_representation(instance)
+        if instance.state == "draft":
+            for field in ("number", "issued_at", "content_digest", "signature_algorithm", "key_fingerprint"):
+                rendered.pop(field, None)
+        return rendered
 
     def _amount(self, item, field: str) -> str:  # type: ignore[no-untyped-def]
         return render_amount(getattr(invoice_amounts(item), field), item.currency)
@@ -162,6 +186,43 @@ class InvoiceSerializer(serializers.Serializer):
 class InvoiceResultSerializer(serializers.Serializer):
     results = InvoiceSerializer(many=True)
     can_manage = serializers.BooleanField()
+    can_issue = serializers.BooleanField()
+
+
+class InvoiceIssueSettingsSerializer(StrictSerializer):
+    legal_name = serializers.CharField(max_length=240)
+    address_line_1 = serializers.CharField(max_length=240)
+    address_line_2 = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    city = serializers.CharField(max_length=120)
+    region = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    postal_code = serializers.CharField(max_length=32)
+    country_code = serializers.CharField(max_length=2)
+    billing_email = serializers.EmailField(max_length=254)
+    phone = serializers.CharField(max_length=64, allow_blank=True, required=False, default="")
+    tax_registration = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    default_currency = serializers.CharField(max_length=3)
+    payment_terms_days = serializers.IntegerField(min_value=0, max_value=365)
+    invoice_prefix = serializers.CharField(max_length=16)
+    yearly_reset = serializers.BooleanField(default=False)
+
+
+class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
+    configured = serializers.BooleanField()
+    issue_ready = serializers.BooleanField()
+    legal_name = serializers.CharField(allow_blank=True)
+    address_line_1 = serializers.CharField(allow_blank=True)
+    address_line_2 = serializers.CharField(allow_blank=True)
+    city = serializers.CharField(allow_blank=True)
+    region = serializers.CharField(allow_blank=True)
+    postal_code = serializers.CharField(allow_blank=True)
+    country_code = serializers.CharField(allow_blank=True)
+    billing_email = serializers.CharField(allow_blank=True)
+    phone = serializers.CharField(allow_blank=True)
+    tax_registration = serializers.CharField(allow_blank=True)
+    default_currency = serializers.CharField()
+    payment_terms_days = serializers.IntegerField()
+    invoice_prefix = serializers.CharField()
+    yearly_reset = serializers.BooleanField()
 
 
 class OriginChoiceSerializer(serializers.Serializer):
@@ -220,6 +281,41 @@ def _tax_rate(workspace: ResolvedWorkspace, value: UUID | None) -> TaxRate | Non
     return get_object_or_404(TaxRate.scoped.for_tenant(workspace.member.tenant), id=value)
 
 
+def _require_recent_session(request) -> None:  # type: ignore[no-untyped-def]
+    if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
+        raise PermissionDenied("API tokens cannot issue invoices or configure invoice issuance.")
+    if not did_recently_authenticate(request._request):
+        raise PermissionDenied("Recent password or MFA reauthentication is required.")
+
+
+def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-untyped-def]
+    try:
+        profile = TenantBillingProfile.objects.get(tenant=tenant)
+        configured = True
+    except TenantBillingProfile.DoesNotExist:
+        profile = TenantBillingProfile(tenant=tenant)
+        configured = False
+    series = InvoiceNumberSeries.objects.filter(tenant=tenant, prefix=profile.invoice_prefix).first()
+    return {
+        "configured": configured and series is not None,
+        "issue_ready": configured and series is not None and profile.is_issue_ready,
+        "legal_name": profile.legal_name,
+        "address_line_1": profile.address_line_1,
+        "address_line_2": profile.address_line_2,
+        "city": profile.city,
+        "region": profile.region,
+        "postal_code": profile.postal_code,
+        "country_code": profile.country_code,
+        "billing_email": profile.billing_email,
+        "phone": profile.phone,
+        "tax_registration": profile.tax_registration,
+        "default_currency": profile.default_currency,
+        "payment_terms_days": profile.payment_terms_days,
+        "invoice_prefix": profile.invoice_prefix,
+        "yearly_reset": series.yearly_reset if series is not None else False,
+    }
+
+
 class InvoiceListCreateView(APIView):
     @extend_schema(operation_id="organization_invoices_list", responses={200: InvoiceResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
@@ -230,6 +326,9 @@ class InvoiceListCreateView(APIView):
                     "results": invoices_for_scope(workspace.data_scope),
                     "can_manage": context_has_permission(
                         workspace.member, PermissionKey.INVOICES_EDIT, organization=workspace.organization
+                    ),
+                    "can_issue": context_has_permission(
+                        workspace.member, PermissionKey.INVOICES_ISSUE, organization=workspace.organization
                     ),
                 }
             ).data
@@ -253,6 +352,44 @@ class InvoiceListCreateView(APIView):
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
+
+
+class InvoiceIssueSettingsView(APIView):
+    @extend_schema(responses={200: InvoiceIssueSettingsResultSerializer})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(workspace.member.tenant)).data)
+
+    @extend_schema(request=InvoiceIssueSettingsSerializer, responses={200: InvoiceIssueSettingsResultSerializer})
+    def put(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+        _require_recent_session(request)
+        serializer = InvoiceIssueSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        yearly_reset = bool(values.pop("yearly_reset"))
+        try:
+            configure_issue_settings(
+                tenant=workspace.member.tenant,
+                actor_id=request.user.pk,
+                values=values,
+                yearly_reset=yearly_reset,
+            )
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(workspace.member.tenant)).data)
+
+
+class InvoiceIssueView(APIView):
+    @extend_schema(request=None, responses={200: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+        _require_recent_session(request)
+        try:
+            record = issue_invoice(invoice=_invoice(workspace, invoice_entity_id), actor_id=request.user.pk)
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
 
 
 class InvoiceDetailView(APIView):

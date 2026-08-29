@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 from datetime import date
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Max, Prefetch, QuerySet
+from django.utils import timezone
+from django.utils.text import slugify
 
+from .document_keys import keys_in_markdown
+from .invoice_pdf import render_invoice_pdf
 from .models import (
     AuditEvent,
     CatalogProduct,
@@ -16,19 +24,27 @@ from .models import (
     Entity,
     EntityVisibility,
     Invoice,
+    InvoiceArtifact,
     InvoiceLine,
+    InvoiceNumberSeries,
+    InvoiceState,
     Organization,
     ServiceRate,
     TaxRate,
     Tenant,
+    TenantBillingProfile,
     workspace_for_owner,
 )
-from .money import InvoiceAmounts, LineAmounts, calculate_invoice, calculate_line
+from .money import InvoiceAmounts, LineAmounts, calculate_invoice, calculate_line, render_amount
+from .publications import _encoded_public_key, publication_signing_key
 from .scoping import DataScope
 
 
 class InvoiceError(ValueError):
     pass
+
+
+ISSUED_SIGNATURE_FORMAT = "tekdocs-issued-invoice/v1"
 
 
 def invoices_for_scope(scope: DataScope) -> QuerySet[Invoice]:
@@ -51,7 +67,241 @@ def line_amounts(line: InvoiceLine) -> LineAmounts:
 
 
 def invoice_amounts(invoice: Invoice) -> InvoiceAmounts:
+    if invoice.state == InvoiceState.ISSUED:
+        if invoice.subtotal_amount is None or invoice.tax_amount is None or invoice.total_amount is None:
+            raise InvoiceError("Issued invoice totals are unavailable")
+        return InvoiceAmounts(
+            subtotal=invoice.subtotal_amount,
+            tax_total=invoice.tax_amount,
+            total=invoice.total_amount,
+        )
     return calculate_invoice((line_amounts(line) for line in invoice.lines.all()), invoice.currency)
+
+
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _profile_snapshot(profile: TenantBillingProfile) -> dict[str, object]:
+    return {
+        "legal_name": profile.legal_name,
+        "address_line_1": profile.address_line_1,
+        "address_line_2": profile.address_line_2,
+        "city": profile.city,
+        "region": profile.region,
+        "postal_code": profile.postal_code,
+        "country_code": profile.country_code,
+        "billing_email": profile.billing_email,
+        "phone": profile.phone,
+        "tax_registration": profile.tax_registration,
+    }
+
+
+def _customer_snapshot(invoice: Invoice) -> dict[str, object]:
+    return {
+        "display_name": invoice.organization.entity.display_name,
+        "legal_name": invoice.organization.legal_name,
+        "website": invoice.organization.website,
+    }
+
+
+@transaction.atomic
+def configure_issue_settings(
+    *, tenant: Tenant, actor_id: UUID, values: dict[str, object], yearly_reset: bool
+) -> tuple[TenantBillingProfile, InvoiceNumberSeries]:
+    profile, _created = TenantBillingProfile.objects.select_for_update().get_or_create(tenant=tenant)
+    for field in (
+        "legal_name",
+        "address_line_1",
+        "address_line_2",
+        "city",
+        "region",
+        "postal_code",
+        "country_code",
+        "billing_email",
+        "phone",
+        "tax_registration",
+        "default_currency",
+        "payment_terms_days",
+        "invoice_prefix",
+    ):
+        if field in values:
+            setattr(profile, field, values[field])
+    _validate(profile)
+    profile.save()
+    series = (
+        InvoiceNumberSeries.objects.select_for_update().filter(tenant=tenant, prefix=profile.invoice_prefix).first()
+    )
+    if series is None:
+        series = InvoiceNumberSeries(tenant=tenant, prefix=profile.invoice_prefix, yearly_reset=yearly_reset)
+    elif series.yearly_reset != yearly_reset:
+        if series.invoices.exists():
+            raise InvoiceError("A numbering series cannot change its yearly-reset rule after use")
+        series.yearly_reset = yearly_reset
+        series.current_year = None
+    _validate(series)
+    series.save()
+    AuditEvent.objects.create(
+        tenant=tenant,
+        actor_id=actor_id,
+        action="invoice.issue_settings_updated",
+        metadata={},
+    )
+    return profile, series
+
+
+@transaction.atomic
+def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
+    locked = (
+        Invoice.objects.select_for_update()
+        .select_related("entity", "organization__entity", "tenant")
+        .prefetch_related("lines")
+        .get(pk=invoice.pk)
+    )
+    if locked.state != InvoiceState.DRAFT:
+        raise InvoiceError("Only a draft invoice can be issued")
+    lines = list(locked.lines.all())
+    if not lines:
+        raise InvoiceError("Add at least one line before issuing the invoice")
+    for line in lines:
+        keys, malformed = keys_in_markdown(line.description)
+        if keys or malformed:
+            raise InvoiceError("Resolve invoice-line key expressions before issuing the invoice")
+    try:
+        profile = TenantBillingProfile.objects.select_for_update().get(tenant=locked.tenant)
+    except TenantBillingProfile.DoesNotExist as exc:
+        raise InvoiceError("Configure the invoice issuer before issuing") from exc
+    if not profile.is_issue_ready:
+        raise InvoiceError("Complete the invoice issuer identity before issuing")
+    try:
+        series = InvoiceNumberSeries.objects.select_for_update().get(
+            tenant=locked.tenant, prefix=profile.invoice_prefix
+        )
+    except InvoiceNumberSeries.DoesNotExist as exc:
+        raise InvoiceError("Configure the invoice numbering series before issuing") from exc
+
+    issue_year = locked.invoice_date.year
+    if series.yearly_reset:
+        if series.current_year is not None and issue_year < series.current_year:
+            raise InvoiceError("A prior-year invoice cannot use a numbering series that has advanced")
+        if series.current_year != issue_year:
+            series.current_year = issue_year
+            series.next_number = 1
+            series.save(update_fields=("current_year", "next_number", "updated_at"))
+    sequence = series.next_number
+    number = (
+        f"{series.prefix}-{issue_year}-{sequence:06d}" if series.yearly_reset else f"{series.prefix}-{sequence:06d}"
+    )
+    amounts = calculate_invoice((line_amounts(line) for line in lines), locked.currency)
+    issued_at = timezone.now()
+    issuer = _profile_snapshot(profile)
+    customer = _customer_snapshot(locked)
+    line_records = []
+    for line in lines:
+        values = line_amounts(line)
+        line_records.append(
+            {
+                "id": str(line.id),
+                "position": line.position,
+                "description": line.description,
+                "quantity": str(line.quantity),
+                "unit_amount": render_amount(line.unit_amount, locked.currency),
+                "currency": line.currency,
+                "tax_rate_name": line.tax_rate_name,
+                "tax_rate_value": str(line.tax_rate_value),
+                "tax_inclusive": line.tax_inclusive,
+                "net": render_amount(values.net, locked.currency),
+                "tax": render_amount(values.tax, locked.currency),
+                "total": render_amount(values.total, locked.currency),
+            }
+        )
+    pdf = render_invoice_pdf(
+        number=number,
+        invoice_date=locked.invoice_date.isoformat(),
+        due_date=locked.due_date.isoformat(),
+        currency=locked.currency,
+        reference=locked.reference,
+        notes=locked.notes,
+        issuer=issuer,
+        customer=customer,
+        lines=line_records,
+        subtotal=render_amount(amounts.subtotal, locked.currency),
+        tax_total=render_amount(amounts.tax_total, locked.currency),
+        total=render_amount(amounts.total, locked.currency),
+    )
+    artifact_checksum = hashlib.sha256(pdf).hexdigest()
+    manifest = {
+        "format": ISSUED_SIGNATURE_FORMAT,
+        "invoice_id": str(locked.entity_id),
+        "number": number,
+        "series_id": str(series.id),
+        "series_sequence": sequence,
+        "series_year": issue_year if series.yearly_reset else None,
+        "invoice_date": locked.invoice_date.isoformat(),
+        "due_date": locked.due_date.isoformat(),
+        "currency": locked.currency,
+        "reference": locked.reference,
+        "notes": locked.notes,
+        "issuer": issuer,
+        "customer": customer,
+        "lines": line_records,
+        "subtotal": render_amount(amounts.subtotal, locked.currency),
+        "tax_total": render_amount(amounts.tax_total, locked.currency),
+        "total": render_amount(amounts.total, locked.currency),
+        "issued_by": str(actor_id),
+        "issued_at": issued_at.isoformat(),
+        "pdf_checksum": artifact_checksum,
+    }
+    digest = hashlib.sha256(_canonical_json(manifest)).digest()
+    signing_key = publication_signing_key()
+    public_key, fingerprint = _encoded_public_key(signing_key)
+
+    locked.state = InvoiceState.ISSUED
+    locked.number_series = series
+    locked.number = number
+    locked.series_year = issue_year if series.yearly_reset else None
+    locked.series_sequence = sequence
+    locked.issuer_snapshot = issuer
+    locked.customer_snapshot = customer
+    locked.key_resolutions = []
+    locked.subtotal_amount = amounts.subtotal
+    locked.tax_amount = amounts.tax_total
+    locked.total_amount = amounts.total
+    locked.content_digest = digest.hex()
+    locked.signature = base64.urlsafe_b64encode(signing_key.sign(digest)).decode("ascii")
+    locked.signature_algorithm = "Ed25519"
+    locked.public_key = public_key
+    locked.key_fingerprint = fingerprint
+    locked.issued_by_id = actor_id
+    locked.issued_at = issued_at
+    _validate(locked)
+    locked.save()
+
+    artifact = InvoiceArtifact(
+        tenant=locked.tenant,
+        organization=locked.organization,
+        invoice=locked,
+        original_filename=f"{slugify(number) or 'invoice'}.pdf",
+        size=len(pdf),
+        checksum=artifact_checksum,
+        created_at=issued_at,
+    )
+    artifact.file.save(artifact.original_filename, ContentFile(pdf), save=False)
+    _validate(artifact)
+    artifact.save()  # type: ignore[no-untyped-call]
+
+    series.next_number = sequence + 1
+    series.save(update_fields=("current_year", "next_number", "updated_at"))
+    locked.entity.display_name = f"Invoice {number}"
+    locked.entity.save(update_fields=("display_name", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="invoice.issued",
+        entity_id=locked.entity_id,
+        metadata={},
+    )
+    return locked
 
 
 def _validate(instance) -> None:  # type: ignore[no-untyped-def]
@@ -169,9 +419,7 @@ def _origin_snapshot(
             },
         )
     if origin_type == "service_rate":
-        service_rate = ServiceRate.objects.filter(
-            tenant=invoice.tenant, id=origin_id, archived_at__isnull=True
-        ).first()
+        service_rate = ServiceRate.objects.filter(tenant=invoice.tenant, id=origin_id, archived_at__isnull=True).first()
         if service_rate is None:
             raise InvoiceError("The service rate is unavailable")
         return (

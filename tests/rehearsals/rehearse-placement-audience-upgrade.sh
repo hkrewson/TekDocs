@@ -51,8 +51,8 @@ if [ "$baseline_version" != "0.8.39" ]; then
   echo "Placement-audience upgrade expected baseline 0.8.39, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.8.44" ]; then
-  echo "Placement-audience upgrade expected current version 0.8.44, found $current_version" >&2
+if [ "$current_version" != "0.8.45" ]; then
+  echo "Placement-audience upgrade expected current version 0.8.45, found $current_version" >&2
   exit 1
 fi
 

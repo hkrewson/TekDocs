@@ -45,8 +45,14 @@ const draft: InvoiceDraft = {
 }
 
 function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
+  const settings = {
+    configured: true, issue_ready: true, legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
+    address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
+    billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
+    payment_terms_days: 30, invoice_prefix: 'INV', yearly_reset: false,
+  }
   return {
-    list: vi.fn().mockResolvedValue({ results: [draft], can_manage: true }),
+    list: vi.fn().mockResolvedValue({ results: [draft], can_manage: true, can_issue: true }),
     choices: vi.fn().mockResolvedValue({
       origins: [{ id: 'rate-1', origin_type: 'service_rate', name: 'Remote support', description: '', unit_amount: '90.00', currency: 'USD', quantity: '1.000' }],
       tax_rates: [],
@@ -57,6 +63,9 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     addLine: vi.fn().mockResolvedValue(draft),
     updateLine: vi.fn().mockResolvedValue(draft),
     removeLine: vi.fn().mockResolvedValue({ ...draft, lines: [], subtotal: '0.00', tax_total: '0.00', total: '0.00' }),
+    issueSettings: vi.fn().mockResolvedValue(settings),
+    saveIssueSettings: vi.fn().mockResolvedValue(settings),
+    issue: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) }),
     ...overrides,
   }
 }
@@ -83,7 +92,7 @@ describe('Invoices', () => {
   it('keeps a read-only draft useful without requesting edit-only choices', async () => {
     const choices = vi.fn()
     const client = invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [draft], can_manage: false }),
+      list: vi.fn().mockResolvedValue({ results: [draft], can_manage: false, can_issue: false }),
       choices,
     })
     render(<Invoices workspace={workspace} client={client} />)
@@ -92,6 +101,20 @@ describe('Invoices', () => {
     expect(screen.queryByRole('button', { name: 'Add line' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New draft' })).not.toBeInTheDocument()
     expect(choices).not.toHaveBeenCalled()
+  })
+
+  it('issues a configured draft and replaces editing controls with signed proof', async () => {
+    const issue = vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<Invoices workspace={workspace} client={invoiceClient({ issue })} />)
+
+    await screen.findByRole('button', { name: 'Issue invoice' })
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }))
+
+    expect(await screen.findByRole('heading', { name: 'INV-000001' })).toBeInTheDocument()
+    expect(issue).toHaveBeenCalledWith(workspace, 'invoice-1')
+    expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Ed25519 signing key/)).toBeInTheDocument()
   })
 
   it('retains the snapshotted tax when an existing line is edited', async () => {

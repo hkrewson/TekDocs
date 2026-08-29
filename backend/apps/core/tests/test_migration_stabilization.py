@@ -23,6 +23,7 @@ from apps.accounts.models import (
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
 from apps.core.documents import create_document
+from apps.core.invoicing import create_invoice, create_line
 from apps.core.models import (
     AuditEvent,
     BlockRevision,
@@ -33,6 +34,8 @@ from apps.core.models import (
     Entity,
     EntityLink,
     InstallationState,
+    Invoice,
+    InvoiceLine,
     Location,
     Organization,
     OrganizationClassification,
@@ -91,7 +94,9 @@ DOCUMENT_RLS_TABLES = {
     "core_commercialcontract",
     "core_contractcost",
     "core_invoice",
+    "core_invoiceartifact",
     "core_invoiceline",
+    "core_invoicenumberseries",
     "core_servicerate",
     "core_networkrack",
     "core_networkdevice",
@@ -188,6 +193,63 @@ def test_billing_foundation_upgrades_from_document_operations(migration_head_res
             "core_billingprofile_validate",
             "core_taxrate_immutable",
         }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_invoice_issue_upgrades_an_exact_prior_draft_without_allocating_a_number(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Invoice-issue upgrade validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Invoice issue upgrade MSP",
+        owner_email=f"invoice-upgrade-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Invoice Upgrade Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = create_organization(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        name="Invoice Upgrade Client",
+        legal_name="Invoice Upgrade Client, LLC",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    invoice = create_invoice(
+        tenant=result.tenant,
+        organization=organization,
+        actor_id=result.owner.id,
+        currency="USD",
+        invoice_date=date(2026, 8, 29),
+        due_date=date(2026, 9, 28),
+        reference="UPGRADE-1",
+    )
+    line = create_line(
+        invoice=invoice,
+        actor_id=result.owner.id,
+        values={"description": "Preserved draft line", "quantity": "2.000", "unit_amount": "15.00"},
+    )
+
+    call_command("migrate", "core", "0128_invoice_drafts", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT state, reference FROM core_invoice WHERE id=%s", [invoice.id])
+        assert cursor.fetchone() == ("draft", "UPGRADE-1")
+        cursor.execute("SELECT description FROM core_invoiceline WHERE id=%s", [line.id])
+        assert cursor.fetchone() == ("Preserved draft line",)
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    upgraded = Invoice.objects.get(pk=invoice.id)
+    assert upgraded.state == "draft"
+    assert upgraded.number == ""
+    assert upgraded.number_series_id is None
+    assert upgraded.subtotal_amount is None
+    assert InvoiceLine.objects.get(pk=line.id).description == "Preserved draft line"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT relname FROM pg_class WHERE relname = ANY(%s) AND relrowsecurity AND relforcerowsecurity",
+            [["core_invoiceartifact", "core_invoicenumberseries"]],
+        )
+        assert {row[0] for row in cursor.fetchall()} == {"core_invoiceartifact", "core_invoicenumberseries"}
 
 
 @pytest.fixture

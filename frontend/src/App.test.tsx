@@ -112,7 +112,7 @@ describe('application shell', () => {
     expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
     expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
     expect(screen.getByText('Reusable documentation and templates')).toBeInTheDocument()
-    expect(screen.getByText('TekDocs 0.8.44')).toBeInTheDocument()
+    expect(screen.getByText('TekDocs 0.8.45')).toBeInTheDocument()
   })
 
   it('opens the permission-aware activity surface instead of a release placeholder', async () => {

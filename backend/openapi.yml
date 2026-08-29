@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.44
+  version: 0.8.45
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -19021,6 +19021,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/issue:
+    post:
+      operationId: workspaces_organizations_invoices_issue_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/lines:
     post:
       operationId: workspaces_organizations_invoices_lines_create
@@ -19149,6 +19183,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/issue-settings:
+    get:
+      operationId: workspaces_organizations_invoices_issue_settings_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceIssueSettingsResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_organizations_invoices_issue_settings_update
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceIssueSettings'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceIssueSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceIssueSettings'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceIssueSettingsResult'
           description: ''
           headers:
             X-Request-ID:
@@ -30004,6 +30105,8 @@ components:
           format: uuid
         state:
           type: string
+        number:
+          type: string
         currency:
           type: string
         invoice_date:
@@ -30035,20 +30138,148 @@ components:
         updated_at:
           type: string
           format: date-time
+        issued_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_digest:
+          type: string
+        signature_algorithm:
+          type: string
+        key_fingerprint:
+          type: string
       required:
+      - content_digest
       - created_at
       - currency
       - due_date
       - id
       - invoice_date
+      - issued_at
+      - key_fingerprint
       - lines
       - notes
+      - number
       - reference
+      - signature_algorithm
       - state
       - subtotal
       - tax_total
       - total
       - updated_at
+    InvoiceIssueSettings:
+      type: object
+      properties:
+        legal_name:
+          type: string
+          maxLength: 240
+        address_line_1:
+          type: string
+          maxLength: 240
+        address_line_2:
+          type: string
+          default: ''
+          maxLength: 240
+        city:
+          type: string
+          maxLength: 120
+        region:
+          type: string
+          default: ''
+          maxLength: 120
+        postal_code:
+          type: string
+          maxLength: 32
+        country_code:
+          type: string
+          maxLength: 2
+        billing_email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          default: ''
+          maxLength: 64
+        tax_registration:
+          type: string
+          default: ''
+          maxLength: 120
+        default_currency:
+          type: string
+          maxLength: 3
+        payment_terms_days:
+          type: integer
+          maximum: 365
+          minimum: 0
+        invoice_prefix:
+          type: string
+          maxLength: 16
+        yearly_reset:
+          type: boolean
+          default: false
+      required:
+      - address_line_1
+      - billing_email
+      - city
+      - country_code
+      - default_currency
+      - invoice_prefix
+      - legal_name
+      - payment_terms_days
+      - postal_code
+    InvoiceIssueSettingsResult:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        issue_ready:
+          type: boolean
+        legal_name:
+          type: string
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        postal_code:
+          type: string
+        country_code:
+          type: string
+        billing_email:
+          type: string
+        phone:
+          type: string
+        tax_registration:
+          type: string
+        default_currency:
+          type: string
+        payment_terms_days:
+          type: integer
+        invoice_prefix:
+          type: string
+        yearly_reset:
+          type: boolean
+      required:
+      - address_line_1
+      - address_line_2
+      - billing_email
+      - city
+      - configured
+      - country_code
+      - default_currency
+      - invoice_prefix
+      - issue_ready
+      - legal_name
+      - payment_terms_days
+      - phone
+      - postal_code
+      - region
+      - tax_registration
+      - yearly_reset
     InvoiceLine:
       type: object
       properties:
@@ -30152,7 +30383,10 @@ components:
             $ref: '#/components/schemas/Invoice'
         can_manage:
           type: boolean
+        can_issue:
+          type: boolean
       required:
+      - can_issue
       - can_manage
       - results
     InvoiceWrite:

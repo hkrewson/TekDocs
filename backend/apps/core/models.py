@@ -200,21 +200,84 @@ class ServiceRate(TimestampedModel):
 
 class InvoiceState(models.TextChoices):
     DRAFT = "draft", "Draft"
+    ISSUED = "issued", "Issued"
+
+
+class InvoiceNumberSeries(TimestampedModel):
+    """A tenant-owned transactional counter used only while issuing invoices."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_number_series")
+    prefix = models.CharField(max_length=16)
+    yearly_reset = models.BooleanField(default=False)
+    current_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    next_number = models.PositiveBigIntegerField(default=1)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("prefix", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "prefix"), name="invoice_series_prefix_unique"),
+            models.CheckConstraint(condition=models.Q(next_number__gte=1), name="invoice_series_next_positive"),
+            models.CheckConstraint(
+                condition=(models.Q(yearly_reset=True) | models.Q(yearly_reset=False, current_year__isnull=True)),
+                name="invoice_series_year_mode_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.prefix
+
+    def clean(self) -> None:
+        self.prefix = self.prefix.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.prefix):
+            raise ValidationError({"prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
 
 
 class Invoice(TimestampedModel):
-    """An unnumbered, exact-Workspace invoice draft."""
+    """An exact-Workspace invoice that becomes immutable when issued."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoices")
     organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoices")
     entity = models.OneToOneField("Entity", on_delete=models.PROTECT, related_name="invoice")
     state = models.CharField(max_length=16, choices=InvoiceState.choices, default=InvoiceState.DRAFT)
+    number_series = models.ForeignKey(
+        InvoiceNumberSeries,
+        on_delete=models.PROTECT,
+        related_name="invoices",
+        null=True,
+        blank=True,
+    )
+    number = models.CharField(max_length=64, blank=True)
+    series_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    series_sequence = models.PositiveBigIntegerField(null=True, blank=True)
     currency = models.CharField(max_length=3)
     invoice_date = models.DateField()
     due_date = models.DateField()
     reference = models.CharField(max_length=240, blank=True)
     notes = models.TextField(blank=True)
+    issuer_snapshot = models.JSONField(default=dict, blank=True)
+    customer_snapshot = models.JSONField(default=dict, blank=True)
+    key_resolutions = models.JSONField(default=list, blank=True)
+    subtotal_amount = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    content_digest = models.CharField(max_length=64, blank=True)
+    signature = models.TextField(blank=True)
+    signature_algorithm = models.CharField(max_length=20, blank=True)
+    public_key = models.TextField(blank=True)
+    key_fingerprint = models.CharField(max_length=64, blank=True)
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="issued_invoices",
+        null=True,
+        blank=True,
+    )
+    issued_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -222,9 +285,59 @@ class Invoice(TimestampedModel):
     class Meta:
         ordering = ("-invoice_date", "-created_at", "id")
         constraints = [
-            models.CheckConstraint(condition=models.Q(state=InvoiceState.DRAFT), name="invoice_draft_state_only"),
+            models.CheckConstraint(condition=models.Q(state__in=InvoiceState.values), name="invoice_state_valid"),
             models.CheckConstraint(
                 condition=models.Q(due_date__gte=models.F("invoice_date")), name="invoice_due_date_valid"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state=InvoiceState.DRAFT,
+                        number_series__isnull=True,
+                        number="",
+                        series_year__isnull=True,
+                        series_sequence__isnull=True,
+                        subtotal_amount__isnull=True,
+                        tax_amount__isnull=True,
+                        total_amount__isnull=True,
+                        issued_by__isnull=True,
+                        issued_at__isnull=True,
+                        content_digest="",
+                        signature="",
+                        signature_algorithm="",
+                        public_key="",
+                        key_fingerprint="",
+                    )
+                    | models.Q(
+                        state=InvoiceState.ISSUED,
+                        number_series__isnull=False,
+                        number__gt="",
+                        series_sequence__isnull=False,
+                        subtotal_amount__isnull=False,
+                        tax_amount__isnull=False,
+                        total_amount__isnull=False,
+                        issued_by__isnull=False,
+                        issued_at__isnull=False,
+                        content_digest__regex=r"^[0-9a-f]{64}$",
+                        signature__gt="",
+                        signature_algorithm="Ed25519",
+                        public_key__gt="",
+                        key_fingerprint__regex=r"^[0-9a-f]{64}$",
+                    )
+                ),
+                name="invoice_issue_fields_consistent",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state=InvoiceState.DRAFT)
+                    | models.Q(total_amount=models.F("subtotal_amount") + models.F("tax_amount"))
+                ),
+                name="invoice_stored_totals_reconcile",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "number"),
+                condition=~models.Q(number=""),
+                name="invoice_number_unique",
             ),
         ]
         indexes = [
@@ -252,6 +365,61 @@ class Invoice(TimestampedModel):
             self.currency = normalize_currency(self.currency)
         except MoneyError as exc:
             raise ValidationError({"currency": str(exc)}) from exc
+        number_series = self.number_series
+        if self.number_series_id and (number_series is None or number_series.tenant_id != self.tenant_id):
+            raise ValidationError("Invoice number series must belong to its tenant")
+
+
+def invoice_artifact_upload_to(instance: "InvoiceArtifact", _filename: str) -> str:
+    """Return an opaque retained-artifact key without customer-authored path material."""
+
+    return str(
+        PurePosixPath("invoice-artifacts") / str(instance.tenant_id) / str(instance.invoice_id) / str(instance.id)
+    )
+
+
+class InvoiceArtifact(models.Model):
+    """The append-only retained PDF produced by one invoice issue transition."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_artifacts")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoice_artifacts")
+    invoice = models.OneToOneField(Invoice, on_delete=models.PROTECT, related_name="artifact")
+    file = models.FileField(upload_to=invoice_artifact_upload_to, max_length=500)
+    original_filename = models.CharField(max_length=240)
+    media_type = models.CharField(max_length=120, default="application/pdf")
+    size = models.PositiveBigIntegerField()
+    checksum = models.CharField(max_length=64)
+    created_at = models.DateTimeField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=("tenant", "organization", "invoice"), name="core_invart_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.original_filename
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Issued invoice artifacts are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Issued invoice artifacts are retained")
+
+    def clean(self) -> None:
+        if self.invoice_id and (
+            self.invoice.tenant_id != self.tenant_id
+            or self.invoice.organization_id != self.organization_id
+            or self.invoice.state != InvoiceState.ISSUED
+        ):
+            raise ValidationError("Invoice artifact must belong to an issued invoice in the same Workspace")
+        if self.media_type != "application/pdf":
+            raise ValidationError("Invoice artifacts must be PDFs")
+        if not re.fullmatch(r"[0-9a-f]{64}", self.checksum):
+            raise ValidationError("Invoice artifact checksum is invalid")
 
 
 class InvoiceLine(TimestampedModel):
@@ -3897,8 +4065,7 @@ class DocumentPublication(models.Model):
                 raise ValidationError("Publication placements are invalid")
             allowed_profiles = {PlacementAudienceProfile.SHARED, self.audience}
             if any(
-                not isinstance(placement, dict)
-                or placement.get("audience_profile") not in allowed_profiles
+                not isinstance(placement, dict) or placement.get("audience_profile") not in allowed_profiles
                 for placement in placements
             ):
                 raise ValidationError("Publication placement audiences are invalid")
@@ -4094,11 +4261,15 @@ class DocumentPublicationArtifact(models.Model):
             or self.entity.entity_type != "document_publication_artifact"
         ):
             raise ValidationError("Publication artifact entity scope or type is invalid")
-        if self.kind in {
-            PublicationArtifactKind.PDF,
-            PublicationArtifactKind.DIAGRAM_SVG,
-            PublicationArtifactKind.DIAGRAM_PNG,
-        } and self.source_attachment_id is not None:
+        if (
+            self.kind
+            in {
+                PublicationArtifactKind.PDF,
+                PublicationArtifactKind.DIAGRAM_SVG,
+                PublicationArtifactKind.DIAGRAM_PNG,
+            }
+            and self.source_attachment_id is not None
+        ):
             raise ValidationError("Generated artifacts cannot identify a source attachment")
         if self.kind == PublicationArtifactKind.ATTACHMENT and self.source_attachment_id is None:
             raise ValidationError("Retained attachment artifacts require a source attachment")

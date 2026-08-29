@@ -2,7 +2,18 @@ import { AuthRequestError, browserCsrfToken, privilegedActionError } from '../au
 
 export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
-export type DocumentFilters = { q?: string; category?: DocumentCategory | ''; template?: 'all' | 'documents' | 'templates' }
+export type DocumentHealthStatus = 'current' | 'stale' | 'unreviewed' | 'unowned' | 'pending' | 'changes_requested'
+export type DocumentReviewState = 'unreviewed' | 'pending' | 'approved' | 'changes_requested'
+export type DocumentFilters = {
+  q?: string
+  category?: DocumentCategory | ''
+  template?: 'all' | 'documents' | 'templates'
+  collection?: string
+  tag?: string
+  health?: DocumentHealthStatus | ''
+  review_state?: DocumentReviewState | ''
+  owner_id?: string
+}
 export type PlacementResolutionMode = 'live' | 'pinned'
 export type PlacementAudienceProfile = 'shared' | 'msp_internal' | 'client_visible'
 export type BlockKind = 'rich_text' | 'heading' | 'code' | 'url' | 'document_link' | 'entity_reference' | 'file_reference'
@@ -34,6 +45,24 @@ export type DocumentRecord = {
   category: DocumentCategory
   is_template: boolean
   library_visible: boolean
+  collection?: string
+  tags?: string[]
+  owner_id?: string | null
+  owner_name?: string | null
+  review_due_on?: string | null
+  review_state?: DocumentReviewState
+  health_status?: DocumentHealthStatus
+  review_requested_by_id?: string | null
+  review_requested_by_name?: string | null
+  review_requested_at?: string | null
+  reviewer_id?: string | null
+  reviewer_name?: string | null
+  review_decided_at?: string | null
+  last_reviewed_by_id?: string | null
+  last_reviewed_by_name?: string | null
+  last_reviewed_at?: string | null
+  review_note?: string
+  matching_excerpt?: string
   template_enrollment_id: string | null
   template_applied_revision_id: string | null
   template_source_id: string | null
@@ -124,7 +153,21 @@ export type DocumentRestructureResult = {
   section_count: number
   document: DocumentRecord
 }
-export type DocumentResult = { results: DocumentRecord[]; count: number }
+export type DocumentFacet = { value: string; count: number }
+export type DocumentResult = {
+  results: DocumentRecord[]
+  count: number
+  collections?: DocumentFacet[]
+  tags?: DocumentFacet[]
+  health?: DocumentFacet[]
+}
+export type DocumentOperationsChoice = { id: string; display_name: string; can_approve: boolean }
+export type DocumentOperationsInput = {
+  owner_id: string | null
+  review_due_on: string | null
+  collection: string
+  tags: string[]
+}
 export type BlockRevision = {
   id: string
   parent_id: string | null
@@ -262,6 +305,10 @@ export interface DocumentsClient {
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
+  operationsChoices?(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentOperationsChoice[]>
+  updateOperations?(scope: DocumentScope, id: string, input: DocumentOperationsInput): Promise<DocumentRecord>
+  requestReview?(scope: DocumentScope, id: string, reviewerId: string, note: string): Promise<DocumentRecord>
+  decideReview?(scope: DocumentScope, id: string, decision: 'approved' | 'changes_requested', note: string): Promise<DocumentRecord>
   previewRestructure(scope: DocumentScope, id: string): Promise<DocumentRestructurePreview>
   applyRestructure(scope: DocumentScope, id: string, baseRevisionId: string): Promise<DocumentRestructureResult>
   listRevisions(scope: DocumentScope, id: string, page?: number): Promise<RevisionResult>
@@ -425,7 +472,12 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.q) query.set('q', filters.q)
     if (filters.category) query.set('category', filters.category)
     if (filters.template && filters.template !== 'all') query.set('template', filters.template)
-    const response = await fetch(`${collectionPath(scope)}${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
+    if (filters.collection) query.set('collection', filters.collection)
+    if (filters.tag) query.set('tag', filters.tag)
+    if (filters.health) query.set('health', filters.health)
+    if (filters.review_state) query.set('review_state', filters.review_state)
+    if (filters.owner_id) query.set('owner_id', filters.owner_id)
+    const response = await fetch(`${collectionPath(scope)}/search${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
   },
   async get(scope, id, signal) {
@@ -441,6 +493,12 @@ export const browserDocumentsClient: DocumentsClient = {
     return mutateForm<DocumentRecord>(`${collectionPath(scope)}/file-backed`, form)
   },
   update: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'PUT', input),
+  async operationsChoices(scope, signal) {
+    return parse<DocumentOperationsChoice[]>(await fetch(`${collectionPath(scope)}/operations/choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  updateOperations: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/operations`, 'PUT', input),
+  requestReview: (scope, id, reviewerId, note) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/reviews`, 'POST', { reviewer_id: reviewerId, note }),
+  decideReview: (scope, id, decision, note) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/reviews/decision`, 'POST', { decision, note }),
   async previewRestructure(scope, id) {
     return parse<DocumentRestructurePreview>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/restructure`, {
       credentials: 'same-origin', headers: { Accept: 'application/json' },

@@ -20,6 +20,7 @@ export type WorkspaceCapability =
   | 'vendors'
   | 'products'
   | 'compliance'
+  | 'deadlines'
   | 'activity'
   | 'recycle_bin'
   | 'integrations'

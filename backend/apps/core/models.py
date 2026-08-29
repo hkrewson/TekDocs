@@ -2871,8 +2871,17 @@ class DocumentCategory(models.TextChoices):
     REFERENCE = "reference", "Reference"
 
 
+class DocumentReviewState(models.TextChoices):
+    UNREVIEWED = "unreviewed", "Unreviewed"
+    PENDING = "pending", "Pending review"
+    APPROVED = "approved", "Approved"
+    CHANGES_REQUESTED = "changes_requested", "Changes requested"
+
+
 class Document(TimestampedModel):
     """A Markdown document owned by exactly one MSP or organization workspace."""
+
+    matching_excerpt: str = ""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documents")
@@ -2887,6 +2896,46 @@ class Document(TimestampedModel):
     )
     is_template = models.BooleanField(default=False)
     library_visible = models.BooleanField(default=False)
+    collection = models.CharField(max_length=120, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_documents",
+        null=True,
+        blank=True,
+    )
+    review_due_on = models.DateField(null=True, blank=True)
+    review_state = models.CharField(
+        max_length=24,
+        choices=DocumentReviewState.choices,
+        default=DocumentReviewState.UNREVIEWED,
+    )
+    review_requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_document_reviews",
+        null=True,
+        blank=True,
+    )
+    review_requested_at = models.DateTimeField(null=True, blank=True)
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="assigned_document_reviews",
+        null=True,
+        blank=True,
+    )
+    review_decided_at = models.DateTimeField(null=True, blank=True)
+    last_reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewed_documents",
+        null=True,
+        blank=True,
+    )
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=500, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True)
 
     objects = models.Manager()
@@ -2897,7 +2946,24 @@ class Document(TimestampedModel):
             models.CheckConstraint(
                 condition=models.Q(category__in=DocumentCategory.values),
                 name="document_category_supported",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(review_state__in=DocumentReviewState.values),
+                name="document_review_state_supported",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        review_state=DocumentReviewState.PENDING,
+                        review_requested_by__isnull=False,
+                        review_requested_at__isnull=False,
+                        reviewer__isnull=False,
+                        review_decided_at__isnull=True,
+                    )
+                    | ~models.Q(review_state=DocumentReviewState.PENDING)
+                ),
+                name="document_pending_review_shape",
+            ),
         ]
         indexes = [
             models.Index(fields=["tenant", "organization", "archived_at"]),
@@ -2905,10 +2971,34 @@ class Document(TimestampedModel):
                 fields=["tenant", "organization", "category", "is_template", "archived_at"],
                 name="core_doc_category_template_idx",
             ),
+            models.Index(
+                fields=["tenant", "organization", "review_state", "review_due_on"],
+                name="core_doc_review_health_idx",
+            ),
+            models.Index(
+                fields=["tenant", "organization", "collection", "archived_at"],
+                name="core_doc_collection_idx",
+            ),
         ]
 
     def __str__(self) -> str:
         return self.entity.display_name
+
+    @property
+    def health_status(self) -> str:
+        if self.owner_id is None:
+            return "unowned"
+        if self.review_state == DocumentReviewState.CHANGES_REQUESTED:
+            return "changes_requested"
+        if self.review_due_on is not None and self.review_due_on <= timezone.localdate():
+            return "stale"
+        if self.review_state == DocumentReviewState.PENDING:
+            return "pending"
+        if self.review_state == DocumentReviewState.UNREVIEWED:
+            return "unreviewed"
+        if self.last_reviewed_at is None:
+            return "unreviewed"
+        return "current"
 
     def clean(self) -> None:
         if self.entity_id and (
@@ -5425,6 +5515,7 @@ class ReminderDomain(models.TextChoices):
     COMPLIANCE = "compliance", "Compliance"
     INVENTORY = "inventory", "Inventory"
     DOMAIN = "domain", "Domain"
+    DOCUMENTATION = "documentation", "Documentation"
 
 
 class ReminderRecurrence(models.TextChoices):

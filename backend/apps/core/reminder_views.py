@@ -22,7 +22,7 @@ class StrictSerializer(serializers.Serializer):
 
 class ReminderWriteSerializer(StrictSerializer):
     source_entity_id = serializers.UUIDField()
-    domain = serializers.ChoiceField(choices=("compliance", "inventory", "domain"))
+    domain = serializers.ChoiceField(choices=("compliance", "inventory", "domain", "documentation"))
     kind = serializers.RegexField(r"^[a-z0-9_]{1,48}$")
     title = serializers.CharField(max_length=240)
     due_on = serializers.DateField()

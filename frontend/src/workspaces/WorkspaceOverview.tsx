@@ -30,6 +30,7 @@ const capabilityLabels = {
   vendors: 'Vendors',
   products: 'Products',
   compliance: 'Compliance',
+  deadlines: 'Reminders',
   activity: 'Activity',
   recycle_bin: 'Recycle bin',
   integrations: 'Integrations',

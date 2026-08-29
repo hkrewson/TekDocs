@@ -12,7 +12,7 @@ import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClien
 import type { WorkspaceClient } from '../workspaces/api'
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, audience_profile: 'shared' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
-const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
+const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, collection: 'Security standards', tags: ['firewall'], owner_id: null, owner_name: null, review_due_on: null, review_state: 'unreviewed', review_requested_by_id: null, review_requested_by_name: null, review_requested_at: null, reviewer_id: null, reviewer_name: null, review_decided_at: null, last_reviewed_by_id: null, last_reviewed_by_name: null, last_reviewed_at: null, review_note: '', health_status: 'unowned', attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
 const sourceDocument: DocumentRecord = { ...document, id: 'doc-source', title: 'Shared checklist', block_id: 'block-source', current_revision_id: 'revision-source', placements: [{ ...primaryPlacement, id: 'placement-source', block_id: 'block-source', block_name: 'Shared checklist — content', resolved_revision_id: 'revision-source' }] }
 
 function clients() {
@@ -76,12 +76,18 @@ function clients() {
   const saveRemoteSource = vi.fn().mockResolvedValue({ id: 'source-1', url: 'https://docs.example.invalid/setup', source_kind: 'auto', enabled: true, check_interval_minutes: 1440, next_check_at: '2026-08-16T00:00:00Z', last_checked_at: null, last_applied_observation_id: null })
   const checkRemoteSource = vi.fn().mockResolvedValue({ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-08-15T00:00:00Z', canonical_markdown: '# Setup\n', diff: '+# Setup' })
   const applyRemoteObservation = vi.fn().mockResolvedValue({ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-08-15T00:00:00Z', canonical_markdown: '# Setup\n', diff: '+# Setup' })
+  const updateOperations = vi.fn().mockResolvedValue({ ...document, owner_id: 'reviewer-1', owner_name: 'Alex Rivera', review_due_on: '2026-09-30', health_status: 'unreviewed' as const })
+  const requestReview = vi.fn().mockResolvedValue({ ...document, review_state: 'pending' as const, reviewer_id: 'reviewer-1', reviewer_name: 'Alex Rivera', health_status: 'pending' as const })
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     get: getDocument,
     create: createDocument,
     createFileBacked,
     update: updateDocument,
+    operationsChoices: vi.fn().mockResolvedValue([{ id: 'reviewer-1', display_name: 'Alex Rivera', can_approve: true }]),
+    updateOperations,
+    requestReview,
+    decideReview: vi.fn().mockResolvedValue({ ...document, review_state: 'approved' as const, health_status: 'current' as const }),
     previewRestructure,
     applyRestructure,
     listRevisions: vi.fn().mockResolvedValue({ results: [{ id: 'revision-1', parent_id: null, revision_number: 1, checksum: 'abc123', created_by: 'Primary Owner', created_at: '2026-08-09T00:00:00Z', is_current: true }], count: 1, page: 1, page_size: 50, has_more: false }),
@@ -133,8 +139,27 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
+  return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, updateOperations, requestReview, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
+
+it('organizes document health and sends an assigned review request', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, updateOperations, requestReview } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.selectOptions(await screen.findByLabelText('Owner'), 'reviewer-1')
+  await user.clear(screen.getByLabelText('Review due'))
+  await user.type(screen.getByLabelText('Review due'), '2026-09-30')
+  await user.click(screen.getByRole('button', { name: 'Save ownership and organization' }))
+  await waitFor(() => expect(updateOperations).toHaveBeenCalledWith({}, 'doc-1', expect.objectContaining({ owner_id: 'reviewer-1', review_due_on: '2026-09-30', collection: 'Security standards', tags: ['firewall'] })))
+
+  await user.selectOptions(screen.getByLabelText('Reviewer'), 'reviewer-1')
+  await user.type(screen.getByLabelText('Review note'), 'Please confirm the firewall standard.')
+  await user.click(screen.getByRole('button', { name: 'Send for review' }))
+  await waitFor(() => expect(requestReview).toHaveBeenCalledWith({}, 'doc-1', 'reviewer-1', 'Please confirm the firewall standard.'))
+})
 
 it('lists titles and persists an independently edited block', async () => {
   const user = userEvent.setup()

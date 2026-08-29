@@ -48,6 +48,11 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route("msp-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-operations-choices", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-operations", ("PUT",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-review-request", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-review-decision", ("POST",), mutations=(PermissionKey.DOCUMENTS_APPROVE,)),
     route("msp-document-file-backed-create", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route(
         "msp-document-detail",
@@ -340,6 +345,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("entity-link-type-catalog", ("GET",), PermissionKey.RELATIONSHIPS_VIEW),
     route("msp-entity-search", ("GET",), PermissionKey.RELATIONSHIPS_VIEW),
+    route("msp-activity-list", ("GET",), PermissionKey.ACTIVITY_VIEW),
     route(
         "msp-entity-relationship-list-create",
         ("GET", "POST"),
@@ -1022,6 +1028,33 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True
+    ),
+    route(
+        "organization-document-operations-choices",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-operations",
+        ("PUT",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-review-request",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-review-decision",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_APPROVE,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-document-file-backed-create",
         ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
@@ -1586,6 +1619,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-reminder-calendar",
         ("GET",),
         PermissionKey.DEADLINES_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-activity-list",
+        ("GET",),
+        PermissionKey.ACTIVITY_VIEW,
         organization_scoped=True,
     ),
     route(

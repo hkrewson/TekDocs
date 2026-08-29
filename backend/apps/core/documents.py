@@ -22,6 +22,7 @@ from .models import (
     DocumentCategory,
     DocumentPlacement,
     DocumentPublication,
+    DocumentReviewState,
     DocumentTemplateEnrollment,
     DocumentTemplateRevision,
     Entity,
@@ -156,6 +157,10 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
             "entity",
             "organization",
             "organization__entity",
+            "owner",
+            "review_requested_by",
+            "reviewer",
+            "last_reviewed_by",
             "template_enrollment",
             "template_enrollment__source_template__entity",
             "template_enrollment__applied_revision",
@@ -647,7 +652,26 @@ def update_document(
     locked_document.category = category
     locked_document.is_template = is_template
     locked_document.library_visible = library_visible
-    locked_document.save(update_fields=("category", "is_template", "library_visible", "updated_at"))
+    locked_document.review_state = DocumentReviewState.UNREVIEWED
+    locked_document.review_requested_by = None
+    locked_document.review_requested_at = None
+    locked_document.reviewer = None
+    locked_document.review_decided_at = None
+    locked_document.review_note = ""
+    locked_document.save(
+        update_fields=(
+            "category",
+            "is_template",
+            "library_visible",
+            "review_state",
+            "review_requested_by",
+            "review_requested_at",
+            "reviewer",
+            "review_decided_at",
+            "review_note",
+            "updated_at",
+        )
+    )
     if placement.parent_id is None and placement.position == 0 and block.library_visible != library_visible:
         block.library_visible = library_visible
         block.save(update_fields=("library_visible", "updated_at"))

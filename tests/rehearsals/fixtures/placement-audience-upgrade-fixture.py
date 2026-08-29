@@ -137,7 +137,7 @@ def verify_fixture():
         assert str(client_only.id) not in str(msp_publication.manifest)
         assert all(verify_publication(client_publication).values())
         assert all(verify_publication(msp_publication).values())
-        print("0.8.39 evidence and 0.8.40 audience isolation survived the 0.8.41 production-image upgrade")
+        print("0.8.39 evidence and 0.8.40 audience isolation survived the 0.8.42 production-image upgrade")
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

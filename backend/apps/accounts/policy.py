@@ -100,6 +100,7 @@ class PermissionKey(StrEnum):
     INTEGRATIONS_VIEW = "integrations.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
     NOTIFICATIONS_MANAGE = "notifications.manage"
+    ACTIVITY_VIEW = "activity.view"
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +199,7 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.INTEGRATIONS_VIEW, "View integrations", "Integrations"),
     _permission(PermissionKey.INTEGRATIONS_MANAGE, "Manage integrations", "Integrations", mfa=True),
     _permission(PermissionKey.NOTIFICATIONS_MANAGE, "Manage notification delivery", "Administration", mfa=True),
+    _permission(PermissionKey.ACTIVITY_VIEW, "View audit activity", "Governance"),
 )
 PERMISSION_BY_KEY = {definition.key: definition for definition in PERMISSION_CATALOG}
 
@@ -279,6 +281,7 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
         PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+        PermissionKey.ACTIVITY_VIEW,
     }
 )
 

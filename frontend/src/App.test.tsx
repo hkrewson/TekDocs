@@ -109,17 +109,19 @@ describe('application shell', () => {
     expect(screen.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/certificates')
     expect(screen.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Activity' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
+    expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
     expect(screen.getByText('Reusable documentation and templates')).toBeInTheDocument()
-    expect(screen.getByText('TekDocs 0.8.41')).toBeInTheDocument()
+    expect(screen.getByText('TekDocs 0.8.42')).toBeInTheDocument()
   })
 
-  it('does not attach a stale release promise to the hidden activity placeholder', () => {
+  it('opens the permission-aware activity surface instead of a release placeholder', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 1, page_size: 50, has_more: false, actions: [] }), { status: 200 }))
     render(app('/activity'))
 
     expect(screen.getByRole('heading', { name: 'Activity' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Not scheduled' })).toBeInTheDocument()
-    expect(screen.queryByText('Planned 0.1.0')).not.toBeInTheDocument()
+    expect(await screen.findByText('No activity matches these filters.')).toBeInTheDocument()
+    expect(screen.queryByText(/Planned|Not scheduled/)).not.toBeInTheDocument()
   })
 
   it('provides stable page-level help without loading remote content', async () => {

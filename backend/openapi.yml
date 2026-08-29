@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.41
+  version: 0.8.42
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -752,6 +752,27 @@ paths:
       responses:
         '204':
           description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/activity:
+    get:
+      operationId: activity_msp_list
+      tags:
+      - activity
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResult'
+          description: ''
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -1876,6 +1897,45 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/operations:
+    put:
+      operationId: documents_msp_operations_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/placements:
     post:
       operationId: document_placements_msp_create
@@ -2949,6 +3009,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/documents/{document_entity_id}/reviews:
+    post:
+      operationId: documents_msp_review_request
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/{document_entity_id}/reviews/decision:
+    post:
+      operationId: documents_msp_review_decision
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_msp_list
@@ -3250,6 +3390,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EntityMentionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/operations/choices:
+    get:
+      operationId: documents_msp_operations_choices
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentOperationsChoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/search:
+    get:
+      operationId: documents_msp_search
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSearchResult'
           description: ''
           headers:
             X-Request-ID:
@@ -11254,6 +11438,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/activity:
+    get:
+      operationId: activity_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/assets:
     get:
       operationId: workspaces_organizations_assets_retrieve_list
@@ -15056,6 +15268,51 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/operations:
+    put:
+      operationId: documents_organization_operations_update
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentOperationsWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/placements:
     post:
       operationId: document_placements_organization_create
@@ -16156,6 +16413,98 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/reviews:
+    post:
+      operationId: documents_organization_review_request
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewRequestWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/reviews/decision:
+    post:
+      operationId: documents_organization_review_decision
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewDecisionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/revisions:
     get:
       operationId: document_revisions_organization_list
@@ -16503,6 +16852,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EntityMentionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/operations/choices:
+    get:
+      operationId: documents_organization_operations_choices
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentOperationsChoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/search:
+    get:
+      operationId: documents_organization_search
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSearchResult'
           description: ''
           headers:
             X-Request-ID:
@@ -22593,6 +23000,74 @@ components:
       - custom_assignable_permissions
       - permissions
       - roles
+    ActivityRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+          nullable: true
+        actor_name:
+          type: string
+          nullable: true
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        entity_name:
+          type: string
+          nullable: true
+        entity_type:
+          type: string
+          nullable: true
+        request_id:
+          type: string
+          format: uuid
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - action
+      - actor_id
+      - actor_name
+      - entity_id
+      - entity_name
+      - entity_type
+      - id
+      - occurred_at
+      - request_id
+    ActivityResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityRecord'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+        actions:
+          type: array
+          items:
+            type: string
+      required:
+      - actions
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     ApiRoot:
       type: object
       properties:
@@ -26051,6 +26526,73 @@ components:
           type: boolean
         library_visible:
           type: boolean
+        collection:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_name:
+          type: string
+          nullable: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        review_state:
+          enum:
+          - unreviewed
+          - pending
+          - approved
+          - changes_requested
+          type: string
+          description: |-
+            * `unreviewed` - Unreviewed
+            * `pending` - Pending review
+            * `approved` - Approved
+            * `changes_requested` - Changes requested
+          x-spec-enum-id: aecb9936b1091ca0
+        health_status:
+          type: string
+        review_requested_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_requested_by_name:
+          type: string
+          nullable: true
+        review_requested_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewer_id:
+          type: string
+          format: uuid
+          nullable: true
+        reviewer_name:
+          type: string
+          nullable: true
+        review_decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_reviewed_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        last_reviewed_by_name:
+          type: string
+          nullable: true
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_note:
+          type: string
         template_enrollment_id:
           type: string
           format: uuid
@@ -26135,14 +26677,21 @@ components:
       - block_id
       - category
       - checksum
+      - collection
       - created_at
       - current_revision_id
+      - health_status
       - id
       - is_reference
       - is_template
+      - last_reviewed_at
+      - last_reviewed_by_id
+      - last_reviewed_by_name
       - library_visible
       - markdown
+      - owner_id
       - owner_kind
+      - owner_name
       - owner_organization_id
       - owner_organization_name
       - placement_count
@@ -26152,7 +26701,17 @@ components:
       - publication_count
       - publications
       - resolved_markdown
+      - review_decided_at
+      - review_due_on
+      - review_note
+      - review_requested_at
+      - review_requested_by_id
+      - review_requested_by_name
+      - review_state
+      - reviewer_id
+      - reviewer_name
       - revision_number
+      - tags
       - template_applied_revision_id
       - template_enrollment_id
       - template_source_id
@@ -26234,6 +26793,16 @@ components:
           default: false
       required:
       - title
+    DocumentFacet:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+      required:
+      - count
+      - value
     DocumentKey:
       type: object
       properties:
@@ -26266,6 +26835,41 @@ components:
       - count
       - results
       - unresolved_count
+    DocumentOperationsChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        can_approve:
+          type: boolean
+      required:
+      - can_approve
+      - display_name
+      - id
+    DocumentOperationsWrite:
+      type: object
+      properties:
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        collection:
+          type: string
+          default: ''
+          maxLength: 120
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 40
+          maxItems: 20
     DocumentPlacement:
       type: object
       properties:
@@ -26997,6 +27601,297 @@ components:
       required:
       - count
       - results
+    DocumentReviewDecisionWrite:
+      type: object
+      properties:
+        decision:
+          enum:
+          - approved
+          - changes_requested
+          type: string
+          description: |-
+            * `approved` - approved
+            * `changes_requested` - changes_requested
+          x-spec-enum-id: 124981b76f284288
+        note:
+          type: string
+          maxLength: 500
+      required:
+      - decision
+      - note
+    DocumentReviewRequestWrite:
+      type: object
+      properties:
+        reviewer_id:
+          type: string
+          format: uuid
+        note:
+          type: string
+          default: ''
+          maxLength: 500
+      required:
+      - reviewer_id
+    DocumentSearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        owner_kind:
+          type: string
+          readOnly: true
+        owner_organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_organization_name:
+          type: string
+          nullable: true
+        is_reference:
+          type: boolean
+          readOnly: true
+        category:
+          enum:
+          - general
+          - policy
+          - procedure
+          - guide
+          - reference
+          type: string
+          description: |-
+            * `general` - General
+            * `policy` - Policy
+            * `procedure` - Procedure
+            * `guide` - Guide
+            * `reference` - Reference
+          x-spec-enum-id: 5c27c16eb333c7c1
+        is_template:
+          type: boolean
+        library_visible:
+          type: boolean
+        collection:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_name:
+          type: string
+          nullable: true
+        review_due_on:
+          type: string
+          format: date
+          nullable: true
+        review_state:
+          enum:
+          - unreviewed
+          - pending
+          - approved
+          - changes_requested
+          type: string
+          description: |-
+            * `unreviewed` - Unreviewed
+            * `pending` - Pending review
+            * `approved` - Approved
+            * `changes_requested` - Changes requested
+          x-spec-enum-id: aecb9936b1091ca0
+        health_status:
+          type: string
+        review_requested_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_requested_by_name:
+          type: string
+          nullable: true
+        review_requested_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewer_id:
+          type: string
+          format: uuid
+          nullable: true
+        reviewer_name:
+          type: string
+          nullable: true
+        review_decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_reviewed_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        last_reviewed_by_name:
+          type: string
+          nullable: true
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_note:
+          type: string
+        template_enrollment_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        template_applied_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        template_source_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentAttachment'
+          readOnly: true
+        attachment_count:
+          type: integer
+          readOnly: true
+        primary_file:
+          allOf:
+          - $ref: '#/components/schemas/DocumentPrimaryFile'
+          nullable: true
+          readOnly: true
+        primary_file_versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPrimaryFile'
+          readOnly: true
+        publications:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPublication'
+          readOnly: true
+        publication_count:
+          type: integer
+          readOnly: true
+        markdown:
+          type: string
+          readOnly: true
+        block_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        current_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        revision_number:
+          type: integer
+          nullable: true
+          readOnly: true
+        checksum:
+          type: string
+          readOnly: true
+        resolved_markdown:
+          type: string
+          readOnly: true
+        placements:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPlacement'
+          readOnly: true
+        placement_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        matching_excerpt:
+          type: string
+      required:
+      - attachment_count
+      - attachments
+      - block_id
+      - category
+      - checksum
+      - collection
+      - created_at
+      - current_revision_id
+      - health_status
+      - id
+      - is_reference
+      - is_template
+      - last_reviewed_at
+      - last_reviewed_by_id
+      - last_reviewed_by_name
+      - library_visible
+      - markdown
+      - matching_excerpt
+      - owner_id
+      - owner_kind
+      - owner_name
+      - owner_organization_id
+      - owner_organization_name
+      - placement_count
+      - placements
+      - primary_file
+      - primary_file_versions
+      - publication_count
+      - publications
+      - resolved_markdown
+      - review_decided_at
+      - review_due_on
+      - review_note
+      - review_requested_at
+      - review_requested_by_id
+      - review_requested_by_name
+      - review_state
+      - reviewer_id
+      - reviewer_name
+      - revision_number
+      - tags
+      - template_applied_revision_id
+      - template_enrollment_id
+      - template_source_id
+      - title
+      - updated_at
+    DocumentSearchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSearchHit'
+        count:
+          type: integer
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentFacet'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentFacet'
+        health:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentFacet'
+      required:
+      - collections
+      - count
+      - health
+      - results
+      - tags
     DocumentTemplateInstantiate:
       type: object
       properties:
@@ -32716,12 +33611,14 @@ components:
           - compliance
           - inventory
           - domain
+          - documentation
           type: string
           description: |-
             * `compliance` - compliance
             * `inventory` - inventory
             * `domain` - domain
-          x-spec-enum-id: bb4b79ed64be8757
+            * `documentation` - documentation
+          x-spec-enum-id: a4f78712edb525a6
         kind:
           type: string
           pattern: ^[a-z0-9_]{1,48}$

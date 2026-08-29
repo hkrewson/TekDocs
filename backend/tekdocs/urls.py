@@ -31,6 +31,7 @@ from apps.accounts.views import (
     OwnerBootstrapView,
     ProfileView,
 )
+from apps.core.activity_views import MSPActivityListView, OrganizationActivityListView
 from apps.core.catalog_views import (
     CatalogModelDetailView,
     CatalogModelListCreateView,
@@ -137,6 +138,8 @@ from apps.core.document_views import (
     MSPDocumentExportView,
     MSPDocumentListCreateView,
     MSPDocumentMentionSearchView,
+    MSPDocumentOperationsChoicesView,
+    MSPDocumentOperationsView,
     MSPDocumentPlacementDetachView,
     MSPDocumentPlacementDetailView,
     MSPDocumentPlacementListCreateView,
@@ -153,8 +156,11 @@ from apps.core.document_views import (
     MSPDocumentReferenceDetailView,
     MSPDocumentReferenceListCreateView,
     MSPDocumentRestructureView,
+    MSPDocumentReviewDecisionView,
+    MSPDocumentReviewRequestView,
     MSPDocumentRevisionDetailView,
     MSPDocumentRevisionListView,
+    MSPDocumentSearchView,
     MSPDocumentTemplateInstantiateView,
     MSPFileBackedDocumentCreateView,
     MSPMarkdownImportView,
@@ -166,6 +172,8 @@ from apps.core.document_views import (
     OrganizationDocumentExportView,
     OrganizationDocumentListCreateView,
     OrganizationDocumentMentionSearchView,
+    OrganizationDocumentOperationsChoicesView,
+    OrganizationDocumentOperationsView,
     OrganizationDocumentPlacementDetachView,
     OrganizationDocumentPlacementDetailView,
     OrganizationDocumentPlacementListCreateView,
@@ -180,8 +188,11 @@ from apps.core.document_views import (
     OrganizationDocumentPublicationMarkdownView,
     OrganizationDocumentPublicationWithdrawView,
     OrganizationDocumentRestructureView,
+    OrganizationDocumentReviewDecisionView,
+    OrganizationDocumentReviewRequestView,
     OrganizationDocumentRevisionDetailView,
     OrganizationDocumentRevisionListView,
+    OrganizationDocumentSearchView,
     OrganizationDocumentTemplateInstantiateView,
     OrganizationDocumentTemplateLibraryView,
     OrganizationDocumentTemplateRolloutApplyView,
@@ -495,6 +506,12 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path("api/v1/documents/search", MSPDocumentSearchView.as_view(), name="msp-document-search"),
+    path(
+        "api/v1/documents/operations/choices",
+        MSPDocumentOperationsChoicesView.as_view(),
+        name="msp-document-operations-choices",
+    ),
     path(
         "api/v1/documents/file-backed",
         MSPFileBackedDocumentCreateView.as_view(),
@@ -530,6 +547,21 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/operations",
+        MSPDocumentOperationsView.as_view(),
+        name="msp-document-operations",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/reviews",
+        MSPDocumentReviewRequestView.as_view(),
+        name="msp-document-review-request",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/reviews/decision",
+        MSPDocumentReviewDecisionView.as_view(),
+        name="msp-document-review-decision",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/restructure",
@@ -679,6 +711,7 @@ urlpatterns = [
     ),
     path("api/v1/entity-link-types", EntityLinkTypeCatalogView.as_view(), name="entity-link-type-catalog"),
     path("api/v1/entities/search", MSPEntitySearchView.as_view(), name="msp-entity-search"),
+    path("api/v1/activity", MSPActivityListView.as_view(), name="msp-activity-list"),
     path("api/v1/relationship-graph", MSPRelationshipGraphView.as_view(), name="msp-relationship-graph"),
     path(
         "api/v1/relationship-graph/views",
@@ -1317,6 +1350,16 @@ urlpatterns = [
         name="organization-document-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/search",
+        OrganizationDocumentSearchView.as_view(),
+        name="organization-document-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/operations/choices",
+        OrganizationDocumentOperationsChoicesView.as_view(),
+        name="organization-document-operations-choices",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/file-backed",
         OrganizationFileBackedDocumentCreateView.as_view(),
         name="organization-document-file-backed-create",
@@ -1695,6 +1738,21 @@ urlpatterns = [
         name="organization-document-detail",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/operations",
+        OrganizationDocumentOperationsView.as_view(),
+        name="organization-document-operations",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/reviews",
+        OrganizationDocumentReviewRequestView.as_view(),
+        name="organization-document-review-request",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/reviews/decision",
+        OrganizationDocumentReviewDecisionView.as_view(),
+        name="organization-document-review-decision",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/restructure",
         OrganizationDocumentRestructureView.as_view(),
         name="organization-document-restructure",
@@ -2003,6 +2061,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/reminders/calendar.ics",
         OrganizationReminderCalendarView.as_view(),
         name="organization-reminder-calendar",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/activity",
+        OrganizationActivityListView.as_view(),
+        name="organization-activity-list",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/domains",

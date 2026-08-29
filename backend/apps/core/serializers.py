@@ -24,6 +24,7 @@ from .models import (
     DocumentPlacement,
     DocumentPublication,
     DocumentPublicationControlEvent,
+    DocumentReviewState,
     LocationKind,
     Organization,
     OrganizationAccessMode,
@@ -380,6 +381,21 @@ class DocumentListQuerySerializer(serializers.Serializer):
         required=False,
         default="all",
     )
+    collection = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    tag = serializers.CharField(max_length=40, required=False, allow_blank=True, default="")
+    health = serializers.ChoiceField(
+        choices=("", "current", "stale", "unreviewed", "unowned", "pending", "changes_requested"),
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    review_state = serializers.ChoiceField(
+        choices=(("", "All"), *DocumentReviewState.choices),
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    owner_id = serializers.UUIDField(required=False, allow_null=True, default=None)
 
 
 class DocumentTemplateInstantiateSerializer(serializers.Serializer):
@@ -892,6 +908,23 @@ class DocumentSerializer(serializers.Serializer):
     category = serializers.ChoiceField(choices=DocumentCategory.choices)
     is_template = serializers.BooleanField()
     library_visible = serializers.BooleanField()
+    collection = serializers.CharField(allow_blank=True)
+    tags = serializers.ListField(child=serializers.CharField())
+    owner_id = serializers.UUIDField(allow_null=True)
+    owner_name = serializers.CharField(source="owner.display_name", allow_null=True)
+    review_due_on = serializers.DateField(allow_null=True)
+    review_state = serializers.ChoiceField(choices=DocumentReviewState.choices)
+    health_status = serializers.CharField()
+    review_requested_by_id = serializers.UUIDField(allow_null=True)
+    review_requested_by_name = serializers.CharField(source="review_requested_by.display_name", allow_null=True)
+    review_requested_at = serializers.DateTimeField(allow_null=True)
+    reviewer_id = serializers.UUIDField(allow_null=True)
+    reviewer_name = serializers.CharField(source="reviewer.display_name", allow_null=True)
+    review_decided_at = serializers.DateTimeField(allow_null=True)
+    last_reviewed_by_id = serializers.UUIDField(allow_null=True)
+    last_reviewed_by_name = serializers.CharField(source="last_reviewed_by.display_name", allow_null=True)
+    last_reviewed_at = serializers.DateTimeField(allow_null=True)
+    review_note = serializers.CharField(allow_blank=True)
     template_enrollment_id = serializers.SerializerMethodField()
     template_applied_revision_id = serializers.SerializerMethodField()
     template_source_id = serializers.SerializerMethodField()
@@ -1152,6 +1185,53 @@ class RevisionConflictSerializer(serializers.Serializer):
 class DocumentResultSerializer(serializers.Serializer):
     results = DocumentSerializer(many=True)
     count = serializers.IntegerField()
+
+
+class DocumentOperationsWriteSerializer(serializers.Serializer):
+    owner_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    review_due_on = serializers.DateField(required=False, allow_null=True, default=None)
+    collection = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    tags = serializers.ListField(
+        child=serializers.CharField(max_length=40, trim_whitespace=True),
+        max_length=20,
+        required=False,
+        default=list,
+    )
+
+
+class DocumentOperationsChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    display_name = serializers.CharField()
+    can_approve = serializers.BooleanField()
+
+
+class DocumentReviewRequestWriteSerializer(serializers.Serializer):
+    reviewer_id = serializers.UUIDField()
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+
+class DocumentReviewDecisionWriteSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(
+        choices=(DocumentReviewState.APPROVED, DocumentReviewState.CHANGES_REQUESTED)
+    )
+    note = serializers.CharField(max_length=500, allow_blank=False)
+
+
+class DocumentSearchHitSerializer(DocumentSerializer):
+    matching_excerpt = serializers.CharField(allow_blank=True)
+
+
+class DocumentFacetSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    count = serializers.IntegerField()
+
+
+class DocumentSearchResultSerializer(serializers.Serializer):
+    results = DocumentSearchHitSerializer(many=True)
+    count = serializers.IntegerField()
+    collections = DocumentFacetSerializer(many=True)
+    tags = DocumentFacetSerializer(many=True)
+    health = DocumentFacetSerializer(many=True)
 
 
 class DocumentationReferenceWriteSerializer(serializers.Serializer):

@@ -103,7 +103,7 @@ describe('documentation placement API client', () => {
     await browserDocumentsClient.replacePrimaryFile(scope, 'doc', new File(['replacement'], 'datasheet-v2.txt'))
     await browserDocumentsClient.archiveAttachment(scope, 'doc', 'attachment')
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents?q=router&category=guide&template=templates')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/search?q=router&category=guide&template=templates')
     expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/import')
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBeInstanceOf(FormData)
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/attachments')

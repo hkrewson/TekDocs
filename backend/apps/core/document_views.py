@@ -1,5 +1,6 @@
 import re
-from typing import cast
+from collections import Counter
+from typing import Any, cast
 from uuid import UUID
 
 from django.core.files.base import ContentFile
@@ -16,7 +17,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey, require_permission
+from apps.accounts.models import TenantMembership
+from apps.accounts.policy import PermissionKey, context_has_permission, require_installation_member, require_permission
 
 from .diagram_exports import DiagramExportArtifact
 from .document_attachments import (
@@ -36,6 +38,12 @@ from .document_exports import (
     export_pdf,
     resolve_export_snapshot,
 )
+from .document_operations import (
+    DocumentOperationsError,
+    decide_document_review,
+    request_document_review,
+    update_document_operations,
+)
 from .document_reuse import reuse_impact_for_placement
 from .documents import (
     PlacementConflict,
@@ -54,6 +62,7 @@ from .documents import (
     instantiate_document_template,
     remove_document_placement,
     remove_listing_reference,
+    resolve_document,
     restructure_document,
     revision_diff,
     revisions_for_document,
@@ -96,6 +105,8 @@ from .serializers import (
     DocumentAttachmentWriteSerializer,
     DocumentCreateSerializer,
     DocumentListQuerySerializer,
+    DocumentOperationsChoiceSerializer,
+    DocumentOperationsWriteSerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
     DocumentPrimaryFileSerializer,
@@ -107,6 +118,9 @@ from .serializers import (
     DocumentRestructurePreviewSerializer,
     DocumentRestructureResultSerializer,
     DocumentResultSerializer,
+    DocumentReviewDecisionWriteSerializer,
+    DocumentReviewRequestWriteSerializer,
+    DocumentSearchResultSerializer,
     DocumentSerializer,
     DocumentTemplateInstantiateSerializer,
     DocumentTemplateRolloutApplySerializer,
@@ -152,22 +166,170 @@ def _document(workspace: ResolvedWorkspace, document_entity_id: UUID):  # type: 
 def _list(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = DocumentListQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
-    values = serializer.validated_data
+    records = _filtered_documents(workspace, serializer.validated_data)
+    context = {
+        "workspace": workspace,
+        "workspace_organization_id": workspace.organization.id if workspace.organization else None,
+    }
+    return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
+
+
+def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) -> list[Document]:
     queryset = documents_for_scope(workspace.data_scope)
     if values["q"]:
-        queryset = queryset.filter(entity__display_name__icontains=values["q"])
+        terms = re.findall(r"\w+", cast(str, values["q"]).casefold())[:12]
+        for term in terms or [cast(str, values["q"])]:
+            queryset = queryset.filter(
+                Q(entity__display_name__icontains=term)
+                | Q(placements__block__current_revision__markdown__icontains=term)
+                | Q(placements__pinned_revision__markdown__icontains=term)
+            )
     if values["category"]:
         queryset = queryset.filter(category=values["category"])
     if values["template"] == "documents":
         queryset = queryset.filter(is_template=False)
     elif values["template"] == "templates":
         queryset = queryset.filter(is_template=True)
-    records = list(queryset.order_by("entity__display_name", "entity_id")[:500])
+    if values["collection"]:
+        queryset = queryset.filter(collection__iexact=values["collection"])
+    if values["review_state"]:
+        queryset = queryset.filter(review_state=values["review_state"])
+    if values["owner_id"]:
+        queryset = queryset.filter(owner_id=values["owner_id"])
+    records = list(queryset.order_by("entity__display_name", "entity_id").distinct()[:500])
+    if values["tag"]:
+        tag = values["tag"].strip().lower()
+        records = [record for record in records if tag in record.tags]
+    if values["health"]:
+        records = [record for record in records if record.health_status == values["health"]]
+    return records
+
+
+def _matching_excerpt(markdown: str, query: str) -> str:
+    markdown = markdown.replace("\r", " ").replace("\n", " ")
+    collapsed = " ".join(markdown.split())
+    if not collapsed:
+        return ""
+    folded = collapsed.casefold()
+    index = folded.find(query.casefold()) if query else -1
+    if index < 0:
+        positions = [folded.find(term) for term in re.findall(r"\w+", query.casefold())[:12]]
+        index = min((position for position in positions if position >= 0), default=-1)
+    if index < 0:
+        return collapsed[:220] + ("…" if len(collapsed) > 220 else "")
+    start = max(0, index - 80)
+    end = min(len(collapsed), index + len(query) + 120)
+    excerpt = collapsed[start:end]
+    return f"{'…' if start else ''}{excerpt}{'…' if end < len(collapsed) else ''}"
+
+
+def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentListQuerySerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    selected = _filtered_documents(workspace, serializer.validated_data)
+    query = serializer.validated_data["q"]
+    ranks: dict[UUID, int] = {}
+    for record in selected:
+        markdown = resolve_document(record).markdown
+        record.matching_excerpt = _matching_excerpt(markdown, query)
+        folded_title = record.entity.display_name.casefold()
+        folded_markdown = markdown.casefold()
+        folded_query = query.casefold()
+        terms = re.findall(r"\w+", folded_query)[:12]
+        ranks[record.id] = (
+            (100 if folded_query and folded_query in folded_title else 0)
+            + (25 if folded_query and folded_query in folded_markdown else 0)
+            + sum(10 for term in terms if term in folded_title)
+            + sum(min(folded_markdown.count(term), 5) for term in terms)
+        )
+    if query:
+        selected.sort(key=lambda record: (-ranks[record.id], record.entity.display_name.casefold()))
+    collection_counts = Counter(record.collection for record in selected if record.collection)
+    tag_counts = Counter(tag for record in selected for tag in record.tags)
+    health_counts = Counter(record.health_status for record in selected)
     context = {
         "workspace": workspace,
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
-    return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
+    payload = {
+        "results": selected,
+        "count": len(selected),
+        "collections": [{"value": value, "count": count} for value, count in sorted(collection_counts.items())],
+        "tags": [{"value": value, "count": count} for value, count in sorted(tag_counts.items())],
+        "health": [{"value": value, "count": count} for value, count in sorted(health_counts.items())],
+    }
+    return Response(DocumentSearchResultSerializer(payload, context=context).data)
+
+
+def _operations(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    serializer = DocumentOperationsWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    try:
+        update_document_operations(
+            workspace=workspace,
+            document=document,
+            actor_id=request.user.pk,
+            **serializer.validated_data,
+        )
+    except DocumentOperationsError as exc:
+        raise serializers.ValidationError({"detail": str(exc)}) from exc
+    return _retrieve(workspace, document_entity_id)
+
+
+def _request_review(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    serializer = DocumentReviewRequestWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    try:
+        request_document_review(
+            workspace=workspace,
+            document=document,
+            actor_id=request.user.pk,
+            **serializer.validated_data,
+        )
+    except DocumentOperationsError as exc:
+        raise serializers.ValidationError({"detail": str(exc)}) from exc
+    return _retrieve(workspace, document_entity_id)
+
+
+def _decide_review(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    serializer = DocumentReviewDecisionWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document, PermissionKey.DOCUMENTS_APPROVE)
+    try:
+        decide_document_review(
+            document=document,
+            actor_id=request.user.pk,
+            **serializer.validated_data,
+        )
+    except DocumentOperationsError as exc:
+        raise serializers.ValidationError({"detail": str(exc)}) from exc
+    return _retrieve(workspace, document_entity_id)
+
+
+def _operations_choices(workspace: ResolvedWorkspace) -> Response:
+    choices = []
+    memberships = TenantMembership.objects.filter(
+        tenant=workspace.member.tenant, user__is_active=True
+    ).select_related("user").order_by("user__display_name", "user_id")
+    for membership in memberships:
+        context = require_installation_member(membership.user)
+        if not context_has_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization):
+            continue
+        choices.append(
+            {
+                "id": str(membership.user_id),
+                "display_name": membership.user.display_name,
+                "can_approve": context_has_permission(
+                    context, PermissionKey.DOCUMENTS_APPROVE, organization=workspace.organization
+                ),
+            }
+        )
+    return Response(choices)
 
 
 def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
@@ -222,9 +384,14 @@ def _retrieve(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Respons
     return Response(DocumentSerializer(_document(workspace, document_entity_id), context=context).data)
 
 
-def _mutate_workspace(request, workspace: ResolvedWorkspace, document):  # type: ignore[no-untyped-def]
+def _mutate_workspace(
+    request: Request,
+    workspace: ResolvedWorkspace,
+    document: Document,
+    permission: PermissionKey = PermissionKey.DOCUMENTS_EDIT,
+) -> None:
     if document.organization_id is None and workspace.organization is not None:
-        require_permission(request.user, PermissionKey.DOCUMENTS_EDIT)
+        require_permission(request.user, permission)
 
 
 def _update(workspace: ResolvedWorkspace, document_entity_id: UUID, request) -> Response:  # type: ignore[no-untyped-def]
@@ -1098,6 +1265,51 @@ class MSPDocumentListCreateView(APIView):
         return _create(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
 
 
+class MSPDocumentSearchView(APIView):
+    @extend_schema(operation_id="documents_msp_search", responses={200: DocumentSearchResultSerializer})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _search(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
+
+
+class MSPDocumentOperationsChoicesView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_operations_choices",
+        responses={200: DocumentOperationsChoiceSerializer(many=True)},
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _operations_choices(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW))
+
+
+class MSPDocumentOperationsView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_operations_update",
+        request=DocumentOperationsWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def put(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _operations(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentReviewRequestView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_review_request",
+        request=DocumentReviewRequestWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _request_review(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
+class MSPDocumentReviewDecisionView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_review_decision",
+        request=DocumentReviewDecisionWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _decide_review(_msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), document_entity_id, request)
+
+
 class MSPDocumentTemplateInstantiateView(APIView):
     @extend_schema(
         operation_id="document_templates_msp_instantiate",
@@ -1419,6 +1631,67 @@ class OrganizationDocumentListCreateView(APIView):
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _create(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request)
+
+
+class OrganizationDocumentSearchView(APIView):
+    @extend_schema(operation_id="documents_organization_search", responses={200: DocumentSearchResultSerializer})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _search(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        )
+
+
+class OrganizationDocumentOperationsChoicesView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_operations_choices",
+        responses={200: DocumentOperationsChoiceSerializer(many=True)},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _operations_choices(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+        )
+
+
+class OrganizationDocumentOperationsView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_operations_update",
+        request=DocumentOperationsWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def put(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _operations(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentReviewRequestView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_review_request",
+        request=DocumentReviewRequestWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _request_review(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentReviewDecisionView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_review_decision",
+        request=DocumentReviewDecisionWriteSerializer,
+        responses={200: DocumentSerializer},
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _decide_review(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            document_entity_id,
+            request,
+        )
 
 
 class OrganizationDocumentTemplateInstantiateView(APIView):

@@ -88,6 +88,8 @@ ORGANIZATION_SCOPED_TABLES = (
 )
 
 TENANT_SCOPED_TABLES = (
+    "core_tenantbillingprofile",
+    "core_taxrate",
     "core_organization",
     "core_organizationclassification",
     "core_customfielddefinitionversion",

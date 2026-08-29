@@ -51,8 +51,8 @@ if [ "$baseline_version" != "0.8.38" ]; then
   echo "Key-publication upgrade expected baseline 0.8.38, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.8.42" ]; then
-  echo "Key-publication upgrade expected current version 0.8.42, found $current_version" >&2
+if [ "$current_version" != "0.8.43" ]; then
+  echo "Key-publication upgrade expected current version 0.8.43, found $current_version" >&2
   exit 1
 fi
 

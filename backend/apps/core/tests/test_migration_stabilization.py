@@ -1,5 +1,7 @@
 import secrets
 import uuid
+from datetime import date
+from decimal import Decimal
 from importlib import import_module
 
 import psycopg
@@ -36,6 +38,9 @@ from apps.core.models import (
     OrganizationClassification,
     Person,
     Site,
+    TaxRate,
+    Tenant,
+    TenantBillingProfile,
     Workspace,
 )
 from apps.core.organizations import create_organization
@@ -139,7 +144,47 @@ DOCUMENT_RLS_TABLES = {
     "core_dataflow",
     "core_dataflowrevision",
     "core_dataflowsnapshot",
+    "core_tenantbillingprofile",
+    "core_taxrate",
 }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_billing_foundation_upgrades_from_document_operations(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Billing-foundation upgrade validation requires PostgreSQL")
+
+    call_command("migrate", "core", "0126", verbosity=0, interactive=False)
+    tenant = Tenant.objects.create(name="Billing upgrade MSP", slug=f"billing-upgrade-{uuid.uuid4()}")
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+
+    profile = TenantBillingProfile.objects.create(tenant=tenant, legal_name="Preserved issuer")
+    rate = TaxRate.objects.create(
+        tenant=tenant,
+        name="Upgrade tax",
+        rate=Decimal("0.082500"),
+        inclusive=False,
+        effective_from=date(2026, 1, 1),
+    )
+    assert Tenant.objects.filter(pk=tenant.pk).exists()
+    assert profile.tenant_id == tenant.id
+    assert rate.tenant_id == tenant.id
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT relname FROM pg_class WHERE relname = ANY(%s) AND relrowsecurity AND relforcerowsecurity",
+            [["core_tenantbillingprofile", "core_taxrate"]],
+        )
+        assert {row[0] for row in cursor.fetchall()} == {"core_tenantbillingprofile", "core_taxrate"}
+        cursor.execute(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(%s)",
+            [["core_billingprofile_validate", "core_taxrate_immutable"]],
+        )
+        assert {row[0] for row in cursor.fetchall()} == {
+            "core_billingprofile_validate",
+            "core_taxrate_immutable",
+        }
 
 
 @pytest.fixture

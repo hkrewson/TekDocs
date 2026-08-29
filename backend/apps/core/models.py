@@ -49,6 +49,115 @@ class Tenant(TimestampedModel):
                 )
 
 
+class TenantBillingProfile(TimestampedModel):
+    """Tenant issuer identity and invoice defaults; no receivable state."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.OneToOneField(Tenant, on_delete=models.PROTECT, related_name="billing_profile")
+    legal_name = models.CharField(max_length=240, blank=True)
+    address_line_1 = models.CharField(max_length=240, blank=True)
+    address_line_2 = models.CharField(max_length=240, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    region = models.CharField(max_length=120, blank=True)
+    postal_code = models.CharField(max_length=32, blank=True)
+    country_code = models.CharField(max_length=2, blank=True)
+    billing_email = models.EmailField(max_length=254, blank=True)
+    phone = models.CharField(max_length=64, blank=True)
+    tax_registration = models.CharField(max_length=120, blank=True)
+    default_currency = models.CharField(max_length=3, default="USD")
+    payment_terms_days = models.PositiveSmallIntegerField(default=30)
+    invoice_prefix = models.CharField(max_length=16, default="INV")
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(payment_terms_days__lte=365),
+                name="billing_profile_payment_terms_bounded",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.legal_name or self.tenant.name
+
+    def clean(self) -> None:
+        from .money import MoneyError, normalize_currency
+
+        try:
+            self.default_currency = normalize_currency(self.default_currency)
+        except MoneyError as exc:
+            raise ValidationError({"default_currency": str(exc)}) from exc
+        self.country_code = self.country_code.strip().upper()
+        self.invoice_prefix = self.invoice_prefix.strip().upper()
+        if self.country_code and (len(self.country_code) != 2 or not self.country_code.isalpha()):
+            raise ValidationError({"country_code": "Country must be a two-letter ISO code"})
+        if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.invoice_prefix):
+            raise ValidationError({"invoice_prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
+
+    @property
+    def is_issue_ready(self) -> bool:
+        required = (
+            self.legal_name,
+            self.address_line_1,
+            self.city,
+            self.postal_code,
+            self.country_code,
+            self.billing_email,
+        )
+        return all(value.strip() for value in required)
+
+
+class TaxRate(models.Model):
+    """One immutable version of an operator-selected tenant tax rate."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="tax_rates")
+    series_id = models.UUIDField(default=uuid.uuid4, editable=False)
+    version = models.PositiveIntegerField(default=1)
+    name = models.CharField(max_length=120)
+    rate = models.DecimalField(max_digits=9, decimal_places=6)
+    inclusive = models.BooleanField(default=False)
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name", "-version", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "series_id", "version"), name="tax_rate_version_unique"),
+            models.CheckConstraint(condition=models.Q(version__gte=1), name="tax_rate_version_positive"),
+            models.CheckConstraint(condition=models.Q(rate__gte=0), name="tax_rate_nonnegative"),
+            models.CheckConstraint(
+                condition=models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=models.F("effective_from")),
+                name="tax_rate_effective_range_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "series_id", "version"), name="core_taxrate_series_idx"),
+            models.Index(fields=("tenant", "effective_from", "effective_to"), name="core_taxrate_effective_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} v{self.version}"
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Tax rate versions are immutable")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Tax rate versions are immutable")
+
+    def clean(self) -> None:
+        if self.effective_to is not None and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "Effective end cannot precede effective start"})
+
+
 class InstallationState(models.Model):
     """The single, migration-created installation bootstrap record."""
 

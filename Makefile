@@ -15,7 +15,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
 	test-browser-artifact-hygiene test-e2e-live
 
-.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal
+.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal placement-audience-upgrade-rehearsal
 .PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check test-diagram-exports diagram-export-release-gate
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
@@ -270,7 +270,7 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true ./tests/rehearsals/rehearse-production-image.sh
 
-release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
+release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
 release-gate: test-compliance-catalogs
 
 compose-doctor:
@@ -317,6 +317,9 @@ publication-control-upgrade-rehearsal:
 
 key-publication-upgrade-rehearsal:
 	./tests/rehearsals/rehearse-key-publication-upgrade.sh
+
+placement-audience-upgrade-rehearsal:
+	./tests/rehearsals/rehearse-placement-audience-upgrade.sh
 
 inventory-backup-rehearsal:
 	./tests/rehearsals/rehearse-inventory-backup.sh

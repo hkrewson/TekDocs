@@ -2,14 +2,14 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-baseline_ref=${TEKDOCS_KEY_PUBLICATION_UPGRADE_FROM_REF:-8691bed}
-work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-key-publication-upgrade.XXXXXX")
+baseline_ref=${TEKDOCS_PLACEMENT_AUDIENCE_UPGRADE_FROM_REF:-57be83f}
+work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-placement-audience-upgrade.XXXXXX")
 baseline_directory="$work_directory/baseline"
 environment_file="$work_directory/upgrade.env"
-project_name="tekdocs_key_publication_upgrade_$$"
+project_name="tekdocs_placement_audience_upgrade_$$"
 fixture_password=$(openssl rand -base64 36 | tr -d '\n')
 production_override="$repository_root/tests/rehearsals/compose.production-image.yml"
-fixture="$repository_root/tests/rehearsals/fixtures/key-publication-upgrade-fixture.py"
+fixture="$repository_root/tests/rehearsals/fixtures/placement-audience-upgrade-fixture.py"
 
 baseline_compose() {
   docker compose --project-name "$project_name" --env-file "$environment_file" \
@@ -47,16 +47,16 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 
 baseline_version=$(tr -d '[:space:]' < "$baseline_directory/VERSION")
 current_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
-if [ "$baseline_version" != "0.8.38" ]; then
-  echo "Key-publication upgrade expected baseline 0.8.38, found $baseline_version" >&2
+if [ "$baseline_version" != "0.8.39" ]; then
+  echo "Placement-audience upgrade expected baseline 0.8.39, found $baseline_version" >&2
   exit 1
 fi
 if [ "$current_version" != "0.8.41" ]; then
-  echo "Key-publication upgrade expected current version 0.8.41, found $current_version" >&2
+  echo "Placement-audience upgrade expected current version 0.8.41, found $current_version" >&2
   exit 1
 fi
 
-echo "Creating retained v2 publication and active key binding in production image $baseline_version"
+echo "Creating exact 0.8.39 placement and signed publication evidence"
 baseline_compose up -d --build --wait backend
 baseline_compose exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$fixture"
@@ -69,4 +69,4 @@ current_compose exec -T -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py 
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend sh -c 'test "$TEKDOCS_IMAGE_VARIANT" = production'
 
-echo "Key-publication production-image upgrade rehearsal passed: $baseline_version -> $current_version"
+echo "Placement-audience production-image upgrade rehearsal passed: $baseline_version -> $current_version"

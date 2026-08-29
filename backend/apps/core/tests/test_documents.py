@@ -365,7 +365,7 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             "key_fingerprint_valid": True,
             "trusted_key": True,
         }
-        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v3"
+        assert publication_payload["manifest"]["format"] == "tekdocs-static-publication/v4"
         assert publication_payload["manifest"]["placements"][0]["revision_id"] == updated["current_revision_id"]
         assert publication_payload["manifest"]["entities"][0]["display_name"] == "Static Client"
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
@@ -1585,6 +1585,210 @@ def test_removing_owned_block_archives_its_identity_without_orphaning_content(ow
 
 
 @pytest.mark.django_db
+def test_placement_audiences_filter_publications_before_snapshot_provenance(
+    owner_client, installation, tmp_path
+):
+    client_org = organization(installation.tenant, "Audience Client")
+    route_kwargs = {"organization_entity_id": client_org.entity_id}
+    created = owner_client.post(
+        reverse("organization-document-list-create", kwargs=route_kwargs),
+        {"title": "Audience runbook", "markdown": "Shared introduction"},
+        content_type="application/json",
+    ).json()
+    placement_route = reverse(
+        "organization-document-placement-list-create",
+        kwargs={**route_kwargs, "document_entity_id": created["id"]},
+    )
+    private_entity = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=client_org,
+        entity_type="client_asset",
+        display_name="Internal audience asset",
+        visibility=EntityVisibility.MSP_PRIVATE,
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        internal_attachment = owner_client.post(
+            reverse(
+                "organization-document-attachment-list-create",
+                kwargs={**route_kwargs, "document_entity_id": created["id"]},
+            ),
+            {"file": SimpleUploadedFile("internal-evidence.txt", b"INTERNAL-FILE-SENTINEL")},
+        ).json()
+    internal_markdown = (
+        "INTERNAL-SENTINEL\n\n"
+        f"[Internal asset](tekdocs://entity/{private_entity.id})\n\n"
+        f"[Internal evidence](tekdocs://attachment/{internal_attachment['id']})"
+    )
+    internal = owner_client.post(
+        placement_route,
+        {
+            "operation": "create_block",
+            "block_name": "Operator secret",
+            "markdown": internal_markdown,
+            "audience_profile": "msp_internal",
+        },
+        content_type="application/json",
+    ).json()["placements"][1]
+    composed = owner_client.post(
+        placement_route,
+        {
+            "operation": "create_block",
+            "block_name": "Client instructions",
+            "markdown": "CLIENT-SENTINEL",
+            "audience_profile": "client_visible",
+        },
+        content_type="application/json",
+    ).json()
+    client_placement = composed["placements"][2]
+
+    assert [item["audience_profile"] for item in composed["placements"]] == [
+        "shared",
+        "msp_internal",
+        "client_visible",
+    ]
+    publication_route = reverse(
+        "organization-document-publication-list-create",
+        kwargs={**route_kwargs, "document_entity_id": created["id"]},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        client_publication = owner_client.post(
+            publication_route,
+            {"reason": "Client edition", "audience": "client_visible", "retention": "permanent"},
+            content_type="application/json",
+        )
+        msp_publication = owner_client.post(
+            publication_route,
+            {"reason": "Operator edition", "audience": "msp_internal", "retention": "permanent"},
+            content_type="application/json",
+        )
+
+    assert client_publication.status_code == 201
+    assert msp_publication.status_code == 201
+    client_payload = client_publication.json()
+    msp_payload = msp_publication.json()
+    assert client_payload["canonical_markdown"] == "Shared introduction\n\nCLIENT-SENTINEL\n"
+    assert msp_payload["canonical_markdown"] == f"Shared introduction\n\n{internal_markdown}\n"
+    assert [item["id"] for item in client_payload["manifest"]["placements"]] == [
+        composed["placements"][0]["id"],
+        client_placement["id"],
+    ]
+    assert [item["id"] for item in msp_payload["manifest"]["placements"]] == [
+        composed["placements"][0]["id"],
+        internal["id"],
+    ]
+    assert "INTERNAL-SENTINEL" not in json.dumps(client_payload)
+    assert internal["id"] not in json.dumps(client_payload)
+    assert str(private_entity.id) not in json.dumps(client_payload)
+    assert internal_attachment["id"] not in json.dumps(client_payload)
+    assert "CLIENT-SENTINEL" not in json.dumps(msp_payload)
+    assert client_placement["id"] not in json.dumps(msp_payload)
+    assert msp_payload["manifest"]["entities"][0]["id"] == str(private_entity.id)
+    assert msp_payload["manifest"]["attachments"][0]["id"] == internal_attachment["id"]
+
+
+@pytest.mark.django_db
+def test_placement_audience_rejects_widening_nested_or_primary_content(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Audience hierarchy", "markdown": "Primary"},
+        content_type="application/json",
+    ).json()
+    placement_route = reverse("msp-document-placement-list-create", kwargs={"document_entity_id": created["id"]})
+    parent = owner_client.post(
+        placement_route,
+        {
+            "operation": "create_block",
+            "markdown": "Internal parent",
+            "audience_profile": "msp_internal",
+        },
+        content_type="application/json",
+    ).json()["placements"][1]
+    widened = owner_client.post(
+        placement_route,
+        {
+            "operation": "create_block",
+            "markdown": "Shared child",
+            "parent_id": parent["id"],
+            "audience_profile": "shared",
+        },
+        content_type="application/json",
+    )
+    valid_child = owner_client.post(
+        placement_route,
+        {
+            "operation": "create_block",
+            "markdown": "Internal child",
+            "parent_id": parent["id"],
+            "audience_profile": "msp_internal",
+        },
+        content_type="application/json",
+    ).json()["placements"][-1]
+    primary_update = owner_client.patch(
+        reverse(
+            "msp-document-placement-detail",
+            kwargs={"document_entity_id": created["id"], "placement_id": created["placements"][0]["id"]},
+        ),
+        {"audience_profile": "client_visible"},
+        content_type="application/json",
+    )
+
+    assert widened.status_code == 409
+    assert "cannot widen" in widened.json()["detail"]
+    assert primary_update.status_code == 409
+    assert "live and shared" in primary_update.json()["detail"]
+    with pytest.raises(DatabaseError, match="child placement cannot widen parent audience"), transaction.atomic():
+        DocumentPlacement.objects.filter(id=valid_child["id"]).update(audience_profile="shared")
+    with pytest.raises(DatabaseError, match="primary document placement must remain shared"), transaction.atomic():
+        DocumentPlacement.objects.filter(id=created["placements"][0]["id"]).update(
+            audience_profile="client_visible"
+        )
+
+
+@pytest.mark.django_db
+def test_excluded_placement_keys_are_not_resolved_for_other_audiences(owner_client, installation, tmp_path):
+    client_org = organization(installation.tenant, "Audience Key Client")
+    route_kwargs = {"organization_entity_id": client_org.entity_id}
+    created = owner_client.post(
+        reverse("organization-document-list-create", kwargs=route_kwargs),
+        {"title": "Audience key boundary", "markdown": "Shared content"},
+        content_type="application/json",
+    ).json()
+    owner_client.post(
+        reverse(
+            "organization-document-placement-list-create",
+            kwargs={**route_kwargs, "document_entity_id": created["id"]},
+        ),
+        {
+            "operation": "create_block",
+            "markdown": "Internal <tekdocs://key/missing.serial_number>",
+            "audience_profile": "msp_internal",
+        },
+        content_type="application/json",
+    )
+    publication_route = reverse(
+        "organization-document-publication-list-create",
+        kwargs={**route_kwargs, "document_entity_id": created["id"]},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        client_publication = owner_client.post(
+            publication_route,
+            {"reason": "Client key boundary", "audience": "client_visible", "retention": "permanent"},
+            content_type="application/json",
+        )
+        msp_publication = owner_client.post(
+            publication_route,
+            {"reason": "MSP key boundary", "audience": "msp_internal", "retention": "permanent"},
+            content_type="application/json",
+        )
+
+    assert client_publication.status_code == 201
+    assert client_publication.json()["canonical_markdown"] == "Shared content\n"
+    assert client_publication.json()["manifest"]["key_resolutions"] == []
+    assert msp_publication.status_code == 409
+    assert DocumentPublication.objects.count() == 1
+
+
+@pytest.mark.django_db
 def test_archiving_document_archives_every_owned_block(owner_client, installation):
     created = owner_client.post(
         reverse("msp-document-list-create"),
@@ -2459,7 +2663,7 @@ def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clea
     document = Document.objects.get(entity_id=created["id"])
     resolved_placement = document.placements.get()
     resolved_revision = resolved_placement.block.current_revision
-    assert manifest["format"] == "tekdocs-portable-document/v2"
+    assert manifest["format"] == "tekdocs-portable-document/v3"
     assert manifest["export_class"] == "editable_revision_snapshot"
     assert manifest["immutable_publication"] is False
     assert manifest["content_digest"] == first["X-TekDocs-Content-Digest"]
@@ -2471,6 +2675,7 @@ def test_portable_bundle_freezes_exact_revisions_and_includes_only_selected_clea
             "depth": 0,
             "block_id": str(resolved_placement.block.entity_id),
             "resolution_mode": "live",
+            "audience_profile": "shared",
             "revision_id": str(resolved_revision.id),
             "revision_number": resolved_revision.revision_number,
             "checksum": resolved_revision.checksum,

@@ -26,7 +26,9 @@ from .models import (
     DocumentTemplateRevision,
     Entity,
     Organization,
+    PlacementAudienceProfile,
     PlacementResolutionMode,
+    PublicationAudience,
     Tenant,
     workspace_for_owner,
 )
@@ -195,7 +197,9 @@ def blocks_for_library(scope: DataScope) -> QuerySet[Block]:
     ).distinct()
 
 
-def resolve_document(document: Document) -> ResolvedDocument:
+def resolve_document(document: Document, *, audience: str | None = None) -> ResolvedDocument:
+    if audience is not None and audience not in PublicationAudience.values:
+        raise PlacementConflict("The selected publication audience is not supported.")
     placements = list(getattr(document, "active_placements", ()))
     if not placements:
         placements = list(
@@ -236,6 +240,16 @@ def resolve_document(document: Document) -> ResolvedDocument:
     if len(resolved) != len(placements):
         raise PlacementConflict("Document composition contains an unreachable or circular placement.")
 
+    if audience is not None:
+        resolved = [
+            item
+            for item in resolved
+            if item.placement.audience_profile
+            in (PlacementAudienceProfile.SHARED, audience)
+        ]
+        if not resolved:
+            raise PlacementConflict("The document has no content for the selected publication audience.")
+
     parts = [item.revision.markdown.strip("\n") for item in resolved]
     markdown = "\n\n".join(parts)
     if markdown:
@@ -243,7 +257,9 @@ def resolve_document(document: Document) -> ResolvedDocument:
     return ResolvedDocument(markdown=markdown, placements=tuple(resolved))
 
 
-def lock_document_composition(document: Document) -> tuple[Document, ResolvedDocument]:
+def lock_document_composition(
+    document: Document, *, audience: str | None = None
+) -> tuple[Document, ResolvedDocument]:
     """Lock one document, its placements, blocks, and selected immutable revisions."""
     locked = (
         Document.objects.select_for_update(of=("self",))
@@ -265,7 +281,7 @@ def lock_document_composition(document: Document) -> tuple[Document, ResolvedDoc
         .order_by("id")
     )
     locked.__dict__["active_placements"] = placements
-    return locked, resolve_document(locked)
+    return locked, resolve_document(locked, audience=audience)
 
 
 def primary_placement(document: Document) -> DocumentPlacement:
@@ -665,6 +681,7 @@ def _template_manifest(source: Document) -> dict[str, object]:
                 "kind": item.placement.block.kind,
                 "name": item.placement.block.entity.display_name,
                 "depth": item.depth,
+                "audience_profile": item.placement.audience_profile,
                 "attachment_ids": sorted(
                     str(value) for value in attachment_ids_in_markdown(item.revision.markdown)
                 ),
@@ -786,6 +803,7 @@ def instantiate_document_template(
                         resolution_mode=mode,
                         pinned_revision_id=item.revision.id if mode == "pinned" else None,
                         parent_id=None,
+                        audience_profile=item.placement.audience_profile,
                     )
                     destination_block_id = source_block.entity_id
                 else:
@@ -797,6 +815,7 @@ def instantiate_document_template(
                         name=source_block.entity.display_name,
                         parent_id=None,
                         position=None,
+                        audience_profile=item.placement.audience_profile,
                     )
                     destination_block_id = created_placement.block.entity_id
                 placement_map.append(
@@ -926,6 +945,7 @@ def apply_template_rollout(
                     resolution_mode=mode,
                     pinned_revision_id=UUID(str(item["source_revision_id"])) if mode == "pinned" else None,
                     parent_id=None,
+                    audience_profile=str(item.get("audience_profile", PlacementAudienceProfile.SHARED)),
                 )
                 destination_block_id = source_block.entity_id
             else:
@@ -940,6 +960,7 @@ def apply_template_rollout(
                     name=source_block.entity.display_name,
                     parent_id=None,
                     position=None,
+                    audience_profile=str(item.get("audience_profile", PlacementAudienceProfile.SHARED)),
                 )
                 destination_block_id = placement.block.entity_id
             mapped = {
@@ -1096,6 +1117,17 @@ def _placement_position(
     return requested_position
 
 
+def _validate_placement_audience(*, parent: DocumentPlacement | None, audience_profile: str) -> None:
+    if audience_profile not in PlacementAudienceProfile.values:
+        raise PlacementConflict("The selected placement audience is not supported.")
+    if (
+        parent is not None
+        and parent.audience_profile != PlacementAudienceProfile.SHARED
+        and parent.audience_profile != audience_profile
+    ):
+        raise PlacementConflict("A child placement cannot widen its parent's audience.")
+
+
 @transaction.atomic
 def create_document_block(
     *,
@@ -1107,6 +1139,7 @@ def create_document_block(
     parent_id: UUID | None,
     position: int | None,
     library_visible: bool = False,
+    audience_profile: str = PlacementAudienceProfile.SHARED,
 ) -> DocumentPlacement:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
     if locked_document.placements.count() >= 500:
@@ -1114,6 +1147,7 @@ def create_document_block(
     if kind not in BlockKind.values:
         raise PlacementConflict("The selected block type is not supported.")
     parent = _placement_parent(document=locked_document, parent_id=parent_id)
+    _validate_placement_audience(parent=parent, audience_profile=audience_profile)
     resolved_position = _placement_position(
         document=locked_document,
         parent=parent,
@@ -1154,6 +1188,7 @@ def create_document_block(
         parent=parent,
         position=resolved_position,
         resolution_mode=PlacementResolutionMode.LIVE,
+        audience_profile=audience_profile,
     )
     AuditEvent.objects.create(
         tenant=locked_document.tenant,
@@ -1175,6 +1210,7 @@ def add_document_placement(
     pinned_revision_id: UUID | None,
     parent_id: UUID | None,
     position: int | None = None,
+    audience_profile: str = PlacementAudienceProfile.SHARED,
 ) -> DocumentPlacement:
     if source_document.pk == document.pk:
         raise PlacementConflict("A document cannot transclude its own primary block.")
@@ -1188,6 +1224,7 @@ def add_document_placement(
         pinned_revision_id=pinned_revision_id,
         parent_id=parent_id,
         position=position,
+        audience_profile=audience_profile,
     )
 
 
@@ -1201,6 +1238,7 @@ def add_block_placement(
     pinned_revision_id: UUID | None,
     parent_id: UUID | None,
     position: int | None = None,
+    audience_profile: str = PlacementAudienceProfile.SHARED,
 ) -> DocumentPlacement:
     locked_document = Document.objects.select_for_update().get(pk=document.pk)
     if locked_document.placements.count() >= 500:
@@ -1215,6 +1253,7 @@ def add_block_placement(
     if block.source_document_id == locked_document.id:
         raise PlacementConflict("A document cannot transclude one of its own blocks.")
     parent = _placement_parent(document=locked_document, parent_id=parent_id)
+    _validate_placement_audience(parent=parent, audience_profile=audience_profile)
     if parent is not None:
         ancestor: DocumentPlacement | None = parent
         seen: set[UUID] = set()
@@ -1251,6 +1290,7 @@ def add_block_placement(
         position=resolved_position,
         resolution_mode=resolution_mode,
         pinned_revision=pinned_revision,
+        audience_profile=audience_profile,
     )
     AuditEvent.objects.create(
         tenant=locked_document.tenant,
@@ -1264,11 +1304,33 @@ def add_block_placement(
 
 @transaction.atomic
 def update_document_placement(
-    *, placement: DocumentPlacement, actor_id: UUID, resolution_mode: str, pinned_revision_id: UUID | None
+    *,
+    placement: DocumentPlacement,
+    actor_id: UUID,
+    resolution_mode: str | None = None,
+    pinned_revision_id: UUID | None = None,
+    audience_profile: str | None = None,
 ) -> DocumentPlacement:
-    locked = DocumentPlacement.objects.select_for_update().select_related("block").get(pk=placement.pk)
+    locked = (
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .select_related("block", "parent")
+        .get(pk=placement.pk)
+    )
+    if resolution_mode is None:
+        resolution_mode = locked.resolution_mode
+        if pinned_revision_id is None:
+            pinned_revision_id = locked.pinned_revision_id
+    audience_profile = audience_profile or locked.audience_profile
     if locked.parent_id is None and locked.position == 0:
-        raise PlacementConflict("The primary document block must remain live.")
+        if resolution_mode != PlacementResolutionMode.LIVE or audience_profile != PlacementAudienceProfile.SHARED:
+            raise PlacementConflict("The primary document block must remain live and shared.")
+    _validate_placement_audience(parent=locked.parent, audience_profile=audience_profile)
+    children = list(locked.children.select_for_update().only("audience_profile"))
+    if (
+        audience_profile != PlacementAudienceProfile.SHARED
+        and any(child.audience_profile != audience_profile for child in children)
+    ):
+        raise PlacementConflict("This audience would exclude one or more nested placements.")
     pinned_revision = None
     if resolution_mode == PlacementResolutionMode.PINNED:
         if pinned_revision_id is None:
@@ -1280,7 +1342,8 @@ def update_document_placement(
         raise PlacementConflict("Live placements cannot specify a pinned revision.")
     locked.resolution_mode = resolution_mode
     locked.pinned_revision = pinned_revision
-    locked.save(update_fields=("resolution_mode", "pinned_revision", "updated_at"))
+    locked.audience_profile = audience_profile
+    locked.save(update_fields=("resolution_mode", "pinned_revision", "audience_profile", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,

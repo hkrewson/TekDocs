@@ -13,7 +13,9 @@ describe('workspace navigation', () => {
   it('derives scope from the URL and preserves equivalent areas', () => {
     expect(workspaceAreaFromPath('/workspaces/organizations/id/documentation')).toBe('documentation')
     expect(workspaceAreaFromPath('/assets')).toBe('assets')
+    expect(workspaceAreaFromPath('/workspaces/organizations/id/search')).toBe('search')
     expect(organizationWorkspacePath(supplier, 'documentation')).toBe(`/workspaces/organizations/${supplier.id}/documentation`)
+    expect(organizationWorkspacePath(supplier, 'search')).toBe(`/workspaces/organizations/${supplier.id}/search`)
     expect(mspWorkspacePath('documentation')).toBe('/documentation')
   })
 

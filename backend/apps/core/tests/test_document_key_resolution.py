@@ -607,7 +607,7 @@ def test_publication_freezes_a_resolved_key_and_its_provenance(installation):
         retention_review_on=None,
     )
 
-    assert publication.manifest["format"] == "tekdocs-static-publication/v3"
+    assert publication.manifest["format"] == "tekdocs-static-publication/v4"
     assert KEY_TARGET_SCHEME not in publication.canonical_markdown
     assert publication.canonical_markdown == "Serial PUB\\-0001.\n"
     assert "PUB-0001" in publication.sanitized_html

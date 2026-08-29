@@ -1017,6 +1017,7 @@ def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
                 parent_id=serializer.validated_data.get("parent_id"),
                 position=serializer.validated_data.get("position"),
                 library_visible=serializer.validated_data["library_visible"],
+                audience_profile=serializer.validated_data["audience_profile"],
             )
         elif serializer.validated_data["operation"] == "reuse_block":
             block = get_object_or_404(
@@ -1030,6 +1031,7 @@ def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
                 pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
                 parent_id=serializer.validated_data.get("parent_id"),
                 position=serializer.validated_data.get("position"),
+                audience_profile=serializer.validated_data["audience_profile"],
             )
         else:
             source_document = _document(workspace, serializer.validated_data["source_document_id"])
@@ -1041,6 +1043,7 @@ def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
                 pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
                 parent_id=serializer.validated_data.get("parent_id"),
                 position=serializer.validated_data.get("position"),
+                audience_profile=serializer.validated_data["audience_profile"],
             )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
@@ -1059,8 +1062,9 @@ def _update_placement(
         update_document_placement(
             placement=placement,
             actor_id=request.user.pk,
-            resolution_mode=serializer.validated_data["resolution_mode"],
+            resolution_mode=serializer.validated_data.get("resolution_mode"),
             pinned_revision_id=serializer.validated_data.get("pinned_revision_id"),
+            audience_profile=serializer.validated_data.get("audience_profile"),
         )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)

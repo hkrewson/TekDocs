@@ -4,7 +4,6 @@ import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, us
 import {
   Activity,
   BadgeCheck,
-  BadgeDollarSign,
   BookOpenText,
   Boxes,
   BriefcaseBusiness,
@@ -14,7 +13,6 @@ import {
   ChevronRight,
   CircleUserRound,
   File,
-  FileCheck2,
   Globe2,
   Handshake,
   KeyRound,
@@ -30,7 +28,6 @@ import {
   ShieldCheck,
   UserPlus,
   ScrollText,
-  TicketCheck,
   Trash2,
   UsersRound,
   X,
@@ -79,6 +76,7 @@ import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
+import packageMetadata from '../package.json'
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
 const AccessControl = lazy(async () => ({ default: (await import('./access-control/AccessControl')).AccessControl }))
@@ -101,6 +99,10 @@ const Networks = lazy(async () => ({ default: (await import('./networks/Networks
 const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
 const Compliance = lazy(async () => ({ default: (await import('./compliance/Compliance')).Compliance }))
 const Domains = lazy(async () => ({ default: (await import('./domains/Domains')).Domains }))
+const Certificates = lazy(async () => ({ default: (await import('./domains/Certificates')).Certificates }))
+const Files = lazy(async () => ({ default: (await import('./files/Files')).Files }))
+const ProductCatalogs = lazy(async () => ({ default: (await import('./catalog/ProductCatalogs')).ProductCatalogs }))
+const SearchResults = lazy(async () => ({ default: (await import('./search/SearchResults')).SearchResults }))
 
 type NavigationItem = {
   label: string
@@ -143,15 +145,10 @@ const navigationSections: NavigationSection[] = [
   { label: 'Relationships', items: [
     { label: 'Vendors', path: '/vendors', area: 'vendors', icon: Handshake },
     { label: 'Products', path: '/products', area: 'products', icon: Package },
-    { label: 'Tickets', path: '/tickets', area: 'tickets', icon: TicketCheck },
-  ] },
-  { label: 'Business', items: [
-    { label: 'Accounting', path: '/accounting', area: 'accounting', icon: BadgeDollarSign },
   ] },
   { label: 'Governance', items: [
     { label: 'Custom fields', path: '/custom-fields', area: 'custom_fields', icon: ListPlus },
     { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
-    { label: 'Activity', path: '/activity', area: 'activity', icon: FileCheck2 },
     { label: 'Recycle bin', path: '/recycle-bin', area: 'recycle_bin', icon: Trash2 },
     { label: 'Integrations', path: '/integrations', area: 'integrations', icon: Plug },
   ] },
@@ -306,23 +303,17 @@ const plannedAreas: Record<string, { title: string; description: string; release
   '/tickets': { title: 'Tickets', description: 'Service requests associated with the active workspace.', release: 'Post-1.0', capabilities: ['Client requests', 'Object relationships', 'Portal visibility'] },
   '/accounting': { title: 'Accounting', description: 'MSP business records for billing, purchasing, and financial operations.', release: 'Post-1.0', capabilities: ['Invoices and payments', 'Quotes and recurring billing', 'Expenses and trips'] },
   '/compliance': { title: 'Compliance', description: 'Versioned frameworks and immutable control catalogs.', release: '0.7.1', capabilities: ['Stable framework identities', 'Versioned controls', 'Immutable catalog snapshots'] },
-  '/activity': { title: 'Activity', description: 'Append-only security and business change history.', release: '0.1.0', capabilities: ['Request correlation', 'Permission-aware history', 'Exportable evidence'] },
+  '/activity': { title: 'Activity', description: 'Append-only security and business change history.', release: 'Not scheduled', capabilities: ['Request correlation', 'Permission-aware history', 'Exportable evidence'] },
   '/integrations': { title: 'Integrations', description: 'Secure provider connections, jobs, webhooks, and reconciliation.', release: '0.7.0', capabilities: ['Provider contracts', 'Scheduled jobs', 'Conflict review'] },
 }
 
 function PlannedPage({ path }: { path: string }) {
   const area = plannedAreas[path]
-  if (path === '/products') {
-    return <>
-      <PageHeader title="Products" description="Reusable supplier product and model definitions." />
-      <section className="content-section"><div className="section-heading"><div><h2>Supplier catalogs are available</h2><p>Open a vendor or manufacturer to manage its templates and product publications. Open a client to create assets from those exact supplier models.</p></div><span>0.3.4</span></div><Link className="secondary-button" to="/organizations">Browse organizations</Link></section>
-    </>
-  }
   return (
     <>
       <PageHeader title={area.title} description={area.description} />
       <section className="content-section">
-        <div className="section-heading"><h2>Planned {area.release}</h2><span>Foundation</span></div>
+        <div className="section-heading"><h2>{area.release === 'Not scheduled' ? area.release : `Planned ${area.release}`}</h2><span>Foundation</span></div>
         <ul className="capability-list">{area.capabilities.map((capability) => <li key={capability}>{capability}</li>)}</ul>
       </section>
     </>
@@ -332,39 +323,26 @@ function PlannedPage({ path }: { path: string }) {
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description="TekDocs 0.8.18" />
+      <PageHeader title="Overview" description={`TekDocs ${packageMetadata.version}`} />
       <section className="content-section">
-        <div className="section-heading"><h2>Foundation status</h2><span>0.8.18</span></div>
-        <div className="status-table" role="table" aria-label="Foundation status">
+        <div className="section-heading"><h2>Available capabilities</h2><span>{packageMetadata.version}</span></div>
+        <div className="status-table" role="table" aria-label="Available capabilities">
           {[
             ['Application shell', 'Available'],
-            ['Tenant and entity primitives', 'Available'],
-            ['Tenant and organization isolation', 'Available'],
-            ['Organization records and classifications', 'Available'],
-            ['Versioned custom-field definitions', 'Available'],
-            ['Typed entity links and backlinks', 'Available'],
-            ['Scoped roles and access collections', 'Available'],
-            ['Workspace recycle bin', 'Available'],
-            ['Database-enforced audit immutability', 'Available'],
-            ['Owner authentication', 'Available'],
-            ['Email delivery foundation', 'Available'],
-            ['Invitation issuance API', 'Available'],
-            ['Invitation account activation', 'Available'],
-            ['Password recovery', 'Available'],
-            ['Session security', 'Available'],
-            ['Reusable documentation', 'Milestone 0.3.0'],
-            ['Controlled publication decisions', 'Available'],
-            ['Client portal identity boundary', 'Available'],
-            ['Read-only client publication portal', 'Available'],
-            ['Permission-filtered notification inbox', 'Available'],
-            ['Retryable SMTP notifications', 'Available'],
-            ['1Password credential references', 'Available'],
+            ['Workspace and organization isolation', 'Available'],
+            ['Authentication, roles, and access collections', 'Available'],
+            ['Reusable documentation and templates', 'Available'],
+            ['Managed files and retained versions', 'Available'],
+            ['STATIC publications and client portal', 'Available'],
+            ['People, sites, and custom fields', 'Available'],
+            ['Assets, software, licenses, and contracts', 'Available'],
             ['Supplier product and model catalogs', 'Available'],
-            ['Client asset catalog provenance', 'Available'],
-            ['Software installations and licensing', 'Available'],
-            ['MSP-owned operational inventory', 'Available'],
-            ['Derived client vendors', 'Available'],
-            ['Racks and network-device placement', 'Available'],
+            ['Simple network records and asset addresses', 'Available'],
+            ['Domain and certificate monitoring', 'Available'],
+            ['Compliance, evidence, risks, and data flows', 'Available'],
+            ['Notifications and provider integrations', 'Available'],
+            ['Permission-filtered workspace search', 'Available'],
+            ['Recycle bin and immutable audit foundation', 'Available'],
           ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
         </div>
       </section>
@@ -410,7 +388,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
 }
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient }) {
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
@@ -420,7 +398,8 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
-  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} /></Suspense>
+  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={initialDocumentId} /></Suspense>
+  if (area === 'files') return <Suspense fallback={<section className="content-section" role="status">Loading files…</section>}><Files workspace={state.workspace} client={documentsClient} /></Suspense>
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
@@ -431,6 +410,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
+  if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   const details = organizationAreaDetails[area]
   return (
@@ -440,6 +420,12 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
       <section className="content-section"><div className="section-heading"><h2>Planned for {details.release}</h2><span>{classificationSummary(state.workspace.classifications)} workspace</span></div><p className="workspace-area-note">The route and ownership context are established. The domain records arrive in their scheduled slice.</p></section>
     </>
   )
+}
+
+function OrganizationSearchRoute({ state, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient }) {
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading workspace search…</section>
+  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
+  return <SearchResults workspace={state.workspace} client={relationshipsClient} />
 }
 
 export function ApplicationShell({ authContext, authClient, accessControlClient, staffAdministrationClient, workspaceClient, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, credentialReferencesClient = browserCredentialReferencesClient, catalogClient = browserCatalogClient, inventoryClient = browserInventoryClient, notificationsClient = browserNotificationsClient, webhooksClient = browserWebhooksClient, complianceClient = browserComplianceClient, domainsClient = browserDomainsClient, networksClient, onSignOut, signingOut = false, signOutError = null }: {
@@ -471,6 +457,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   const [shellContext, setShellContext] = useState(authContext)
   const [organizationWorkspace, setOrganizationWorkspace] = useState<OrganizationWorkspaceState>({ phase: 'idle' })
   const location = useLocation()
+  const [searchDraft, setSearchDraft] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
   const previousPathname = useRef(location.pathname)
@@ -497,6 +484,17 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
     classifications: [], capabilities: [], organization: null,
   }), [shellContext.tenant.id, shellContext.tenant.name])
   const activeArea = workspaceAreaFromPath(location.pathname)
+  const requestedDocumentId = new URLSearchParams(location.search).get('document')
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault()
+    const query = searchDraft.trim()
+    if (!query) return
+    const path = selectedWorkspace
+      ? `/workspaces/organizations/${encodeURIComponent(selectedWorkspace.id)}/search`
+      : '/search'
+    void navigate(`${path}?q=${encodeURIComponent(query)}`)
+  }
 
   function openNotificationTarget(target: NotificationTarget) {
     if (!target.organization_id) return
@@ -523,7 +521,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
-          <label className="search-field"><Search size={17} /><span className="sr-only">Search TekDocs</span><input placeholder="Search TekDocs" disabled /></label>
+          <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
@@ -533,7 +531,8 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <Suspense fallback={<section className="content-section" role="status"><h1>Loading workspace</h1><p>Please wait…</p></section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
-            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} /></Suspense>} />
+            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
+            <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">Loading files…</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
@@ -551,11 +550,15 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
             <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />
             <Route path="/compliance" element={<Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={null} client={complianceClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/assets', '/licenses', '/services', '/vendors', '/networks', '/integrations', '/compliance', '/domains'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">Loading supplier catalogs…</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
+            <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">Loading search…</section>}><SearchResults key={location.search} workspace={null} client={relationshipsClient} /></Suspense>} />
+            {Object.keys(plannedAreas).filter((path) => !['/files', '/assets', '/licenses', '/services', '/vendors', '/products', '/networks', '/integrations', '/compliance', '/domains', '/certificates'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
+            <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} />} />)}
+            <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
+            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} />} />)}
             <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes></Suspense>

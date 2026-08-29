@@ -1,6 +1,6 @@
 import type { WorkspaceCapability, WorkspaceOption } from './api'
 
-export type WorkspaceArea = WorkspaceCapability | 'settings'
+export type WorkspaceArea = WorkspaceCapability | 'settings' | 'search'
 
 const recognizedAreas = new Set<WorkspaceArea>([
   'overview',
@@ -26,6 +26,7 @@ const recognizedAreas = new Set<WorkspaceArea>([
   'integrations',
   'accounting',
   'settings',
+  'search',
 ])
 
 const mspAreas = new Set<WorkspaceArea>([
@@ -52,6 +53,7 @@ const mspAreas = new Set<WorkspaceArea>([
   'integrations',
   'accounting',
   'settings',
+  'search',
 ])
 
 export function workspaceAreaFromPath(pathname: string): WorkspaceArea {
@@ -65,7 +67,7 @@ export function mspWorkspacePath(area: WorkspaceArea): string {
 }
 
 export function organizationWorkspacePath(workspace: WorkspaceOption, area: WorkspaceArea): string {
-  const selectedArea = workspace.capabilities.includes(area as WorkspaceCapability) ? area : 'overview'
+  const selectedArea = area === 'search' || workspace.capabilities.includes(area as WorkspaceCapability) ? area : 'overview'
   return `/workspaces/organizations/${workspace.id}/${selectedArea}`
 }
 

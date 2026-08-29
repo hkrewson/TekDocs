@@ -4,6 +4,7 @@ export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
 export type DocumentFilters = { q?: string; category?: DocumentCategory | ''; template?: 'all' | 'documents' | 'templates' }
 export type PlacementResolutionMode = 'live' | 'pinned'
+export type PlacementAudienceProfile = 'shared' | 'msp_internal' | 'client_visible'
 export type BlockKind = 'rich_text' | 'heading' | 'code' | 'url' | 'document_link' | 'entity_reference' | 'file_reference'
 export type DocumentPlacement = {
   id: string
@@ -14,6 +15,7 @@ export type DocumentPlacement = {
   position: number
   depth: number
   resolution_mode: PlacementResolutionMode
+  audience_profile: PlacementAudienceProfile
   pinned_revision_id: string | null
   resolved_revision_id: string
   resolved_revision_number: number
@@ -150,6 +152,7 @@ export type ReusedPlacementInput = {
   pinned_revision_id?: string | null
   parent_id?: string | null
   position?: number | null
+  audience_profile?: PlacementAudienceProfile
 }
 export type ReusedBlockInput = {
   operation: 'reuse_block'
@@ -158,6 +161,7 @@ export type ReusedBlockInput = {
   pinned_revision_id?: string | null
   parent_id?: string | null
   position?: number | null
+  audience_profile?: PlacementAudienceProfile
 }
 export type NewBlockInput = {
   operation: 'create_block'
@@ -167,11 +171,13 @@ export type NewBlockInput = {
   parent_id?: string | null
   position?: number | null
   library_visible?: boolean
+  audience_profile?: PlacementAudienceProfile
 }
 export type PlacementInput = ReusedPlacementInput | ReusedBlockInput | NewBlockInput
 export type PlacementUpdateInput = {
-  resolution_mode: PlacementResolutionMode
+  resolution_mode?: PlacementResolutionMode
   pinned_revision_id?: string | null
+  audience_profile?: PlacementAudienceProfile
 }
 export type ReuseAudience = {
   relationship: 'source' | 'placement' | 'listing'
@@ -252,6 +258,7 @@ export class RevisionConflictError extends AuthRequestError {
 
 export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
+  get(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentRecord>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
@@ -420,6 +427,9 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.template && filters.template !== 'all') query.set('template', filters.template)
     const response = await fetch(`${collectionPath(scope)}${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
+  },
+  async get(scope, id, signal) {
+    return parse<DocumentRecord>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
   async createFileBacked(scope, input) {

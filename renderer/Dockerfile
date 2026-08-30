@@ -13,7 +13,7 @@ ENV NODE_ENV=production \
 # older browser when the repository moves, whereas this fails the build and asks for a
 # deliberate decision. To bump, raise CHROMIUM_SERIES, rebuild, and re-run
 # `make production-image-rehearsal`.
-ARG CHROMIUM_SERIES=151
+ARG CHROMIUM_SERIES=152
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache chromium rsvg-convert \

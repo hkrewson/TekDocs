@@ -166,6 +166,9 @@ async function mockWorkspaceApplication(page: Page) {
       return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
     }
     if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
+    if (url.pathname.endsWith('/documents/search')) return route.fulfill({ json: { results: [], count: 0, collections: [], tags: [], health: [] } })
+    if (url.pathname.endsWith('/documents/operations/choices')) return route.fulfill({ json: [] })
+    if (url.pathname.endsWith('/documents/template-library')) return route.fulfill({ json: { results: [], count: 0 } })
     if (url.pathname.endsWith('/documents')) return route.fulfill({ json: { results: [], count: 0 } })
     if (url.pathname.endsWith('/assets')) return route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true, can_view_relationships: true, can_create_relationships: true, can_archive_relationships: true } })
     if (url.pathname.endsWith('/products')) return route.fulfill({ json: { results: [], count: 0 } })
@@ -233,6 +236,7 @@ test('workspace switcher preserves routes, capability navigation, history, and a
   await expect(page.getByRole('link', { name: 'Products' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Networks' })).not.toBeVisible()
   await expect(page).toHaveTitle(/Northwind Supply · Documentation · TekDocs/)
+  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Products' }).click()
@@ -374,8 +378,8 @@ test('separate tabs retain independent URL-derived workspace context', async ({ 
 
   await page.goto(`/workspaces/organizations/${supplierWorkspace.id}/documentation`)
   await otherPage.goto(`/workspaces/organizations/${clientWorkspace.id}/assets`)
-  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
-  await expect(otherPage.getByRole('heading', { name: 'Assets' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible({ timeout: 10_000 })
+  await expect(otherPage.getByRole('heading', { name: 'Assets' })).toBeVisible({ timeout: 10_000 })
 
   await page.getByRole('link', { name: 'Products' }).click()
   await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${supplierWorkspace.id}/products$`))

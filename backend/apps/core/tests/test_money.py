@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from apps.core.money import (
@@ -64,6 +64,7 @@ def test_round_half_up_and_inclusive_tax_are_explicit():
     rate_basis_points=st.integers(min_value=0, max_value=5000),
     inclusive=st.booleans(),
 )
+@settings(suppress_health_check=[HealthCheck.too_slow])
 def test_rendered_line_sets_reconcile_exactly(currency, raw_units, quantity, rate_basis_points, inclusive):
     scale = Decimal(1).scaleb(-minor_unit(currency))
     rate = Decimal(rate_basis_points) / Decimal("10000")

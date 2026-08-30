@@ -118,6 +118,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "activity",
         "recycle_bin",
         "integrations",
+        "accounting",
         "products",
     ]
     assert selected.json()["organization"]["legal_name"] == "Acme Workspace, LLC"

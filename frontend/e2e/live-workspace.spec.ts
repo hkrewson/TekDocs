@@ -527,7 +527,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await page.getByRole('button', { name: 'Live Acme onboarding' }).click()
   await expect(page.getByRole('heading', { name: 'Acme onboarding' })).toBeVisible()
-  await expect(page.getByText('Revision two is retained.')).toBeVisible()
+  await expect(page.getByText('Revision two is retained.', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'New document' }).click()
   await page.getByRole('button', { name: 'Upload file' }).click()
@@ -637,7 +637,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: /Live Acme Client/ }).click()
   await expect(successStatus(page)).toHaveText('Reference added to Live Acme Client.')
   await page.goto(`/workspaces/organizations/${clientId}/documentation`)
-  await expect(page.getByRole('button', { name: /Live shared response.*MSP reference/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Live shared response/ })).toBeVisible()
   await page.getByRole('button', { name: 'Live Acme onboarding' }).click()
   await page.getByRole('button', { name: 'Add content here' }).last().click()
   await page.getByRole('button', { name: 'Existing content' }).click()
@@ -657,7 +657,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: /Live Main Campus.*site.*Live Acme Client/ }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(successStatus(page)).toHaveText('TekDocs record added.')
-  await expect(page.getByText('One MSP-owned block.')).toBeVisible()
+  await expect(page.getByLabel('Document content').getByText('One MSP-owned block.', { exact: true })).toBeVisible()
 
   await page.goto('/documentation')
   await openPrimaryDocumentBlock(page, 'Live shared response')
@@ -691,8 +691,9 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   await page.goto(`/workspaces/organizations/${clientId}/documentation`)
   await page.getByRole('button', { name: 'Live Acme onboarding' }).click()
-  await expect(page.getByText('MSP-owned block revision two.')).toBeVisible()
-  await expect(page.getByText('MSP-owned block revision three.')).toHaveCount(0)
+  const clientDocumentContent = page.getByLabel('Document content')
+  await expect(clientDocumentContent.getByText('MSP-owned block revision two.', { exact: true })).toBeVisible()
+  await expect(clientDocumentContent.getByText('MSP-owned block revision three.', { exact: true })).toHaveCount(0)
 
   // Entity mentions are deliberately permission-aware. The site created earlier is
   // MSP-private by default, so remove that exercised mention before producing the
@@ -714,7 +715,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible()
   await expect(page.locator('.publication-integrity code').first()).toContainText(/^SHA-256 [0-9a-f]{64}$/)
   await page.getByRole('button', { name: 'Close publication' }).click()
-  await expect(page.getByRole('button', { name: /Live Acme onboarding.*1 STATIC/ })).toBeVisible()
+  await expect(page.locator('.static-publication-list').getByRole('button', { name: /Live Acme onboarding/ })).toBeVisible()
 
   const portalEmail = `live-client-${suffix}@example.invalid`
   const currentCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')

@@ -1,0 +1,2 @@
+# Static route metadata in historical commit 4edcfa2 is not a credential.
+4edcfa2f2676c56b162b3250cb1398eea91d101a:backend/apps/core/permission_inventory.py:generic-api-key:1031

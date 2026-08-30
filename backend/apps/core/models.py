@@ -252,7 +252,7 @@ class InvoiceNumberSeries(TimestampedModel):
     separator = models.CharField(max_length=1, default="-", blank=True)
     sequence_digits = models.PositiveSmallIntegerField(default=6)
     reset_period = models.CharField(max_length=8, default="never")
-    current_period = models.CharField(max_length=7, blank=True)
+    current_period = models.CharField(max_length=7, blank=True, default="")
     next_number = models.PositiveBigIntegerField(default=1)
 
     objects = models.Manager()

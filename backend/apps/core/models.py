@@ -67,6 +67,33 @@ class TenantBillingProfile(TimestampedModel):
     default_currency = models.CharField(max_length=3, default="USD")
     payment_terms_days = models.PositiveSmallIntegerField(default=30)
     invoice_prefix = models.CharField(max_length=16, default="INV")
+    invoice_date_component = models.CharField(
+        max_length=24,
+        choices=(
+            ("none", "No date"),
+            ("year", "Four-digit year"),
+            ("short_year", "Two-digit year"),
+            ("year_month", "Year and month"),
+            ("short_year_month", "Short year and month"),
+            ("month_year", "Month and year"),
+            ("month_short_year", "Month and short year"),
+            ("year_month_code", "Year and month letter"),
+            ("short_year_month_code", "Short year and month letter"),
+        ),
+        default="none",
+    )
+    invoice_separator = models.CharField(
+        max_length=1,
+        choices=(("-", "Hyphen"), ("/", "Slash"), (".", "Period"), ("", "None")),
+        default="-",
+        blank=True,
+    )
+    invoice_sequence_digits = models.PositiveSmallIntegerField(default=6)
+    invoice_reset_period = models.CharField(
+        max_length=8,
+        choices=(("never", "Never"), ("yearly", "Every year"), ("monthly", "Every month")),
+        default="never",
+    )
 
     objects = models.Manager()
     scoped = TenantScopedManager()
@@ -83,6 +110,7 @@ class TenantBillingProfile(TimestampedModel):
         return self.legal_name or self.tenant.name
 
     def clean(self) -> None:
+        from .countries import COUNTRY_CODES
         from .money import MoneyError, normalize_currency
 
         try:
@@ -91,10 +119,21 @@ class TenantBillingProfile(TimestampedModel):
             raise ValidationError({"default_currency": str(exc)}) from exc
         self.country_code = self.country_code.strip().upper()
         self.invoice_prefix = self.invoice_prefix.strip().upper()
-        if self.country_code and (len(self.country_code) != 2 or not self.country_code.isalpha()):
-            raise ValidationError({"country_code": "Country must be a two-letter ISO code"})
+        if self.country_code and self.country_code not in COUNTRY_CODES:
+            raise ValidationError({"country_code": "Choose a supported ISO country"})
         if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.invoice_prefix):
             raise ValidationError({"invoice_prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
+        if not 1 <= self.invoice_sequence_digits <= 12:
+            raise ValidationError({"invoice_sequence_digits": "Sequence digits must be between 1 and 12"})
+        if self.invoice_reset_period == "yearly" and self.invoice_date_component == "none":
+            raise ValidationError({"invoice_date_component": "Include a year when numbering restarts each year"})
+        if self.invoice_reset_period == "monthly" and self.invoice_date_component not in {
+            "year_month", "short_year_month", "month_year", "month_short_year",
+            "year_month_code", "short_year_month_code",
+        }:
+            raise ValidationError(
+                {"invoice_date_component": "Include a year and month when numbering restarts each month"}
+            )
 
     @property
     def is_issue_ready(self) -> bool:
@@ -209,8 +248,11 @@ class InvoiceNumberSeries(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_number_series")
     prefix = models.CharField(max_length=16)
-    yearly_reset = models.BooleanField(default=False)
-    current_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    date_component = models.CharField(max_length=24, default="none")
+    separator = models.CharField(max_length=1, default="-", blank=True)
+    sequence_digits = models.PositiveSmallIntegerField(default=6)
+    reset_period = models.CharField(max_length=8, default="never")
+    current_period = models.CharField(max_length=7, blank=True)
     next_number = models.PositiveBigIntegerField(default=1)
 
     objects = models.Manager()
@@ -219,11 +261,14 @@ class InvoiceNumberSeries(TimestampedModel):
     class Meta:
         ordering = ("prefix", "id")
         constraints = [
-            models.UniqueConstraint(fields=("tenant", "prefix"), name="invoice_series_prefix_unique"),
+            models.UniqueConstraint(
+                fields=("tenant", "prefix", "date_component", "separator", "sequence_digits", "reset_period"),
+                name="invoice_series_format_unique",
+            ),
             models.CheckConstraint(condition=models.Q(next_number__gte=1), name="invoice_series_next_positive"),
             models.CheckConstraint(
-                condition=(models.Q(yearly_reset=True) | models.Q(yearly_reset=False, current_year__isnull=True)),
-                name="invoice_series_year_mode_valid",
+                condition=models.Q(sequence_digits__gte=1, sequence_digits__lte=12),
+                name="invoice_series_digits_bounded",
             ),
         ]
 
@@ -234,6 +279,24 @@ class InvoiceNumberSeries(TimestampedModel):
         self.prefix = self.prefix.strip().upper()
         if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.prefix):
             raise ValidationError({"prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
+        if self.date_component not in {
+            "none", "year", "short_year", "year_month", "short_year_month", "month_year",
+            "month_short_year", "year_month_code", "short_year_month_code",
+        }:
+            raise ValidationError({"date_component": "Unsupported invoice date component"})
+        if self.separator not in {"-", "/", ".", ""}:
+            raise ValidationError({"separator": "Unsupported invoice number separator"})
+        if self.reset_period not in {"never", "yearly", "monthly"}:
+            raise ValidationError({"reset_period": "Unsupported invoice reset period"})
+        if not 1 <= self.sequence_digits <= 12:
+            raise ValidationError({"sequence_digits": "Sequence digits must be between 1 and 12"})
+        if self.reset_period == "yearly" and self.date_component == "none":
+            raise ValidationError({"date_component": "Include a year when numbering restarts each year"})
+        if self.reset_period == "monthly" and self.date_component not in {
+            "year_month", "short_year_month", "month_year", "month_short_year",
+            "year_month_code", "short_year_month_code",
+        }:
+            raise ValidationError({"date_component": "Include a year and month when numbering restarts each month"})
 
 
 class Invoice(TimestampedModel):

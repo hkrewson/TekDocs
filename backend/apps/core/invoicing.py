@@ -233,9 +233,51 @@ def _customer_snapshot(invoice: Invoice) -> dict[str, object]:
     }
 
 
+def _series_values(profile: TenantBillingProfile) -> dict[str, object]:
+    return {
+        "prefix": profile.invoice_prefix,
+        "date_component": profile.invoice_date_component,
+        "separator": profile.invoice_separator,
+        "sequence_digits": profile.invoice_sequence_digits,
+        "reset_period": profile.invoice_reset_period,
+    }
+
+
+def _date_component(value: date, component: str) -> str:
+    month_code = chr(ord("A") + value.month - 1)
+    return {
+        "none": "",
+        "year": f"{value.year:04d}",
+        "short_year": f"{value.year % 100:02d}",
+        "year_month": f"{value.year:04d}{value.month:02d}",
+        "short_year_month": f"{value.year % 100:02d}{value.month:02d}",
+        "month_year": f"{value.month:02d}{value.year:04d}",
+        "month_short_year": f"{value.month:02d}{value.year % 100:02d}",
+        "year_month_code": f"{value.year:04d}{month_code}",
+        "short_year_month_code": f"{value.year % 100:02d}{month_code}",
+    }[component]
+
+
+def render_invoice_number(series: InvoiceNumberSeries, invoice_date: date, sequence: int) -> str:
+    if sequence >= 10**series.sequence_digits:
+        raise InvoiceError("The invoice numbering series has used every available sequence number")
+    parts = [series.prefix, _date_component(invoice_date, series.date_component)]
+    parts = [part for part in parts if part]
+    parts.append(f"{sequence:0{series.sequence_digits}d}")
+    return series.separator.join(parts)
+
+
+def _series_period(series: InvoiceNumberSeries, invoice_date: date) -> str:
+    if series.reset_period == "yearly":
+        return f"{invoice_date.year:04d}"
+    if series.reset_period == "monthly":
+        return f"{invoice_date.year:04d}-{invoice_date.month:02d}"
+    return ""
+
+
 @transaction.atomic
 def configure_issue_settings(
-    *, tenant: Tenant, actor_id: UUID, values: dict[str, object], yearly_reset: bool
+    *, tenant: Tenant, actor_id: UUID, values: dict[str, object]
 ) -> tuple[TenantBillingProfile, InvoiceNumberSeries]:
     profile, _created = TenantBillingProfile.objects.select_for_update().get_or_create(tenant=tenant)
     for field in (
@@ -252,21 +294,19 @@ def configure_issue_settings(
         "default_currency",
         "payment_terms_days",
         "invoice_prefix",
+        "invoice_date_component",
+        "invoice_separator",
+        "invoice_sequence_digits",
+        "invoice_reset_period",
     ):
         if field in values:
             setattr(profile, field, values[field])
     _validate(profile)
     profile.save()
-    series = (
-        InvoiceNumberSeries.objects.select_for_update().filter(tenant=tenant, prefix=profile.invoice_prefix).first()
-    )
+    series_values = _series_values(profile)
+    series = InvoiceNumberSeries.objects.select_for_update().filter(tenant=tenant, **series_values).first()
     if series is None:
-        series = InvoiceNumberSeries(tenant=tenant, prefix=profile.invoice_prefix, yearly_reset=yearly_reset)
-    elif series.yearly_reset != yearly_reset:
-        if series.invoices.exists():
-            raise InvoiceError("A numbering series cannot change its yearly-reset rule after use")
-        series.yearly_reset = yearly_reset
-        series.current_year = None
+        series = InvoiceNumberSeries(tenant=tenant, **series_values)
     _validate(series)
     series.save()
     AuditEvent.objects.create(
@@ -302,24 +342,20 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     if not profile.is_issue_ready:
         raise InvoiceError("Complete the invoice issuer identity before issuing")
     try:
-        series = InvoiceNumberSeries.objects.select_for_update().get(
-            tenant=locked.tenant, prefix=profile.invoice_prefix
-        )
+        series = InvoiceNumberSeries.objects.select_for_update().get(tenant=locked.tenant, **_series_values(profile))
     except InvoiceNumberSeries.DoesNotExist as exc:
         raise InvoiceError("Configure the invoice numbering series before issuing") from exc
 
-    issue_year = locked.invoice_date.year
-    if series.yearly_reset:
-        if series.current_year is not None and issue_year < series.current_year:
-            raise InvoiceError("A prior-year invoice cannot use a numbering series that has advanced")
-        if series.current_year != issue_year:
-            series.current_year = issue_year
+    issue_period = _series_period(series, locked.invoice_date)
+    if series.reset_period != "never":
+        if series.current_period and issue_period < series.current_period:
+            raise InvoiceError("A prior-period invoice cannot use a numbering series that has advanced")
+        if series.current_period != issue_period:
+            series.current_period = issue_period
             series.next_number = 1
-            series.save(update_fields=("current_year", "next_number", "updated_at"))
+            series.save(update_fields=("current_period", "next_number", "updated_at"))
     sequence = series.next_number
-    number = (
-        f"{series.prefix}-{issue_year}-{sequence:06d}" if series.yearly_reset else f"{series.prefix}-{sequence:06d}"
-    )
+    number = render_invoice_number(series, locked.invoice_date, sequence)
     amounts = calculate_invoice((line_amounts(line) for line in lines), locked.currency)
     issued_at = timezone.now()
     issuer = _profile_snapshot(profile)
@@ -364,7 +400,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         "number": number,
         "series_id": str(series.id),
         "series_sequence": sequence,
-        "series_year": issue_year if series.yearly_reset else None,
+        "series_year": locked.invoice_date.year if series.reset_period != "never" else None,
         "invoice_date": locked.invoice_date.isoformat(),
         "due_date": locked.due_date.isoformat(),
         "currency": locked.currency,
@@ -387,7 +423,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     locked.state = InvoiceState.ISSUED
     locked.number_series = series
     locked.number = number
-    locked.series_year = issue_year if series.yearly_reset else None
+    locked.series_year = locked.invoice_date.year if series.reset_period != "never" else None
     locked.series_sequence = sequence
     locked.issuer_snapshot = issuer
     locked.customer_snapshot = customer
@@ -419,7 +455,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     artifact.save()  # type: ignore[no-untyped-call]
 
     series.next_number = sequence + 1
-    series.save(update_fields=("current_year", "next_number", "updated_at"))
+    series.save(update_fields=("current_period", "next_number", "updated_at"))
     locked.entity.display_name = f"Invoice {number}"
     locked.entity.save(update_fields=("display_name", "updated_at"))
     AuditEvent.objects.create(

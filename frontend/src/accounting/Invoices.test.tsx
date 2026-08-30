@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import { Invoices } from './Invoices'
 import type { InvoiceClient, InvoiceDraft } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -49,7 +50,8 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     configured: true, issue_ready: true, legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
     address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
     billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
-    payment_terms_days: 30, invoice_prefix: 'INV', yearly_reset: false,
+    payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none', invoice_separator: '-',
+    invoice_sequence_digits: 6, invoice_reset_period: 'never', country_choices: [{ value: 'US', label: 'United States' }],
   }
   return {
     list: vi.fn().mockResolvedValue({ results: [draft], can_manage: true, can_issue: true }),
@@ -74,6 +76,17 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
 }
 
 describe('Invoices', () => {
+  it('keeps MSP settings out of the client workspace and links there when setup is incomplete', async () => {
+    const client = invoiceClient({ issue: vi.fn().mockRejectedValue(new Error('Configure invoice issue settings first.')) })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<MemoryRouter><Invoices workspace={workspace} client={client} /></MemoryRouter>)
+
+    expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Invoice settings' })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
+    expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/accounting')
+  })
+
   it('shows exact draft totals and creates a snapshotted origin line', async () => {
     const addLine = vi.fn().mockResolvedValue(draft)
     const client = invoiceClient({ addLine })

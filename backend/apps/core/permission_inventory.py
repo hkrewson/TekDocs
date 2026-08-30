@@ -508,11 +508,10 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
-        "organization-invoice-issue-settings",
+        "msp-invoice-settings",
         ("GET", "PUT"),
         PermissionKey.INVOICES_ISSUE,
         (PermissionKey.INVOICES_ISSUE,),
-        organization_scoped=True,
     ),
     route(
         "organization-invoice-detail",

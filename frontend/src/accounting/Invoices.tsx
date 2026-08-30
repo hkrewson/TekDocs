@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, FileCheck2, Mail, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
+import { Download, FileCheck2, Mail, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Link } from 'react-router'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
-import type { InvoiceClient, InvoiceDraft, InvoiceIssueSettings, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
+import type { InvoiceClient, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
 
 type DraftForm = { currency: string; invoice_date: string; due_date: string; reference: string; notes: string }
 type LineForm = {
@@ -71,9 +72,9 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [canManage, setCanManage] = useState(false)
   const [canIssue, setCanIssue] = useState(false)
-  const [issueSettings, setIssueSettings] = useState<InvoiceIssueSettings | null>(null)
+  const [needsSettings, setNeedsSettings] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'issue-settings' | 'delivery'>('none')
+  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'delivery'>('none')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
   const [line, setLine] = useState<LineForm>(emptyLine)
@@ -85,14 +86,12 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     const controller = new AbortController()
     client.list(workspace, controller.signal)
       .then(async (result) => {
-        const [choices, settings] = await Promise.all([
-          result.can_manage ? client.choices(workspace, controller.signal) : Promise.resolve({ origins: [], tax_rates: [] }),
-          result.can_issue ? client.issueSettings(workspace, controller.signal) : Promise.resolve(null),
-        ])
+        const choices = result.can_manage
+          ? await client.choices(workspace, controller.signal)
+          : { origins: [], tax_rates: [] }
         setRecords(result.results)
         setCanManage(result.can_manage)
         setCanIssue(result.can_issue)
-        setIssueSettings(settings)
         setOrigins(choices.origins)
         setTaxRates(choices.tax_rates)
         setPhase('ready')
@@ -144,25 +143,19 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
 
   async function issueSelected() {
     if (!selected) return
-    if (!issueSettings?.issue_ready) {
-      setEditor('issue-settings')
-      return
-    }
     if (!window.confirm(translate('accounting.issueConfirm'))) return
-    await perform(() => client.issue(workspace, selected.id))
-  }
-
-  async function saveIssueSettings(value: InvoiceIssueSettings) {
     setBusy(true)
     setError(null)
-    try {
-      const payload: Record<string, unknown> = { ...value }
-      delete payload.configured
-      delete payload.issue_ready
-      setIssueSettings(await client.saveIssueSettings(workspace, payload))
-      setEditor('none')
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : translate('accounting.settingsFailed'))
+    setNeedsSettings(false)
+    try { replace(await client.issue(workspace, selected.id)) }
+    catch (caught) {
+      const message = caught instanceof Error ? caught.message : translate('accounting.changeFailed')
+      if (message.toLowerCase().includes('configure')) {
+        setNeedsSettings(true)
+        setError(translate('accounting.settingsRequired'))
+      } else {
+        setError(message)
+      }
     } finally { setBusy(false) }
   }
 
@@ -176,11 +169,10 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     <header className="page-header">
       <div><h1>{translate('accounting.heading')}</h1></div>
       <div className="form-actions">
-        {canIssue && <button type="button" className="secondary-button" onClick={() => setEditor('issue-settings')}><Settings size={16} aria-hidden="true" />{translate('accounting.issueSettings')}</button>}
         {canManage && <button type="button" className="primary-button" aria-label={translate('accounting.newDraft')} onClick={() => { setDraft(emptyDraft()); setEditor('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('accounting.newDraft')}</span></button>}
       </div>
     </header>
-    {error && <div className="form-message error" role="alert">{error}</div>}
+    {error && <div className="form-message error" role="alert">{error}{needsSettings && <> <Link to="/accounting">{translate('accounting.openSettings')}</Link></>}</div>}
     {phase === 'loading' && <section className="content-section" role="status">{translate('accounting.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.unavailable')}</h2><p>{translate('accounting.loadFailed')}</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
@@ -217,28 +209,8 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     </div>}
     {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected.id, draft)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
-    {editor === 'issue-settings' && issueSettings && <IssueSettingsEditor initial={issueSettings} busy={busy} cancel={() => setEditor('none')} submit={(value) => { void saveIssueSettings(value) }} />}
-    {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
+    {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input autoFocus type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
   </>
-}
-
-function IssueSettingsEditor({ initial, busy, cancel, submit }: { initial: InvoiceIssueSettings; busy: boolean; cancel: () => void; submit: (value: InvoiceIssueSettings) => void }) {
-  const [value, setValue] = useState(initial)
-  function save(event: FormEvent) { event.preventDefault(); submit(value) }
-  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-issue-settings-title"><form className="record-form" onSubmit={save}><div className="section-heading"><h2 id="invoice-issue-settings-title">{translate('accounting.issueSettings')}</h2></div><div className="form-grid">
-    <Field label={translate('accounting.legalName')} value={value.legal_name} onChange={(legal_name) => setValue({ ...value, legal_name })} />
-    <Field label={translate('accounting.billingEmail')} type="email" value={value.billing_email} onChange={(billing_email) => setValue({ ...value, billing_email })} />
-    <Field label={translate('accounting.addressLine1')} value={value.address_line_1} onChange={(address_line_1) => setValue({ ...value, address_line_1 })} />
-    <Field label={translate('accounting.addressLine2')} value={value.address_line_2} required={false} onChange={(address_line_2) => setValue({ ...value, address_line_2 })} />
-    <Field label={translate('accounting.city')} value={value.city} onChange={(city) => setValue({ ...value, city })} />
-    <Field label={translate('accounting.region')} value={value.region} required={false} onChange={(region) => setValue({ ...value, region })} />
-    <Field label={translate('accounting.postalCode')} value={value.postal_code} onChange={(postal_code) => setValue({ ...value, postal_code })} />
-    <Field label={translate('accounting.countryCode')} value={value.country_code} onChange={(country_code) => setValue({ ...value, country_code: country_code.toUpperCase() })} />
-    <Field label={translate('accounting.defaultCurrency')} value={value.default_currency} onChange={(default_currency) => setValue({ ...value, default_currency: default_currency.toUpperCase() })} />
-    <Field label={translate('accounting.paymentTerms')} type="number" value={String(value.payment_terms_days)} onChange={(payment_terms_days) => setValue({ ...value, payment_terms_days: Number(payment_terms_days) })} />
-    <Field label={translate('accounting.invoicePrefix')} value={value.invoice_prefix} onChange={(invoice_prefix) => setValue({ ...value, invoice_prefix: invoice_prefix.toUpperCase() })} />
-    <label><span>{translate('accounting.yearlyReset')}</span><input type="checkbox" checked={value.yearly_reset} onChange={(event) => setValue({ ...value, yearly_reset: event.target.checked })} /></label>
-  </div><Actions busy={busy} cancel={cancel} label={translate('accounting.saveSettings')} /></form></section>
 }
 
 function DraftEditor({ value, setValue, busy, title, cancel, submit }: { value: DraftForm; setValue: (value: DraftForm) => void; busy: boolean; title: string; cancel: () => void; submit: () => void }) {
@@ -263,8 +235,8 @@ function LineEditor({ value, setValue, origins, taxRates, busy, cancel, submit }
   </div><Actions busy={busy || (!value.originKey && (!value.description.trim() || !value.unit_amount))} cancel={cancel} label={translate('accounting.saveLine')} /></form></section>
 }
 
-function Field({ label, value, onChange, type = 'text', step, disabled = false, required = true }: { label: string; value: string; onChange: (value: string) => void; type?: string; step?: string; disabled?: boolean; required?: boolean }) {
-  return <label><span>{label}</span><input required={required} disabled={disabled} type={type} step={step} min={type === 'number' ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></label>
+function Field({ label, value, onChange, type = 'text', step, disabled = false, required = true, autoFocus = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; step?: string; disabled?: boolean; required?: boolean; autoFocus?: boolean }) {
+  return <label><span>{label}</span><input autoFocus={autoFocus} required={required} disabled={disabled} type={type} step={step} min={type === 'number' ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></label>
 }
 
 function Actions({ busy, cancel, label }: { busy: boolean; cancel: () => void; label: string }) {

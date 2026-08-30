@@ -2772,6 +2772,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/invoice-settings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_invoice_settings_retrieve"];
+        readonly put: operations["workspaces_msp_invoice_settings_update"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/licenses": {
         readonly parameters: {
             readonly query?: never;
@@ -5677,22 +5693,6 @@ export interface paths {
         };
         readonly get: operations["workspaces_organizations_invoices_pdf_retrieve"];
         readonly put?: never;
-        readonly post?: never;
-        readonly delete?: never;
-        readonly options?: never;
-        readonly head?: never;
-        readonly patch?: never;
-        readonly trace?: never;
-    };
-    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/issue-settings": {
-        readonly parameters: {
-            readonly query?: never;
-            readonly header?: never;
-            readonly path?: never;
-            readonly cookie?: never;
-        };
-        readonly get: operations["workspaces_organizations_invoices_issue_settings_retrieve"];
-        readonly put: operations["workspaces_organizations_invoices_issue_settings_update"];
         readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
@@ -9496,6 +9496,10 @@ export interface components {
             readonly delivered_at: string | null;
             readonly delivery_count: number;
         };
+        readonly InvoiceCountryChoice: {
+            readonly value: string;
+            readonly label: string;
+        };
         readonly InvoiceDelivery: {
             /** Format: email */
             readonly recipient: string;
@@ -9509,7 +9513,259 @@ export interface components {
             /** @default  */
             readonly region: string;
             readonly postal_code: string;
-            readonly country_code: string;
+            /**
+             * @description * `AD` - Andorra
+             *     * `AE` - United Arab Emirates
+             *     * `AF` - Afghanistan
+             *     * `AG` - Antigua & Barbuda
+             *     * `AI` - Anguilla
+             *     * `AL` - Albania
+             *     * `AM` - Armenia
+             *     * `AO` - Angola
+             *     * `AQ` - Antarctica
+             *     * `AR` - Argentina
+             *     * `AS` - Samoa (American)
+             *     * `AT` - Austria
+             *     * `AU` - Australia
+             *     * `AW` - Aruba
+             *     * `AX` - Åland Islands
+             *     * `AZ` - Azerbaijan
+             *     * `BA` - Bosnia & Herzegovina
+             *     * `BB` - Barbados
+             *     * `BD` - Bangladesh
+             *     * `BE` - Belgium
+             *     * `BF` - Burkina Faso
+             *     * `BG` - Bulgaria
+             *     * `BH` - Bahrain
+             *     * `BI` - Burundi
+             *     * `BJ` - Benin
+             *     * `BL` - St Barthelemy
+             *     * `BM` - Bermuda
+             *     * `BN` - Brunei
+             *     * `BO` - Bolivia
+             *     * `BQ` - Caribbean NL
+             *     * `BR` - Brazil
+             *     * `BS` - Bahamas
+             *     * `BT` - Bhutan
+             *     * `BV` - Bouvet Island
+             *     * `BW` - Botswana
+             *     * `BY` - Belarus
+             *     * `BZ` - Belize
+             *     * `CA` - Canada
+             *     * `CC` - Cocos (Keeling) Islands
+             *     * `CD` - Congo (Dem. Rep.)
+             *     * `CF` - Central African Rep.
+             *     * `CG` - Congo (Rep.)
+             *     * `CH` - Switzerland
+             *     * `CI` - Côte d’Ivoire
+             *     * `CK` - Cook Islands
+             *     * `CL` - Chile
+             *     * `CM` - Cameroon
+             *     * `CN` - China
+             *     * `CO` - Colombia
+             *     * `CR` - Costa Rica
+             *     * `CU` - Cuba
+             *     * `CV` - Cape Verde
+             *     * `CW` - Curaçao
+             *     * `CX` - Christmas Island
+             *     * `CY` - Cyprus
+             *     * `CZ` - Czech Republic
+             *     * `DE` - Germany
+             *     * `DJ` - Djibouti
+             *     * `DK` - Denmark
+             *     * `DM` - Dominica
+             *     * `DO` - Dominican Republic
+             *     * `DZ` - Algeria
+             *     * `EC` - Ecuador
+             *     * `EE` - Estonia
+             *     * `EG` - Egypt
+             *     * `EH` - Western Sahara
+             *     * `ER` - Eritrea
+             *     * `ES` - Spain
+             *     * `ET` - Ethiopia
+             *     * `FI` - Finland
+             *     * `FJ` - Fiji
+             *     * `FK` - Falkland Islands
+             *     * `FM` - Micronesia
+             *     * `FO` - Faroe Islands
+             *     * `FR` - France
+             *     * `GA` - Gabon
+             *     * `GB` - Britain (UK)
+             *     * `GD` - Grenada
+             *     * `GE` - Georgia
+             *     * `GF` - French Guiana
+             *     * `GG` - Guernsey
+             *     * `GH` - Ghana
+             *     * `GI` - Gibraltar
+             *     * `GL` - Greenland
+             *     * `GM` - Gambia
+             *     * `GN` - Guinea
+             *     * `GP` - Guadeloupe
+             *     * `GQ` - Equatorial Guinea
+             *     * `GR` - Greece
+             *     * `GS` - South Georgia & the South Sandwich Islands
+             *     * `GT` - Guatemala
+             *     * `GU` - Guam
+             *     * `GW` - Guinea-Bissau
+             *     * `GY` - Guyana
+             *     * `HK` - Hong Kong
+             *     * `HM` - Heard Island & McDonald Islands
+             *     * `HN` - Honduras
+             *     * `HR` - Croatia
+             *     * `HT` - Haiti
+             *     * `HU` - Hungary
+             *     * `ID` - Indonesia
+             *     * `IE` - Ireland
+             *     * `IL` - Israel
+             *     * `IM` - Isle of Man
+             *     * `IN` - India
+             *     * `IO` - British Indian Ocean Territory
+             *     * `IQ` - Iraq
+             *     * `IR` - Iran
+             *     * `IS` - Iceland
+             *     * `IT` - Italy
+             *     * `JE` - Jersey
+             *     * `JM` - Jamaica
+             *     * `JO` - Jordan
+             *     * `JP` - Japan
+             *     * `KE` - Kenya
+             *     * `KG` - Kyrgyzstan
+             *     * `KH` - Cambodia
+             *     * `KI` - Kiribati
+             *     * `KM` - Comoros
+             *     * `KN` - St Kitts & Nevis
+             *     * `KP` - Korea (North)
+             *     * `KR` - Korea (South)
+             *     * `KW` - Kuwait
+             *     * `KY` - Cayman Islands
+             *     * `KZ` - Kazakhstan
+             *     * `LA` - Laos
+             *     * `LB` - Lebanon
+             *     * `LC` - St Lucia
+             *     * `LI` - Liechtenstein
+             *     * `LK` - Sri Lanka
+             *     * `LR` - Liberia
+             *     * `LS` - Lesotho
+             *     * `LT` - Lithuania
+             *     * `LU` - Luxembourg
+             *     * `LV` - Latvia
+             *     * `LY` - Libya
+             *     * `MA` - Morocco
+             *     * `MC` - Monaco
+             *     * `MD` - Moldova
+             *     * `ME` - Montenegro
+             *     * `MF` - St Martin (French)
+             *     * `MG` - Madagascar
+             *     * `MH` - Marshall Islands
+             *     * `MK` - North Macedonia
+             *     * `ML` - Mali
+             *     * `MM` - Myanmar (Burma)
+             *     * `MN` - Mongolia
+             *     * `MO` - Macau
+             *     * `MP` - Northern Mariana Islands
+             *     * `MQ` - Martinique
+             *     * `MR` - Mauritania
+             *     * `MS` - Montserrat
+             *     * `MT` - Malta
+             *     * `MU` - Mauritius
+             *     * `MV` - Maldives
+             *     * `MW` - Malawi
+             *     * `MX` - Mexico
+             *     * `MY` - Malaysia
+             *     * `MZ` - Mozambique
+             *     * `NA` - Namibia
+             *     * `NC` - New Caledonia
+             *     * `NE` - Niger
+             *     * `NF` - Norfolk Island
+             *     * `NG` - Nigeria
+             *     * `NI` - Nicaragua
+             *     * `NL` - Netherlands
+             *     * `NO` - Norway
+             *     * `NP` - Nepal
+             *     * `NR` - Nauru
+             *     * `NU` - Niue
+             *     * `NZ` - New Zealand
+             *     * `OM` - Oman
+             *     * `PA` - Panama
+             *     * `PE` - Peru
+             *     * `PF` - French Polynesia
+             *     * `PG` - Papua New Guinea
+             *     * `PH` - Philippines
+             *     * `PK` - Pakistan
+             *     * `PL` - Poland
+             *     * `PM` - St Pierre & Miquelon
+             *     * `PN` - Pitcairn
+             *     * `PR` - Puerto Rico
+             *     * `PS` - Palestine
+             *     * `PT` - Portugal
+             *     * `PW` - Palau
+             *     * `PY` - Paraguay
+             *     * `QA` - Qatar
+             *     * `RE` - Réunion
+             *     * `RO` - Romania
+             *     * `RS` - Serbia
+             *     * `RU` - Russia
+             *     * `RW` - Rwanda
+             *     * `SA` - Saudi Arabia
+             *     * `SB` - Solomon Islands
+             *     * `SC` - Seychelles
+             *     * `SD` - Sudan
+             *     * `SE` - Sweden
+             *     * `SG` - Singapore
+             *     * `SH` - St Helena
+             *     * `SI` - Slovenia
+             *     * `SJ` - Svalbard & Jan Mayen
+             *     * `SK` - Slovakia
+             *     * `SL` - Sierra Leone
+             *     * `SM` - San Marino
+             *     * `SN` - Senegal
+             *     * `SO` - Somalia
+             *     * `SR` - Suriname
+             *     * `SS` - South Sudan
+             *     * `ST` - Sao Tome & Principe
+             *     * `SV` - El Salvador
+             *     * `SX` - St Maarten (Dutch)
+             *     * `SY` - Syria
+             *     * `SZ` - Eswatini (Swaziland)
+             *     * `TC` - Turks & Caicos Is
+             *     * `TD` - Chad
+             *     * `TF` - French S. Terr.
+             *     * `TG` - Togo
+             *     * `TH` - Thailand
+             *     * `TJ` - Tajikistan
+             *     * `TK` - Tokelau
+             *     * `TL` - East Timor
+             *     * `TM` - Turkmenistan
+             *     * `TN` - Tunisia
+             *     * `TO` - Tonga
+             *     * `TR` - Turkey
+             *     * `TT` - Trinidad & Tobago
+             *     * `TV` - Tuvalu
+             *     * `TW` - Taiwan
+             *     * `TZ` - Tanzania
+             *     * `UA` - Ukraine
+             *     * `UG` - Uganda
+             *     * `UM` - US minor outlying islands
+             *     * `US` - United States
+             *     * `UY` - Uruguay
+             *     * `UZ` - Uzbekistan
+             *     * `VA` - Vatican City
+             *     * `VC` - St Vincent
+             *     * `VE` - Venezuela
+             *     * `VG` - Virgin Islands (UK)
+             *     * `VI` - Virgin Islands (US)
+             *     * `VN` - Vietnam
+             *     * `VU` - Vanuatu
+             *     * `WF` - Wallis & Futuna
+             *     * `WS` - Samoa (western)
+             *     * `YE` - Yemen
+             *     * `YT` - Mayotte
+             *     * `ZA` - South Africa
+             *     * `ZM` - Zambia
+             *     * `ZW` - Zimbabwe
+             * @enum {string}
+             */
+            readonly country_code: "AD" | "AE" | "AF" | "AG" | "AI" | "AL" | "AM" | "AO" | "AQ" | "AR" | "AS" | "AT" | "AU" | "AW" | "AX" | "AZ" | "BA" | "BB" | "BD" | "BE" | "BF" | "BG" | "BH" | "BI" | "BJ" | "BL" | "BM" | "BN" | "BO" | "BQ" | "BR" | "BS" | "BT" | "BV" | "BW" | "BY" | "BZ" | "CA" | "CC" | "CD" | "CF" | "CG" | "CH" | "CI" | "CK" | "CL" | "CM" | "CN" | "CO" | "CR" | "CU" | "CV" | "CW" | "CX" | "CY" | "CZ" | "DE" | "DJ" | "DK" | "DM" | "DO" | "DZ" | "EC" | "EE" | "EG" | "EH" | "ER" | "ES" | "ET" | "FI" | "FJ" | "FK" | "FM" | "FO" | "FR" | "GA" | "GB" | "GD" | "GE" | "GF" | "GG" | "GH" | "GI" | "GL" | "GM" | "GN" | "GP" | "GQ" | "GR" | "GS" | "GT" | "GU" | "GW" | "GY" | "HK" | "HM" | "HN" | "HR" | "HT" | "HU" | "ID" | "IE" | "IL" | "IM" | "IN" | "IO" | "IQ" | "IR" | "IS" | "IT" | "JE" | "JM" | "JO" | "JP" | "KE" | "KG" | "KH" | "KI" | "KM" | "KN" | "KP" | "KR" | "KW" | "KY" | "KZ" | "LA" | "LB" | "LC" | "LI" | "LK" | "LR" | "LS" | "LT" | "LU" | "LV" | "LY" | "MA" | "MC" | "MD" | "ME" | "MF" | "MG" | "MH" | "MK" | "ML" | "MM" | "MN" | "MO" | "MP" | "MQ" | "MR" | "MS" | "MT" | "MU" | "MV" | "MW" | "MX" | "MY" | "MZ" | "NA" | "NC" | "NE" | "NF" | "NG" | "NI" | "NL" | "NO" | "NP" | "NR" | "NU" | "NZ" | "OM" | "PA" | "PE" | "PF" | "PG" | "PH" | "PK" | "PL" | "PM" | "PN" | "PR" | "PS" | "PT" | "PW" | "PY" | "QA" | "RE" | "RO" | "RS" | "RU" | "RW" | "SA" | "SB" | "SC" | "SD" | "SE" | "SG" | "SH" | "SI" | "SJ" | "SK" | "SL" | "SM" | "SN" | "SO" | "SR" | "SS" | "ST" | "SV" | "SX" | "SY" | "SZ" | "TC" | "TD" | "TF" | "TG" | "TH" | "TJ" | "TK" | "TL" | "TM" | "TN" | "TO" | "TR" | "TT" | "TV" | "TW" | "TZ" | "UA" | "UG" | "UM" | "US" | "UY" | "UZ" | "VA" | "VC" | "VE" | "VG" | "VI" | "VN" | "VU" | "WF" | "WS" | "YE" | "YT" | "ZA" | "ZM" | "ZW";
             /** Format: email */
             readonly billing_email: string;
             /** @default  */
@@ -9519,8 +9775,35 @@ export interface components {
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
-            /** @default false */
-            readonly yearly_reset: boolean;
+            /**
+             * @description * `none` - none
+             *     * `year` - year
+             *     * `short_year` - short_year
+             *     * `year_month` - year_month
+             *     * `short_year_month` - short_year_month
+             *     * `month_year` - month_year
+             *     * `month_short_year` - month_short_year
+             *     * `year_month_code` - year_month_code
+             *     * `short_year_month_code` - short_year_month_code
+             * @enum {string}
+             */
+            readonly invoice_date_component: "none" | "year" | "short_year" | "year_month" | "short_year_month" | "month_year" | "month_short_year" | "year_month_code" | "short_year_month_code";
+            /**
+             * @description * `-` - -
+             *     * `/` - /
+             *     * `.` - .
+             *     * `` -
+             * @enum {string}
+             */
+            readonly invoice_separator: "-" | "/" | "." | "";
+            readonly invoice_sequence_digits: number;
+            /**
+             * @description * `never` - never
+             *     * `yearly` - yearly
+             *     * `monthly` - monthly
+             * @enum {string}
+             */
+            readonly invoice_reset_period: "never" | "yearly" | "monthly";
         };
         readonly InvoiceIssueSettingsResult: {
             readonly configured: boolean;
@@ -9538,7 +9821,11 @@ export interface components {
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
-            readonly yearly_reset: boolean;
+            readonly invoice_date_component: string;
+            readonly invoice_separator: string;
+            readonly invoice_sequence_digits: number;
+            readonly invoice_reset_period: string;
+            readonly country_choices: readonly components["schemas"]["InvoiceCountryChoice"][];
         };
         readonly InvoiceLine: {
             /** Format: uuid */
@@ -19365,6 +19652,54 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_invoice_settings_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_invoice_settings_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceIssueSettings"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceIssueSettings"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceIssueSettings"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_licenses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
@@ -26854,58 +27189,6 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    readonly workspaces_organizations_invoices_issue_settings_retrieve: {
-        readonly parameters: {
-            readonly query?: never;
-            readonly header?: never;
-            readonly path: {
-                readonly organization_entity_id: string;
-            };
-            readonly cookie?: never;
-        };
-        readonly requestBody?: never;
-        readonly responses: {
-            readonly 200: {
-                headers: {
-                    /** @description Server-generated request correlation UUID. */
-                    readonly "X-Request-ID"?: string;
-                    readonly [name: string]: unknown;
-                };
-                content: {
-                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
-                };
-            };
-        };
-    };
-    readonly workspaces_organizations_invoices_issue_settings_update: {
-        readonly parameters: {
-            readonly query?: never;
-            readonly header?: never;
-            readonly path: {
-                readonly organization_entity_id: string;
-            };
-            readonly cookie?: never;
-        };
-        readonly requestBody: {
-            readonly content: {
-                readonly "application/json": components["schemas"]["InvoiceIssueSettings"];
-                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceIssueSettings"];
-                readonly "multipart/form-data": components["schemas"]["InvoiceIssueSettings"];
-            };
-        };
-        readonly responses: {
-            readonly 200: {
-                headers: {
-                    /** @description Server-generated request correlation UUID. */
-                    readonly "X-Request-ID"?: string;
-                    readonly [name: string]: unknown;
-                };
-                content: {
-                    readonly "application/json": components["schemas"]["InvoiceIssueSettingsResult"];
                 };
             };
         };

@@ -271,7 +271,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         ),
         "organization-invoice-list-create": ("organization_entity_id",),
         "organization-invoice-origin-choices": ("organization_entity_id",),
-        "organization-invoice-issue-settings": ("organization_entity_id",),
+        "msp-invoice-settings": (),
         "organization-invoice-detail": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-issue": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-pdf": ("organization_entity_id", "invoice_entity_id"),

@@ -21,17 +21,17 @@ describe('invoice API client', () => {
     await browserInvoiceClient.addLine(workspace, 'invoice/1', { description: 'Service' })
     await browserInvoiceClient.updateLine(workspace, 'invoice/1', 'line/1', { quantity: '2' })
     await browserInvoiceClient.removeLine(workspace, 'invoice/1', 'line/1')
-    await browserInvoiceClient.issueSettings(workspace)
-    await browserInvoiceClient.saveIssueSettings(workspace, { invoice_prefix: 'INV' })
+    await browserInvoiceClient.issueSettings()
+    await browserInvoiceClient.saveIssueSettings({ invoice_prefix: 'INV' })
     await browserInvoiceClient.issue(workspace, 'invoice/1')
     await browserInvoiceClient.deliver(workspace, 'invoice/1', 'accounts@example.invalid')
 
     expect(fetch).toHaveBeenCalledWith(
-      '/api/v1/workspaces/organizations/client%2F1/invoices/issue-settings',
+      '/api/v1/workspaces/msp/invoice-settings',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
     expect(fetch).toHaveBeenCalledWith(
-      '/api/v1/workspaces/organizations/client%2F1/invoices/issue-settings',
+      '/api/v1/workspaces/msp/invoice-settings',
       expect.objectContaining({ method: 'PUT', body: JSON.stringify({ invoice_prefix: 'INV' }) }),
     )
     expect(fetch).toHaveBeenCalledWith(
@@ -66,7 +66,7 @@ describe('invoice API client', () => {
   it('uses a safe fallback when an error response is not JSON', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('not-json', { status: 500 }))
     await expect(
-      browserInvoiceClient.issueSettings({ kind: 'organization', id: 'client' } as never),
+      browserInvoiceClient.issueSettings(),
     ).rejects.toThrow('The invoice request failed.')
   })
 })

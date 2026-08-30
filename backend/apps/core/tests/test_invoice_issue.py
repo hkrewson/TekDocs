@@ -75,7 +75,10 @@ def settings_payload(**overrides):  # type: ignore[no-untyped-def]
         "default_currency": "USD",
         "payment_terms_days": 30,
         "invoice_prefix": "INV",
-        "yearly_reset": False,
+        "invoice_date_component": "none",
+        "invoice_separator": "-",
+        "invoice_sequence_digits": 6,
+        "invoice_reset_period": "never",
         **overrides,
     }
 
@@ -102,16 +105,16 @@ def draft_with_line(installation, organization, suffix=""):  # type: ignore[no-u
 def test_issue_requires_recent_session_and_complete_settings(owner_client, installation, monkeypatch):
     organization = client_organization(installation)
     invoice = draft_with_line(installation, organization)
-    settings_url = reverse(
-        "organization-invoice-issue-settings", kwargs={"organization_entity_id": organization.entity_id}
-    )
+    settings_url = reverse("msp-invoice-settings")
     issue_url = reverse(
         "organization-invoice-issue",
         kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": invoice.entity_id},
     )
 
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: False)
-    assert owner_client.put(settings_url, settings_payload(), content_type="application/json").status_code == 403
+    expired = owner_client.put(settings_url, settings_payload(), content_type="application/json")
+    assert expired.status_code == 403
+    assert expired.json()["error"]["code"] == "recent_authentication_required"
     assert owner_client.post(issue_url).status_code == 403
 
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
@@ -128,9 +131,7 @@ def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, in
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
     organization = client_organization(installation)
     invoice = draft_with_line(installation, organization)
-    settings_url = reverse(
-        "organization-invoice-issue-settings", kwargs={"organization_entity_id": organization.entity_id}
-    )
+    settings_url = reverse("msp-invoice-settings")
     assert owner_client.put(settings_url, settings_payload(), content_type="application/json").status_code == 200
     issue_url = reverse(
         "organization-invoice-issue",
@@ -215,8 +216,15 @@ def test_concurrent_issue_allocates_consecutive_gapless_yearly_numbers(installat
         country_code="US",
         billing_email="billing@example.invalid",
         invoice_prefix="YEAR",
+        invoice_date_component="year",
+        invoice_reset_period="yearly",
     )
-    InvoiceNumberSeries.objects.create(tenant=installation.tenant, prefix="YEAR", yearly_reset=True)
+    InvoiceNumberSeries.objects.create(
+        tenant=installation.tenant,
+        prefix="YEAR",
+        date_component="year",
+        reset_period="yearly",
+    )
     invoice_ids = [draft_with_line(installation, organization, str(index)).id for index in range(6)]
 
     def issue(invoice_id):  # type: ignore[no-untyped-def]
@@ -232,5 +240,51 @@ def test_concurrent_issue_allocates_consecutive_gapless_yearly_numbers(installat
 
     assert sorted(numbers) == [f"YEAR-2026-{index:06d}" for index in range(1, 7)]
     series = InvoiceNumberSeries.objects.get(tenant=installation.tenant, prefix="YEAR")
-    assert series.current_year == 2026
+    assert series.current_period == "2026"
     assert series.next_number == 7
+
+
+@pytest.mark.django_db
+def test_settings_offer_country_choices_and_validate_numbering_period(owner_client, installation, monkeypatch):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    settings_url = reverse("msp-invoice-settings")
+
+    result = owner_client.get(settings_url)
+    assert result.status_code == 200
+    assert {"value": "US", "label": "United States"} in result.json()["country_choices"]
+    assert owner_client.put(
+        settings_url, settings_payload(country_code="ZZ"), content_type="application/json"
+    ).status_code == 400
+    assert owner_client.put(
+        settings_url,
+        settings_payload(invoice_reset_period="monthly", invoice_date_component="year"),
+        content_type="application/json",
+    ).status_code == 400
+
+
+@pytest.mark.django_db
+def test_flexible_number_format_uses_month_letter_and_selected_width(owner_client, installation, monkeypatch, tmp_path):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    organization = client_organization(installation, "Flexible Number Client")
+    settings_url = reverse("msp-invoice-settings")
+    configured = owner_client.put(
+        settings_url,
+        settings_payload(
+            invoice_prefix="TC",
+            invoice_date_component="short_year_month_code",
+            invoice_separator="/",
+            invoice_sequence_digits=4,
+            invoice_reset_period="monthly",
+        ),
+        content_type="application/json",
+    )
+    assert configured.status_code == 200
+    invoice = draft_with_line(installation, organization)
+    issue_url = reverse(
+        "organization-invoice-issue",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": invoice.entity_id},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        result = owner_client.post(issue_url)
+    assert result.status_code == 200
+    assert result.json()["number"] == "TC/26H/0001"

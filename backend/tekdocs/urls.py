@@ -254,13 +254,13 @@ from apps.core.invoice_views import (
     InvoiceCSVDownloadView,
     InvoiceDeliveryView,
     InvoiceDetailView,
-    InvoiceIssueSettingsView,
     InvoiceIssueView,
     InvoiceLineDetailView,
     InvoiceLineListCreateView,
     InvoiceListCreateView,
     InvoiceOriginChoiceView,
     InvoicePDFDownloadView,
+    MSPInvoiceSettingsView,
     ServiceRateDetailView,
     ServiceRateListCreateView,
 )
@@ -1374,9 +1374,9 @@ urlpatterns = [
         name="organization-invoice-origin-choices",
     ),
     path(
-        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/issue-settings",
-        InvoiceIssueSettingsView.as_view(),
-        name="organization-invoice-issue-settings",
+        "api/v1/workspaces/msp/invoice-settings",
+        MSPInvoiceSettingsView.as_view(),
+        name="msp-invoice-settings",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>",

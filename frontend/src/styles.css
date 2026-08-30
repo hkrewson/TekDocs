@@ -235,6 +235,34 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .classification-options label { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
 .classification-options input { min-height: auto; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .form-actions { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.form-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow-y: auto; padding: 24px; background: rgba(25, 27, 25, .48); }
+.record-form { width: min(720px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 20px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: 0 2px 8px rgba(35, 36, 31, .16); }
+.record-form .section-heading { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.record-form .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.record-form label { min-width: 0; display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.record-form input:not([type='checkbox']), .record-form select, .record-form textarea { width: 100%; min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.record-form textarea { resize: vertical; }
+.record-form input:disabled, .record-form select:disabled, .record-form textarea:disabled { color: var(--quiet); background: #efede7; cursor: not-allowed; }
+.record-form .wide-field { grid-column: 1 / -1; }
+.record-form-section { min-width: 0; margin: 0; padding: 0; border: 0; }
+.record-form-section legend { margin-bottom: 12px; padding: 0; color: var(--text); font-size: 13px; font-weight: 650; }
+.record-form-section + .record-form-section { margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--border); }
+.record-form .checkbox-field { display: flex; align-items: center; align-self: end; gap: 8px; min-height: 38px; color: var(--text); }
+.record-form .checkbox-field input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.record-form > .form-actions { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.record-form > p { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.invoice-settings-form { width: min(760px, 100%); max-height: none; margin: 0; overflow: visible; box-shadow: none; }
+.invoice-reauth-form { width: min(760px, 100%); display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, .8fr) auto; align-items: end; gap: 14px 18px; margin-bottom: 16px; }
+.invoice-reauth-form h2 { margin: 0 0 4px; font-size: 15px; }
+.invoice-reauth-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.invoice-reauth-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.invoice-reauth-form input { width: 100%; min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+@media (max-width: 700px) { .invoice-reauth-form { grid-template-columns: 1fr; align-items: stretch; } .invoice-reauth-form .primary-button { justify-self: start; } }
+.numbering-settings .field-help { margin: -4px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.numbering-settings .form-grid + .field-help { margin: 14px 0 0; }
+.invoice-number-preview { align-self: end; min-height: 38px; display: grid; align-content: center; gap: 2px; padding: 7px 10px; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 7px; }
+.invoice-number-preview span { color: var(--muted); font-size: 11px; font-weight: 600; }
+.invoice-number-preview strong { overflow-wrap: anywhere; color: var(--text); font: 600 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .field-guidance { color: #7d3024; font-size: 12px; }
 .form-success { margin-bottom: 16px; padding: 10px 12px; color: #35512d; background: #edf3e9; border: 1px solid #bdcdb7; border-radius: 7px; font-size: 13px; }
 .form-message { margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; line-height: 1.45; }
@@ -1280,6 +1308,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .scoped-assignment-list li button { grid-column: 2; grid-row: 1 / span 2; }
   .catalog-layout { grid-template-columns: 1fr; }
   .inventory-layout { grid-template-columns: 1fr; }
+  .form-overlay { padding: 12px; }
+  .record-form { max-height: calc(100dvh - 24px); padding: 16px; }
+  .record-form .form-grid { grid-template-columns: 1fr; }
+  .record-form .wide-field { grid-column: auto; }
   .asset-bulk-toolbar { align-items: stretch; flex-direction: column; }
   .asset-relationship-form { grid-template-columns: 1fr; align-items: stretch; }
   .inventory-provenance { grid-template-columns: 1fr; }

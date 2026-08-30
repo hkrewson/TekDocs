@@ -64,7 +64,7 @@ def test_billing_profile_database_guards_reject_invalid_direct_writes(tenant):
     with pytest.raises(DatabaseError, match="currency invalid"), transaction.atomic():
         TenantBillingProfile.objects.filter(pk=profile.pk).update(default_currency="usd")
     with pytest.raises(DatabaseError, match="country invalid"), transaction.atomic():
-        TenantBillingProfile.objects.filter(pk=profile.pk).update(country_code="u1")
+        TenantBillingProfile.objects.filter(pk=profile.pk).update(country_code="ZZ")
     with pytest.raises(DatabaseError, match="invoice prefix invalid"), transaction.atomic():
         TenantBillingProfile.objects.filter(pk=profile.pk).update(invoice_prefix="invoice 1")
 

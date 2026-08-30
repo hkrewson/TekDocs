@@ -52,6 +52,8 @@ export type InvoiceOrigin = {
 
 export type TaxRateChoice = { id: string; name: string; rate: string; inclusive: boolean }
 
+export type InvoiceDateComponent = 'none' | 'year' | 'short_year' | 'year_month' | 'short_year_month' | 'month_year' | 'month_short_year' | 'year_month_code' | 'short_year_month_code'
+
 export type InvoiceIssueSettings = {
   configured: boolean
   issue_ready: boolean
@@ -68,7 +70,11 @@ export type InvoiceIssueSettings = {
   default_currency: string
   payment_terms_days: number
   invoice_prefix: string
-  yearly_reset: boolean
+  invoice_date_component: InvoiceDateComponent
+  invoice_separator: '-' | '/' | '.' | ''
+  invoice_sequence_digits: number
+  invoice_reset_period: 'never' | 'yearly' | 'monthly'
+  country_choices: Array<{ value: string; label: string }>
 }
 
 export interface InvoiceClient {
@@ -80,12 +86,19 @@ export interface InvoiceClient {
   addLine(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
   updateLine(workspace: WorkspaceContext, invoiceId: string, lineId: string, values: object): Promise<InvoiceDraft>
   removeLine(workspace: WorkspaceContext, invoiceId: string, lineId: string): Promise<InvoiceDraft>
-  issueSettings(workspace: WorkspaceContext, signal?: AbortSignal): Promise<InvoiceIssueSettings>
-  saveIssueSettings(workspace: WorkspaceContext, values: object): Promise<InvoiceIssueSettings>
+  issueSettings(signal?: AbortSignal): Promise<InvoiceIssueSettings>
+  saveIssueSettings(values: object): Promise<InvoiceIssueSettings>
   issue(workspace: WorkspaceContext, invoiceId: string): Promise<InvoiceDraft>
   deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
   pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
   csvUrl(workspace: WorkspaceContext, invoiceId: string): string
+}
+
+export class InvoiceRequestError extends Error {
+  constructor(message: string, readonly status?: number, readonly code?: string) {
+    super(message)
+    this.name = 'InvoiceRequestError'
+  }
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -106,7 +119,12 @@ function errorText(value: unknown): string | undefined {
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as Record<string, unknown>
-    throw new Error(errorText(body) || 'The invoice request failed.')
+    const envelope = body.error && typeof body.error === 'object' ? body.error as Record<string, unknown> : undefined
+    throw new InvoiceRequestError(
+      errorText(envelope?.detail) || errorText(body) || 'The invoice request failed.',
+      response.status,
+      typeof envelope?.code === 'string' ? envelope.code : undefined,
+    )
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
@@ -135,8 +153,8 @@ export const browserInvoiceClient: InvoiceClient = {
   addLine: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines`, 'POST', values),
   updateLine: (workspace, invoiceId, lineId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines/${encodeURIComponent(lineId)}`, 'PATCH', values),
   removeLine: (workspace, invoiceId, lineId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/lines/${encodeURIComponent(lineId)}`, 'DELETE'),
-  issueSettings: (workspace, signal) => read(`${basePath(workspace)}/issue-settings`, signal),
-  saveIssueSettings: (workspace, values) => mutate(`${basePath(workspace)}/issue-settings`, 'PUT', values),
+  issueSettings: (signal) => read('/api/v1/workspaces/msp/invoice-settings', signal),
+  saveIssueSettings: (values) => mutate('/api/v1/workspaces/msp/invoice-settings', 'PUT', values),
   issue: (workspace, invoiceId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/issue`, 'POST'),
   deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
   pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,

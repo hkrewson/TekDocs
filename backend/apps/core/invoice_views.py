@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .countries import COUNTRY_CHOICES
 from .invoicing import (
     InvoiceError,
     configure_issue_settings,
@@ -47,6 +48,11 @@ from .models import (
 )
 from .money import render_amount
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
+
+
+class RecentAuthenticationRequired(PermissionDenied):
+    default_detail = "Recent password or MFA reauthentication is required."
+    default_code = "recent_authentication_required"
 
 
 class StrictSerializer(serializers.Serializer):
@@ -211,18 +217,48 @@ class InvoiceIssueSettingsSerializer(StrictSerializer):
     city = serializers.CharField(max_length=120)
     region = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
     postal_code = serializers.CharField(max_length=32)
-    country_code = serializers.CharField(max_length=2)
+    country_code = serializers.ChoiceField(choices=COUNTRY_CHOICES)
     billing_email = serializers.EmailField(max_length=254)
     phone = serializers.CharField(max_length=64, allow_blank=True, required=False, default="")
     tax_registration = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
     default_currency = serializers.CharField(max_length=3)
     payment_terms_days = serializers.IntegerField(min_value=0, max_value=365)
-    invoice_prefix = serializers.CharField(max_length=16)
-    yearly_reset = serializers.BooleanField(default=False)
+    invoice_prefix = serializers.RegexField(r"^[A-Z0-9-]{1,16}$")
+    invoice_date_component = serializers.ChoiceField(
+        choices=(
+            "none", "year", "short_year", "year_month", "short_year_month", "month_year",
+            "month_short_year", "year_month_code", "short_year_month_code",
+        )
+    )
+    invoice_separator = serializers.ChoiceField(choices=("-", "/", ".", ""), allow_blank=True)
+    invoice_sequence_digits = serializers.IntegerField(min_value=1, max_value=12)
+    invoice_reset_period = serializers.ChoiceField(choices=("never", "yearly", "monthly"))
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        date_component = attrs["invoice_date_component"]
+        reset_period = attrs["invoice_reset_period"]
+        if reset_period == "yearly" and date_component == "none":
+            raise serializers.ValidationError(
+                {"invoice_date_component": "Include a year when numbering restarts each year."}
+            )
+        monthly_components = {
+            "year_month", "short_year_month", "month_year", "month_short_year",
+            "year_month_code", "short_year_month_code",
+        }
+        if reset_period == "monthly" and date_component not in monthly_components:
+            raise serializers.ValidationError(
+                {"invoice_date_component": "Include a year and month when numbering restarts each month."}
+            )
+        return attrs
 
 
 class InvoiceDeliverySerializer(StrictSerializer):
     recipient = serializers.EmailField(max_length=254)
+
+
+class InvoiceCountryChoiceSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
 
 
 class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
@@ -241,7 +277,11 @@ class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
     default_currency = serializers.CharField()
     payment_terms_days = serializers.IntegerField()
     invoice_prefix = serializers.CharField()
-    yearly_reset = serializers.BooleanField()
+    invoice_date_component = serializers.CharField()
+    invoice_separator = serializers.CharField(allow_blank=True)
+    invoice_sequence_digits = serializers.IntegerField()
+    invoice_reset_period = serializers.CharField()
+    country_choices = InvoiceCountryChoiceSerializer(many=True)
 
 
 class OriginChoiceSerializer(serializers.Serializer):
@@ -304,7 +344,7 @@ def _require_recent_session(request) -> None:  # type: ignore[no-untyped-def]
     if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
         raise PermissionDenied("API tokens cannot issue or deliver invoices or configure invoice issuance.")
     if not did_recently_authenticate(request._request):
-        raise PermissionDenied("Recent password or MFA reauthentication is required.")
+        raise RecentAuthenticationRequired()
 
 
 def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-untyped-def]
@@ -314,7 +354,14 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
     except TenantBillingProfile.DoesNotExist:
         profile = TenantBillingProfile(tenant=tenant)
         configured = False
-    series = InvoiceNumberSeries.objects.filter(tenant=tenant, prefix=profile.invoice_prefix).first()
+    series = InvoiceNumberSeries.objects.filter(
+        tenant=tenant,
+        prefix=profile.invoice_prefix,
+        date_component=profile.invoice_date_component,
+        separator=profile.invoice_separator,
+        sequence_digits=profile.invoice_sequence_digits,
+        reset_period=profile.invoice_reset_period,
+    ).first()
     return {
         "configured": configured and series is not None,
         "issue_ready": configured and series is not None and profile.is_issue_ready,
@@ -331,7 +378,11 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         "default_currency": profile.default_currency,
         "payment_terms_days": profile.payment_terms_days,
         "invoice_prefix": profile.invoice_prefix,
-        "yearly_reset": series.yearly_reset if series is not None else False,
+        "invoice_date_component": profile.invoice_date_component,
+        "invoice_separator": profile.invoice_separator,
+        "invoice_sequence_digits": profile.invoice_sequence_digits,
+        "invoice_reset_period": profile.invoice_reset_period,
+        "country_choices": [{"value": code, "label": name} for code, name in COUNTRY_CHOICES],
     }
 
 
@@ -373,30 +424,28 @@ class InvoiceListCreateView(APIView):
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
 
-class InvoiceIssueSettingsView(APIView):
+class MSPInvoiceSettingsView(APIView):
     @extend_schema(responses={200: InvoiceIssueSettingsResultSerializer})
-    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
-        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(workspace.member.tenant)).data)
+    def get(self, request):  # type: ignore[no-untyped-def]
+        member = require_permission(request.user, PermissionKey.INVOICES_ISSUE)
+        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(member.tenant)).data)
 
     @extend_schema(request=InvoiceIssueSettingsSerializer, responses={200: InvoiceIssueSettingsResultSerializer})
-    def put(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+    def put(self, request):  # type: ignore[no-untyped-def]
+        member = require_permission(request.user, PermissionKey.INVOICES_ISSUE)
         _require_recent_session(request)
         serializer = InvoiceIssueSettingsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = dict(serializer.validated_data)
-        yearly_reset = bool(values.pop("yearly_reset"))
         try:
             configure_issue_settings(
-                tenant=workspace.member.tenant,
+                tenant=member.tenant,
                 actor_id=request.user.pk,
                 values=values,
-                yearly_reset=yearly_reset,
             )
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
-        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(workspace.member.tenant)).data)
+        return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(member.tenant)).data)
 
 
 class InvoiceIssueView(APIView):

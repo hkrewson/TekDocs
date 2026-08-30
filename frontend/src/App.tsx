@@ -100,6 +100,7 @@ const Sites = lazy(async () => ({ default: (await import('./sites/Sites')).Sites
 const Licenses = lazy(async () => ({ default: (await import('./inventory/Licenses')).Licenses }))
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Invoices = lazy(async () => ({ default: (await import('./accounting/Invoices')).Invoices }))
+const InvoiceSettings = lazy(async () => ({ default: (await import('./accounting/InvoiceSettings')).InvoiceSettings }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
 const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
@@ -194,7 +195,7 @@ function NavSection({ items, label, collapsed, onNavigate, workspace }: { items:
   )
 }
 
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
@@ -205,13 +206,14 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   workspaceClient: WorkspaceClient
   workspaceLoading: boolean
   organizationRoute: boolean
+  canManageInvoiceSettings: boolean
 }) {
   const availableSections = navigationSections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => workspace
         ? workspace.capabilities.includes(item.area)
-        : item.area !== 'accounting'),
+        : item.area !== 'accounting' || canManageInvoiceSettings),
     }))
     .filter((section) => section.items.length > 0)
   return (
@@ -535,7 +537,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">{translate('shell.skip')}</a>
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
@@ -571,8 +573,9 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/deadlines" element={<Reminders workspace={null} relationshipsClient={relationshipsClient} />} />
             <Route path="/activity" element={<ActivityLog workspace={null} />} />
             <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">Loading supplier catalogs…</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
+            <Route path="/accounting" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">Loading invoice settings…</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">Loading search…</section>}><SearchResults key={location.search} workspace={null} client={relationshipsClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/files', '/assets', '/licenses', '/services', '/vendors', '/products', '/networks', '/integrations', '/compliance', '/domains', '/certificates'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
+            {Object.keys(plannedAreas).filter((path) => !['/files', '/assets', '/licenses', '/services', '/vendors', '/products', '/networks', '/integrations', '/compliance', '/domains', '/certificates', '/accounting'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />

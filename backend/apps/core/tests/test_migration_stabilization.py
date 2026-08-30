@@ -243,6 +243,8 @@ def test_invoice_issue_upgrades_an_exact_prior_draft_without_allocating_a_number
     assert upgraded.number == ""
     assert upgraded.number_series_id is None
     assert upgraded.subtotal_amount is None
+    assert upgraded.delivered_at is None
+    assert upgraded.delivery_count == 0
     assert InvoiceLine.objects.get(pk=line.id).description == "Preserved draft line"
     with connection.cursor() as cursor:
         cursor.execute(

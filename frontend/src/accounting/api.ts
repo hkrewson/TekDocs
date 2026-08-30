@@ -36,6 +36,8 @@ export type InvoiceDraft = {
   content_digest?: string
   signature_algorithm?: string
   key_fingerprint?: string
+  delivered_at?: string | null
+  delivery_count?: number
 }
 
 export type InvoiceOrigin = {
@@ -81,6 +83,9 @@ export interface InvoiceClient {
   issueSettings(workspace: WorkspaceContext, signal?: AbortSignal): Promise<InvoiceIssueSettings>
   saveIssueSettings(workspace: WorkspaceContext, values: object): Promise<InvoiceIssueSettings>
   issue(workspace: WorkspaceContext, invoiceId: string): Promise<InvoiceDraft>
+  deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
+  pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
+  csvUrl(workspace: WorkspaceContext, invoiceId: string): string
 }
 
 function basePath(workspace: WorkspaceContext) {
@@ -133,4 +138,7 @@ export const browserInvoiceClient: InvoiceClient = {
   issueSettings: (workspace, signal) => read(`${basePath(workspace)}/issue-settings`, signal),
   saveIssueSettings: (workspace, values) => mutate(`${basePath(workspace)}/issue-settings`, 'PUT', values),
   issue: (workspace, invoiceId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/issue`, 'POST'),
+  deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
+  pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,
+  csvUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/csv`,
 }

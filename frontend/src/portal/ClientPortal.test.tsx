@@ -20,6 +20,7 @@ describe('ClientPortal', () => {
   it('lists and opens only explicitly client-visible STATIC documentation accessibly', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [{ id: 'pub-1', title: 'Access guide', category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: 'abc', source_kind: 'organization_document', visibility: 'client_visible', artifacts: [] }] }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ id: 'pub-1', title: 'Access guide', category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: 'abc', source_kind: 'organization_document', visibility: 'client_visible', artifacts: [], sanitized_html: '<h1>Safe guide</h1><script>alert(1)</script>' }), { status: 200 }))
     })
@@ -40,15 +41,36 @@ describe('ClientPortal', () => {
 
   it('appends a bounded older page without replacing the current document list', async () => {
     const document = (id: string, title: string) => ({ id, title, category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: id, source_kind: 'organization_document', visibility: 'client_visible', artifacts: [] })
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify({ count: 1, has_more: true, next_cursor: 'signed-cursor', results: [document('pub-1', 'Current guide')] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [document('pub-2', 'Older guide')] }), { status: 200 }))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
+      if (url.includes('cursor=')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [document('pub-2', 'Older guide')] }), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: true, next_cursor: 'signed-cursor', results: [document('pub-1', 'Current guide')] }), { status: 200 }))
+    })
     const user = userEvent.setup()
     render(<ClientPortal context={context} onSignOut={vi.fn()} signingOut={false} signOutError={null} />)
 
     await user.click(await screen.findByRole('button', { name: 'Load more documents' }))
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/portal/documents?cursor=signed-cursor')
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/portal/documents?cursor=signed-cursor', expect.anything())
     expect(screen.getByRole('button', { name: /current guide/i })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /older guide/i })).toBeInTheDocument()
+  })
+
+  it('lists own issued invoices and opens matching PDF and CSV downloads', async () => {
+    const invoice = { id: 'invoice-1', state: 'issued', number: 'INV-000001', currency: 'USD', invoice_date: '2026-08-29', due_date: '2026-09-28', reference: 'PO-1', notes: '', subtotal: '25.00', tax_total: '0.00', total: '25.00', lines: [{ id: 'line-1', position: 1, description: 'Managed service', quantity: '1.000', unit_amount: '25.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '25.00', tax: '0.00', total: '25.00', origin_type: '', origin_id: null }], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z', issued_at: '2026-08-29T12:00:00Z' }
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 1, results: [invoice] }), { status: 200 }))
+      if (url.endsWith('/api/v1/portal/invoices/invoice-1')) return Promise.resolve(new Response(JSON.stringify(invoice), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
+    })
+    const user = userEvent.setup()
+    render(<ClientPortal context={context} onSignOut={vi.fn()} signingOut={false} signOutError={null} />)
+
+    await user.click(await screen.findByRole('button', { name: /INV-000001/i }))
+    expect(await screen.findByRole('heading', { name: 'INV-000001' })).toBeInTheDocument()
+    expect(screen.getByText('Managed service')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/v1/portal/invoices/invoice-1/pdf')
+    expect(screen.getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/api/v1/portal/invoices/invoice-1/csv')
   })
 })

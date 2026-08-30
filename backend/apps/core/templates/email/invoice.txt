@@ -1,0 +1,5 @@
+Invoice {{ invoice_number }}
+
+{{ issuer_name }} has issued invoice {{ invoice_number }} for {{ currency }} {{ total }}, due {{ due_date }}.
+
+The signed PDF and matching CSV export are attached.

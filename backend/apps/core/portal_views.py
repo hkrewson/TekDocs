@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from uuid import UUID
 
 from django.core import signing
@@ -14,12 +15,15 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import require_client_portal_member
 
+from .invoice_views import InvoiceSerializer, _invoice_download_response
 from .models import (
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
     Entity,
     EntityVisibility,
+    Invoice,
+    InvoiceState,
     PublicationAudience,
     PublicationControlAction,
 )
@@ -30,6 +34,133 @@ from .serializers import PortalDocumentDetailSerializer, PortalDocumentResultSer
 
 PORTAL_DOCUMENT_PAGE_SIZE = 50
 PORTAL_DOCUMENT_SCAN_LIMIT = 100
+
+
+class PortalInvoiceResultSerializer(serializers.Serializer):
+    results = InvoiceSerializer(many=True)
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    next_cursor = serializers.CharField(allow_null=True)
+
+
+def _decode_portal_invoice_cursor(value: str | None, *, member):  # type: ignore[no-untyped-def]
+    if value is None:
+        return None
+    if len(value) > 1024:
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."})
+    try:
+        payload = signing.loads(value, salt="tekdocs.portal-invoices.v1", max_age=60 * 60 * 24 * 30)
+        if not isinstance(payload, dict) or payload.get("scope") != [
+            str(member.tenant.id),
+            str(member.user.id),
+            str(member.organization.id),
+        ]:
+            raise BadSignature
+        return (
+            date.fromisoformat(str(payload["invoice_date"])),
+            datetime.fromisoformat(str(payload["created_at"])),
+            UUID(str(payload["id"])),
+        )
+    except (BadSignature, KeyError, TypeError, ValueError):
+        raise serializers.ValidationError({"cursor": "Cursor is invalid."}) from None
+
+
+def _portal_invoice_cursor(invoice: Invoice, *, member) -> str:  # type: ignore[no-untyped-def]
+    return signing.dumps(
+        {
+            "scope": [str(member.tenant.id), str(member.user.id), str(member.organization.id)],
+            "invoice_date": invoice.invoice_date.isoformat(),
+            "created_at": invoice.created_at.isoformat(),
+            "id": str(invoice.id),
+        },
+        salt="tekdocs.portal-invoices.v1",
+        compress=True,
+    )
+
+
+def _portal_invoices(request) -> QuerySet[Invoice]:  # type: ignore[no-untyped-def]
+    member = require_client_portal_member(request.user)
+    organization = member.organization
+    if organization is None:
+        raise PermissionDenied("Client portal membership is required.")
+    bind_local_rls_scope(
+        DataScope.organization(member.tenant, organization),
+        organization_mode=OrganizationRLSMode.ORGANIZATION,
+    )
+    return (
+        Invoice.objects.filter(
+            tenant=member.tenant,
+            organization=organization,
+            state=InvoiceState.ISSUED,
+        )
+        .select_related("entity", "organization", "artifact")
+        .prefetch_related("lines")
+        .order_by("-invoice_date", "-created_at", "id")
+    )
+
+
+def _portal_invoice(request, invoice_entity_id: UUID) -> Invoice:  # type: ignore[no-untyped-def]
+    return get_object_or_404(_portal_invoices(request), entity_id=invoice_entity_id)
+
+
+class ClientPortalInvoiceListView(APIView):
+    @extend_schema(
+        operation_id="client_portal_invoices_list",
+        parameters=[OpenApiParameter("cursor", str, required=False)],
+        responses={200: PortalInvoiceResultSerializer},
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        member = require_client_portal_member(request.user)
+        after = _decode_portal_invoice_cursor(request.query_params.get("cursor"), member=member)
+        queryset = _portal_invoices(request)
+        if after is not None:
+            invoice_date, created_at, invoice_id = after
+            queryset = queryset.filter(
+                Q(invoice_date__lt=invoice_date)
+                | Q(invoice_date=invoice_date, created_at__lt=created_at)
+                | Q(invoice_date=invoice_date, created_at=created_at, id__gt=invoice_id)
+            )
+        scanned = list(queryset[:51])
+        records = scanned[:50]
+        has_more = len(scanned) > 50
+        response = Response(
+            PortalInvoiceResultSerializer(
+                {
+                    "results": records,
+                    "count": len(records),
+                    "has_more": has_more,
+                    "next_cursor": _portal_invoice_cursor(records[-1], member=member) if has_more else None,
+                }
+            ).data
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class ClientPortalInvoiceDetailView(APIView):
+    @extend_schema(operation_id="client_portal_invoices_retrieve", responses={200: InvoiceSerializer})
+    def get(self, request, invoice_entity_id):  # type: ignore[no-untyped-def]
+        response = Response(InvoiceSerializer(_portal_invoice(request, invoice_entity_id)).data)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class ClientPortalInvoicePDFDownloadView(APIView):
+    @extend_schema(
+        operation_id="client_portal_invoice_pdf_download",
+        responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, invoice_entity_id):  # type: ignore[no-untyped-def]
+        return _invoice_download_response(_portal_invoice(request, invoice_entity_id), "pdf")
+
+
+class ClientPortalInvoiceCSVDownloadView(APIView):
+    @extend_schema(
+        operation_id="client_portal_invoice_csv_download",
+        responses={(200, "text/csv"): bytes, 409: OpenApiResponse(description="Export conflict")},
+    )
+    def get(self, request, invoice_entity_id):  # type: ignore[no-untyped-def]
+        return _invoice_download_response(_portal_invoice(request, invoice_entity_id), "csv")
 
 
 def _portal_publications(request) -> QuerySet[DocumentPublication]:  # type: ignore[no-untyped-def]

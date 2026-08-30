@@ -66,6 +66,9 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     issueSettings: vi.fn().mockResolvedValue(settings),
     saveIssueSettings: vi.fn().mockResolvedValue(settings),
     issue: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) }),
+    deliver: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }),
+    pdfUrl: vi.fn().mockReturnValue('/invoice.pdf'),
+    csvUrl: vi.fn().mockReturnValue('/invoice.csv'),
     ...overrides,
   }
 }
@@ -137,9 +140,28 @@ describe('Invoices', () => {
     ))
   })
 
+  it('downloads and emails an issued invoice with PDF and CSV parity', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
+    const delivered = { ...issued, delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }
+    const deliver = vi.fn().mockResolvedValue(delivered)
+    render(<Invoices workspace={workspace} client={invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], can_manage: true, can_issue: true }),
+      deliver,
+    })} />)
+
+    expect(await screen.findByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/invoice.pdf')
+    expect(screen.getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/invoice.csv')
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }))
+    fireEvent.change(screen.getByLabelText('Recipient email'), { target: { value: 'accounts@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invoice' }))
+
+    await waitFor(() => expect(deliver).toHaveBeenCalledWith(workspace, 'invoice-1', 'accounts@example.invalid'))
+    expect(await screen.findByText(/Delivery count 1/)).toBeInTheDocument()
+  })
+
   it('shows a bounded error state when the workspace request fails', async () => {
     const client = invoiceClient({ list: vi.fn().mockRejectedValue(new Error('Denied')) })
     render(<Invoices workspace={workspace} client={client} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invoice drafts could not be loaded.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invoices could not be loaded.')
   })
 })

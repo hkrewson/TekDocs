@@ -274,6 +274,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-invoice-issue-settings": ("organization_entity_id",),
         "organization-invoice-detail": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-issue": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-pdf": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-csv": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-deliver": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-line-list-create": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-line-detail": ("organization_entity_id", "invoice_entity_id", "line_id"),
         "organization-client-asset-list-create": ("organization_entity_id",),
@@ -514,6 +517,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-recycle-bin": ("organization_entity_id",),
         "organization-activity-list": ("organization_entity_id",),
         "notification-delivery-retry": ("delivery_id",),
+        "client-portal-invoice-detail": ("invoice_entity_id",),
+        "client-portal-invoice-pdf": ("invoice_entity_id",),
+        "client-portal-invoice-csv": ("invoice_entity_id",),
     }
     if route_name in {"msp-recycle-bin-restore", "organization-recycle-bin-restore"}:
         kwargs = {"record_type": "site", "record_id": value}

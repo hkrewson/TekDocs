@@ -183,7 +183,7 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.NETWORKS_VIEW, "View networks", "Networks"),
     _permission(PermissionKey.NETWORKS_EDIT, "Edit networks", "Networks", mfa=True),
     _permission(PermissionKey.COSTS_VIEW, "View costs", "Sensitive data"),
-    _permission(PermissionKey.INVOICES_VIEW, "View invoice drafts", "Accounting"),
+    _permission(PermissionKey.INVOICES_VIEW, "View invoices", "Accounting"),
     _permission(PermissionKey.INVOICES_EDIT, "Edit invoice drafts", "Accounting", mfa=True),
     _permission(PermissionKey.INVOICES_ISSUE, "Issue invoices", "Accounting", mfa=True),
     _permission(PermissionKey.CREDENTIAL_REFERENCES_VIEW, "View credential references", "Credential references"),

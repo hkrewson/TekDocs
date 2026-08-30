@@ -34,7 +34,7 @@ const topics: Record<string, HelpTopic> = {
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
   tickets: { title: 'Tickets', summary: 'Understand the planned service-request boundary for a future release.', slug: 'Product-boundaries' },
-  accounting: { title: 'Invoice drafts', summary: 'Create unnumbered invoice drafts with fixed line descriptions, prices, currencies, and tax values.', slug: 'Invoice-drafts' },
+  accounting: { title: 'Invoices', summary: 'Create drafts, issue signed invoices, and deliver matching PDF and CSV copies to a client.', slug: 'Invoice-drafts' },
 }
 
 export function helpTopicForPath(pathname: string): HelpTopic {

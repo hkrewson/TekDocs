@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.45
+  version: 0.8.46
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -5222,6 +5222,142 @@ paths:
         '200':
           content:
             application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/portal/invoices:
+    get:
+      operationId: client_portal_invoices_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalInvoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/portal/invoices/{invoice_entity_id}:
+    get:
+      operationId: client_portal_invoices_retrieve
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/portal/invoices/{invoice_entity_id}/csv:
+    get:
+      operationId: client_portal_invoice_csv_download
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Export conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/portal/invoices/{invoice_entity_id}/pdf:
+    get:
+      operationId: client_portal_invoice_pdf_download
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
               schema:
                 type: string
                 format: binary
@@ -19021,6 +19157,99 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/csv:
+    get:
+      operationId: workspaces_organizations_invoices_csv_retrieve
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Export conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/deliver:
+    post:
+      operationId: workspaces_organizations_invoices_deliver_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceDelivery'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceDelivery'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceDelivery'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/issue:
     post:
       operationId: workspaces_organizations_invoices_issue_create
@@ -19190,6 +19419,53 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/pdf:
+    get:
+      operationId: workspaces_organizations_invoices_pdf_retrieve
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/issue-settings:
     get:
       operationId: workspaces_organizations_invoices_issue_settings_retrieve
@@ -30148,10 +30424,18 @@ components:
           type: string
         key_fingerprint:
           type: string
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivery_count:
+          type: integer
       required:
       - content_digest
       - created_at
       - currency
+      - delivered_at
+      - delivery_count
       - due_date
       - id
       - invoice_date
@@ -30167,6 +30451,15 @@ components:
       - tax_total
       - total
       - updated_at
+    InvoiceDelivery:
+      type: object
+      properties:
+        recipient:
+          type: string
+          format: email
+          maxLength: 254
+      required:
+      - recipient
     InvoiceIssueSettings:
       type: object
       properties:
@@ -34047,6 +34340,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PortalDocument'
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - count
+      - has_more
+      - next_cursor
+      - results
+    PortalInvoiceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
         count:
           type: integer
         has_more:

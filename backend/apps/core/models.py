@@ -278,6 +278,16 @@ class Invoice(TimestampedModel):
         blank=True,
     )
     issued_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    delivered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="delivered_invoices",
+        null=True,
+        blank=True,
+    )
+    delivery_recipient = models.EmailField(blank=True)
+    delivery_count = models.PositiveIntegerField(default=0)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -333,6 +343,24 @@ class Invoice(TimestampedModel):
                     | models.Q(total_amount=models.F("subtotal_amount") + models.F("tax_amount"))
                 ),
                 name="invoice_stored_totals_reconcile",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery_count=0,
+                        delivered_at__isnull=True,
+                        delivered_by__isnull=True,
+                        delivery_recipient="",
+                    )
+                    | models.Q(
+                        state=InvoiceState.ISSUED,
+                        delivery_count__gte=1,
+                        delivered_at__isnull=False,
+                        delivered_by__isnull=False,
+                        delivery_recipient__gt="",
+                    )
+                ),
+                name="invoice_delivery_fields_consistent",
             ),
             models.UniqueConstraint(
                 fields=("tenant", "number"),

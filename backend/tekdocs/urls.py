@@ -251,6 +251,8 @@ from apps.core.inventory_views import (
     ClientVendorListView,
 )
 from apps.core.invoice_views import (
+    InvoiceCSVDownloadView,
+    InvoiceDeliveryView,
     InvoiceDetailView,
     InvoiceIssueSettingsView,
     InvoiceIssueView,
@@ -258,6 +260,7 @@ from apps.core.invoice_views import (
     InvoiceLineListCreateView,
     InvoiceListCreateView,
     InvoiceOriginChoiceView,
+    InvoicePDFDownloadView,
     ServiceRateDetailView,
     ServiceRateListCreateView,
 )
@@ -328,6 +331,10 @@ from apps.core.portal_views import (
     ClientPortalDocumentArtifactDownloadView,
     ClientPortalDocumentDetailView,
     ClientPortalDocumentListView,
+    ClientPortalInvoiceCSVDownloadView,
+    ClientPortalInvoiceDetailView,
+    ClientPortalInvoiceListView,
+    ClientPortalInvoicePDFDownloadView,
 )
 from apps.core.recycle_views import (
     MSPRecycleBinListView,
@@ -430,6 +437,22 @@ urlpatterns = [
         "api/v1/portal/documents/<uuid:publication_entity_id>/artifacts/<uuid:artifact_entity_id>/download",
         ClientPortalDocumentArtifactDownloadView.as_view(),
         name="client-portal-document-artifact-download",
+    ),
+    path("api/v1/portal/invoices", ClientPortalInvoiceListView.as_view(), name="client-portal-invoice-list"),
+    path(
+        "api/v1/portal/invoices/<uuid:invoice_entity_id>",
+        ClientPortalInvoiceDetailView.as_view(),
+        name="client-portal-invoice-detail",
+    ),
+    path(
+        "api/v1/portal/invoices/<uuid:invoice_entity_id>/pdf",
+        ClientPortalInvoicePDFDownloadView.as_view(),
+        name="client-portal-invoice-pdf",
+    ),
+    path(
+        "api/v1/portal/invoices/<uuid:invoice_entity_id>/csv",
+        ClientPortalInvoiceCSVDownloadView.as_view(),
+        name="client-portal-invoice-csv",
     ),
     path("api/v1/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/v1/auth/api-tokens", APITokenListCreateView.as_view(), name="api-token-list-create"),
@@ -1364,6 +1387,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/issue",
         InvoiceIssueView.as_view(),
         name="organization-invoice-issue",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/pdf",
+        InvoicePDFDownloadView.as_view(),
+        name="organization-invoice-pdf",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/csv",
+        InvoiceCSVDownloadView.as_view(),
+        name="organization-invoice-csv",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/deliver",
+        InvoiceDeliveryView.as_view(),
+        name="organization-invoice-deliver",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/lines",

@@ -400,7 +400,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
   deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
   activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },
-  accounting: { title: 'Accounting', description: 'Draft and issue immutable signed invoices for this client organization.', release: '0.8.45' },
+  accounting: { title: 'Accounting', description: 'Draft, issue, deliver, and download immutable signed invoices for this client organization.', release: '0.8.46' },
 }
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
@@ -426,7 +426,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'deadlines') return <Reminders workspace={state.workspace} relationshipsClient={relationshipsClient} />
   if (area === 'activity') return <ActivityLog workspace={state.workspace} />
-  if (area === 'accounting') return <Suspense fallback={<section className="content-section" role="status">Loading invoice drafts…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
+  if (area === 'accounting') return <Suspense fallback={<section className="content-section" role="status">Loading invoices…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
   if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />

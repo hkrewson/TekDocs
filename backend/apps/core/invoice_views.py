@@ -6,8 +6,10 @@ from allauth.account.internal.flows.reauthentication import did_recently_authent
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.http import content_disposition_header
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -23,7 +25,10 @@ from .invoicing import (
     create_line,
     delete_invoice,
     delete_line,
+    deliver_invoice,
     invoice_amounts,
+    invoice_csv_bytes,
+    invoice_pdf_bytes,
     invoices_for_scope,
     issue_invoice,
     line_amounts,
@@ -159,11 +164,21 @@ class InvoiceSerializer(serializers.Serializer):
     content_digest = serializers.CharField(allow_blank=True)
     signature_algorithm = serializers.CharField(allow_blank=True)
     key_fingerprint = serializers.CharField(allow_blank=True)
+    delivered_at = serializers.DateTimeField(allow_null=True)
+    delivery_count = serializers.IntegerField()
 
     def to_representation(self, instance):  # type: ignore[no-untyped-def]
         rendered = super().to_representation(instance)
         if instance.state == "draft":
-            for field in ("number", "issued_at", "content_digest", "signature_algorithm", "key_fingerprint"):
+            for field in (
+                "number",
+                "issued_at",
+                "content_digest",
+                "signature_algorithm",
+                "key_fingerprint",
+                "delivered_at",
+                "delivery_count",
+            ):
                 rendered.pop(field, None)
         return rendered
 
@@ -204,6 +219,10 @@ class InvoiceIssueSettingsSerializer(StrictSerializer):
     payment_terms_days = serializers.IntegerField(min_value=0, max_value=365)
     invoice_prefix = serializers.CharField(max_length=16)
     yearly_reset = serializers.BooleanField(default=False)
+
+
+class InvoiceDeliverySerializer(StrictSerializer):
+    recipient = serializers.EmailField(max_length=254)
 
 
 class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
@@ -283,7 +302,7 @@ def _tax_rate(workspace: ResolvedWorkspace, value: UUID | None) -> TaxRate | Non
 
 def _require_recent_session(request) -> None:  # type: ignore[no-untyped-def]
     if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
-        raise PermissionDenied("API tokens cannot issue invoices or configure invoice issuance.")
+        raise PermissionDenied("API tokens cannot issue or deliver invoices or configure invoice issuance.")
     if not did_recently_authenticate(request._request):
         raise PermissionDenied("Recent password or MFA reauthentication is required.")
 
@@ -390,6 +409,59 @@ class InvoiceIssueView(APIView):
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
+
+
+def _invoice_download_response(invoice: Invoice, export_format: str) -> HttpResponse:
+    try:
+        if export_format == "pdf":
+            content = invoice_pdf_bytes(invoice)
+            media_type = "application/pdf"
+        else:
+            content = invoice_csv_bytes(invoice)
+            media_type = "text/csv; charset=utf-8"
+    except InvoiceError as exc:
+        return HttpResponse(str(exc), status=409, content_type="text/plain; charset=utf-8")
+    response = HttpResponse(content, content_type=media_type)
+    disposition = content_disposition_header(True, f"{invoice.number}.{export_format}")
+    if disposition is not None:
+        response["Content-Disposition"] = disposition
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+class InvoicePDFDownloadView(APIView):
+    @extend_schema(
+        responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")}
+    )
+    def get(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VIEW)
+        return _invoice_download_response(_invoice(workspace, invoice_entity_id), "pdf")
+
+
+class InvoiceCSVDownloadView(APIView):
+    @extend_schema(responses={(200, "text/csv"): bytes, 409: OpenApiResponse(description="Export conflict")})
+    def get(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VIEW)
+        return _invoice_download_response(_invoice(workspace, invoice_entity_id), "csv")
+
+
+class InvoiceDeliveryView(APIView):
+    @extend_schema(request=InvoiceDeliverySerializer, responses={200: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+        _require_recent_session(request)
+        serializer = InvoiceDeliverySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = deliver_invoice(
+                invoice=_invoice(workspace, invoice_entity_id),
+                recipient=serializer.validated_data["recipient"],
+                actor_id=request.user.pk,
+            )
+        except (InvoiceError, DjangoValidationError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(record).data)
 
 
 class InvoiceDetailView(APIView):

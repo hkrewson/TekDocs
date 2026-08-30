@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileCheck2, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
+import { Download, FileCheck2, Mail, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -73,12 +73,13 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
   const [canIssue, setCanIssue] = useState(false)
   const [issueSettings, setIssueSettings] = useState<InvoiceIssueSettings | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'issue-settings'>('none')
+  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'issue-settings' | 'delivery'>('none')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
   const [line, setLine] = useState<LineForm>(emptyLine)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deliveryRecipient, setDeliveryRecipient] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -165,6 +166,12 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     } finally { setBusy(false) }
   }
 
+  async function deliverSelected(event: FormEvent) {
+    event.preventDefault()
+    if (!selected) return
+    await perform(() => client.deliver(workspace, selected.id, deliveryRecipient))
+  }
+
   return <>
     <header className="page-header">
       <div><h1>{translate('accounting.heading')}</h1></div>
@@ -192,6 +199,12 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
           {selected.notes && <p>{selected.notes}</p>}
           {selected.state === 'draft' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => { void removeDraft() }}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button></>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => { void issueSelected() }}><FileCheck2 size={15} />{translate('accounting.issue')}</button>}</div>}
           {selected.state === 'issued' && selected.issued_at && <p className="workspace-area-note">{translate('accounting.issuedProof', { date: formatPlainDate(selected.issued_at.slice(0, 10)), fingerprint: selected.key_fingerprint?.slice(0, 12) ?? '' })}</p>}
+          {selected.state === 'issued' && <div className="form-actions">
+            <a className="secondary-button" href={client.pdfUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a>
+            <a className="secondary-button" href={client.csvUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadCsv')}</a>
+            {canIssue && <button type="button" className="primary-button" disabled={busy} onClick={() => { setDeliveryRecipient(''); setEditor('delivery') }}><Mail size={15} aria-hidden="true" />{translate('accounting.deliver')}</button>}
+          </div>}
+          {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate('accounting.deliveredProof', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
           <div className="section-heading"><h3>{translate('accounting.lines')}</h3>{canManage && selected.state === 'draft' && <button type="button" className="secondary-button" onClick={() => beginLine()}><Plus size={15} />{translate('accounting.addLine')}</button>}</div>
           {selected.lines.length === 0 ? <p className="empty-state">{translate('accounting.noLines')}</p> : <ul className="inventory-list">{selected.lines.map((item) => <li key={item.id}><div><strong>{item.description}</strong><span>{item.quantity} × {item.currency} {item.unit_amount}{item.tax_rate_name ? ` · ${item.tax_rate_name}` : ''}</span></div><div><strong>{item.currency} {item.total}</strong>{canManage && selected.state === 'draft' && <div className="form-actions"><button type="button" className="text-button" aria-label={translate('accounting.editLine', { description: item.description })} onClick={() => beginLine(item)}>{translate('common.edit')}</button><button type="button" className="text-button" aria-label={translate('accounting.deleteLine', { description: item.description })} onClick={() => { void perform(() => client.removeLine(workspace, selected.id, item.id)) }}>{translate('common.remove')}</button></div>}</div></li>)}</ul>}
           <dl className="inventory-provenance">
@@ -205,6 +218,7 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected.id, draft)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
     {editor === 'issue-settings' && issueSettings && <IssueSettingsEditor initial={issueSettings} busy={busy} cancel={() => setEditor('none')} submit={(value) => { void saveIssueSettings(value) }} />}
+    {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
   </>
 }
 

@@ -20,6 +20,7 @@ class TransactionalTemplate(StrEnum):
     MFA_CHANGED = "mfa_changed"
     NOTIFICATION = "notification"
     NOTIFICATION_DIGEST = "notification_digest"
+    INVOICE = "invoice"
 
 
 def send_transactional_email(
@@ -29,6 +30,7 @@ def send_transactional_email(
     recipient: str,
     context: dict[str, Any] | None = None,
     message_id: str | None = None,
+    attachments: list[tuple[str, bytes, str]] | None = None,
 ) -> int:
     normalized_recipient = recipient.strip()
     if "\r" in normalized_recipient or "\n" in normalized_recipient:
@@ -55,7 +57,40 @@ def send_transactional_email(
         headers={"Message-ID": message_id} if message_id is not None else None,
     )
     message.attach_alternative(html_body, "text/html")
+    for filename, content, media_type in attachments or []:
+        message.attach(filename, content, media_type)
     return message.send(fail_silently=False)
+
+
+def send_invoice_email(
+    *,
+    recipient: str,
+    invoice_number: str,
+    issuer_name: str,
+    total: str,
+    currency: str,
+    due_date: str,
+    pdf: bytes,
+    csv_export: bytes,
+    message_id: str,
+) -> int:
+    return send_transactional_email(
+        template=TransactionalTemplate.INVOICE,
+        subject=f"Invoice {invoice_number} from {issuer_name}",
+        recipient=recipient,
+        context={
+            "invoice_number": invoice_number,
+            "issuer_name": issuer_name,
+            "total": total,
+            "currency": currency,
+            "due_date": due_date,
+        },
+        message_id=message_id,
+        attachments=[
+            (f"{invoice_number}.pdf", pdf, "application/pdf"),
+            (f"{invoice_number}.csv", csv_export, "text/csv"),
+        ],
+    )
 
 
 def send_notification_email(

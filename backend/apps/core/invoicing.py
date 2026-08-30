@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
+import io
 import json
 from datetime import date
 from decimal import Decimal
 from typing import cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import Max, Prefetch, QuerySet
+from django.db.models import F, Max, Prefetch, QuerySet
 from django.utils import timezone
 from django.utils.text import slugify
 
 from .document_keys import keys_in_markdown
+from .email import send_invoice_email
 from .invoice_pdf import render_invoice_pdf
 from .models import (
     AuditEvent,
@@ -45,6 +48,131 @@ class InvoiceError(ValueError):
 
 
 ISSUED_SIGNATURE_FORMAT = "tekdocs-issued-invoice/v1"
+
+
+def _issued_invoice(invoice: Invoice) -> Invoice:
+    if invoice.state != InvoiceState.ISSUED:
+        raise InvoiceError("Only issued invoices can be delivered or downloaded")
+    return invoice
+
+
+def invoice_pdf_bytes(invoice: Invoice) -> bytes:
+    issued = _issued_invoice(invoice)
+    try:
+        artifact = issued.artifact
+    except InvoiceArtifact.DoesNotExist as exc:
+        raise InvoiceError("The retained invoice PDF is unavailable") from exc
+    artifact.file.open("rb")
+    try:
+        content = cast(bytes, artifact.file.read())
+    finally:
+        artifact.file.close()
+    if len(content) != artifact.size or hashlib.sha256(content).hexdigest() != artifact.checksum:
+        raise InvoiceError("The retained invoice PDF failed its integrity check")
+    return content
+
+
+def _safe_csv_cell(value: object) -> str:
+    rendered = str(value)
+    return f"'{rendered}" if rendered.startswith(("=", "+", "-", "@")) else rendered
+
+
+def invoice_csv_bytes(invoice: Invoice) -> bytes:
+    issued = _issued_invoice(invoice)
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(
+        [
+            "invoice_number",
+            "invoice_date",
+            "due_date",
+            "reference",
+            "currency",
+            "line_position",
+            "description",
+            "quantity",
+            "unit_amount",
+            "tax_rate_name",
+            "tax_rate_value",
+            "tax_inclusive",
+            "net",
+            "tax",
+            "line_total",
+            "invoice_subtotal",
+            "invoice_tax",
+            "invoice_total",
+        ]
+    )
+    amounts = invoice_amounts(issued)
+    for line in issued.lines.all():
+        line_totals = line_amounts(line)
+        writer.writerow(
+            [
+                issued.number,
+                issued.invoice_date.isoformat(),
+                issued.due_date.isoformat(),
+                _safe_csv_cell(issued.reference),
+                issued.currency,
+                line.position,
+                _safe_csv_cell(line.description),
+                str(line.quantity),
+                render_amount(line.unit_amount, issued.currency),
+                _safe_csv_cell(line.tax_rate_name),
+                str(line.tax_rate_value),
+                "true" if line.tax_inclusive else "false",
+                render_amount(line_totals.net, issued.currency),
+                render_amount(line_totals.tax, issued.currency),
+                render_amount(line_totals.total, issued.currency),
+                render_amount(amounts.subtotal, issued.currency),
+                render_amount(amounts.tax_total, issued.currency),
+                render_amount(amounts.total, issued.currency),
+            ]
+        )
+    return output.getvalue().encode("utf-8")
+
+
+@transaction.atomic
+def deliver_invoice(*, invoice: Invoice, recipient: str, actor_id: UUID) -> Invoice:
+    locked = (
+        Invoice.objects.select_for_update()
+        .select_related("tenant")
+        .prefetch_related("lines")
+        .get(pk=invoice.pk)
+    )
+    _issued_invoice(locked)
+    pdf = invoice_pdf_bytes(locked)
+    csv_export = invoice_csv_bytes(locked)
+    issuer_name = str(locked.issuer_snapshot.get("legal_name", "")).strip()
+    if not issuer_name:
+        raise InvoiceError("The snapshotted invoice issuer is unavailable")
+    total = render_amount(invoice_amounts(locked).total, locked.currency)
+    send_invoice_email(
+        recipient=recipient,
+        invoice_number=locked.number,
+        issuer_name=issuer_name,
+        total=total,
+        currency=locked.currency,
+        due_date=locked.due_date.isoformat(),
+        pdf=pdf,
+        csv_export=csv_export,
+        message_id=f"<tekdocs-invoice-{locked.entity_id}-{uuid4()}@invoice.tekdocs.invalid>",
+    )
+    delivered_at = timezone.now()
+    Invoice.objects.filter(pk=locked.pk).update(
+        delivered_at=delivered_at,
+        delivered_by_id=actor_id,
+        delivery_recipient=recipient,
+        delivery_count=F("delivery_count") + 1,
+        updated_at=delivered_at,
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="invoice.delivered",
+        entity_id=locked.entity_id,
+        metadata={"delivery_count": locked.delivery_count + 1},
+    )
+    return invoices_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 def invoices_for_scope(scope: DataScope) -> QuerySet[Invoice]:

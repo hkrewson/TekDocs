@@ -30,6 +30,9 @@ export type PortalDocumentResult = {
   next_cursor: string | null
 }
 
+export type PortalInvoice = InvoiceDraft & { state: 'issued'; number: string; issued_at: string }
+export type PortalInvoiceResult = { results: PortalInvoice[]; count: number; has_more: boolean; next_cursor: string | null }
+
 async function decode<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(response.status === 403 ? 'Portal access was denied.' : 'Published documentation could not be loaded.')
   return response.json() as Promise<T>
@@ -46,4 +49,18 @@ export const portalClient = {
   artifactUrl(documentId: string, artifactId: string): string {
     return `/api/v1/portal/documents/${documentId}/artifacts/${artifactId}/download`
   },
+  async listInvoices(cursor?: string): Promise<PortalInvoiceResult> {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+    return decode(await fetch(`/api/v1/portal/invoices${query}`, { credentials: 'same-origin' }))
+  },
+  async getInvoice(id: string): Promise<PortalInvoice> {
+    return decode(await fetch(`/api/v1/portal/invoices/${encodeURIComponent(id)}`, { credentials: 'same-origin' }))
+  },
+  invoicePdfUrl(id: string): string {
+    return `/api/v1/portal/invoices/${encodeURIComponent(id)}/pdf`
+  },
+  invoiceCsvUrl(id: string): string {
+    return `/api/v1/portal/invoices/${encodeURIComponent(id)}/csv`
+  },
 }
+import type { InvoiceDraft } from '../accounting/api'

@@ -24,6 +24,7 @@ describe('invoice API client', () => {
     await browserInvoiceClient.issueSettings(workspace)
     await browserInvoiceClient.saveIssueSettings(workspace, { invoice_prefix: 'INV' })
     await browserInvoiceClient.issue(workspace, 'invoice/1')
+    await browserInvoiceClient.deliver(workspace, 'invoice/1', 'accounts@example.invalid')
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/invoices/issue-settings',
@@ -37,6 +38,12 @@ describe('invoice API client', () => {
       '/api/v1/workspaces/organizations/client%2F1/invoices/invoice%2F1/issue',
       expect.objectContaining({ method: 'POST' }),
     )
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/invoices/invoice%2F1/deliver',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ recipient: 'accounts@example.invalid' }) }),
+    )
+    expect(browserInvoiceClient.pdfUrl(workspace, 'invoice/1')).toContain('/invoice%2F1/pdf')
+    expect(browserInvoiceClient.csvUrl(workspace, 'invoice/1')).toContain('/invoice%2F1/csv')
     const issue = vi.mocked(fetch).mock.calls.find(
       ([path, options]) => typeof path === 'string' && path.endsWith('/issue') && options?.method === 'POST',
     )

@@ -373,6 +373,8 @@
   "documentation.setAudienceMsp": "Include for MSP only",
   "documentation.setAudienceClient": "Include for client only",
   "documentation.audienceUpdated": "Content audience updated.",
+  "documentation.documentSettings": "Document settings",
+  "documentation.closeDocumentSettings": "Close document settings",
   "documentation.documents": "Documents",
   "documentation.browse": "Browse documents",
   "documentation.contentHealth": "Content health",

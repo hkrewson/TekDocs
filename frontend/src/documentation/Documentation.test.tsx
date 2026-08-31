@@ -142,6 +142,23 @@ function clients() {
   return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, updateOperations, requestReview, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
 
+it('exposes document settings and opens them before the document content', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  const settingsButton = screen.getByRole('button', { name: 'Document settings' })
+  expect(settingsButton).toHaveTextContent('Document settings')
+  expect(settingsButton).toHaveAttribute('aria-expanded', 'false')
+
+  await user.click(settingsButton)
+  const settingsPanel = screen.getByRole('region', { name: 'Document settings' })
+  expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
+  expect(settingsPanel).toHaveFocus()
+  expect(settingsPanel.compareDocumentPosition(screen.getByRole('article')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
 it('organizes document health and sends an assigned review request', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, updateOperations, requestReview } = clients()

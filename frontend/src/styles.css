@@ -592,6 +592,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-inline-editor .placement-audience-field { margin-top: 10px; }
 .document-context-panel { width: min(900px, 100%); margin: 0 auto; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .document-context-panel .section-heading { margin-bottom: 12px; }
+.document-settings-panel { scroll-margin-top: 68px; }
 .document-detail-fields { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(160px, .4fr); gap: 12px; }
 .document-detail-fields > label:not(.checkbox-field), .reuse-resolution label, .reuse-document label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .document-detail-fields input, .document-detail-fields select, .reuse-resolution input, .reuse-resolution select, .reuse-document select { min-height: 38px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }

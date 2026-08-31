@@ -6,6 +6,6 @@
   "type": "module",
   "dependencies": {
     "@mermaid-js/mermaid-cli": "11.16.0",
-    "puppeteer": "25.7.0"
+    "puppeteer": "25.9.0"
   }
 }

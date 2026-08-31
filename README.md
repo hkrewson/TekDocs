@@ -27,6 +27,8 @@ The security review currently recorded by the project used Claude Opus 5 (High) 
 
 TekDocs stores provider-neutral credential references. It does not store or retrieve customer credential values.
 
+Invoices are a bounded issuance capability; TekDocs is not a general ledger or payment processor. Ticketing, PSA, CRM, RMM, and MDM workflows remain in their authoritative external systems and may be projected through explicit integrations. The maintained [product capability contract](docs/PRODUCT_BOUNDARY.md) distinguishes current, intended 1.0, experimental, and excluded behavior.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

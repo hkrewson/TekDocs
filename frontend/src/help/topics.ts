@@ -33,13 +33,17 @@ const topics: Record<string, HelpTopic> = {
   staff: { title: 'Staff and invitations', summary: 'Invite MSP staff, review invitation delivery and expiry, and continue into role and client assignment.', slug: 'People-and-access' },
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
-  tickets: { title: 'Tickets', summary: 'Understand the planned service-request boundary for a future release.', slug: 'Product-boundaries' },
-  accounting: { title: 'Invoices', summary: 'Create drafts, issue signed invoices, and deliver matching PDF and CSV copies to a client.', slug: 'Invoice-drafts' },
+  invoices: { title: 'Invoices', summary: 'Create drafts, issue signed invoices, and deliver matching PDF and CSV copies to a client.', slug: 'Invoices' },
 }
 
 export function helpTopicForPath(pathname: string): HelpTopic {
   const workspaceMatch = pathname.match(/^\/workspaces\/organizations\/[^/]+\/([^/]+)/)
-  const area = (workspaceMatch?.[1] ?? pathname.split('/').filter(Boolean)[0] ?? 'overview').replaceAll('-', '_')
+  const rawArea = workspaceMatch?.[1]
+  const area = rawArea
+    ? (rawArea === 'accounting' ? 'invoices' : rawArea.replaceAll('-', '_'))
+    : pathname === '/accounting'
+      ? 'invoices'
+      : capabilityForPath(pathname) ?? pathname.split('/').filter(Boolean)[0] ?? 'overview'
   return topics[area] ?? topics.overview
 }
 
@@ -48,3 +52,4 @@ export function helpTopicUrl(topic: HelpTopic) {
 }
 
 export const helpTopicSlugs = [...new Set(Object.values(topics).map((topic) => topic.slug))].sort()
+import { capabilityForPath } from '../product/capabilities'

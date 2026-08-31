@@ -3,38 +3,13 @@ import { Link } from 'react-router'
 import { EntityRelationships } from '../relationships/EntityRelationships'
 import type { RelationshipsClient } from '../relationships/api'
 import type { WorkspaceContext } from './api'
+import { capabilityRegistry } from '../product/capabilities'
 
 const classificationLabels = {
   client: 'Client',
   vendor: 'Vendor',
   manufacturer: 'Manufacturer',
   partner: 'Partner',
-}
-
-const capabilityLabels = {
-  overview: 'Overview',
-  documentation: 'Documentation',
-  files: 'Files',
-  organizations: 'Organizations',
-  people: 'People',
-  sites: 'Sites',
-  custom_fields: 'Custom fields',
-  assets: 'Assets',
-  licenses: 'Licenses',
-  networks: 'Networks',
-  domains: 'Domains',
-  certificates: 'Certificates',
-  credentials: 'Credentials',
-  services: 'Services',
-  tickets: 'Tickets',
-  vendors: 'Vendors',
-  products: 'Products',
-  compliance: 'Compliance',
-  deadlines: 'Reminders',
-  activity: 'Activity',
-  recycle_bin: 'Recycle bin',
-  integrations: 'Integrations',
-  accounting: 'Accounting',
 }
 
 export function WorkspaceOverview({ workspace, relationshipsClient }: { workspace: WorkspaceContext; relationshipsClient?: RelationshipsClient }) {
@@ -62,9 +37,9 @@ export function WorkspaceOverview({ workspace, relationshipsClient }: { workspac
       </section>
       <EntityRelationships organizationId={workspace.id} organizationName={workspace.name} client={relationshipsClient} />
       <section className="content-section" aria-labelledby="workspace-areas-heading">
-        <div className="section-heading"><div><h2 id="workspace-areas-heading">Workspace areas</h2><p>Records created in these areas will belong to {workspace.name}. Individual data modules arrive in their scheduled milestones.</p></div></div>
+        <div className="section-heading"><div><h2 id="workspace-areas-heading">Workspace areas</h2><p>Records created in these areas belong to {workspace.name}.</p></div></div>
         <ul className="workspace-capability-list">
-          {workspace.capabilities.filter((capability) => capability !== 'overview').map((capability) => <li key={capability}>{capabilityLabels[capability]}</li>)}
+          {workspace.capabilities.filter((capability) => capability !== 'overview').map((capability) => <li key={capability}>{capabilityRegistry[capability].label}</li>)}
         </ul>
       </section>
     </>

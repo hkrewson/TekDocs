@@ -43,7 +43,7 @@ const clientWorkspace = {
   id: crypto.randomUUID(),
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'vendors'],
   organization: { id: '', name: 'Acme Dental', legal_name: 'Acme Dental, LLC', website: '', classifications: ['client'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 clientWorkspace.organization.id = clientWorkspace.id
@@ -409,7 +409,8 @@ test('keyboard-only workspace switching restores focus and keeps unsupported rou
   await expect(trigger).toBeFocused()
 
   await page.goto(`/workspaces/organizations/${clientWorkspace.id}/unsupported-area`)
-  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/overview$`))
+  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/unsupported-area$`))
+  await expect(page.getByRole('heading', { name: 'Page unavailable' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Current workspace: Acme Dental/ })).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
 })

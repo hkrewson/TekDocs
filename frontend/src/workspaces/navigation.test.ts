@@ -17,6 +17,8 @@ describe('workspace navigation', () => {
     expect(organizationWorkspacePath(supplier, 'documentation')).toBe(`/workspaces/organizations/${supplier.id}/documentation`)
     expect(organizationWorkspacePath(supplier, 'search')).toBe(`/workspaces/organizations/${supplier.id}/search`)
     expect(mspWorkspacePath('documentation')).toBe('/documentation')
+    expect(mspWorkspacePath('invoices')).toBe('/invoices')
+    expect(workspaceAreaFromPath('/accounting')).toBe('invoices')
   })
 
   it('falls back to overview when the destination lacks the current area', () => {

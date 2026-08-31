@@ -39,7 +39,7 @@ const loadOrganization = vi.fn().mockResolvedValue({
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors', 'recycle_bin'],
+  capabilities: ['overview', 'people', 'sites', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'vendors', 'recycle_bin'],
   organization: {
     id: '00000000-0000-4000-8000-000000000010',
     name: 'Acme Dental',
@@ -111,8 +111,16 @@ describe('application shell', () => {
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
     expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
-    expect(screen.getByText('Reusable documentation and templates')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Available capabilities' })).toHaveTextContent('Documentation')
     expect(screen.getByText('TekDocs 0.8.46')).toBeInTheDocument()
+  })
+
+  it('does not advertise excluded capabilities through deep links', () => {
+    render(app('/tickets'))
+
+    expect(screen.getByRole('heading', { name: 'Page unavailable' })).toBeInTheDocument()
+    expect(screen.queryByText(/planned|post-1.0/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
   })
 
   it('opens the permission-aware activity surface instead of a release placeholder', async () => {

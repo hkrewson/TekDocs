@@ -77,7 +77,8 @@ import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
-import { classificationSummary, organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
+import { capabilityRegistry, workspaceCapabilities } from './product/capabilities'
+import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
@@ -123,6 +124,11 @@ type NavigationSection = {
   items: NavigationItem[]
 }
 
+function navigationItem(area: WorkspaceCapability, icon: NavigationItem['icon']): NavigationItem {
+  const definition = capabilityRegistry[area]
+  return { label: definition.label, path: definition.path, area, icon }
+}
+
 function AppLink({ to, className, children, ...props }: {
   to: string
   className?: string
@@ -133,36 +139,36 @@ function AppLink({ to, className, children, ...props }: {
 
 const navigationSections: NavigationSection[] = [
   { label: 'Workspace', items: [
-    { label: 'Overview', path: '/overview', area: 'overview', icon: Activity },
-    { label: 'Organizations', path: '/organizations', area: 'organizations', icon: Building2 },
-    { label: 'People', path: '/people', area: 'people', icon: UsersRound },
-    { label: 'Sites', path: '/sites', area: 'sites', icon: MapPin },
-    { label: 'Documentation', path: '/documentation', area: 'documentation', icon: BookOpenText },
-    { label: 'Files', path: '/files', area: 'files', icon: File },
+    navigationItem('overview', Activity),
+    navigationItem('organizations', Building2),
+    navigationItem('people', UsersRound),
+    navigationItem('sites', MapPin),
+    navigationItem('documentation', BookOpenText),
+    navigationItem('files', File),
   ] },
   { label: 'Infrastructure', items: [
-    { label: 'Assets', path: '/assets', area: 'assets', icon: Boxes },
-    { label: 'Licenses', path: '/licenses', area: 'licenses', icon: ScrollText },
-    { label: 'Networks', path: '/networks', area: 'networks', icon: Network },
-    { label: 'Domains', path: '/domains', area: 'domains', icon: Globe2 },
-    { label: 'Certificates', path: '/certificates', area: 'certificates', icon: BadgeCheck },
-    { label: 'Credentials', path: '/credentials', area: 'credentials', icon: KeyRound },
-    { label: 'Services', path: '/services', area: 'services', icon: BriefcaseBusiness },
+    navigationItem('assets', Boxes),
+    navigationItem('licenses', ScrollText),
+    navigationItem('networks', Network),
+    navigationItem('domains', Globe2),
+    navigationItem('certificates', BadgeCheck),
+    navigationItem('credentials', KeyRound),
+    navigationItem('services', BriefcaseBusiness),
   ] },
   { label: 'Relationships', items: [
-    { label: 'Vendors', path: '/vendors', area: 'vendors', icon: Handshake },
-    { label: 'Products', path: '/products', area: 'products', icon: Package },
+    navigationItem('vendors', Handshake),
+    navigationItem('products', Package),
   ] },
   { label: 'Business', items: [
-    { label: 'Accounting', path: '/accounting', area: 'accounting', icon: ReceiptText },
+    navigationItem('invoices', ReceiptText),
   ] },
   { label: 'Governance', items: [
-    { label: 'Custom fields', path: '/custom-fields', area: 'custom_fields', icon: ListPlus },
-    { label: 'Compliance', path: '/compliance', area: 'compliance', icon: ShieldCheck },
-    { label: 'Reminders', path: '/deadlines', area: 'deadlines', icon: CalendarDays },
-    { label: 'Activity', path: '/activity', area: 'activity', icon: Activity },
-    { label: 'Recycle bin', path: '/recycle-bin', area: 'recycle_bin', icon: Trash2 },
-    { label: 'Integrations', path: '/integrations', area: 'integrations', icon: Plug },
+    navigationItem('custom_fields', ListPlus),
+    navigationItem('compliance', ShieldCheck),
+    navigationItem('deadlines', CalendarDays),
+    navigationItem('activity', Activity),
+    navigationItem('recycle_bin', Trash2),
+    navigationItem('integrations', Plug),
   ] },
 ]
 
@@ -213,7 +219,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
       ...section,
       items: section.items.filter((item) => workspace
         ? workspace.capabilities.includes(item.area)
-        : item.area !== 'accounting' || canManageInvoiceSettings),
+        : item.area !== 'invoices' || canManageInvoiceSettings),
     }))
     .filter((section) => section.items.length > 0)
   return (
@@ -305,32 +311,13 @@ function PageHeader({ title, description, action }: { title: string; description
   )
 }
 
-const plannedAreas: Record<string, { title: string; description: string; release: string; capabilities: string[] }> = {
-  '/files': { title: 'Files', description: 'Managed files and attachments with explicit ownership and references.', release: '0.3.8', capabilities: ['Safe uploads', 'Ownership scope', 'Permission-aware references'] },
-  '/assets': { title: 'Assets', description: 'Hardware, software, licensing, warranty, and cost records.', release: '0.3.5', capabilities: ['Hardware inventory', 'Software and licenses', 'Cost visibility controls'] },
-  '/licenses': { title: 'Licenses', description: 'Software entitlements, seats, renewals, and client assignments.', release: '0.3.6', capabilities: ['License inventory', 'Seat assignments', 'Renewal dates'] },
-  '/networks': { title: 'Networks', description: 'Simple location-owned networks with VLAN, CIDR, range, gateway, and DNS.', release: '0.5.10', capabilities: ['Network records', 'Calculated gateway and ranges', 'Workspace isolation'] },
-  '/domains': { title: 'Domains', description: 'Domain registration, DNS ownership, and expiration monitoring.', release: '0.7.8', capabilities: ['Registration records', 'DNS monitoring', 'Expiry notifications'] },
-  '/certificates': { title: 'Certificates', description: 'TLS endpoints, certificate chains, and expiry monitoring.', release: '0.7.9', capabilities: ['Endpoint inventory', 'Chain evidence', 'Expiry notifications'] },
-  '/services': { title: 'Services', description: 'Services, contracts, providers, and operational dependencies.', release: '0.3.7', capabilities: ['Service inventory', 'Provider relationships', 'Renewal tracking'] },
-  '/vendors': { title: 'Vendors', description: 'Organizations supplying products or services to this workspace.', release: '0.3.4', capabilities: ['Relationship-derived list', 'Supplier provenance', 'Related contacts'] },
-  '/products': { title: 'Products', description: 'Reusable supplier product and model definitions.', release: '0.3.3', capabilities: ['Product templates', 'Model specifications', 'Client asset provenance'] },
-  '/tickets': { title: 'Tickets', description: 'Service requests associated with the active workspace.', release: 'Post-1.0', capabilities: ['Client requests', 'Object relationships', 'Portal visibility'] },
-  '/accounting': { title: 'Accounting', description: 'MSP business records for billing, purchasing, and financial operations.', release: 'Post-1.0', capabilities: ['Invoices and payments', 'Quotes and recurring billing', 'Expenses and trips'] },
-  '/compliance': { title: 'Compliance', description: 'Versioned frameworks and immutable control catalogs.', release: '0.7.1', capabilities: ['Stable framework identities', 'Versioned controls', 'Immutable catalog snapshots'] },
-  '/integrations': { title: 'Integrations', description: 'Secure provider connections, jobs, webhooks, and reconciliation.', release: '0.7.0', capabilities: ['Provider contracts', 'Scheduled jobs', 'Conflict review'] },
-}
-
-function PlannedPage({ path }: { path: string }) {
-  const area = plannedAreas[path]
+function UnavailablePage({ organizationOverview }: { organizationOverview?: string }) {
   return (
-    <>
-      <PageHeader title={area.title} description={area.description} />
-      <section className="content-section">
-        <div className="section-heading"><h2>{area.release === 'Not scheduled' ? area.release : `Planned ${area.release}`}</h2><span>Foundation</span></div>
-        <ul className="capability-list">{area.capabilities.map((capability) => <li key={capability}>{capability}</li>)}</ul>
-      </section>
-    </>
+    <section className="content-section workspace-error" role="alert">
+      <h1>{translate('navigation.pageUnavailable')}</h1>
+      <p>{translate('navigation.pageUnavailableHelp')}</p>
+      <Link className="secondary-button" to={organizationOverview ?? '/overview'}>{translate('navigation.returnToOverview')}</Link>
+    </section>
   )
 }
 
@@ -341,23 +328,7 @@ function Overview() {
       <section className="content-section">
         <div className="section-heading"><h2>Available capabilities</h2><span>{packageMetadata.version}</span></div>
         <div className="status-table" role="table" aria-label="Available capabilities">
-          {[
-            ['Application shell', 'Available'],
-            ['Workspace and organization isolation', 'Available'],
-            ['Authentication, roles, and access collections', 'Available'],
-            ['Reusable documentation and templates', 'Available'],
-            ['Managed files and retained versions', 'Available'],
-            ['STATIC publications and client portal', 'Available'],
-            ['People, sites, and custom fields', 'Available'],
-            ['Assets, software, licenses, and contracts', 'Available'],
-            ['Supplier product and model catalogs', 'Available'],
-            ['Simple network records and asset addresses', 'Available'],
-            ['Domain and certificate monitoring', 'Available'],
-            ['Compliance, evidence, risks, and data flows', 'Available'],
-            ['Notifications and provider integrations', 'Available'],
-            ['Permission-filtered workspace search', 'Available'],
-            ['Recycle bin and immutable audit foundation', 'Available'],
-          ].map(([name, status]) => <div className="status-row" role="row" key={name}><span role="cell">{name}</span><span role="cell">{status}</span></div>)}
+          {workspaceCapabilities.map((capability) => <div className="status-row" role="row" key={capability}><span role="cell">{capabilityRegistry[capability].label}</span><span role="cell">Available</span></div>)}
         </div>
       </section>
     </>
@@ -396,13 +367,12 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   services: { title: 'Services', description: 'Services, providers, contracts, and dependencies scoped to this organization.', release: '0.3.7' },
   vendors: { title: 'Vendors', description: 'Suppliers related to this organization through products, assets, or services.', release: '0.3.4' },
   products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
-  tickets: { title: 'Tickets', description: 'Service requests associated with this organization.', release: 'Post-1.0' },
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
   integrations: { title: 'Integrations', description: 'Signed webhooks and provider connections scoped to this organization.', release: '0.6.3' },
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
   deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
   activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },
-  accounting: { title: 'Accounting', description: 'Draft, issue, deliver, and download immutable signed invoices for this client organization.', release: '0.8.46' },
+  invoices: { title: 'Invoices', description: 'Draft, issue, deliver, and download immutable signed invoices for this client organization.', release: '0.8.46' },
 }
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
@@ -428,18 +398,11 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'deadlines') return <Reminders workspace={state.workspace} relationshipsClient={relationshipsClient} />
   if (area === 'activity') return <ActivityLog workspace={state.workspace} />
-  if (area === 'accounting') return <Suspense fallback={<section className="content-section" role="status">Loading invoices…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
+  if (area === 'invoices') return <Suspense fallback={<section className="content-section" role="status">Loading invoices…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
   if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
-  const details = organizationAreaDetails[area]
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to={organizationWorkspacePath(state.workspace, 'overview')}>{state.workspace.name}</Link><span aria-hidden="true">/</span><span aria-current="page">{details.title}</span></nav>
-      <PageHeader title={details.title} description={details.description} />
-      <section className="content-section"><div className="section-heading"><h2>Planned for {details.release}</h2><span>{classificationSummary(state.workspace.classifications)} workspace</span></div><p className="workspace-area-note">The route and ownership context are established. The domain records arrive in their scheduled slice.</p></section>
-    </>
-  )
+  return <UnavailablePage organizationOverview={organizationWorkspacePath(state.workspace, 'overview')} />
 }
 
 function OrganizationSearchRoute({ state, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient }) {
@@ -550,6 +513,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
           <Suspense fallback={<section className="content-section" role="status"><h1>Loading workspace</h1><p>Please wait…</p></section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
+            <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
             <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
             <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">Loading files…</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
@@ -573,17 +537,18 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/deadlines" element={<Reminders workspace={null} relationshipsClient={relationshipsClient} />} />
             <Route path="/activity" element={<ActivityLog workspace={null} />} />
             <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">Loading supplier catalogs…</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
-            <Route path="/accounting" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">Loading invoice settings…</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <Navigate to="/overview" replace />} />
+            <Route path="/invoices" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">Loading invoice settings…</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <UnavailablePage />} />
+            <Route path="/accounting" element={<Navigate to="/invoices" replace />} />
             <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">Loading search…</section>}><SearchResults key={location.search} workspace={null} client={relationshipsClient} /></Suspense>} />
-            {Object.keys(plannedAreas).filter((path) => !['/files', '/assets', '/licenses', '/services', '/vendors', '/products', '/networks', '/integrations', '/compliance', '/domains', '/certificates', '/accounting'].includes(path)).map((path) => <Route key={path} path={path} element={<PlannedPage path={path} />} />)}
             <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} />} />)}
-            <Route path="/workspaces/organizations/:organizationId/*" element={<Navigate to={`/workspaces/organizations/${organizationId}/overview`} replace />} />
-            <Route path="*" element={<Navigate to="/overview" replace />} />
+            <Route path="/workspaces/organizations/:organizationId/accounting" element={<Navigate to={`/workspaces/organizations/${organizationId}/invoices`} replace />} />
+            <Route path="/workspaces/organizations/:organizationId/*" element={<UnavailablePage organizationOverview={`/workspaces/organizations/${organizationId}/overview`} />} />
+            <Route path="*" element={<UnavailablePage />} />
           </Routes></Suspense>
         </main>
       </div>

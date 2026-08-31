@@ -47,6 +47,7 @@ check:
 	./scripts/check-version.sh
 	./scripts/check-supply-chain-pins.sh
 	./scripts/check-wiki.py
+	./scripts/check-product-boundary.py
 	./scripts/check-compose-config.sh
 	docker run --rm -v "$(CURDIR):/repo:ro" -w /repo rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend ruff check .
@@ -151,7 +152,7 @@ test-organizations:
 	docker compose run --rm migrate pytest apps/core/tests/test_organizations.py apps/core/tests/test_scoping.py -q
 
 test-workspaces:
-	docker compose run --rm migrate pytest apps/core/tests/test_workspaces.py apps/core/tests/test_scoping.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_capability_contract.py apps/core/tests/test_workspaces.py apps/core/tests/test_scoping.py -q
 
 test-people:
 	docker compose run --rm migrate pytest apps/core/tests/test_people.py apps/core/tests/test_scoping.py -q

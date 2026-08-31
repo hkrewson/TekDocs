@@ -16,6 +16,7 @@ from apps.accounts.policy import (
     require_permission,
 )
 
+from .capabilities import CAPABILITY_PERMISSIONS
 from .models import Organization
 from .scoping import DataScope
 
@@ -34,7 +35,6 @@ MSP_CAPABILITIES = (
     "certificates",
     "credentials",
     "services",
-    "tickets",
     "vendors",
     "products",
     "compliance",
@@ -42,7 +42,7 @@ MSP_CAPABILITIES = (
     "activity",
     "recycle_bin",
     "integrations",
-    "accounting",
+    "invoices",
 )
 
 CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
@@ -60,14 +60,13 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "certificates",
         "credentials",
         "services",
-        "tickets",
         "vendors",
         "compliance",
         "deadlines",
         "activity",
         "recycle_bin",
         "integrations",
-        "accounting",
+        "invoices",
     ),
     "vendor": (
         "overview",
@@ -107,32 +106,6 @@ CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "recycle_bin",
         "integrations",
     ),
-}
-
-CAPABILITY_PERMISSIONS: dict[str, PermissionKey] = {
-    "overview": PermissionKey.WORKSPACES_VIEW,
-    "organizations": PermissionKey.ORGANIZATIONS_VIEW,
-    "people": PermissionKey.PEOPLE_VIEW,
-    "sites": PermissionKey.SITES_VIEW,
-    "custom_fields": PermissionKey.CUSTOM_FIELDS_VIEW,
-    "documentation": PermissionKey.DOCUMENTS_VIEW,
-    "files": PermissionKey.DOCUMENTS_VIEW,
-    "assets": PermissionKey.ASSETS_VIEW,
-    "licenses": PermissionKey.ASSETS_VIEW,
-    "networks": PermissionKey.NETWORKS_VIEW,
-    "domains": PermissionKey.NETWORKS_VIEW,
-    "certificates": PermissionKey.NETWORKS_VIEW,
-    "credentials": PermissionKey.CREDENTIAL_REFERENCES_VIEW,
-    "services": PermissionKey.WORKSPACES_VIEW,
-    "tickets": PermissionKey.WORKSPACES_VIEW,
-    "vendors": PermissionKey.ASSETS_VIEW,
-    "products": PermissionKey.ASSETS_VIEW,
-    "compliance": PermissionKey.COMPLIANCE_VIEW,
-    "deadlines": PermissionKey.DEADLINES_VIEW,
-    "activity": PermissionKey.ACTIVITY_VIEW,
-    "recycle_bin": PermissionKey.RECYCLE_BIN_VIEW,
-    "integrations": PermissionKey.INTEGRATIONS_VIEW,
-    "accounting": PermissionKey.INVOICES_VIEW,
 }
 
 

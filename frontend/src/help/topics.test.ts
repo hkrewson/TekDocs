@@ -6,6 +6,9 @@ describe('contextual help topics', () => {
     expect(helpTopicForPath('/staff').slug).toBe('People-and-access')
     expect(helpTopicForPath('/workspaces/organizations/123/documentation').slug).toBe('Documentation')
     expect(helpTopicForPath('/workspaces/organizations/123/recycle_bin').slug).toBe('Recycle-bin')
+    expect(helpTopicForPath('/invoices').slug).toBe('Invoices')
+    expect(helpTopicForPath('/accounting').slug).toBe('Invoices')
+    expect(helpTopicForPath('/tickets').slug).toBe('Workspaces-and-organizations')
   })
 
   it('falls back safely and creates only same-Wiki topic URLs', () => {

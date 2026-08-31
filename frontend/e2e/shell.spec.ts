@@ -87,6 +87,20 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
+test('excluded modules are unavailable and accounting redirects to invoices', async ({ page }) => {
+  await mockAuthenticated(page)
+
+  await page.goto('/tickets')
+  await expect(page.getByRole('heading', { name: 'Page unavailable' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Tickets' })).toHaveCount(0)
+  await expect(page.getByText(/planned|post-1.0/i)).toHaveCount(0)
+
+  await page.goto('/accounting')
+  await expect(page).toHaveURL(/\/invoices$/)
+  await expect(page.getByRole('heading', { name: 'Page unavailable' })).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})
+
 test('raw Markdown remains the editable canonical representation', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/documentation')

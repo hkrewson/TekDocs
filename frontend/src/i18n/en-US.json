@@ -1,4 +1,7 @@
 {
+  "navigation.pageUnavailable": "Page unavailable",
+  "navigation.pageUnavailableHelp": "This page does not exist or is not available in this workspace.",
+  "navigation.returnToOverview": "Return to overview",
   "pagination.label": "{label} pages",
   "pagination.range": "{first}–{last} of {count}",
   "pagination.page": "Page {page}",

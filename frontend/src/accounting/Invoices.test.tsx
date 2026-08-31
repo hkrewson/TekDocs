@@ -10,7 +10,7 @@ const workspace: WorkspaceContext = {
   id: 'client-1',
   name: 'Example Client',
   classifications: ['client'],
-  capabilities: ['overview', 'accounting'],
+  capabilities: ['overview', 'invoices'],
   organization: null,
 }
 

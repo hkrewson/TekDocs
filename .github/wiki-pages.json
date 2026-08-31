@@ -17,7 +17,7 @@
     {"slug": "Credential-references", "audience": "end_user", "contextual": true},
     {"slug": "Services-and-contracts", "audience": "end_user", "contextual": true},
     {"slug": "Vendors-and-products", "audience": "end_user", "contextual": true},
-    {"slug": "Invoice-drafts", "audience": "end_user", "contextual": true},
+    {"slug": "Invoices", "audience": "end_user", "contextual": true},
     {"slug": "Custom-fields", "audience": "end_user", "contextual": true},
     {"slug": "Compliance", "audience": "end_user", "contextual": true},
     {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true},
@@ -26,9 +26,11 @@
     {"slug": "Account-security", "audience": "end_user", "contextual": true},
     {"slug": "Roles-and-permissions", "audience": "security", "contextual": true},
     {"slug": "Notifications", "audience": "operator", "contextual": true},
-    {"slug": "Product-boundaries", "audience": "end_user", "contextual": true},
+    {"slug": "Product-boundaries", "audience": "end_user"},
     {"slug": "Backup-and-recovery", "audience": "operator"},
     {"slug": "Upgrade-and-rollback", "audience": "operator"},
+    {"slug": "Compatibility", "audience": "operator"},
+    {"slug": "Release-record", "audience": "operator"},
     {"slug": "Security-model", "audience": "security"},
     {"slug": "API-v1", "audience": "api"}
   ]

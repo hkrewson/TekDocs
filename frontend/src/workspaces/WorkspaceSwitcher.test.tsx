@@ -10,7 +10,7 @@ const acme: WorkspaceContext = {
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   classifications: ['client'],
-  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'vendors'],
   organization: null,
 }
 
@@ -18,7 +18,7 @@ const northwind: WorkspaceOption = {
   id: '00000000-0000-4000-8000-000000000011',
   name: 'Northwind Clinic',
   classifications: ['client', 'vendor'],
-  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'tickets', 'vendors', 'products'],
+  capabilities: ['overview', 'people', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'vendors', 'products'],
 }
 
 function Location() {

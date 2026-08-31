@@ -80,7 +80,6 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
             "certificates",
             "credentials",
             "services",
-            "tickets",
             "vendors",
             "products",
             "compliance",
@@ -88,7 +87,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
             "activity",
             "recycle_bin",
             "integrations",
-            "accounting",
+            "invoices",
         ],
         "organization": None,
     }
@@ -111,14 +110,13 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
         "certificates",
         "credentials",
         "services",
-        "tickets",
         "vendors",
         "compliance",
         "deadlines",
         "activity",
         "recycle_bin",
         "integrations",
-        "accounting",
+        "invoices",
         "products",
     ]
     assert selected.json()["organization"]["legal_name"] == "Acme Workspace, LLC"

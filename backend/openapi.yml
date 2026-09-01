@@ -1410,6 +1410,337 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documentation-maps:
+    get:
+      operationId: documentation_maps_msp_list
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMapResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: documentation_maps_msp_create
+      tags:
+      - documentation-maps
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/{map_entity_id}:
+    get:
+      operationId: documentation_maps_msp_retrieve
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: documentation_maps_msp_update
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: documentation_maps_msp_archive
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/{map_entity_id}/baselines:
+    post:
+      operationId: documentation_maps_msp_baseline_create
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapBaseline'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/{map_entity_id}/baselines/{baseline_id}/download:
+    get:
+      operationId: documentation_maps_msp_baseline_download
+      parameters:
+      - in: path
+        name: baseline_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/{map_entity_id}/preview:
+    get:
+      operationId: documentation_maps_msp_preview
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapPreview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/{map_entity_id}/review:
+    post:
+      operationId: documentation_maps_msp_review
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documentation-maps
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documentation-maps/choices:
+    get:
+      operationId: documentation_maps_msp_choices
+      tags:
+      - documentation-maps
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapChoices'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents:
     get:
       operationId: documents_msp_list
@@ -5143,6 +5474,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/portal/documentation-maps:
+    get:
+      operationId: client_portal_documentation_maps_list
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalDocumentationMapResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/portal/documentation-maps/{baseline_id}/download:
+    get:
+      operationId: client_portal_documentation_maps_download
+      parameters:
+      - in: path
+        name: baseline_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/portal/documents:
     get:
       operationId: client_portal_documents_list
@@ -15483,6 +15864,400 @@ paths:
       responses:
         '204':
           description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps:
+    get:
+      operationId: documentation_maps_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMapResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: documentation_maps_organization_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}:
+    get:
+      operationId: documentation_maps_organization_retrieve
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: documentation_maps_organization_update
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapUpdate'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: documentation_maps_organization_archive
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/baselines:
+    post:
+      operationId: documentation_maps_organization_baseline_create
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapBaselineWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapBaseline'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/baselines/{baseline_id}/download
+  : get:
+      operationId: documentation_maps_organization_baseline_download
+      parameters:
+      - in: path
+        name: baseline_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/preview:
+    get:
+      operationId: documentation_maps_organization_preview
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapPreview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/review:
+    post:
+      operationId: documentation_maps_organization_review
+      parameters:
+      - in: path
+        name: map_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MapReview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationMap'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/choices:
+    get:
+      operationId: documentation_maps_organization_choices
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapChoices'
+          description: ''
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -29932,6 +30707,70 @@ components:
       required:
       - base_revision_id
       - title
+    DocumentationMap:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        purpose:
+          type: string
+        map_type:
+          type: string
+        audience:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_name:
+          type: string
+          nullable: true
+        review_state:
+          type: string
+        current_revision:
+          $ref: '#/components/schemas/MapRevision'
+        revision_count:
+          type: integer
+          readOnly: true
+        baselines:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapBaseline'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - audience
+      - baselines
+      - created_at
+      - current_revision
+      - id
+      - map_type
+      - owner_id
+      - owner_name
+      - purpose
+      - review_state
+      - revision_count
+      - title
+      - updated_at
+    DocumentationMapResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentationMap'
+        count:
+          type: integer
+      required:
+      - count
+      - results
     DocumentationReference:
       type: object
       properties:
@@ -33135,6 +33974,414 @@ components:
           maxLength: 4000
       required:
       - address
+    MapBaseline:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        revision_id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+        content_digest:
+          type: string
+        byte_size:
+          type: integer
+        formats:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - byte_size
+      - content_digest
+      - created_at
+      - created_by
+      - formats
+      - id
+      - revision_id
+      - revision_number
+    MapBaselineWrite:
+      type: object
+      properties:
+        expected_revision_id:
+          type: string
+          format: uuid
+        formats:
+          type: array
+          items:
+            enum:
+            - pdf
+            - docx
+            type: string
+            description: |-
+              * `pdf` - pdf
+              * `docx` - docx
+            x-spec-enum-id: d4db8eb78dbbb25f
+          maxItems: 2
+      required:
+      - expected_revision_id
+    MapChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          type: string
+        detail:
+          type: string
+        current_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - detail
+      - id
+      - kind
+      - title
+    MapChoices:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapChoice'
+        publications:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapChoice'
+        maps:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapChoice'
+        owners:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapChoice'
+      required:
+      - documents
+      - maps
+      - owners
+      - publications
+    MapEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        position:
+          type: integer
+        kind:
+          type: string
+        label:
+          type: string
+        title:
+          type: string
+          readOnly: true
+        document_id:
+          type: string
+          format: uuid
+          nullable: true
+        document_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        map_id:
+          type: string
+          format: uuid
+          nullable: true
+        external_url:
+          type: string
+      required:
+      - document_id
+      - document_revision_id
+      - external_url
+      - id
+      - kind
+      - label
+      - map_id
+      - parent_id
+      - position
+      - publication_id
+      - title
+    MapEntryWrite:
+      type: object
+      properties:
+        parent_index:
+          type: integer
+          minimum: 0
+          nullable: true
+        position:
+          type: integer
+          minimum: 0
+        kind:
+          enum:
+          - document
+          - document_revision
+          - publication
+          - map
+          - external
+          type: string
+          description: |-
+            * `document` - Live document
+            * `document_revision` - Exact document revision
+            * `publication` - STATIC publication
+            * `map` - Subordinate map
+            * `external` - External resource
+          x-spec-enum-id: 014fbd3a1848124d
+        label:
+          type: string
+          default: ''
+          maxLength: 240
+        document_id:
+          type: string
+          format: uuid
+          nullable: true
+        document_revision_id:
+          type: string
+          format: uuid
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        map_id:
+          type: string
+          format: uuid
+          nullable: true
+        external_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 1000
+      required:
+      - kind
+      - position
+    MapFinding:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          enum:
+          - information
+          - warning
+          - blocker
+          type: string
+          description: |-
+            * `information` - information
+            * `warning` - warning
+            * `blocker` - blocker
+          x-spec-enum-id: 95fa8c6aa2cfa560
+        entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        detail:
+          type: string
+      required:
+      - code
+      - detail
+      - entry_id
+      - severity
+    MapPreview:
+      type: object
+      properties:
+        map:
+          $ref: '#/components/schemas/DocumentationMap'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapFinding'
+        blocker_count:
+          type: integer
+        warning_count:
+          type: integer
+      required:
+      - blocker_count
+      - findings
+      - map
+      - warning_count
+    MapReview:
+      type: object
+      properties:
+        state:
+          enum:
+          - approved
+          - changes_requested
+          type: string
+          description: |-
+            * `approved` - approved
+            * `changes_requested` - changes_requested
+          x-spec-enum-id: 124981b76f284288
+      required:
+      - state
+    MapRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        revision_number:
+          type: integer
+        title:
+          type: string
+        purpose:
+          type: string
+        map_type:
+          type: string
+        audience:
+          type: string
+        content_digest:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapEntry'
+          readOnly: true
+      required:
+      - audience
+      - content_digest
+      - created_at
+      - created_by
+      - entries
+      - id
+      - map_type
+      - parent_id
+      - purpose
+      - revision_number
+      - title
+    MapUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        purpose:
+          type: string
+          default: ''
+          maxLength: 1000
+        map_type:
+          enum:
+          - operating_manual
+          - disaster_recovery
+          - onboarding
+          - compliance
+          - handoff
+          - general
+          type: string
+          description: |-
+            * `operating_manual` - Operating manual
+            * `disaster_recovery` - Disaster recovery book
+            * `onboarding` - Onboarding pack
+            * `compliance` - Compliance binder
+            * `handoff` - Handoff package
+            * `general` - General documentation set
+          x-spec-enum-id: a3cb31f989034aef
+        audience:
+          enum:
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: 489f26fd4031dd3a
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapEntryWrite'
+        expected_revision_id:
+          type: string
+          format: uuid
+      required:
+      - audience
+      - entries
+      - expected_revision_id
+      - map_type
+      - title
+    MapWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        purpose:
+          type: string
+          default: ''
+          maxLength: 1000
+        map_type:
+          enum:
+          - operating_manual
+          - disaster_recovery
+          - onboarding
+          - compliance
+          - handoff
+          - general
+          type: string
+          description: |-
+            * `operating_manual` - Operating manual
+            * `disaster_recovery` - Disaster recovery book
+            * `onboarding` - Onboarding pack
+            * `compliance` - Compliance binder
+            * `handoff` - Handoff package
+            * `general` - General documentation set
+          x-spec-enum-id: a3cb31f989034aef
+        audience:
+          enum:
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: 489f26fd4031dd3a
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapEntryWrite'
+      required:
+      - audience
+      - entries
+      - map_type
+      - title
     MarkdownImport:
       type: object
       properties:
@@ -36152,6 +37399,53 @@ components:
       - count
       - has_more
       - next_cursor
+      - results
+    PortalDocumentationMap:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        purpose:
+          type: string
+        map_type:
+          type: string
+        baseline_id:
+          type: string
+          format: uuid
+        content_digest:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        contents:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
+      required:
+      - baseline_id
+      - content_digest
+      - contents
+      - created_at
+      - id
+      - map_type
+      - purpose
+      - title
+    PortalDocumentationMapResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalDocumentationMap'
+        count:
+          type: integer
+      required:
+      - count
       - results
     PortalInvoiceResult:
       type: object

@@ -13,7 +13,7 @@ const topics: Record<string, HelpTopic> = {
   organizations: { title: 'Organizations', summary: 'Create clients and suppliers, classify them, and enter their isolated workspaces.', slug: 'Organizations' },
   people: { title: 'People', summary: 'Manage MSP employees and organization contacts, locations, and access assignments.', slug: 'People-and-access' },
   sites: { title: 'Sites and locations', summary: 'Represent buildings and nested physical locations without mixing organization ownership.', slug: 'Sites-and-locations' },
-  documentation: { title: 'Documentation', summary: 'Create Markdown-first documents, reuse live or pinned blocks, and publish immutable STATIC copies.', slug: 'Documentation' },
+  documentation: { title: 'Documentation', summary: 'Create Markdown-first documents, reuse live or pinned blocks, publish immutable STATIC copies, and assemble retained maps for runbooks and handoffs.', slug: 'Documentation' },
   files: { title: 'Files and attachments', summary: 'Attach scanned, quarantined files to authorized records and retained publications.', slug: 'Files-and-attachments' },
   assets: { title: 'Assets', summary: 'Track physical assets, supplier provenance, lifecycle, warranties, assignments, and permitted costs.', slug: 'Assets' },
   licenses: { title: 'Software and licenses', summary: 'Track software installations, entitlements, seats, assignments, and renewals.', slug: 'Software-and-licenses' },

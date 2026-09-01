@@ -6,7 +6,7 @@ import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import { NotificationInbox } from '../notifications/NotificationInbox'
 import { browserPortalNotificationsClient } from '../notifications/api'
 import type { NotificationsClient, NotificationTarget } from '../notifications/api'
-import { portalClient, type PortalDocument, type PortalDocumentDetail, type PortalInvoice } from './api'
+import { portalClient, type PortalDocument, type PortalDocumentDetail, type PortalDocumentationMap, type PortalInvoice } from './api'
 
 export function ClientPortal({ context, onSignOut, signingOut, signOutError, notificationsClient = browserPortalNotificationsClient }: {
   context: AuthenticatedContext
@@ -28,6 +28,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
   const [invoicePhase, setInvoicePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [invoiceCursor, setInvoiceCursor] = useState<string | null>(null)
   const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false)
+  const [maps, setMaps] = useState<PortalDocumentationMap[]>([])
+  const [mapPhase, setMapPhase] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const loadDocuments = useCallback(async (cursor?: string) => {
     if (cursor) setLoadingMore(true)
@@ -60,6 +62,18 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
       setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.')
       setPhase('error')
     })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    void portalClient.listDocumentationMaps().then((result) => {
+      if (!active) return
+      const records = Array.isArray(result.results)
+        ? result.results.filter((item) => item && typeof item.baseline_id === 'string' && Array.isArray(item.contents))
+        : []
+      setMaps(records); setMapPhase('ready')
+    }).catch(() => { if (active) setMapPhase('error') })
     return () => { active = false }
   }, [])
 
@@ -127,7 +141,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           </button>
         </div>
       </header>
-      <main className="client-portal-main" aria-busy={phase === 'loading' || invoicePhase === 'loading' || detailLoading || loadingMore || loadingMoreInvoices}>
+      <main className="client-portal-main" aria-busy={phase === 'loading' || invoicePhase === 'loading' || mapPhase === 'loading' || detailLoading || loadingMore || loadingMoreInvoices}>
         {signOutError && <div className="form-error" role="alert">{signOutError}</div>}
         <header className="page-header"><div><h1>{organization?.name ?? 'Client portal'}</h1><p>{translate('portal.summary')}</p></div></header>
         {error && <div className="form-error" role="alert">{error}</div>}
@@ -155,6 +169,13 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           {invoicePhase === 'ready' && invoices.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noInvoices')}</p></div>}
           {invoicePhase === 'ready' && invoices.length > 0 && <ul className="portal-document-list">{invoices.map((invoice) => <li key={invoice.id}><button type="button" disabled={detailLoading} onClick={() => { void openInvoice(invoice) }}><span><strong>{invoice.number}</strong><small>{invoice.currency} {invoice.total} · {translate('accounting.dueDate')} {new Date(`${invoice.due_date}T00:00:00`).toLocaleDateString()}</small></span><span className="visibility-label client-visible">{translate('accounting.issued')}</span></button></li>)}</ul>}
           {invoicePhase === 'ready' && invoiceCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMoreInvoices} onClick={() => { void loadInvoices(invoiceCursor) }}>{loadingMoreInvoices ? translate('portal.loadingInvoices') : translate('portal.loadMoreInvoices')}</button></div>}
+        </section>
+        <section className="content-section" aria-labelledby="portal-maps-heading">
+          <div className="section-heading"><div><h2 id="portal-maps-heading">Documentation maps</h2><p>Approved runbooks and handoff packages prepared for your organization.</p></div><span>{maps.length}</span></div>
+          {mapPhase === 'loading' && <p role="status">Loading documentation maps…</p>}
+          {mapPhase === 'error' && <p role="alert">Documentation maps are unavailable.</p>}
+          {mapPhase === 'ready' && maps.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>No documentation maps have been published to your organization.</p></div>}
+          {mapPhase === 'ready' && maps.length > 0 && <ul className="portal-document-list">{maps.map((map) => <li key={map.id}><div className="portal-map-row"><span><strong>{map.title}</strong><small>{map.purpose || `${map.contents.length} mapped item${map.contents.length === 1 ? '' : 's'}`}</small></span><a className="secondary-button" href={portalClient.documentationMapUrl(map.baseline_id)}><Download size={15} aria-hidden="true" />Download handoff</a></div></li>)}</ul>}
         </section>
         <section className="content-section" aria-labelledby="portal-documents-heading">
           <div className="section-heading"><div><h2 id="portal-documents-heading">Published documentation</h2><p>Only approved, current client-visible STATIC publications appear here.</p></div><span>{documents.length}</span></div>

@@ -200,6 +200,24 @@ from apps.core.document_views import (
     OrganizationFileBackedDocumentCreateView,
     OrganizationMarkdownImportView,
 )
+from apps.core.documentation_map_views import (
+    ClientPortalDocumentationMapDownloadView,
+    ClientPortalDocumentationMapListView,
+    MSPDocumentationMapBaselineDownloadView,
+    MSPDocumentationMapBaselineListCreateView,
+    MSPDocumentationMapChoicesView,
+    MSPDocumentationMapDetailView,
+    MSPDocumentationMapListCreateView,
+    MSPDocumentationMapPreviewView,
+    MSPDocumentationMapReviewView,
+    OrganizationDocumentationMapBaselineDownloadView,
+    OrganizationDocumentationMapBaselineListCreateView,
+    OrganizationDocumentationMapChoicesView,
+    OrganizationDocumentationMapDetailView,
+    OrganizationDocumentationMapListCreateView,
+    OrganizationDocumentationMapPreviewView,
+    OrganizationDocumentationMapReviewView,
+)
 from apps.core.domain_hierarchy_views import (
     MSPHostnameListCreateView,
     MSPObservationCreateView,
@@ -440,6 +458,16 @@ urlpatterns = [
     ),
     path("api/v1/portal/documents", ClientPortalDocumentListView.as_view(), name="client-portal-document-list"),
     path(
+        "api/v1/portal/documentation-maps",
+        ClientPortalDocumentationMapListView.as_view(),
+        name="client-portal-documentation-map-list",
+    ),
+    path(
+        "api/v1/portal/documentation-maps/<uuid:baseline_id>/download",
+        ClientPortalDocumentationMapDownloadView.as_view(),
+        name="client-portal-documentation-map-download",
+    ),
+    path(
         "api/v1/portal/documents/<uuid:publication_entity_id>",
         ClientPortalDocumentDetailView.as_view(),
         name="client-portal-document-detail",
@@ -551,6 +579,41 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path(
+        "api/v1/documentation-maps",
+        MSPDocumentationMapListCreateView.as_view(),
+        name="msp-documentation-map-list-create",
+    ),
+    path(
+        "api/v1/documentation-maps/choices",
+        MSPDocumentationMapChoicesView.as_view(),
+        name="msp-documentation-map-choices",
+    ),
+    path(
+        "api/v1/documentation-maps/<uuid:map_entity_id>",
+        MSPDocumentationMapDetailView.as_view(),
+        name="msp-documentation-map-detail",
+    ),
+    path(
+        "api/v1/documentation-maps/<uuid:map_entity_id>/review",
+        MSPDocumentationMapReviewView.as_view(),
+        name="msp-documentation-map-review",
+    ),
+    path(
+        "api/v1/documentation-maps/<uuid:map_entity_id>/preview",
+        MSPDocumentationMapPreviewView.as_view(),
+        name="msp-documentation-map-preview",
+    ),
+    path(
+        "api/v1/documentation-maps/<uuid:map_entity_id>/baselines",
+        MSPDocumentationMapBaselineListCreateView.as_view(),
+        name="msp-documentation-map-baselines",
+    ),
+    path(
+        "api/v1/documentation-maps/<uuid:map_entity_id>/baselines/<uuid:baseline_id>/download",
+        MSPDocumentationMapBaselineDownloadView.as_view(),
+        name="msp-documentation-map-baseline-download",
+    ),
     path("api/v1/documents/search", MSPDocumentSearchView.as_view(), name="msp-document-search"),
     path(
         "api/v1/documents/operations/choices",
@@ -1477,6 +1540,41 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents",
         OrganizationDocumentListCreateView.as_view(),
         name="organization-document-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps",
+        OrganizationDocumentationMapListCreateView.as_view(),
+        name="organization-documentation-map-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/choices",
+        OrganizationDocumentationMapChoicesView.as_view(),
+        name="organization-documentation-map-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/<uuid:map_entity_id>",
+        OrganizationDocumentationMapDetailView.as_view(),
+        name="organization-documentation-map-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/<uuid:map_entity_id>/review",
+        OrganizationDocumentationMapReviewView.as_view(),
+        name="organization-documentation-map-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/<uuid:map_entity_id>/preview",
+        OrganizationDocumentationMapPreviewView.as_view(),
+        name="organization-documentation-map-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/<uuid:map_entity_id>/baselines",
+        OrganizationDocumentationMapBaselineListCreateView.as_view(),
+        name="organization-documentation-map-baselines",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documentation-maps/<uuid:map_entity_id>/baselines/<uuid:baseline_id>/download",
+        OrganizationDocumentationMapBaselineDownloadView.as_view(),
+        name="organization-documentation-map-baseline-download",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/search",

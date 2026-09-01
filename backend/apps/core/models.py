@@ -5341,6 +5341,254 @@ class ImportExternalKey(TimestampedModel):
         return f"{self.source_system}:{self.record_type}:{self.external_key}"
 
 
+class DocumentationMapType(models.TextChoices):
+    OPERATING_MANUAL = "operating_manual", "Operating manual"
+    DISASTER_RECOVERY = "disaster_recovery", "Disaster recovery book"
+    ONBOARDING = "onboarding", "Onboarding pack"
+    COMPLIANCE = "compliance", "Compliance binder"
+    HANDOFF = "handoff", "Handoff package"
+    GENERAL = "general", "General documentation set"
+
+
+class DocumentationMapAudience(models.TextChoices):
+    MSP_INTERNAL = "msp_internal", "MSP internal"
+    CLIENT_VISIBLE = "client_visible", "Client visible"
+
+
+class DocumentationMapEntryKind(models.TextChoices):
+    DOCUMENT = "document", "Live document"
+    DOCUMENT_REVISION = "document_revision", "Exact document revision"
+    PUBLICATION = "publication", "STATIC publication"
+    MAP = "map", "Subordinate map"
+    EXTERNAL = "external", "External resource"
+
+
+class DocumentationMap(models.Model):
+    """Stable identity for one versioned documentation set."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_maps")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="documentation_maps")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documentation_maps", null=True, blank=True
+    )
+    entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="documentation_map_record")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_documentation_maps",
+        null=True,
+        blank=True,
+    )
+    review_state = models.CharField(
+        max_length=24, choices=DocumentReviewState.choices, default=DocumentReviewState.UNREVIEWED
+    )
+    current_revision = models.ForeignKey(
+        "DocumentationMapRevision",
+        on_delete=models.PROTECT,
+        related_name="current_for_maps",
+        null=True,
+        blank=True,
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("entity__display_name", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(review_state__in=DocumentReviewState.values), name="documentation_map_review_valid"
+            )
+        ]
+        indexes = [models.Index(fields=("workspace", "archived_at"), name="core_docmap_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.entity.display_name
+
+
+class DocumentationMapRevision(models.Model):
+    """Append-only metadata and ordered entry snapshot for one map revision."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_map_revisions")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="documentation_map_revisions")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documentation_map_revisions", null=True, blank=True
+    )
+    documentation_map = models.ForeignKey(DocumentationMap, on_delete=models.PROTECT, related_name="revisions")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="successors", null=True, blank=True)
+    revision_number = models.PositiveIntegerField()
+    title = models.CharField(max_length=240)
+    purpose = models.CharField(max_length=1000, blank=True)
+    map_type = models.CharField(max_length=32, choices=DocumentationMapType.choices)
+    audience = models.CharField(max_length=24, choices=DocumentationMapAudience.choices)
+    content_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="documentation_map_revisions"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("revision_number", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("documentation_map", "revision_number"), name="documentation_map_revision_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(map_type__in=DocumentationMapType.values), name="documentation_map_type_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(audience__in=DocumentationMapAudience.values),
+                name="documentation_map_audience_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"),
+                name="documentation_map_revision_digest_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("workspace", "documentation_map", "revision_number"), name="core_docmaprev_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} r{self.revision_number}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Documentation map revisions are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Documentation map revisions are retained")
+
+
+class DocumentationMapEntry(models.Model):
+    """One immutable, hierarchically ordered member of a map revision."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_map_entries")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="documentation_map_entries")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documentation_map_entries", null=True, blank=True
+    )
+    revision = models.ForeignKey(DocumentationMapRevision, on_delete=models.PROTECT, related_name="entries")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="children", null=True, blank=True)
+    position = models.PositiveIntegerField()
+    kind = models.CharField(max_length=24, choices=DocumentationMapEntryKind.choices)
+    label = models.CharField(max_length=240, blank=True)
+    document = models.ForeignKey(
+        Document, on_delete=models.PROTECT, related_name="documentation_map_entries", null=True, blank=True
+    )
+    document_revision = models.ForeignKey(
+        BlockRevision,
+        on_delete=models.PROTECT,
+        related_name="documentation_map_entries",
+        null=True,
+        blank=True,
+    )
+    publication = models.ForeignKey(
+        DocumentPublication,
+        on_delete=models.PROTECT,
+        related_name="documentation_map_entries",
+        null=True,
+        blank=True,
+    )
+    subordinate_map = models.ForeignKey(
+        DocumentationMap,
+        on_delete=models.PROTECT,
+        related_name="parent_map_entries",
+        null=True,
+        blank=True,
+    )
+    external_url = models.URLField(max_length=1000, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("position", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("revision", "parent", "position"), name="documentation_map_entry_position_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=DocumentationMapEntryKind.values), name="documentation_map_entry_kind_valid"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("workspace", "revision", "parent", "position"), name="core_docmapentry_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return self.label or f"{self.kind} {self.position + 1}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Documentation map entries are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Documentation map entries are retained")
+
+
+def documentation_map_baseline_upload_to(instance: "DocumentationMapBaseline", _filename: str) -> str:
+    return str(PurePosixPath("documentation-map-baselines") / str(instance.tenant_id) / str(instance.id) / "bundle.zip")
+
+
+class DocumentationMapBaseline(models.Model):
+    """Retained immutable bytes for one exact map revision and dependency set."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="documentation_map_baselines")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="documentation_map_baselines")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="documentation_map_baselines", null=True, blank=True
+    )
+    documentation_map = models.ForeignKey(DocumentationMap, on_delete=models.PROTECT, related_name="baselines")
+    revision = models.ForeignKey(DocumentationMapRevision, on_delete=models.PROTECT, related_name="baselines")
+    manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    byte_size = models.PositiveBigIntegerField()
+    artifact = models.FileField(upload_to=documentation_map_baseline_upload_to, max_length=500)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="documentation_map_baselines"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"),
+                name="documentation_map_baseline_digest_valid",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("workspace", "documentation_map", "created_at"), name="core_docmapbase_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.documentation_map} baseline {self.id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self._state.adding is False:
+            raise ValidationError("Documentation map baselines are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Documentation map baselines are retained")
+
+
 def git_export_upload_to(instance: "GitExportBundle", _filename: str) -> str:
     return str(PurePosixPath("git-exports") / str(instance.tenant_id) / str(instance.id))
 

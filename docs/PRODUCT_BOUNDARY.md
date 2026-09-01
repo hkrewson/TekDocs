@@ -9,7 +9,7 @@ The current column describes `0.8.46`. The 1.0 column is the release contract, n
 | Workspaces, organizations, people, sites, files, access control, audit, recovery | supported | supported | TekDocs | — |
 | Markdown documentation, reusable blocks, revision history, STATIC publication, client portal | supported | supported | TekDocs | — |
 | Structured topic types and guided authoring | excluded | supported | TekDocs | [#30](https://github.com/hkrewson/TekDocs/issues/30) |
-| Documentation maps, baselines, and client handoff packages | excluded | supported | TekDocs | [#29](https://github.com/hkrewson/TekDocs/issues/29) |
+| Documentation maps, baselines, and client handoff packages | supported | supported | TekDocs | — |
 | Publication preflight and documentation lint | experimental | supported | TekDocs | [#31](https://github.com/hkrewson/TekDocs/issues/31) |
 | Controlled taxonomies and tag governance | excluded | supported | TekDocs | [#32](https://github.com/hkrewson/TekDocs/issues/32) |
 | Inventory, licensing, commercial records, networks, domains, certificates, reminders, compliance | supported | supported | TekDocs records documented state; external systems may supply observations | — |
@@ -37,4 +37,3 @@ The current column describes `0.8.46`. The 1.0 column is the release contract, n
 ## Integration principle
 
 TekDocs is the system of record for structured documentation and the relationships it authors. A system of action remains authoritative for its own workflow. Integrations use explicit external identifiers, minimum necessary projections, read/reconcile behavior by default, and separately approved write scopes.
-

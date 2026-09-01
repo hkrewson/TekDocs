@@ -30,6 +30,17 @@ export type PortalDocumentResult = {
   next_cursor: string | null
 }
 
+export type PortalDocumentationMap = {
+  id: string
+  title: string
+  purpose: string
+  map_type: string
+  baseline_id: string
+  content_digest: string
+  created_at: string
+  contents: { title: string; kind: 'publication' | 'map'; source_id: string }[]
+}
+
 export type PortalInvoice = InvoiceDraft & { state: 'issued'; number: string; issued_at: string }
 export type PortalInvoiceResult = { results: PortalInvoice[]; count: number; has_more: boolean; next_cursor: string | null }
 
@@ -39,6 +50,12 @@ async function decode<T>(response: Response): Promise<T> {
 }
 
 export const portalClient = {
+  async listDocumentationMaps(): Promise<{ results: PortalDocumentationMap[]; count: number }> {
+    return decode(await fetch('/api/v1/portal/documentation-maps', { credentials: 'same-origin' }))
+  },
+  documentationMapUrl(baselineId: string): string {
+    return `/api/v1/portal/documentation-maps/${encodeURIComponent(baselineId)}/download`
+  },
   async listDocuments(cursor?: string): Promise<PortalDocumentResult> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
     return decode(await fetch(`/api/v1/portal/documents${query}`, { credentials: 'same-origin' }))

@@ -452,6 +452,118 @@ export interface paths {
         readonly patch: operations["custom_fields_msp_version"];
         readonly trace?: never;
     };
+    readonly "/api/v1/documentation-maps": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_msp_list"];
+        readonly put?: never;
+        readonly post: operations["documentation_maps_msp_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/{map_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_msp_retrieve"];
+        readonly put: operations["documentation_maps_msp_update"];
+        readonly post?: never;
+        readonly delete: operations["documentation_maps_msp_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/{map_entity_id}/baselines": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documentation_maps_msp_baseline_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/{map_entity_id}/baselines/{baseline_id}/download": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_msp_baseline_download"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/{map_entity_id}/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_msp_preview"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/{map_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documentation_maps_msp_review"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documentation-maps/choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_msp_choices"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents": {
         readonly parameters: {
             readonly query?: never;
@@ -1468,6 +1580,38 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["portal_context_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/portal/documentation-maps": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_documentation_maps_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/portal/documentation-maps/{baseline_id}/download": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_documentation_maps_download"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -4610,6 +4754,118 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch: operations["custom_fields_organization_version"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_organization_list"];
+        readonly put?: never;
+        readonly post: operations["documentation_maps_organization_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_organization_retrieve"];
+        readonly put: operations["documentation_maps_organization_update"];
+        readonly post?: never;
+        readonly delete: operations["documentation_maps_organization_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/baselines": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documentation_maps_organization_baseline_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/baselines/{baseline_id}/download": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_organization_baseline_download"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_organization_preview"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/{map_entity_id}/review": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documentation_maps_organization_review"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documentation-maps/choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documentation_maps_organization_choices"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents": {
@@ -9109,6 +9365,29 @@ export interface components {
             /** Format: uuid */
             readonly base_revision_id: string;
         };
+        readonly DocumentationMap: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly purpose: string;
+            readonly map_type: string;
+            readonly audience: string;
+            /** Format: uuid */
+            readonly owner_id: string | null;
+            readonly owner_name: string | null;
+            readonly review_state: string;
+            readonly current_revision: components["schemas"]["MapRevision"];
+            readonly revision_count: number;
+            readonly baselines: readonly components["schemas"]["MapBaseline"][];
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly DocumentationMapResult: {
+            readonly results: readonly components["schemas"]["DocumentationMap"][];
+            readonly count: number;
+        };
         readonly DocumentationReference: {
             /** Format: uuid */
             readonly id: string;
@@ -10496,6 +10775,179 @@ export interface components {
             readonly hardware_asset_id?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly MapBaseline: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly revision_id: string;
+            readonly revision_number: number;
+            readonly content_digest: string;
+            readonly byte_size: number;
+            readonly formats: readonly string[];
+            readonly created_by: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly MapBaselineWrite: {
+            /** Format: uuid */
+            readonly expected_revision_id: string;
+            readonly formats?: readonly ("pdf" | "docx")[];
+        };
+        readonly MapChoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly kind: string;
+            readonly detail: string;
+            /** Format: uuid */
+            readonly current_revision_id?: string | null;
+        };
+        readonly MapChoices: {
+            readonly documents: readonly components["schemas"]["MapChoice"][];
+            readonly publications: readonly components["schemas"]["MapChoice"][];
+            readonly maps: readonly components["schemas"]["MapChoice"][];
+            readonly owners: readonly components["schemas"]["MapChoice"][];
+        };
+        readonly MapEntry: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly parent_id: string | null;
+            readonly position: number;
+            readonly kind: string;
+            readonly label: string;
+            readonly title: string;
+            /** Format: uuid */
+            readonly document_id: string | null;
+            /** Format: uuid */
+            readonly document_revision_id: string | null;
+            /** Format: uuid */
+            readonly publication_id: string | null;
+            /** Format: uuid */
+            readonly map_id: string | null;
+            readonly external_url: string;
+        };
+        readonly MapEntryWrite: {
+            readonly parent_index?: number | null;
+            readonly position: number;
+            /**
+             * @description * `document` - Live document
+             *     * `document_revision` - Exact document revision
+             *     * `publication` - STATIC publication
+             *     * `map` - Subordinate map
+             *     * `external` - External resource
+             * @enum {string}
+             */
+            readonly kind: "document" | "document_revision" | "publication" | "map" | "external";
+            /** @default  */
+            readonly label: string;
+            /** Format: uuid */
+            readonly document_id?: string | null;
+            /** Format: uuid */
+            readonly document_revision_id?: string | null;
+            /** Format: uuid */
+            readonly publication_id?: string | null;
+            /** Format: uuid */
+            readonly map_id?: string | null;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly external_url: string;
+        };
+        readonly MapFinding: {
+            readonly code: string;
+            /**
+             * @description * `information` - information
+             *     * `warning` - warning
+             *     * `blocker` - blocker
+             * @enum {string}
+             */
+            readonly severity: "information" | "warning" | "blocker";
+            /** Format: uuid */
+            readonly entry_id: string | null;
+            readonly detail: string;
+        };
+        readonly MapPreview: {
+            readonly map: components["schemas"]["DocumentationMap"];
+            readonly findings: readonly components["schemas"]["MapFinding"][];
+            readonly blocker_count: number;
+            readonly warning_count: number;
+        };
+        readonly MapReview: {
+            /**
+             * @description * `approved` - approved
+             *     * `changes_requested` - changes_requested
+             * @enum {string}
+             */
+            readonly state: "approved" | "changes_requested";
+        };
+        readonly MapRevision: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly parent_id: string | null;
+            readonly revision_number: number;
+            readonly title: string;
+            readonly purpose: string;
+            readonly map_type: string;
+            readonly audience: string;
+            readonly content_digest: string;
+            readonly created_by: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly entries: readonly components["schemas"]["MapEntry"][];
+        };
+        readonly MapUpdate: {
+            readonly title: string;
+            /** @default  */
+            readonly purpose: string;
+            /**
+             * @description * `operating_manual` - Operating manual
+             *     * `disaster_recovery` - Disaster recovery book
+             *     * `onboarding` - Onboarding pack
+             *     * `compliance` - Compliance binder
+             *     * `handoff` - Handoff package
+             *     * `general` - General documentation set
+             * @enum {string}
+             */
+            readonly map_type: "operating_manual" | "disaster_recovery" | "onboarding" | "compliance" | "handoff" | "general";
+            /**
+             * @description * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_visible";
+            /** Format: uuid */
+            readonly owner_id?: string | null;
+            readonly entries: readonly components["schemas"]["MapEntryWrite"][];
+            /** Format: uuid */
+            readonly expected_revision_id: string;
+        };
+        readonly MapWrite: {
+            readonly title: string;
+            /** @default  */
+            readonly purpose: string;
+            /**
+             * @description * `operating_manual` - Operating manual
+             *     * `disaster_recovery` - Disaster recovery book
+             *     * `onboarding` - Onboarding pack
+             *     * `compliance` - Compliance binder
+             *     * `handoff` - Handoff package
+             *     * `general` - General documentation set
+             * @enum {string}
+             */
+            readonly map_type: "operating_manual" | "disaster_recovery" | "onboarding" | "compliance" | "handoff" | "general";
+            /**
+             * @description * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_visible";
+            /** Format: uuid */
+            readonly owner_id?: string | null;
+            readonly entries: readonly components["schemas"]["MapEntryWrite"][];
         };
         readonly MarkdownImport: {
             /** Format: uri */
@@ -11888,6 +12340,25 @@ export interface components {
             readonly count: number;
             readonly has_more: boolean;
             readonly next_cursor: string | null;
+        };
+        readonly PortalDocumentationMap: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly purpose: string;
+            readonly map_type: string;
+            /** Format: uuid */
+            readonly baseline_id: string;
+            readonly content_digest: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly contents: readonly {
+                readonly [key: string]: unknown;
+            }[];
+        };
+        readonly PortalDocumentationMapResult: {
+            readonly results: readonly components["schemas"]["PortalDocumentationMap"][];
+            readonly count: number;
         };
         readonly PortalInvoiceResult: {
             readonly results: readonly components["schemas"]["Invoice"][];
@@ -14038,6 +14509,274 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["CustomFieldDefinitionVersionResult"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMapResult"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapWrite"];
+                readonly "multipart/form-data": components["schemas"]["MapWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapUpdate"];
+                readonly "multipart/form-data": components["schemas"]["MapUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly documentation_maps_msp_baseline_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapBaselineWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapBaselineWrite"];
+                readonly "multipart/form-data": components["schemas"]["MapBaselineWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapBaseline"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_baseline_download: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly baseline_id: string;
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/zip": string;
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_preview: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapPreview"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapReview"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapReview"];
+                readonly "multipart/form-data": components["schemas"]["MapReview"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_msp_choices: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapChoices"];
                 };
             };
         };
@@ -16993,6 +17732,50 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly client_portal_documentation_maps_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["PortalDocumentationMapResult"];
+                };
+            };
+        };
+    };
+    readonly client_portal_documentation_maps_download: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly baseline_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/zip": string;
                 };
             };
         };
@@ -24860,6 +25643,287 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["CustomFieldDefinitionVersionResult"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMapResult"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapWrite"];
+                readonly "multipart/form-data": components["schemas"]["MapWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapUpdate"];
+                readonly "multipart/form-data": components["schemas"]["MapUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly documentation_maps_organization_baseline_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapBaselineWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapBaselineWrite"];
+                readonly "multipart/form-data": components["schemas"]["MapBaselineWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapBaseline"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_baseline_download: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly baseline_id: string;
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/zip": string;
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_preview: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapPreview"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_review: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly map_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["MapReview"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["MapReview"];
+                readonly "multipart/form-data": components["schemas"]["MapReview"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentationMap"];
+                };
+            };
+        };
+    };
+    readonly documentation_maps_organization_choices: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MapChoices"];
                 };
             };
         };

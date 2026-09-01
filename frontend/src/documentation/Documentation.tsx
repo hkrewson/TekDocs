@@ -8,6 +8,7 @@ import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../work
 import { browserWorkspaceClient } from '../workspaces/api'
 import type { RelationshipsClient } from '../relationships/api'
 import { DocumentRelationshipRail } from './DocumentRelationshipRail'
+import { DocumentationMaps } from './DocumentationMaps'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import { browserDocumentsClient, RevisionConflictError } from './api'
 import type { DocumentKeyBinding, DocumentKeyReport, WorkspaceKeyBinding } from './api'
@@ -56,6 +57,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const requestedDocumentId = initialDocumentId ?? null
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
+  const [documentationView, setDocumentationView] = useState<'documents' | 'maps'>('documents')
   const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
@@ -813,7 +815,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setTemplateFilter('all')
   }
 
+  if (documentationView === 'maps') return <DocumentationMaps workspace={workspace} onShowDocuments={() => setDocumentationView('documents')} />
+
   return <>
+    <nav className="segmented-control documentation-mode" aria-label="Documentation view"><button type="button" aria-pressed="true">Documents</button><button type="button" aria-pressed="false" onClick={() => setDocumentationView('maps')}>Maps</button></nav>
     <header className="page-header"><div><h1>Documentation</h1></div><div className="page-actions"><button className="secondary-button" type="button" aria-pressed={indexMode === 'health'} onClick={() => setIndexMode((value) => value === 'browse' ? 'health' : 'browse')}><CalendarCheck2 size={16} aria-hidden="true" /><span className="button-label">{indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')}</span></button><input ref={importInput} aria-label="Markdown file to import" className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={create}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {message && <div className="form-message success" role="status">{message}</div>}

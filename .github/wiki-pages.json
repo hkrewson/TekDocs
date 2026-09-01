@@ -10,6 +10,7 @@
     {"slug": "People-and-access", "audience": "end_user", "contextual": true},
     {"slug": "Sites-and-locations", "audience": "end_user", "contextual": true},
     {"slug": "Documentation", "audience": "end_user", "contextual": true},
+    {"slug": "Documentation-maps", "audience": "end_user"},
     {"slug": "Files-and-attachments", "audience": "end_user", "contextual": true},
     {"slug": "Assets", "audience": "end_user", "contextual": true},
     {"slug": "Software-and-licenses", "audience": "end_user", "contextual": true},

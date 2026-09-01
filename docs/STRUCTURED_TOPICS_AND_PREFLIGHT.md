@@ -10,13 +10,12 @@ STATIC publication reruns preflight after acquiring the composition lock. A bloc
 
 The publication and portable export manifests add optional `topic_type` and `topic_schema_version` fields. Publication manifests also retain the preflight contract version, checked composition digest, and severity counts without copying finding content into the signed artifact.
 
-The stable semantic convention is:
+The stable structured convention is an ordinary level-two Markdown heading:
 
 ```markdown
-<!-- tekdocs:section validation -->
 ## Validation
 
 Describe how the technician proves the result.
 ```
 
-Only the marker provides semantic identity. The heading remains presentation text and may be renamed. Extra unmarked sections are allowed. DITA XML and installation-defined topic schemas remain out of scope.
+The heading text identifies the template section and therefore remains fixed while the document uses that starter template. Authors may add other headings and content freely. DITA XML and installation-defined topic schemas remain out of scope.

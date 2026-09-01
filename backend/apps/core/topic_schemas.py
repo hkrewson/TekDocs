@@ -9,7 +9,7 @@ from .models import DocumentTopicType
 
 SCHEMA_VERSION = 1
 MARKER = re.compile(r"^<!--\s*tekdocs:section\s+([a-z][a-z0-9_-]*)\s*-->\s*$")
-HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+HEADING = re.compile(r"^##\s+(.+?)\s*$")
 
 
 @dataclass(frozen=True)
@@ -177,16 +177,21 @@ def catalog() -> list[dict[str, object]]:
 
 def seed_markdown(topic_type: str, existing: str = "") -> str:
     schema = SCHEMAS[topic_type]
-    found_ids = [match.group(1) for line in existing.splitlines() if (match := MARKER.match(line))]
+    existing = "\n".join(line for line in existing.splitlines() if not MARKER.match(line))
+    sections_by_label = {section.label.casefold(): section for section in schema.sections}
+    found_ids = [
+        sections_by_label[match.group(1).casefold()].id
+        for line in existing.splitlines()
+        if (match := HEADING.match(line)) and match.group(1).casefold() in sections_by_label
+    ]
     if found_ids == [section.id for section in schema.sections]:
         return existing.rstrip() + ("\n" if existing else "")
-    existing = "\n".join(line for line in existing.splitlines() if not MARKER.match(line))
     if not schema.sections:
         return existing + ("\n" if existing else "")
     chunks = []
     for index, section in enumerate(schema.sections):
         body = existing.strip() if index == 0 and existing.strip() else ""
-        chunks.append(f"<!-- tekdocs:section {section.id} -->\n## {section.label}\n\n{body}".rstrip())
+        chunks.append(f"## {section.label}\n\n{body}".rstrip())
     return "\n\n".join(chunks) + "\n"
 
 
@@ -195,13 +200,13 @@ def inspect_markdown(topic_type: str, markdown: str) -> list[dict[str, object]]:
     if not schema.sections:
         return []
     required = [item.id for item in schema.sections]
+    sections_by_label = {section.label.casefold(): section for section in schema.sections}
     lines = markdown.splitlines()
-    found: list[tuple[str, int, str]] = []
+    found: list[tuple[str, int]] = []
     for index, line in enumerate(lines):
-        match = MARKER.match(line)
-        if match:
-            heading = HEADING.match(lines[index + 1]) if index + 1 < len(lines) else None
-            found.append((match.group(1), index, heading.group(1) if heading else ""))
+        match = HEADING.match(line)
+        if match and (section := sections_by_label.get(match.group(1).casefold())):
+            found.append((section.id, index))
     findings: list[dict[str, object]] = []
     ids = [item[0] for item in found]
     for section_id in required:
@@ -209,27 +214,9 @@ def inspect_markdown(topic_type: str, markdown: str) -> list[dict[str, object]]:
             findings.append({"code": "topic.section.missing", "severity": "blocker", "section_id": section_id})
         elif ids.count(section_id) > 1:
             findings.append({"code": "topic.section.duplicate", "severity": "blocker", "section_id": section_id})
-    for section_id, line_number, heading_text in found:
-        if section_id not in required:
-            findings.append(
-                {
-                    "code": "topic.section.unknown",
-                    "severity": "warning",
-                    "section_id": section_id,
-                    "line": line_number + 1,
-                }
-            )
-        if not heading_text:
-            findings.append(
-                {
-                    "code": "topic.section.heading_missing",
-                    "severity": "blocker",
-                    "section_id": section_id,
-                    "line": line_number + 1,
-                }
-            )
+    for section_id, line_number in found:
         next_line = next((candidate[1] for candidate in found if candidate[1] > line_number), len(lines))
-        if not "\n".join(lines[line_number + 2 : next_line]).strip():
+        if not "\n".join(lines[line_number + 1 : next_line]).strip():
             findings.append(
                 {
                     "code": "topic.section.empty",

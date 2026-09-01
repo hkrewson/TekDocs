@@ -75,7 +75,7 @@ function clients() {
     composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: true,
     counts: { blocker: 0, warning: 0, info: 0 }, findings: [],
   })
-  const policyStarter = '<!-- tekdocs:section purpose -->\n## Purpose\n\n<!-- tekdocs:section scope -->\n## Scope\n'
+  const policyStarter = '## Purpose\n\n## Scope\n'
   const topicSchemas = vi.fn().mockResolvedValue({
     schema_version: 1,
     topics: [
@@ -86,9 +86,9 @@ function clients() {
   const convertTopic = vi.fn()
     .mockResolvedValueOnce({
       topic_type: 'procedure', topic_schema_version: 1, base_revision_id: 'revision-1',
-      original_markdown: '# Firewall', converted_markdown: '<!-- tekdocs:section purpose -->\n## Purpose\n\n# Firewall', findings: [],
+      original_markdown: '# Firewall', converted_markdown: '## Purpose\n\n# Firewall', findings: [],
     })
-    .mockResolvedValueOnce({ ...document, topic_type: 'procedure' as const, topic_schema_version: 1, current_revision_id: 'revision-2', revision_number: 2, markdown: '<!-- tekdocs:section purpose -->\n## Purpose\n\n# Firewall' })
+    .mockResolvedValueOnce({ ...document, topic_type: 'procedure' as const, topic_schema_version: 1, current_revision_id: 'revision-2', revision_number: 2, markdown: '## Purpose\n\n# Firewall' })
   const approvePublication = vi.fn().mockResolvedValue(publication)
   const withdrawPublication = vi.fn().mockResolvedValue({ ...publication, lifecycle_state: 'withdrawn' as const })
   const getPublication = vi.fn().mockResolvedValue(publication)
@@ -429,7 +429,8 @@ it('places the selected starter template directly into a new document draft', as
   await waitFor(() => expect(createDocument).toHaveBeenCalled())
   const input = createDocument.mock.calls.at(-1)?.[1]
   expect(input).toMatchObject({ title: 'Acceptable use', topic_type: 'policy' })
-  expect(input?.markdown).toContain('<!-- tekdocs:section purpose -->')
+  expect(input?.markdown).toContain('## Purpose')
+  expect(input?.markdown).not.toContain('tekdocs:section')
 })
 
 it('creates a file-backed document with notes and exposes retained primary-file versions', async () => {

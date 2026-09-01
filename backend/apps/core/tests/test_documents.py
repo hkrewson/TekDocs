@@ -189,7 +189,8 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
     created = created_response.json()
     assert created["topic_type"] == "procedure"
     assert created["topic_schema_version"] == 1
-    assert "<!-- tekdocs:section purpose -->" in created["markdown"]
+    assert "## Purpose" in created["markdown"]
+    assert "tekdocs:section" not in created["markdown"]
     original_revision = created["current_revision_id"]
 
     preflight_response = owner_client.get(
@@ -209,7 +210,7 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
     )
     assert preview_response.status_code == 200
     assert preview_response.json()["topic_type"] == "troubleshooting"
-    assert "<!-- tekdocs:section issue -->" in preview_response.json()["converted_markdown"]
+    assert "## Issue" in preview_response.json()["converted_markdown"]
     assert Document.objects.get(entity_id=created["id"]).topic_type == "procedure"
 
     applied_response = owner_client.post(
@@ -222,7 +223,7 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
     assert applied_response.json()["current_revision_id"] != original_revision
     historical = BlockRevision.objects.get(id=original_revision)
     assert historical.topic_type == "procedure"
-    assert "<!-- tekdocs:section purpose -->" in historical.markdown
+    assert "## Purpose" in historical.markdown
     stale_preview = owner_client.post(
         conversion_url,
         {"topic_type": "reference", "base_revision_id": original_revision, "apply": False},
@@ -244,7 +245,8 @@ def test_policy_starter_markdown_is_accepted_without_duplicate_structure(owner_c
     )
     assert response.status_code == 201
     assert response.json()["markdown"] == starter
-    assert response.json()["markdown"].count("<!-- tekdocs:section purpose -->") == 1
+    assert response.json()["markdown"].count("## Purpose") == 1
+    assert "tekdocs:section" not in response.json()["markdown"]
 
 
 @pytest.mark.django_db

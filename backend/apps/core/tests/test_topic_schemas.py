@@ -50,7 +50,8 @@ def test_seeded_procedure_is_parseable_and_only_warns_for_empty_sections():
     markdown = seed_markdown(DocumentTopicType.PROCEDURE, "Reset the edge router.")
     findings = inspect_markdown(DocumentTopicType.PROCEDURE, markdown)
     assert not [item for item in findings if item["severity"] == "blocker"]
-    assert "<!-- tekdocs:section purpose -->" in markdown
+    assert "## Purpose" in markdown
+    assert "tekdocs:section" not in markdown
     assert "Reset the edge router." in markdown
 
 
@@ -59,21 +60,26 @@ def test_seed_markdown_does_not_wrap_an_already_seeded_template_again():
     assert seed_markdown(DocumentTopicType.POLICY, starter) == starter
 
 
-def test_missing_duplicate_and_malformed_semantics_are_blockers_without_rewriting_content():
-    markdown = """<!-- tekdocs:section purpose -->
-## Purpose
+def test_missing_and_duplicate_required_headings_are_blockers_without_rewriting_content():
+    markdown = """## Purpose
 
 Keep this text.
 
-<!-- tekdocs:section purpose -->
-not a heading
+## Purpose
 """
     findings = inspect_markdown(DocumentTopicType.PROCEDURE, markdown)
     codes = [item["code"] for item in findings if item["severity"] == "blocker"]
     assert "topic.section.duplicate" in codes
-    assert "topic.section.heading_missing" in codes
     assert "topic.section.missing" in codes
     assert "Keep this text." in markdown
+
+
+def test_legacy_section_comments_are_removed_when_markdown_is_seeded_again():
+    legacy = "<!-- tekdocs:section purpose -->\n## Purpose\n\nText\n"
+    converted = seed_markdown(DocumentTopicType.POLICY, legacy)
+    assert "tekdocs:section" not in converted
+    assert "## Purpose" in converted
+    assert "Text" in converted
 
 
 def test_unstructured_content_has_no_required_section_findings():

@@ -48,28 +48,18 @@ FINDING_CATALOG = {
     "topic.section.missing": (
         "blocker",
         "A required topic section is missing.",
-        "Restore the section marker and heading in the editor.",
+        "Restore the section heading in the editor.",
     ),
     "topic.section.duplicate": (
         "blocker",
         "A required topic section appears more than once.",
-        "Keep one semantic marker for this section.",
-    ),
-    "topic.section.heading_missing": (
-        "blocker",
-        "A topic marker is not followed by a heading.",
-        "Add a Markdown heading immediately after the marker.",
+        "Keep one heading for this section.",
     ),
     "topic.section.empty": ("warning", "A required topic section is empty.", "Add useful content to the section."),
     "topic.section.order": (
         "warning",
         "Required topic sections are out of the guided order.",
-        "Move the marked sections into the suggested order.",
-    ),
-    "topic.section.unknown": (
-        "warning",
-        "An unknown semantic section marker is present.",
-        "Remove it or replace it with a marker from the current schema.",
+        "Move the sections into the suggested order.",
     ),
     "document.keys.unresolved": (
         "blocker",

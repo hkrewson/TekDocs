@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
+import { FilterMenu } from '../FilterMenu'
 import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserOperationsClient } from './api'
@@ -19,6 +20,15 @@ export function ActivityLog({ workspace, client = browserOperationsClient }: { w
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [client, filters, scope])
 
+  const activeDateFilterCount = [filters.occurred_after, filters.occurred_before].filter(Boolean).length
+  const dateFilterLabel = filters.occurred_after && filters.occurred_before
+    ? 'Custom range'
+    : filters.occurred_after
+      ? 'After a date'
+      : filters.occurred_before
+        ? 'Before a date'
+        : 'Any time'
+
   return <>
     <header className="page-header">
       <div><h1>{translate('activity.heading')}</h1><p>{translate('activity.intro')}</p></div>
@@ -26,8 +36,12 @@ export function ActivityLog({ workspace, client = browserOperationsClient }: { w
     <section className="content-section">
       <div className="operations-filters">
         <label>{translate('activity.search')}<span className="search-input"><Search size={16} /><input type="search" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value, page: 1 })} /></span></label>
-        <label>{translate('activity.after')}<input type="datetime-local" value={filters.occurred_after} onChange={(event) => setFilters({ ...filters, occurred_after: event.target.value, page: 1 })} /></label>
-        <label>{translate('activity.before')}<input type="datetime-local" value={filters.occurred_before} onChange={(event) => setFilters({ ...filters, occurred_before: event.target.value, page: 1 })} /></label>
+        <FilterMenu groups={[{
+          kind: 'custom',
+          label: 'Date range',
+          valueLabel: dateFilterLabel,
+          content: <div className="filter-menu-custom"><label>{translate('activity.after')}<input type="datetime-local" value={filters.occurred_after} onChange={(event) => setFilters({ ...filters, occurred_after: event.target.value, page: 1 })} /></label><label>{translate('activity.before')}<input type="datetime-local" value={filters.occurred_before} onChange={(event) => setFilters({ ...filters, occurred_before: event.target.value, page: 1 })} /></label></div>,
+        }]} activeCount={activeDateFilterCount} onClear={() => setFilters({ ...filters, occurred_after: '', occurred_before: '', page: 1 })} menuLabel="Activity filters" />
       </div>
       {phase === 'loading' && <p role="status">{translate('activity.loading')}</p>}
       {phase === 'error' && <p role="alert">{translate('activity.loadFailed')}</p>}

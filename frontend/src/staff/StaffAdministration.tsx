@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { MailPlus, RefreshCw, Search, ShieldCheck, UserRoundCheck } from 'lucide-react'
 import { CollectionPagination } from '../CollectionPagination'
+import { FilterMenu } from '../FilterMenu'
 import { formatDateTime, translate} from '../i18n/localization'
 import { AuthRequestError } from '../auth/api'
 import type { Member } from '../access-control/api'
@@ -141,7 +142,7 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
         <div className="section-heading"><div><h2 id="invitation-history-heading">Invitation history</h2><p>Up to 200 recent MSP-staff invitations are retained here. Client-portal invitations remain inside their client workflow.</p></div></div>
         <div className="staff-invitation-filters">
           <label><span className="sr-only">Search invitation email</span><Search size={15} /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Search email" /></label>
-          <label><span className="sr-only">Filter invitation status</span><select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setPage(1) }}><option value="all">All statuses</option><option value="pending">Pending</option><option value="delivery_failed">Delivery failed</option><option value="accepted">Accepted</option><option value="expired">Expired</option><option value="revoked">Revoked</option></select></label>
+          <FilterMenu groups={[{ kind: 'choices', label: 'Status', value: filter, choices: [{ value: 'all', label: 'All statuses' }, { value: 'pending', label: 'Pending' }, { value: 'delivery_failed', label: 'Delivery failed' }, { value: 'accepted', label: 'Accepted' }, { value: 'expired', label: 'Expired' }, { value: 'revoked', label: 'Revoked' }], onChange: (value) => { setFilter(value as Filter); setPage(1) } }]} activeCount={filter === 'all' ? 0 : 1} onClear={() => { setFilter('all'); setPage(1) }} menuLabel="Invitation filters" />
         </div>
         {invitations === null ? <p role="status" className="settings-state">Loading invitation history…</p> : filteredInvitations.length === 0 ? <p className="settings-state">No invitations match this view.</p> : <><div className="table-scroll" role="group" aria-label={translate('staff.invitationTable')} tabIndex={0}><table className="staff-invitation-table"><caption className="sr-only">MSP staff invitation history</caption><thead><tr><th>Email</th><th>Status</th><th>Sent</th><th>Expires</th><th>Attempts</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{invitationPage.map((invitation) => {
           const state = effectiveState(invitation)

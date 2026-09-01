@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RotateCcw, Search } from 'lucide-react'
+import { FilterMenu } from '../FilterMenu'
 import { formatDateTime, translate} from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserRecycleBinClient } from './api'
@@ -80,7 +81,7 @@ export function RecycleBin({ workspace, client = browserRecycleBinClient }: { wo
         <div className="section-heading recycle-bin-heading"><h2 id="recycle-bin-heading">Archived records</h2><span>{items ? `${items.length} shown` : 'Loading'}</span></div>
         <div className="recycle-bin-toolbar">
           <label className="recycle-bin-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search archived records</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search archived records" /></label>
-          <label><span>Record type</span><select value={recordType} onChange={(event) => setRecordType(event.target.value as RecycleBinRecordType | '')}><option value="">All types</option>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <FilterMenu groups={[{ kind: 'choices', label: 'Record type', value: recordType, choices: [{ value: '', label: 'All types' }, ...Object.entries(typeLabels).map(([value, label]) => ({ value, label }))], onChange: (value) => setRecordType(value as RecycleBinRecordType | '') }]} activeCount={recordType ? 1 : 0} onClear={() => setRecordType('')} menuLabel="Archived record filters" />
         </div>
         {visiblePhase === 'loading' && <p className="empty-state" role="status">Loading archived records…</p>}
         {visiblePhase === 'error' && <p className="empty-state">Archived records are unavailable.</p>}

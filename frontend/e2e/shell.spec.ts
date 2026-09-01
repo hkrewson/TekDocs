@@ -91,7 +91,7 @@ test('document filters use one accessible disclosure menu', async ({ page }) => 
   await mockAuthenticated(page)
   await page.goto('/documentation')
 
-  const trigger = page.locator('.document-filter-trigger')
+  const trigger = page.locator('.filter-trigger')
   await trigger.click()
   const menu = page.getByRole('dialog', { name: 'Document filters' })
   await expect(menu.locator('details')).toHaveCount(5)

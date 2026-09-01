@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatDateTime, translate} from '../i18n/localization'
+import { FilterMenu } from '../FilterMenu'
 
 import type { NotificationDelivery, NotificationDeliveryAdminClient } from './api'
 
@@ -53,7 +54,7 @@ export function NotificationDeliveryAdmin({ client }: { client: NotificationDeli
   return <>
     <header className="page-header"><div><h1>Email delivery</h1></div></header>
     <section className="content-section notification-delivery-admin">
-      <div className="section-heading"><h2>Recent deliveries</h2><label>State <select value={filter} onChange={(event) => { setPhase('loading'); setFilter(event.target.value) }}>{states.map((state) => <option key={state} value={state}>{state ? state.replace('_', ' ') : 'All states'}</option>)}</select></label></div>
+      <div className="section-heading"><h2>Recent deliveries</h2><FilterMenu groups={[{ kind: 'choices', label: 'State', value: filter, choices: states.map((state) => ({ value: state, label: state ? state.replace('_', ' ') : 'All states' })), onChange: (value) => { setPhase('loading'); setFilter(value) } }]} activeCount={filter ? 1 : 0} onClear={() => { setPhase('loading'); setFilter('') }} menuLabel="Email delivery filters" /></div>
       <p className="workspace-area-note">Message content and recipient email addresses are intentionally excluded from this view.</p>
       {message && <p role="status">{message}</p>}
       {phase === 'loading' && <p role="status">Loading delivery metadata…</p>}

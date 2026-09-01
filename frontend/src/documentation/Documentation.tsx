@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Filter, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
+import { Archive, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
+import { FilterMenu } from '../FilterMenu'
+import type { FilterMenuGroup } from '../FilterMenu'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import { translate } from '../i18n/localization'
 import type { WorkspaceContext, WorkspaceClient, WorkspaceOption } from '../workspaces/api'
@@ -48,65 +50,6 @@ function placementAudienceLabel(profile: PlacementAudienceProfile): string {
   if (profile === 'msp_internal') return translate('documentation.audienceMspInternal')
   if (profile === 'client_visible') return translate('documentation.audienceClientVisible')
   return translate('documentation.audienceShared')
-}
-
-type DocumentFilterChoice = { value: string; label: string }
-type DocumentFilterGroup = {
-  label: string
-  value: string
-  choices: DocumentFilterChoice[]
-  onChange: (value: string) => void
-}
-
-function DocumentFilterMenu({ groups, activeCount, onClear }: { groups: DocumentFilterGroup[]; activeCount: number; onClear: () => void }) {
-  const [open, setOpen] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    menuRef.current?.querySelector<HTMLElement>('summary')?.focus()
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node) && !triggerRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setOpen(false)
-      triggerRef.current?.focus()
-    }
-    document.addEventListener('pointerdown', closeOnPointerDown)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('pointerdown', closeOnPointerDown)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [open])
-
-  const close = () => {
-    setOpen(false)
-    triggerRef.current?.focus()
-  }
-
-  return <div className="document-filter-control">
-    <button ref={triggerRef} className="secondary-button document-filter-trigger" type="button" aria-haspopup="dialog" aria-controls="document-filter-menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-      <Filter size={16} aria-hidden="true" />
-      <span>{translate('documentation.filters')}{activeCount > 0 ? ` (${activeCount})` : ''}</span>
-    </button>
-    {open && <div ref={menuRef} id="document-filter-menu" className="document-filter-menu" role="dialog" aria-label={translate('documentation.filterMenu')}>
-      <div className="document-filter-menu-heading"><strong>{translate('documentation.filters')}</strong><button className="icon-button" type="button" aria-label={translate('documentation.closeFilters')} onClick={close}><X size={16} /></button></div>
-      {groups.map((group) => {
-        const currentLabel = group.choices.find((choice) => choice.value === group.value)?.label ?? group.choices[0]?.label
-        return <details key={group.label} className="document-filter-group">
-          <summary><span>{group.label}</span><span>{currentLabel}</span></summary>
-          <div className="document-filter-choices" role="radiogroup" aria-label={group.label}>
-            {group.choices.map((choice) => <label key={choice.value || 'all'}><input type="radio" name={`document-filter-${group.label}`} value={choice.value} checked={group.value === choice.value} onChange={() => group.onChange(choice.value)} /><span>{choice.label}</span></label>)}
-          </div>
-        </details>
-      })}
-      <div className="document-filter-menu-footer"><button type="button" disabled={activeCount === 0} onClick={onClear}>{translate('documentation.clearFilters')}</button></div>
-    </div>}
-  </div>
 }
 
 export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient, relationshipsClient, initialDocumentId }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient; relationshipsClient?: RelationshipsClient; initialDocumentId?: string | null }) {
@@ -821,32 +764,37 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       : [...current, attachmentId])
   }
   const activeDocumentFilterCount = [categoryFilter, collectionFilter, tagFilter, healthFilter, templateFilter === 'all' ? '' : templateFilter].filter(Boolean).length
-  const documentFilterGroups: DocumentFilterGroup[] = [
+  const documentFilterGroups: FilterMenuGroup[] = [
     {
+      kind: 'choices' as const,
       label: translate('documentation.category'),
       value: categoryFilter,
       choices: [{ value: '', label: translate('documentation.allCategories') }, ...categories],
       onChange: (value) => setCategoryFilter(value as DocumentCategory | ''),
     },
     {
+      kind: 'choices' as const,
       label: translate('documentation.collection'),
       value: collectionFilter,
       choices: [{ value: '', label: translate('documentation.allCollections') }, ...(loaded?.collections ?? []).map((item) => ({ value: item.value, label: `${item.value} (${item.count})` }))],
       onChange: setCollectionFilter,
     },
     {
+      kind: 'choices' as const,
       label: translate('documentation.tag'),
       value: tagFilter,
       choices: [{ value: '', label: translate('documentation.allTags') }, ...(loaded?.tags ?? []).map((item) => ({ value: item.value, label: `${item.value} (${item.count})` }))],
       onChange: setTagFilter,
     },
     {
+      kind: 'choices' as const,
       label: translate('documentation.health'),
       value: healthFilter,
       choices: [{ value: '', label: translate('documentation.allHealth') }, ...(loaded?.health ?? []).map((item) => ({ value: item.value, label: `${item.value.replaceAll('_', ' ')} (${item.count})` }))],
       onChange: (value) => setHealthFilter(value as DocumentHealthStatus | ''),
     },
     {
+      kind: 'choices' as const,
       label: translate('documentation.type'),
       value: templateFilter,
       choices: [
@@ -871,7 +819,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     {message && <div className="form-message success" role="status">{message}</div>}
     <section className="content-section document-index" aria-labelledby="document-index-heading">
       <div className="section-heading"><h2 id="document-index-heading">{indexMode === 'health' ? translate('documentation.contentHealth') : translate('documentation.documents')}</h2><span>{phase === 'ready' ? translate('documentation.resultCount', { count: results.length }) : translate('common.loading')}</span></div>
-      <div className="document-filters"><label className="document-search-field"><span>{translate('documentation.search')}</span><input type="search" value={documentQuery} onChange={(event) => setDocumentQuery(event.target.value)} /></label><DocumentFilterMenu groups={documentFilterGroups} activeCount={activeDocumentFilterCount} onClear={clearDocumentFilters} /></div>
+      <div className="document-filters"><label className="document-search-field"><span>{translate('documentation.search')}</span><input type="search" value={documentQuery} onChange={(event) => setDocumentQuery(event.target.value)} /></label><FilterMenu groups={documentFilterGroups} activeCount={activeDocumentFilterCount} onClear={clearDocumentFilters} menuLabel={translate('documentation.filterMenu')} /></div>
       {visiblePhase === 'loading' && <p className="empty-state" role="status">Loading documents…</p>}
       {visiblePhase === 'error' && <p className="empty-state">Documents are unavailable.</p>}
       {visiblePhase === 'ready' && results.length === 0 && <p className="empty-state">No documents have been added to this workspace.</p>}

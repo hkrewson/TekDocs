@@ -28,7 +28,9 @@ describe('SearchResults', () => {
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
     expect(screen.getByRole('link', { name: /mail.example.com/ })).toHaveAttribute('href', '/certificates?q=mail.example.com')
     expect(screen.getByText('Allow the management subnet.')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Documents (1)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Filters$/ }))
+    fireEvent.click(screen.getByText('Result type', { exact: true }))
+    expect(screen.getByRole('radio', { name: 'Documents (1)' })).toBeInTheDocument()
     expect(search).toHaveBeenCalledWith({}, 'firewall', '', 1, expect.any(AbortSignal))
   })
 
@@ -38,7 +40,9 @@ describe('SearchResults', () => {
     render(<MemoryRouter initialEntries={['/search?q=firewall']}><SearchResults workspace={null} client={client} /></MemoryRouter>)
 
     await screen.findByText('17 authorized records found.')
-    fireEvent.change(screen.getByLabelText('Result type'), { target: { value: 'document' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Filters$/ }))
+    fireEvent.click(screen.getByText('Result type', { exact: true }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Documents (1)' }))
     await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 1, expect.any(AbortSignal)))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 2, expect.any(AbortSignal)))

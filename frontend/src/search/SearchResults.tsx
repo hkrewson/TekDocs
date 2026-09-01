@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
+import { FilterMenu } from '../FilterMenu'
 
 import { formatInstantDate, translate } from '../i18n/localization'
 import type { MessageId } from '../i18n/localization'
@@ -101,13 +102,16 @@ export function SearchResults({ workspace, client }: {
         <label htmlFor="workspace-search">{translate('search.label')}</label>
         <div><Search size={17} aria-hidden="true" /><input id="workspace-search" autoFocus type="search" value={draft} maxLength={80} placeholder={translate('search.placeholder')} onChange={(event) => setDraft(event.target.value)} /><button className="primary-button" type="submit">{translate('search.submit')}</button></div>
       </form>
-      <div className="search-controls">
-        <label htmlFor="search-result-type">{translate('search.resultType')}</label>
-        <select id="search-result-type" value={resultType} onChange={(event) => updateParameters(query, searchResultType(event.target.value))}>
-          <option value="">{visible ? translate('search.allResultsCount', { count: visible.facets.reduce((count, facet) => count + facet.count, 0) }) : translate('search.allResults')}</option>
-          {workspaceSearchResultTypes.map((value) => <option key={value} value={value}>{facetCounts.has(value) ? translate('search.typeCount', { label: translate(resultTypeLabelIds[value]), count: facetCounts.get(value) ?? 0 }) : translate(resultTypeLabelIds[value])}</option>)}
-        </select>
-      </div>
+      <div className="search-controls"><FilterMenu groups={[{
+        kind: 'choices',
+        label: translate('search.resultType'),
+        value: resultType,
+        choices: [
+          { value: '', label: visible ? translate('search.allResultsCount', { count: visible.facets.reduce((count, facet) => count + facet.count, 0) }) : translate('search.allResults') },
+          ...workspaceSearchResultTypes.map((value) => ({ value, label: facetCounts.has(value) ? translate('search.typeCount', { label: translate(resultTypeLabelIds[value]), count: facetCounts.get(value) ?? 0 }) : translate(resultTypeLabelIds[value]) })),
+        ],
+        onChange: (value) => updateParameters(query, searchResultType(value)),
+      }]} activeCount={resultType ? 1 : 0} onClear={() => updateParameters(query, '')} menuLabel={translate('search.filters')} /></div>
       <div className="section-heading search-results-heading"><div><h2 id="search-results-heading">{query ? translate('search.resultsFor', { query }) : translate('search.results')}</h2>{query && visible && <p>{visible.truncated ? translate('search.countLimited', { count: visible.count }) : translate('search.count', { count: visible.count })}</p>}</div></div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {query.length < 2

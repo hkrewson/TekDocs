@@ -349,6 +349,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("entity-link-type-catalog", ("GET",), PermissionKey.RELATIONSHIPS_VIEW),
     route("msp-entity-search", ("GET",), PermissionKey.RELATIONSHIPS_VIEW),
+    route("msp-workspace-search", ("GET",)),
     route("msp-activity-list", ("GET",), PermissionKey.ACTIVITY_VIEW),
     route(
         "msp-entity-relationship-list-create",
@@ -1416,6 +1417,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.RELATIONSHIPS_VIEW,
         organization_scoped=True,
     ),
+    route("organization-workspace-search", ("GET",), organization_scoped=True),
     route(
         "organization-entity-relationship-list-create",
         ("GET", "POST"),

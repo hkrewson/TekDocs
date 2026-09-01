@@ -18,6 +18,7 @@ The security review currently recorded by the project used Claude Opus 5 (High) 
 - Permission-aware field and content keys with exact-revision export and publication snapshots
 - Immutable STATIC publications with signed manifests and retained PDF artifacts
 - People, sites, locations, custom fields, and typed entity relationships
+- Permission-aware workspace search across documentation content and operational identifiers
 - Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history
 - Simplified network records for locations, VLANs, CIDRs, ranges, gateways, DNS, and asset MAC addresses
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring

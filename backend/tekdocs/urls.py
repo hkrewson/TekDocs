@@ -364,6 +364,7 @@ from apps.core.reminder_views import (
     OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
+from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
 from apps.core.site_views import (
     MSPLocationDetailView,
     MSPLocationListCreateView,
@@ -745,6 +746,7 @@ urlpatterns = [
     ),
     path("api/v1/entity-link-types", EntityLinkTypeCatalogView.as_view(), name="entity-link-type-catalog"),
     path("api/v1/entities/search", MSPEntitySearchView.as_view(), name="msp-entity-search"),
+    path("api/v1/search", MSPWorkspaceSearchView.as_view(), name="msp-workspace-search"),
     path("api/v1/activity", MSPActivityListView.as_view(), name="msp-activity-list"),
     path("api/v1/relationship-graph", MSPRelationshipGraphView.as_view(), name="msp-relationship-graph"),
     path(
@@ -2205,6 +2207,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/entities/search",
         OrganizationEntitySearchView.as_view(),
         name="organization-entity-search",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/search",
+        OrganizationUnifiedSearchView.as_view(),
+        name="organization-workspace-search",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/relationship-graph",

@@ -141,6 +141,16 @@ async function mockWorkspaceApplication(page: Page) {
   ] }))
   await page.route('**/api/v1/workspaces/organizations**', (route) => {
     const url = new URL(route.request().url())
+    if (/\/workspaces\/organizations\/[^/]+\/search$/.test(url.pathname)) {
+      const pageNumber = Number(url.searchParams.get('page') ?? '1')
+      const resultType = url.searchParams.get('result_type')
+      const results = pageNumber === 1 ? [{
+        id: crypto.randomUUID(), result_type: 'document', entity_type: 'document', title: 'Firewall recovery guide', excerpt: 'Rotate the firewall recovery key before maintenance.', workspace_label: clientWorkspace.name, target: `/workspaces/organizations/${clientWorkspace.id}/documentation?document=document-1`, score: 1000, updated_at: '2026-08-31T12:00:00Z', review_state: 'approved',
+      }] : [{
+        id: crypto.randomUUID(), result_type: 'document', entity_type: 'document', title: 'Firewall replacement notes', excerpt: 'Replacement firewall inventory and handoff.', workspace_label: clientWorkspace.name, target: `/workspaces/organizations/${clientWorkspace.id}/documentation?document=document-2`, score: 900, updated_at: '2026-08-30T12:00:00Z', review_state: 'unreviewed',
+      }]
+      return route.fulfill({ json: { results, facets: [{ value: 'document', label: 'Documents', count: 17 }], page: pageNumber, page_size: 15, count: resultType === 'document' ? 17 : 17, has_more: pageNumber === 1, truncated: false } })
+    }
     if (url.pathname.endsWith('/entities/search')) {
       const query = url.searchParams.get('q')?.toLowerCase() ?? ''
       const results = [supplierWorkspace]
@@ -385,6 +395,25 @@ test('separate tabs retain independent URL-derived workspace context', async ({ 
   await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${supplierWorkspace.id}/products$`))
   await expect(otherPage).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/assets$`))
   await otherPage.close()
+})
+
+test('workspace search supports keyboard submission, filtering, pagination, and direct results', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/overview`)
+
+  const globalSearch = page.getByRole('searchbox', { name: 'Search TekDocs' })
+  await globalSearch.fill('firewall')
+  await globalSearch.press('Enter')
+
+  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/search\\?q=firewall`))
+  await expect(page.getByRole('heading', { name: 'Results for “firewall”' })).toBeVisible()
+  await expect(page.getByText('Rotate the firewall recovery key before maintenance.')).toBeVisible()
+  await page.getByLabel('Result type').selectOption('document')
+  await expect(page).toHaveURL(/type=document/)
+  await page.getByRole('button', { name: 'Next' }).click()
+  await expect(page).toHaveURL(/page=2/)
+  await expect(page.getByRole('link', { name: /Firewall replacement notes/ })).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
 test('keyboard-only workspace switching restores focus and keeps unsupported routes in context', async ({ page }) => {

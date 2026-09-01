@@ -223,11 +223,30 @@ def _visible_entities(
         entities = entities.filter(visibility)
     if not include_archived:
         entities = entities.filter(archived_at__isnull=True)
-    return entities.distinct().select_related(
-        "organization",
-        "organization__entity",
-        "organization_record",
-    ).prefetch_related("organization_record__classifications")
+    return (
+        entities.distinct()
+        .select_related(
+            "organization",
+            "organization__entity",
+            "organization_record",
+        )
+        .prefetch_related("organization_record__classifications")
+    )
+
+
+def visible_entities_for_workspace(
+    *,
+    workspace: ResolvedWorkspace,
+    include_reference_organizations: bool,
+    include_archived: bool = False,
+) -> QuerySet[Entity]:
+    """Public permission-filtered entity seam shared by relationships and search."""
+
+    return _visible_entities(
+        workspace=workspace,
+        include_reference_organizations=include_reference_organizations,
+        include_archived=include_archived,
+    )
 
 
 def entity_for_workspace(*, workspace: ResolvedWorkspace, entity_id: UUID) -> Entity:
@@ -487,8 +506,9 @@ def relationship_graph_projection(
                 break
             remaining = edge_limit - len(selected)
             candidates = list(
-                links.filter(Q(source_id__in=frontier) | Q(target_id__in=frontier))
-                .exclude(id__in=visited_links)[: remaining + 1]
+                links.filter(Q(source_id__in=frontier) | Q(target_id__in=frontier)).exclude(id__in=visited_links)[
+                    : remaining + 1
+                ]
             )
             if len(candidates) > remaining:
                 truncated = True

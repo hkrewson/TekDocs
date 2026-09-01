@@ -31,6 +31,7 @@ from apps.core.organization_views import _organizations_for_context
 from apps.core.people import query_people
 from apps.core.relationships import relationships_for_entity, search_entities
 from apps.core.sites import query_sites
+from apps.core.workspace_search import search_workspace
 from apps.core.workspaces import resolve_organization_workspace, search_organization_workspaces
 
 REFERENCE_ORGANIZATIONS = 100
@@ -301,6 +302,10 @@ def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
             {"q": "Reference", "page_size": 25},
         ),
         (
+            reverse("organization-workspace-search", kwargs={"organization_entity_id": selected.entity_id}),
+            {"q": "Reference", "page_size": 25},
+        ),
+        (
             reverse(
                 "organization-entity-relationship-list-create",
                 kwargs={"organization_entity_id": selected.entity_id, "entity_id": linked_entity.id},
@@ -363,6 +368,17 @@ def test_reference_dataset_read_paths_meet_query_and_latency_budgets():
                 page_size=25,
             ),
             5,
+        ),
+        (
+            "unified workspace search",
+            lambda: search_workspace(
+                workspace=workspace,
+                query="Reference",
+                result_type="",
+                page=1,
+                page_size=25,
+            ),
+            10,
         ),
         (
             "relationship discovery",

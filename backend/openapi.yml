@@ -5972,6 +5972,138 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/search:
+    get:
+      operationId: workspace_search_msp
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 80
+          minLength: 2
+        required: true
+      - in: query
+        name: result_type
+        schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - document
+          - file
+          - asset
+          - product
+          - model
+          - license
+          - service
+          - credential_reference
+          - domain
+          - certificate
+          - network
+          - data_flow
+          - ''
+          type: string
+          x-spec-enum-id: c21fae85431bd963
+          default: ''
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+          * `document` - document
+          * `file` - file
+          * `asset` - asset
+          * `product` - product
+          * `model` - model
+          * `license` - license
+          * `service` - service
+          * `credential_reference` - credential_reference
+          * `domain` - domain
+          * `certificate` - certificate
+          * `network` - network
+          * `data_flow` - data_flow
+      tags:
+      - search
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedWorkspaceSearchResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid or over-broad search parameters
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Workspace access required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '404':
+          description: Organization workspace not found
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '503':
+          description: Search execution budget exceeded
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/sites:
     get:
       operationId: sites_msp_list
@@ -23235,6 +23367,144 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/search:
+    get:
+      operationId: workspace_search_organization
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 15
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 80
+          minLength: 2
+        required: true
+      - in: query
+        name: result_type
+        schema:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - document
+          - file
+          - asset
+          - product
+          - model
+          - license
+          - service
+          - credential_reference
+          - domain
+          - certificate
+          - network
+          - data_flow
+          - ''
+          type: string
+          x-spec-enum-id: c21fae85431bd963
+          default: ''
+        description: |-
+          * `organization` - organization
+          * `person` - person
+          * `site` - site
+          * `location` - location
+          * `document` - document
+          * `file` - file
+          * `asset` - asset
+          * `product` - product
+          * `model` - model
+          * `license` - license
+          * `service` - service
+          * `credential_reference` - credential_reference
+          * `domain` - domain
+          * `certificate` - certificate
+          * `network` - network
+          * `data_flow` - data_flow
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedWorkspaceSearchResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid or over-broad search parameters
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Workspace access required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '404':
+          description: Organization workspace not found
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '503':
+          description: Search execution budget exceeded
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/sites:
     get:
       operationId: sites_organization_list
@@ -36443,6 +36713,157 @@ components:
       required:
       - cidr
       - name
+    UnifiedWorkspaceSearchFacet:
+      type: object
+      properties:
+        value:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - document
+          - file
+          - asset
+          - product
+          - model
+          - license
+          - service
+          - credential_reference
+          - domain
+          - certificate
+          - network
+          - data_flow
+          type: string
+          description: |-
+            * `organization` - organization
+            * `person` - person
+            * `site` - site
+            * `location` - location
+            * `document` - document
+            * `file` - file
+            * `asset` - asset
+            * `product` - product
+            * `model` - model
+            * `license` - license
+            * `service` - service
+            * `credential_reference` - credential_reference
+            * `domain` - domain
+            * `certificate` - certificate
+            * `network` - network
+            * `data_flow` - data_flow
+          x-spec-enum-id: c21fae85431bd963
+        label:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+      required:
+      - count
+      - label
+      - value
+    UnifiedWorkspaceSearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        result_type:
+          enum:
+          - organization
+          - person
+          - site
+          - location
+          - document
+          - file
+          - asset
+          - product
+          - model
+          - license
+          - service
+          - credential_reference
+          - domain
+          - certificate
+          - network
+          - data_flow
+          type: string
+          description: |-
+            * `organization` - organization
+            * `person` - person
+            * `site` - site
+            * `location` - location
+            * `document` - document
+            * `file` - file
+            * `asset` - asset
+            * `product` - product
+            * `model` - model
+            * `license` - license
+            * `service` - service
+            * `credential_reference` - credential_reference
+            * `domain` - domain
+            * `certificate` - certificate
+            * `network` - network
+            * `data_flow` - data_flow
+          x-spec-enum-id: c21fae85431bd963
+        entity_type:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+        workspace_label:
+          type: string
+        target:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+        updated_at:
+          type: string
+          format: date-time
+        review_state:
+          type: string
+          nullable: true
+      required:
+      - entity_type
+      - excerpt
+      - id
+      - result_type
+      - review_state
+      - score
+      - target
+      - title
+      - updated_at
+      - workspace_label
+    UnifiedWorkspaceSearchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedWorkspaceSearchHit'
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedWorkspaceSearchFacet'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        truncated:
+          type: boolean
+      required:
+      - count
+      - facets
+      - has_more
+      - page
+      - page_size
+      - results
+      - truncated
     VLAN:
       type: object
       properties:

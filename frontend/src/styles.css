@@ -218,10 +218,14 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .page-search > div { display: flex; align-items: center; gap: 8px; max-width: 720px; padding-left: 10px; color: var(--muted); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
 .page-search input { min-width: 0; flex: 1; min-height: 38px; border: 0; outline: 0; color: var(--text); background: transparent; }
 .page-search button { margin: -1px; border-radius: 0 7px 7px 0; }
+.search-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 18px; }
+.search-controls label { font-size: 13px; font-weight: 600; }
+.search-controls select { min-width: min(220px, 100%); }
 .search-results-heading { margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--border); }
 .search-result-list a { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 2px; color: var(--text); border-bottom: 1px solid var(--border); text-decoration: none; }
 .search-result-list a:hover { color: var(--accent); background: var(--surface-subtle); }
 .search-result-list a > span { display: grid; gap: 3px; }
+.search-result-excerpt { max-width: 760px; color: var(--text-soft); font-size: 13px; line-height: 1.45; }
 .search-result-list small { color: var(--muted); font-size: 12px; }
 .organization-form-section { margin-bottom: 18px; }
 .organization-form-section .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }

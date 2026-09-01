@@ -1748,6 +1748,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/search": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspace_search_msp"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/sites": {
         readonly parameters: {
             readonly query?: never;
@@ -6572,6 +6588,22 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["organization_reminder_calendar"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/search": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspace_search_organization"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -12176,6 +12208,72 @@ export interface components {
             /** @default  */
             readonly description: string;
         };
+        readonly UnifiedWorkspaceSearchFacet: {
+            /**
+             * @description * `organization` - organization
+             *     * `person` - person
+             *     * `site` - site
+             *     * `location` - location
+             *     * `document` - document
+             *     * `file` - file
+             *     * `asset` - asset
+             *     * `product` - product
+             *     * `model` - model
+             *     * `license` - license
+             *     * `service` - service
+             *     * `credential_reference` - credential_reference
+             *     * `domain` - domain
+             *     * `certificate` - certificate
+             *     * `network` - network
+             *     * `data_flow` - data_flow
+             * @enum {string}
+             */
+            readonly value: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow";
+            readonly label: string;
+            readonly count: number;
+        };
+        readonly UnifiedWorkspaceSearchHit: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `organization` - organization
+             *     * `person` - person
+             *     * `site` - site
+             *     * `location` - location
+             *     * `document` - document
+             *     * `file` - file
+             *     * `asset` - asset
+             *     * `product` - product
+             *     * `model` - model
+             *     * `license` - license
+             *     * `service` - service
+             *     * `credential_reference` - credential_reference
+             *     * `domain` - domain
+             *     * `certificate` - certificate
+             *     * `network` - network
+             *     * `data_flow` - data_flow
+             * @enum {string}
+             */
+            readonly result_type: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow";
+            readonly entity_type: string;
+            readonly title: string;
+            readonly excerpt: string;
+            readonly workspace_label: string;
+            readonly target: string;
+            readonly score: number;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly review_state: string | null;
+        };
+        readonly UnifiedWorkspaceSearchResult: {
+            readonly results: readonly components["schemas"]["UnifiedWorkspaceSearchHit"][];
+            readonly facets: readonly components["schemas"]["UnifiedWorkspaceSearchFacet"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly truncated: boolean;
+        };
         readonly VLAN: {
             /** Format: uuid */
             readonly id: string;
@@ -17249,6 +17347,94 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RelationshipGraphSnapshot"];
+                };
+            };
+        };
+    };
+    readonly workspace_search_msp: {
+        readonly parameters: {
+            readonly query: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q: string;
+                /**
+                 * @description * `organization` - organization
+                 *     * `person` - person
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `document` - document
+                 *     * `file` - file
+                 *     * `asset` - asset
+                 *     * `product` - product
+                 *     * `model` - model
+                 *     * `license` - license
+                 *     * `service` - service
+                 *     * `credential_reference` - credential_reference
+                 *     * `domain` - domain
+                 *     * `certificate` - certificate
+                 *     * `network` - network
+                 *     * `data_flow` - data_flow
+                 */
+                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "";
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["UnifiedWorkspaceSearchResult"];
+                };
+            };
+            /** @description Invalid or over-broad search parameters */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Workspace access required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Organization workspace not found */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Search execution budget exceeded */
+            readonly 503: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };
@@ -29786,6 +29972,96 @@ export interface operations {
                 };
                 content: {
                     readonly "text/calendar": string;
+                };
+            };
+        };
+    };
+    readonly workspace_search_organization: {
+        readonly parameters: {
+            readonly query: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q: string;
+                /**
+                 * @description * `organization` - organization
+                 *     * `person` - person
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `document` - document
+                 *     * `file` - file
+                 *     * `asset` - asset
+                 *     * `product` - product
+                 *     * `model` - model
+                 *     * `license` - license
+                 *     * `service` - service
+                 *     * `credential_reference` - credential_reference
+                 *     * `domain` - domain
+                 *     * `certificate` - certificate
+                 *     * `network` - network
+                 *     * `data_flow` - data_flow
+                 */
+                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "";
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["UnifiedWorkspaceSearchResult"];
+                };
+            };
+            /** @description Invalid or over-broad search parameters */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Workspace access required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Organization workspace not found */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Search execution budget exceeded */
+            readonly 503: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

@@ -5,6 +5,7 @@
     {"slug": "Roadmap", "audience": "end_user"},
     {"slug": "TekDocs-Setup", "audience": "operator"},
     {"slug": "Workspaces-and-organizations", "audience": "end_user", "contextual": true},
+    {"slug": "Search", "audience": "end_user", "contextual": true},
     {"slug": "Organizations", "audience": "end_user", "contextual": true},
     {"slug": "People-and-access", "audience": "end_user", "contextual": true},
     {"slug": "Sites-and-locations", "audience": "end_user", "contextual": true},

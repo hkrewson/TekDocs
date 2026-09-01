@@ -386,6 +386,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-site-list-create": ("organization_entity_id",),
         "organization-document-list-create": ("organization_entity_id",),
         "organization-document-search": ("organization_entity_id",),
+        "organization-workspace-search": ("organization_entity_id",),
         "organization-document-operations-choices": ("organization_entity_id",),
         "organization-document-operations": ("organization_entity_id", "document_entity_id"),
         "organization-document-review-request": ("organization_entity_id", "document_entity_id"),

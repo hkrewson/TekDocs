@@ -4,7 +4,16 @@ export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
 export type DocumentHealthStatus = 'current' | 'stale' | 'unreviewed' | 'unowned' | 'pending' | 'changes_requested'
 export type DocumentReviewState = 'unreviewed' | 'pending' | 'approved' | 'changes_requested'
-export type DocumentTopicType = 'unstructured' | 'procedure' | 'troubleshooting' | 'reference' | 'system_overview' | 'change_runbook'
+export type DocumentTopicType = 'unstructured' | 'policy' | 'procedure' | 'guide' | 'troubleshooting' | 'reference' | 'system_overview' | 'change_runbook'
+export type TopicSchema = {
+  type: DocumentTopicType
+  label: string
+  description: string
+  schema_version: number
+  starter_markdown: string
+  sections: { id: string; label: string; description: string }[]
+}
+export type TopicSchemaCatalog = { schema_version: number; topics: TopicSchema[] }
 export type DocumentFilters = {
   q?: string
   category?: DocumentCategory | ''
@@ -313,6 +322,7 @@ export interface DocumentsClient {
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
   preflight?(scope: DocumentScope, id: string, audience: PublicationAudience): Promise<DocumentPreflight>
   convertTopic?(scope: DocumentScope, id: string, topicType: DocumentTopicType, baseRevisionId: string, apply: boolean): Promise<TopicConversionPreview | DocumentRecord>
+  topicSchemas(signal?: AbortSignal): Promise<TopicSchemaCatalog>
   operationsChoices?(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentOperationsChoice[]>
   updateOperations?(scope: DocumentScope, id: string, input: DocumentOperationsInput): Promise<DocumentRecord>
   requestReview?(scope: DocumentScope, id: string, reviewerId: string, note: string): Promise<DocumentRecord>
@@ -505,6 +515,9 @@ export const browserDocumentsClient: DocumentsClient = {
     return parse<DocumentPreflight>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/preflight?audience=${encodeURIComponent(audience)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   convertTopic: (scope, id, topicType, baseRevisionId, apply) => mutate<TopicConversionPreview | DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/topic-conversion`, 'POST', { topic_type: topicType, base_revision_id: baseRevisionId, apply }),
+  async topicSchemas(signal) {
+    return parse<TopicSchemaCatalog>(await fetch('/api/v1/documents/topic-schemas', { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
   async operationsChoices(scope, signal) {
     return parse<DocumentOperationsChoice[]>(await fetch(`${collectionPath(scope)}/operations/choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },

@@ -4,7 +4,7 @@ Status: accepted for issues #30 and #31.
 
 ## Decision
 
-TekDocs keeps Markdown canonical. A structured document declares one versioned topic type: unstructured, procedure, troubleshooting, reference, system overview, or change runbook. Semantic section identity uses portable Markdown comments of the form `<!-- tekdocs:section purpose -->` immediately before a heading. The immutable block revision records the topic type and schema version, so older revisions are never reinterpreted or rewritten.
+TekDocs keeps Markdown canonical. A structured document declares one versioned topic type: unstructured, policy, procedure, guide, troubleshooting, reference, system overview, or change runbook. The catalog provides complete starter Markdown so the author chooses one compact template control and immediately edits the resulting structure; it is not merely a classification field. Semantic section identity uses portable Markdown comments of the form `<!-- tekdocs:section purpose -->` immediately before a heading. The immutable block revision records the topic type and schema version, so older revisions are never reinterpreted or rewritten.
 
 Conversion is explicit and previewed. It removes only prior TekDocs semantic marker comments, retains all authored headings and content, places retained content in the first guided section, and adds the remaining required sections. Templates carry the topic contract into enrolled documents. Publication and portable-export manifests retain the topic type and schema version.
 

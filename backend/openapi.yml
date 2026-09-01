@@ -26318,7 +26318,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -26326,12 +26328,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         topic_schema_version:
           type: integer
         created_by:
@@ -26371,7 +26375,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -26379,12 +26385,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         topic_schema_version:
           type: integer
         created_by:
@@ -29393,7 +29401,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -29401,12 +29411,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         topic_schema_version:
           type: integer
         is_template:
@@ -29683,7 +29695,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -29691,12 +29705,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
           default: unstructured
       required:
       - title
@@ -30653,7 +30669,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -30661,12 +30679,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         topic_schema_version:
           type: integer
         is_template:
@@ -31022,7 +31042,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -31030,12 +31052,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         base_revision_id:
           type: string
           format: uuid
@@ -31051,7 +31075,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -31059,12 +31085,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         topic_schema_version:
           type: integer
         base_revision_id:
@@ -31125,7 +31153,9 @@ components:
         topic_type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -31133,12 +31163,14 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
           default: unstructured
         base_revision_id:
           type: string
@@ -39450,7 +39482,9 @@ components:
         type:
           enum:
           - unstructured
+          - policy
           - procedure
+          - guide
           - troubleshooting
           - reference
           - system_overview
@@ -39458,18 +39492,22 @@ components:
           type: string
           description: |-
             * `unstructured` - Unstructured
+            * `policy` - Policy
             * `procedure` - Procedure
+            * `guide` - Guide
             * `troubleshooting` - Troubleshooting
             * `reference` - Reference
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
-          x-spec-enum-id: d198934f750d0e10
+          x-spec-enum-id: 6e919a6bb6439ac8
         label:
           type: string
         description:
           type: string
         schema_version:
           type: integer
+        starter_markdown:
+          type: string
         sections:
           type: array
           items:
@@ -39479,6 +39517,7 @@ components:
       - label
       - schema_version
       - sections
+      - starter_markdown
       - type
     TopicSchemaCatalog:
       type: object

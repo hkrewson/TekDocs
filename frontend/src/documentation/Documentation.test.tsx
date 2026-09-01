@@ -75,6 +75,14 @@ function clients() {
     composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: true,
     counts: { blocker: 0, warning: 0, info: 0 }, findings: [],
   })
+  const policyStarter = '<!-- tekdocs:section purpose -->\n## Purpose\n\n<!-- tekdocs:section scope -->\n## Scope\n'
+  const topicSchemas = vi.fn().mockResolvedValue({
+    schema_version: 1,
+    topics: [
+      { type: 'unstructured' as const, label: 'Unstructured', description: 'Start with a blank document.', schema_version: 1, starter_markdown: '', sections: [] },
+      { type: 'policy' as const, label: 'Policy', description: 'Set clear rules.', schema_version: 1, starter_markdown: policyStarter, sections: [{ id: 'purpose', label: 'Purpose', description: 'Why.' }, { id: 'scope', label: 'Scope', description: 'Who and what.' }] },
+    ],
+  })
   const convertTopic = vi.fn()
     .mockResolvedValueOnce({
       topic_type: 'procedure', topic_schema_version: 1, base_revision_id: 'revision-1',
@@ -125,6 +133,7 @@ function clients() {
     replacePrimaryFile,
     archiveAttachment,
     preflight,
+    topicSchemas,
     convertTopic,
     publish,
     approvePublication,
@@ -219,11 +228,11 @@ it('previews and confirms a document type conversion without rewriting the origi
 
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
-  await user.selectOptions(screen.getByLabelText('Guided structure'), 'procedure')
+  await user.selectOptions(within(screen.getByRole('region', { name: 'Starter template' })).getByRole('combobox'), 'procedure')
 
   await waitFor(() => expect(convertTopic).toHaveBeenNthCalledWith(1, {}, 'doc-1', 'procedure', 'revision-1', false))
   await waitFor(() => expect(convertTopic).toHaveBeenNthCalledWith(2, {}, 'doc-1', 'procedure', 'revision-1', true))
-  expect(await screen.findByRole('status')).toHaveTextContent('Converted to Procedure')
+  expect(await screen.findByRole('status')).toHaveTextContent('Applied the Procedure starter template')
 })
 
 it('shows publication findings and keeps a blocked document from publishing', async () => {
@@ -403,6 +412,24 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
+})
+
+it('places the selected starter template directly into a new document draft', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, createDocument } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await screen.findByRole('button', { name: /Firewall standard/ })
+  await user.click(screen.getByRole('button', { name: 'New document' }))
+  await user.type(screen.getByLabelText('Document title'), 'Acceptable use')
+  await user.selectOptions(screen.getByLabelText('Starter template'), 'policy')
+  const draft = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' })
+  expect(draft.value).toContain('## Purpose')
+  expect(draft.value).toContain('## Scope')
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
+  await waitFor(() => expect(createDocument).toHaveBeenCalled())
+  const input = createDocument.mock.calls.at(-1)?.[1]
+  expect(input).toMatchObject({ title: 'Acceptable use', topic_type: 'policy' })
+  expect(input?.markdown).toContain('<!-- tekdocs:section purpose -->')
 })
 
 it('creates a file-backed document with notes and exposes retained primary-file versions', async () => {

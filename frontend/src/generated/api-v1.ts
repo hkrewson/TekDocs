@@ -7577,14 +7577,16 @@ export interface components {
             readonly checksum: string;
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly topic_schema_version: number;
             readonly created_by: string | null;
             /** Format: date-time */
@@ -7600,14 +7602,16 @@ export interface components {
             readonly checksum: string;
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly topic_schema_version: number;
             readonly created_by: string | null;
             /** Format: date-time */
@@ -8853,14 +8857,16 @@ export interface components {
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly topic_schema_version: number;
             readonly is_template: boolean;
             readonly library_visible: boolean;
@@ -8960,7 +8966,9 @@ export interface components {
             readonly library_visible: boolean;
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
@@ -8968,7 +8976,7 @@ export interface components {
              * @default unstructured
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
         };
         readonly DocumentFacet: {
             readonly value: string;
@@ -9384,14 +9392,16 @@ export interface components {
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly topic_schema_version: number;
             readonly is_template: boolean;
             readonly library_visible: boolean;
@@ -9516,14 +9526,16 @@ export interface components {
         readonly DocumentTopicConversion: {
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             /** Format: uuid */
             readonly base_revision_id: string;
             /** @default false */
@@ -9532,14 +9544,16 @@ export interface components {
         readonly DocumentTopicConversionPreview: {
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly topic_schema_version: number;
             /** Format: uuid */
             readonly base_revision_id: string;
@@ -9569,7 +9583,9 @@ export interface components {
             readonly library_visible: boolean;
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
@@ -9577,7 +9593,7 @@ export interface components {
              * @default unstructured
              * @enum {string}
              */
-            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             /** Format: uuid */
             readonly base_revision_id: string;
         };
@@ -13230,17 +13246,20 @@ export interface components {
         readonly TopicSchema: {
             /**
              * @description * `unstructured` - Unstructured
+             *     * `policy` - Policy
              *     * `procedure` - Procedure
+             *     * `guide` - Guide
              *     * `troubleshooting` - Troubleshooting
              *     * `reference` - Reference
              *     * `system_overview` - System overview
              *     * `change_runbook` - Change runbook
              * @enum {string}
              */
-            readonly type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly type: "unstructured" | "policy" | "procedure" | "guide" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             readonly label: string;
             readonly description: string;
             readonly schema_version: number;
+            readonly starter_markdown: string;
             readonly sections: readonly components["schemas"]["TopicSection"][];
         };
         readonly TopicSchemaCatalog: {

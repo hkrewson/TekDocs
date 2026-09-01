@@ -380,6 +380,7 @@ class TopicSchemaSerializer(serializers.Serializer):
     label = serializers.CharField()
     description = serializers.CharField()
     schema_version = serializers.IntegerField()
+    starter_markdown = serializers.CharField(allow_blank=True)
     sections = TopicSectionSerializer(many=True)
 
 

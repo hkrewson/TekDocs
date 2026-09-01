@@ -156,6 +156,12 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ topic_type: 'troubleshooting', base_revision_id: 'revision/id', apply: false }))
   })
 
+  it('loads the starter-template catalog', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ schema_version: 1, topics: [] }), { status: 200 })))
+    await browserDocumentsClient.topicSchemas()
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/documents/topic-schemas')
+  })
+
   it('repeats the field message a rejected request came back with', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({

@@ -33,32 +33,69 @@ def _s(section_id: str, label: str, description: str) -> Section:
 
 SCHEMAS: dict[str, TopicSchema] = {
     DocumentTopicType.UNSTRUCTURED: TopicSchema(
-        DocumentTopicType.UNSTRUCTURED, "Unstructured", "Write freely without required sections.", ()
+        DocumentTopicType.UNSTRUCTURED, "Unstructured", "Start with a blank document.", ()
+    ),
+    DocumentTopicType.POLICY: TopicSchema(
+        DocumentTopicType.POLICY,
+        "Policy",
+        "Set clear, enforceable rules and accountability.",
+        (
+            _s("purpose", "Purpose", "Why the policy exists and the risk it addresses."),
+            _s("scope", "Scope", "Who and what the policy covers, including explicit exclusions."),
+            _s("definitions", "Definitions", "Terms that a reasonable employee might interpret more than one way."),
+            _s("policy-statement", "Policy statement", "Clear, testable requirements using must and must not."),
+            _s(
+                "roles-responsibilities",
+                "Roles and responsibilities",
+                "Accountability assigned to roles, not individuals.",
+            ),
+            _s("compliance-consequences", "Compliance and consequences", "What happens when the policy is breached."),
+            _s("related", "Related documents", "Procedures, forms, resources, and related policies."),
+            _s("revision-history", "Revision history", "A dated log of changes to the policy."),
+        ),
     ),
     DocumentTopicType.PROCEDURE: TopicSchema(
         DocumentTopicType.PROCEDURE,
         "Procedure",
-        "Repeatable work with validation and a safe way back.",
+        "Document a repeatable operational process.",
         (
+            _s("overview", "Overview", "A concise summary of the procedure."),
             _s("purpose", "Purpose", "What this procedure accomplishes."),
-            _s("prerequisites", "Prerequisites", "Access, tools, inputs, and conditions needed first."),
-            _s("risk-impact", "Risk and impact", "Expected impact and material risks."),
-            _s("actions", "Actions", "The ordered steps to perform."),
-            _s("validation", "Validation", "How to prove the result is correct."),
-            _s("rollback", "Rollback", "How to return to the prior safe state."),
-            _s("escalation", "Escalation", "When and where to escalate."),
+            _s("scope", "Scope", "Who, what, and which conditions the procedure covers."),
+            _s(
+                "responsibilities", "Responsibilities", "The roles responsible for carrying out and approving the work."
+            ),
+            _s("process", "Process", "The ordered steps to follow."),
+            _s("related", "Related", "Related documents, support pages, forms, and resources."),
+            _s("revision-history", "Revision history", "A dated log of changes to the procedure."),
+        ),
+    ),
+    DocumentTopicType.GUIDE: TopicSchema(
+        DocumentTopicType.GUIDE,
+        "Guide",
+        "Give end users a friendly, task-focused walkthrough.",
+        (
+            _s("overview", "Overview", "What the guide covers and what the reader will accomplish."),
+            _s("walkthrough", "Walkthrough", "The steps the reader should follow."),
+            _s("related", "Related", "Related documentation, support pages, and resources."),
+            _s("revision-history", "Revision history", "A dated log of changes to the guide."),
         ),
     ),
     DocumentTopicType.TROUBLESHOOTING: TopicSchema(
         DocumentTopicType.TROUBLESHOOTING,
         "Troubleshooting",
-        "Diagnose a condition and select a remedy.",
+        "Capture an issue, investigation, next steps, and resolution.",
         (
-            _s("condition", "Condition or symptom", "What is observed and when."),
-            _s("diagnostics", "Diagnostics", "Checks that narrow the cause."),
-            _s("causes", "Likely causes", "Known causes and distinguishing evidence."),
-            _s("remedies", "Remedies", "Corrective actions and validation."),
-            _s("escalation", "Escalation", "When and where to escalate."),
+            _s("issue", "Issue", "What the user describes, recorded verbatim."),
+            _s(
+                "steps-to-reproduce",
+                "Steps to reproduce",
+                "If reproducible, the exact steps that make the issue occur.",
+            ),
+            _s("steps-taken", "Steps taken", "The exact troubleshooting or resolution steps already performed."),
+            _s("next-steps", "Next steps", "The next troubleshooting actions expected, if any."),
+            _s("related", "Related", "Documentation, support pages, or resources used during research."),
+            _s("resolution", "Resolution", "A general overview of what resolved the issue."),
         ),
     ),
     DocumentTopicType.REFERENCE: TopicSchema(
@@ -67,10 +104,13 @@ SCHEMAS: dict[str, TopicSchema] = {
         "Authoritative values and constraints for lookup.",
         (
             _s("purpose", "Purpose", "What this reference describes."),
-            _s("values", "Authoritative values", "The values readers should rely on."),
-            _s("constraints", "Constraints", "Limits, assumptions, and exceptions."),
-            _s("source", "Source", "The authority from which the values came."),
+            _s("values", "Values and specifications", "The authoritative values readers should rely on."),
+            _s("constraints", "Constraints and exceptions", "Limits, assumptions, and exceptions."),
+            _s("examples", "Examples", "Examples showing correct interpretation or use."),
+            _s("source", "Sources", "The authorities from which the information came."),
             _s("last-verified", "Last verified", "When and by whom the values were checked."),
+            _s("related", "Related", "Related documentation and resources."),
+            _s("revision-history", "Revision history", "A dated log of changes to the reference."),
         ),
     ),
     DocumentTopicType.SYSTEM_OVERVIEW: TopicSchema(
@@ -78,12 +118,25 @@ SCHEMAS: dict[str, TopicSchema] = {
         "System overview",
         "Explain ownership, dependencies, and recovery.",
         (
-            _s("purpose", "Purpose", "What the system does and for whom."),
-            _s("owners", "Owners", "Business and technical ownership."),
+            _s("overview", "Overview", "What the system is and what it does."),
+            _s("purpose-scope", "Purpose and scope", "Who the system serves and the boundaries of this overview."),
+            _s("owners", "Owners and contacts", "Business ownership, technical ownership, and support contacts."),
+            _s("architecture", "Architecture", "The major components and how they fit together."),
             _s("dependencies", "Dependencies", "Required systems, services, and vendors."),
-            _s("data-flow", "Data flow", "How information moves through the system."),
-            _s("monitoring", "Monitoring", "Signals, alerts, and normal operating checks."),
-            _s("recovery", "Recovery", "Restoration priorities and procedure references."),
+            _s(
+                "data-integrations",
+                "Data and integrations",
+                "Important data flows, interfaces, and integration points.",
+            ),
+            _s("monitoring", "Monitoring and alerts", "Signals, alerts, and normal operating checks."),
+            _s(
+                "security-access",
+                "Security and access",
+                "Authentication, authorization, and sensitive-data considerations.",
+            ),
+            _s("recovery", "Backup and recovery", "Protection, restoration priorities, and procedure references."),
+            _s("related", "Related", "Related procedures, diagrams, and resources."),
+            _s("revision-history", "Revision history", "A dated log of changes to the overview."),
         ),
     ),
     DocumentTopicType.CHANGE_RUNBOOK: TopicSchema(
@@ -91,11 +144,18 @@ SCHEMAS: dict[str, TopicSchema] = {
         "Change runbook",
         "Execute a controlled change and retain evidence.",
         (
-            _s("pre-checks", "Pre-checks", "Readiness checks before the change."),
-            _s("change-steps", "Change steps", "The ordered implementation steps."),
+            _s("change-summary", "Change summary", "A concise description of the planned change."),
+            _s("purpose", "Purpose", "Why the change is required."),
+            _s("scope-impact", "Scope and impact", "Affected systems, users, risks, and expected interruption."),
+            _s("prerequisites", "Prerequisites", "Approvals, access, tools, backups, and dependencies needed first."),
+            _s("pre-checks", "Pre-change checks", "Readiness checks and the expected starting state."),
+            _s("change-steps", "Implementation steps", "The ordered implementation steps."),
             _s("validation", "Validation", "Tests proving the change succeeded."),
-            _s("rollback", "Rollback", "Triggers and steps for reverting."),
+            _s("rollback", "Rollback", "Rollback triggers and ordered steps for returning to a safe state."),
+            _s("communication", "Communication", "Who must be informed before, during, and after the change."),
             _s("evidence", "Evidence", "Records to retain after execution."),
+            _s("related", "Related", "Related procedures, tickets, approvals, and resources."),
+            _s("revision-history", "Revision history", "A dated log of changes to the runbook."),
         ),
     ),
 }
@@ -108,6 +168,7 @@ def catalog() -> list[dict[str, object]]:
             "label": schema.label,
             "description": schema.description,
             "schema_version": SCHEMA_VERSION,
+            "starter_markdown": seed_markdown(schema.type),
             "sections": [section.__dict__ for section in schema.sections],
         }
         for schema in SCHEMAS.values()
@@ -116,6 +177,9 @@ def catalog() -> list[dict[str, object]]:
 
 def seed_markdown(topic_type: str, existing: str = "") -> str:
     schema = SCHEMAS[topic_type]
+    found_ids = [match.group(1) for line in existing.splitlines() if (match := MARKER.match(line))]
+    if found_ids == [section.id for section in schema.sections]:
+        return existing.rstrip() + ("\n" if existing else "")
     existing = "\n".join(line for line in existing.splitlines() if not MARKER.match(line))
     if not schema.sections:
         return existing + ("\n" if existing else "")

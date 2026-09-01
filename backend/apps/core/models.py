@@ -3462,7 +3462,9 @@ class DocumentReviewState(models.TextChoices):
 
 class DocumentTopicType(models.TextChoices):
     UNSTRUCTURED = "unstructured", "Unstructured"
+    POLICY = "policy", "Policy"
     PROCEDURE = "procedure", "Procedure"
+    GUIDE = "guide", "Guide"
     TROUBLESHOOTING = "troubleshooting", "Troubleshooting"
     REFERENCE = "reference", "Reference"
     SYSTEM_OVERVIEW = "system_overview", "System overview"

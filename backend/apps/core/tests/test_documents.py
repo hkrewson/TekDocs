@@ -55,6 +55,7 @@ from apps.core.models import (
     DocumentPublicationControlEvent,
     DocumentRemoteSource,
     DocumentTemplateEnrollment,
+    DocumentTopicType,
     Entity,
     EntityLink,
     EntityVisibility,
@@ -208,7 +209,7 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
     )
     assert preview_response.status_code == 200
     assert preview_response.json()["topic_type"] == "troubleshooting"
-    assert "<!-- tekdocs:section condition -->" in preview_response.json()["converted_markdown"]
+    assert "<!-- tekdocs:section issue -->" in preview_response.json()["converted_markdown"]
     assert Document.objects.get(entity_id=created["id"]).topic_type == "procedure"
 
     applied_response = owner_client.post(
@@ -229,6 +230,21 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
     )
     assert stale_preview.status_code == 409
     assert stale_preview.json()["code"] == "revision_conflict"
+
+
+@pytest.mark.django_db
+def test_policy_starter_markdown_is_accepted_without_duplicate_structure(owner_client, installation):
+    from apps.core.topic_schemas import seed_markdown
+
+    starter = seed_markdown(DocumentTopicType.POLICY)
+    response = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Acceptable use", "markdown": starter, "topic_type": "policy", "category": "policy"},
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    assert response.json()["markdown"] == starter
+    assert response.json()["markdown"].count("<!-- tekdocs:section purpose -->") == 1
 
 
 @pytest.mark.django_db

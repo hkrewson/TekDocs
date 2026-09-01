@@ -12,7 +12,7 @@ import { DocumentationMaps } from './DocumentationMaps'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import { browserDocumentsClient, RevisionConflictError } from './api'
 import type { DocumentKeyBinding, DocumentKeyReport, WorkspaceKeyBinding } from './api'
-import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentHealthStatus, DocumentInput, DocumentOperationsChoice, DocumentPlacement, DocumentPreflight, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentRemoteObservation, DocumentRemoteSource, DocumentRestructurePreview, DocumentTopicType, DocumentsClient, EntityMentionOption, PlacementAudienceProfile, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout } from './api'
+import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentHealthStatus, DocumentInput, DocumentOperationsChoice, DocumentPlacement, DocumentPreflight, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentRemoteObservation, DocumentRemoteSource, DocumentRestructurePreview, DocumentTopicType, DocumentsClient, EntityMentionOption, PlacementAudienceProfile, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout, TopicSchema } from './api'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 const PdfViewer = lazy(async () => ({ default: (await import('./PdfViewer')).PdfViewer }))
@@ -23,7 +23,9 @@ const categories: { value: DocumentCategory; label: string }[] = [
 ]
 const topicTypes: { value: DocumentTopicType; label: string; description: string }[] = [
   { value: 'unstructured', label: translate('documentation.topicUnstructured'), description: translate('documentation.topicUnstructuredHelp') },
+  { value: 'policy', label: translate('documentation.topicPolicy'), description: translate('documentation.topicPolicyHelp') },
   { value: 'procedure', label: translate('documentation.topicProcedure'), description: translate('documentation.topicProcedureHelp') },
+  { value: 'guide', label: translate('documentation.topicGuide'), description: translate('documentation.topicGuideHelp') },
   { value: 'troubleshooting', label: translate('documentation.topicTroubleshooting'), description: translate('documentation.topicTroubleshootingHelp') },
   { value: 'reference', label: translate('documentation.topicReference'), description: translate('documentation.topicReferenceHelp') },
   { value: 'system_overview', label: translate('documentation.topicSystemOverview'), description: translate('documentation.topicSystemOverviewHelp') },
@@ -75,6 +77,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [markdown, setMarkdown] = useState('')
   const [category, setCategory] = useState<DocumentCategory>('general')
   const [topicType, setTopicType] = useState<DocumentTopicType>('unstructured')
+  const [topicSchemas, setTopicSchemas] = useState<TopicSchema[]>([])
+  const [topicSchemasLoading, setTopicSchemasLoading] = useState(true)
   const [isTemplate, setIsTemplate] = useState(false)
   const [libraryVisible, setLibraryVisible] = useState(false)
   const [documentQuery, setDocumentQuery] = useState('')
@@ -202,6 +206,14 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
   }, [categoryFilter, client, collectionFilter, documentQuery, healthFilter, requestedDocumentId, revision, scope, scopeKey, tagFilter, templateFilter])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    client.topicSchemas(controller.signal)
+      .then((catalog) => { if (!controller.signal.aborted) { setTopicSchemas(catalog.topics); setTopicSchemasLoading(false) } })
+      .catch(() => { if (!controller.signal.aborted) { setTopicSchemas([]); setTopicSchemasLoading(false) } })
+    return () => controller.abort()
+  }, [client])
 
   useEffect(() => {
     if (!client.operationsChoices) return
@@ -734,6 +746,15 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       if ('id' in result) { setSelected(result); setTopicType(result.topic_type ?? 'unstructured'); setMarkdown(result.markdown); setMessage(translate('documentation.topicConverted', { type: label })); setRevision((value) => value + 1) }
     } catch (conversionError) { setError(errorMessage(conversionError)) } finally { setSaving(false) }
   }
+  const chooseStarterTemplate = (nextTopic: DocumentTopicType) => {
+    const nextSchema = topicSchemas.find((schema) => schema.type === nextTopic)
+    const currentStarter = topicSchemas.find((schema) => schema.type === topicType)?.starter_markdown ?? ''
+    const hasAuthoredContent = Boolean(markdown.trim()) && markdown !== currentStarter
+    if (hasAuthoredContent && !window.confirm(translate('documentation.replaceDraftWithTemplate'))) return
+    setTopicType(nextTopic)
+    setMarkdown(nextSchema?.starter_markdown ?? '')
+    setEditorGeneration((value) => value + 1)
+  }
   const runDocumentCheck = async () => {
     if (!selected || selected === 'new' || !client.preflight) return
     setDocumentCheck({ phase: 'loading' })
@@ -920,7 +941,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       {selected === 'new' ? <>
         <div className="document-edit-heading"><label>Document title<input autoFocus maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>{newDocumentMode === 'write' && <label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label>}<button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div>
         <div className="document-actions" role="group" aria-label="Document source"><button className={newDocumentMode === 'write' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setNewDocumentMode('write'); setNewPrimaryFile(null) }}>{translate('documentation.writeDocument')}</button><button className={newDocumentMode === 'file' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setNewDocumentMode('file'); setIsTemplate(false) }}>{translate('documentation.uploadFile')}</button></div>
-        {newDocumentMode === 'write' && <fieldset className="document-topic-picker"><legend>{translate('documentation.documentType')}</legend><p>{translate('documentation.documentTypeChoiceHelp')}</p><div>{topicTypes.map((topic) => <label key={topic.value}><input type="radio" name="new-document-topic" value={topic.value} checked={topicType === topic.value} onChange={() => setTopicType(topic.value)} /><span><strong>{topic.label}</strong><small>{topic.description}</small></span></label>)}</div></fieldset>}
+        {newDocumentMode === 'write' && <div className="document-template-control"><label>{translate('documentation.starterTemplate')}<select value={topicType} disabled={topicSchemasLoading} onChange={(event) => chooseStarterTemplate(event.target.value as DocumentTopicType)}>{topicTypes.map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}</select></label><p>{topicTypes.find((topic) => topic.value === topicType)?.description}</p>{topicSchemas.find((schema) => schema.type === topicType)?.sections.length ? <p className="template-sections">{translate('documentation.templateIncludes', { sections: topicSchemas.find((schema) => schema.type === topicType)!.sections.map((section) => section.label).join(', ') })}</p> : null}</div>}
         {newDocumentMode === 'file' && <div className="document-context-panel primary-file-picker"><label>Primary file<input ref={newPrimaryFileInput} type="file" required onChange={(event) => setNewPrimaryFile(event.target.files?.[0] ?? null)} /></label><p>The file is scanned before the document is created. PDF files can be read here; other supported files remain available for download.</p></div>}
         <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`new-${newDocumentMode}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="" organizationId={workspace?.id} onMarkdownChange={setMarkdown} /></Suspense>
         <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || (newDocumentMode === 'file' && !newPrimaryFile)} onClick={() => { if (newDocumentMode === 'file') void createFileBackedDocument(); else void save() }}>{saving ? 'Creating…' : newDocumentMode === 'file' ? 'Create file-backed document' : 'Create document'}</button><button className="secondary-button" type="button" onClick={close}>{translate('common.cancel')}</button></div>
@@ -932,7 +953,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
         {selected.primary_file && <section className="document-context-panel primary-document-file" aria-labelledby="primary-document-file-heading"><header className="section-heading"><div><strong id="primary-document-file-heading">{selected.primary_file.filename}</strong><span>Primary file · version {selected.primary_file.version_number} · {selected.primary_file.size.toLocaleString()} bytes</span></div><div><input ref={replacementFileInput} className="sr-only" aria-label="Replacement primary file" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replacePrimaryFile(file) }} />{selected.primary_file.media_type === 'application/pdf' && !viewedPdf && <button className="secondary-button" type="button" onClick={() => setViewedPdf({ filename: selected.primary_file!.filename, url: client.attachmentDownloadUrl(scope, selected.id, selected.primary_file!.id) })}>{translate('documentation.viewPdf')}</button>}<a className="secondary-button" href={client.attachmentDownloadUrl(scope, selected.id, selected.primary_file.id)}><Download size={15} />Download</a><button className="secondary-button" type="button" disabled={saving} onClick={() => replacementFileInput.current?.click()}><RefreshCw size={15} />{translate('documentation.replaceFile')}</button></div></header>{viewedPdf && <Suspense fallback={<p role="status">Loading PDF viewer…</p>}><PdfViewer filename={viewedPdf.filename} url={viewedPdf.url} onClose={() => setViewedPdf(null)} /></Suspense>}</section>}
 
-        {activePanel === 'details' && <section className="document-context-panel document-topic-settings" aria-labelledby="document-topic-heading"><div className="section-heading"><div><h2 id="document-topic-heading">{translate('documentation.documentType')}</h2><p>{topicTypes.find((item) => item.value === selected.topic_type)?.description ?? topicTypes[0].description}</p></div></div><label>{translate('documentation.guidedStructure')}<select value={selected.topic_type ?? 'unstructured'} disabled={saving} onChange={(event) => { void changeTopic(event.target.value as DocumentTopicType) }}>{topicTypes.map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}</select></label><p className="field-hint">{translate('documentation.topicChangeHelp')}</p></section>}
+        {activePanel === 'details' && <section className="document-context-panel document-topic-settings" aria-labelledby="document-topic-heading"><div className="section-heading"><div><h2 id="document-topic-heading">{translate('documentation.starterTemplate')}</h2><p>{topicTypes.find((item) => item.value === selected.topic_type)?.description ?? topicTypes[0].description}</p></div></div><label>{translate('documentation.starterTemplate')}<select value={selected.topic_type ?? 'unstructured'} disabled={saving} onChange={(event) => { void changeTopic(event.target.value as DocumentTopicType) }}>{topicTypes.map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}</select></label><p className="field-hint">{translate('documentation.topicChangeHelp')}</p></section>}
 
         <section className="document-context-panel document-check" aria-labelledby="document-check-heading"><div className="section-heading"><div><h2 id="document-check-heading">{translate('documentation.documentationCheck')}</h2><p>{translate('documentation.documentationCheckHelp')}</p></div><button className="secondary-button" type="button" disabled={documentCheck?.phase === 'loading'} onClick={() => { void runDocumentCheck() }}>{documentCheck?.phase === 'loading' ? translate('documentation.checking') : translate('documentation.checkDocument')}</button></div>{documentCheck?.phase === 'error' && <p role="alert">{translate('documentation.checkUnavailable')}</p>}{documentCheck?.phase === 'ready' && documentCheck.report && <><p role="status">{documentCheck.report.valid ? translate('documentation.noPublicationBlockers') : translate('documentation.publicationBlockerCount', { count: documentCheck.report.counts.blocker })}</p>{documentCheck.report.findings.length > 0 && <ul>{documentCheck.report.findings.map((finding, index) => <li key={`${finding.code}-${finding.section_id ?? ''}-${index}`}><strong>{finding.summary}</strong><span>{finding.remediation}</span></li>)}</ul>}</>}</section>
 

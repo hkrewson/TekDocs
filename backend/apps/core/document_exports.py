@@ -241,6 +241,8 @@ def resolve_export_snapshot(
         },
         "title": locked_document.entity.display_name,
         "category": locked_document.category,
+        "topic_type": locked_document.topic_type,
+        "topic_schema_version": locked_document.topic_schema_version,
         "key_resolutions": list(frozen_keys.manifest_records),
         "placements": [
             {
@@ -288,7 +290,7 @@ def export_html(
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta http-equiv="Content-Security-Policy" '
-        'content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
+        "content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'\">"
         f"<title>{escape(title)}</title></head><body><main>{body}</main></body></html>\n"
     ).encode()
 

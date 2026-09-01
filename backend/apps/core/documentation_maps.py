@@ -8,7 +8,7 @@ import zipfile
 from dataclasses import dataclass
 from html import escape
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
@@ -20,6 +20,7 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 
 from apps.accounts.models import User
 
+from .diagram_exports import DiagramExportArtifact
 from .document_exports import export_docx, export_html, export_pdf, resolve_export_snapshot
 from .documents import resolve_document
 from .models import (
@@ -41,8 +42,10 @@ from .models import (
     PublicationAudience,
     PublicationControlAction,
 )
+from .preflight import run_map_preflight
 from .publications import read_publication_artifact
 from .rendering import attachment_ids_in_markdown
+from .topic_schemas import inspect_markdown
 from .workspaces import ResolvedWorkspace
 
 MAP_FORMAT = "tekdocs-documentation-map/v1"
@@ -231,7 +234,7 @@ def _resolve_targets(
                     tenant=workspace.member.tenant,
                     organization=workspace.organization,
                     entity__workspace_id=workspace.data_scope.workspace_id,
-                    entity_id=entry.get("document_id"),
+                    entity_id=cast(UUID, entry.get("document_id")),
                     archived_at__isnull=True,
                 )
             except Document.DoesNotExist as exc:
@@ -240,7 +243,7 @@ def _resolve_targets(
             if kind == DocumentationMapEntryKind.DOCUMENT_REVISION:
                 try:
                     revision = BlockRevision.objects.select_related("block__source_document").get(
-                        id=entry.get("document_revision_id"),
+                        id=cast(UUID, entry.get("document_revision_id")),
                         tenant=workspace.member.tenant,
                         organization=workspace.organization,
                         block__source_document=document,
@@ -254,7 +257,7 @@ def _resolve_targets(
                     tenant=workspace.member.tenant,
                     organization=workspace.organization,
                     document__entity__workspace_id=workspace.data_scope.workspace_id,
-                    entity_id=entry.get("publication_id"),
+                    entity_id=cast(UUID, entry.get("publication_id")),
                 )
             except DocumentPublication.DoesNotExist as exc:
                 raise ValidationError({"entries": "A selected publication is unavailable in this Workspace."}) from exc
@@ -265,7 +268,7 @@ def _resolve_targets(
                     tenant=workspace.member.tenant,
                     organization=workspace.organization,
                     workspace_id=workspace.data_scope.workspace_id,
-                    entity_id=entry.get("map_id"),
+                    entity_id=cast(UUID, entry.get("map_id")),
                     archived_at__isnull=True,
                 )
             except DocumentationMap.DoesNotExist as exc:
@@ -275,17 +278,19 @@ def _resolve_targets(
             entry["external_url"] = _safe_external_url(str(entry.get("external_url") or ""))
 
         if audience == DocumentationMapAudience.CLIENT_VISIBLE:
-            publication = entry.get("publication")
-            subordinate = entry.get("subordinate_map")
-            if publication is not None:
-                if publication.audience != PublicationAudience.CLIENT_VISIBLE or not _approved_current(publication):
+            selected_publication = cast(DocumentPublication | None, entry.get("publication"))
+            selected_subordinate = cast(DocumentationMap | None, entry.get("subordinate_map"))
+            if selected_publication is not None:
+                if selected_publication.audience != PublicationAudience.CLIENT_VISIBLE or not _approved_current(
+                    selected_publication
+                ):
                     raise ValidationError(
                         {"entries": "Client-visible maps require approved current client publications."}
                     )
-            elif subordinate is not None:
+            elif selected_subordinate is not None:
                 if (
-                    subordinate.current_revision is None
-                    or subordinate.current_revision.audience != DocumentationMapAudience.CLIENT_VISIBLE
+                    selected_subordinate.current_revision is None
+                    or selected_subordinate.current_revision.audience != DocumentationMapAudience.CLIENT_VISIBLE
                 ):
                     raise ValidationError(
                         {"entries": "Client-visible maps may include only client-visible subordinate maps."}
@@ -400,7 +405,7 @@ def create_map(
     if owner_id and membership is None:
         raise ValidationError({"owner_id": "The selected owner is unavailable."})
     owner = membership.user if membership else None
-    entity = Entity.objects.create_owned(
+    entity = Entity.objects.create_owned(  # type: ignore[no-untyped-call]
         tenant=workspace.member.tenant,
         organization=workspace.organization,
         entity_type="documentation_map",
@@ -552,6 +557,18 @@ def inspect_map(documentation_map: DocumentationMap) -> list[MapFinding]:
                 findings.append(_finding("unowned_document", "warning", entry, "The document has no owner."))
             if entry.document.review_state != DocumentReviewState.APPROVED:
                 findings.append(_finding("unreviewed_document", "warning", entry, "The document is not approved."))
+            resolved_markdown = resolve_document(entry.document).markdown
+            for topic_finding in inspect_markdown(entry.document.topic_type, resolved_markdown):
+                severity = str(topic_finding["severity"])
+                section_id = topic_finding.get("section_id")
+                findings.append(
+                    _finding(
+                        str(topic_finding["code"]),
+                        severity,
+                        entry,
+                        f"The structured document has an incomplete {section_id or 'section'} contract.",
+                    )
+                )
         elif entry.kind == DocumentationMapEntryKind.PUBLICATION and entry.publication is not None:
             if not _approved_current(entry.publication):
                 findings.append(
@@ -657,7 +674,7 @@ def _document_files(
             raise ValidationError("The selected document revision is unavailable.")
         markdown = revision.markdown
         html = export_html(title=_entry_title(entry), markdown=markdown)
-        diagrams = ()
+        diagrams: tuple[DiagramExportArtifact, ...] = ()
         source_digest = revision.checksum
         snapshot_manifest: dict[str, object] = {
             "document_id": str(document.entity_id),
@@ -725,7 +742,7 @@ def _collect_baseline(
         prefix = f"{base_path}/{index:03d}-{entry.id}"
         descriptor: dict[str, object] = {
             "entry_id": str(entry.id),
-            "parent_index": indexes.get(entry.parent_id),
+            "parent_index": indexes.get(entry.parent_id) if entry.parent_id is not None else None,
             "position": entry.position,
             "title": _entry_title(entry),
             "kind": entry.kind,
@@ -780,8 +797,8 @@ def create_baseline(
     )
     if locked.current_revision_id != expected_revision_id or locked.current_revision is None:
         raise MapRevisionConflict("The map changed before the baseline lock was acquired.")
-    findings = inspect_map(locked)
-    blockers = [finding for finding in findings if finding.severity == "blocker"]
+    preflight = run_map_preflight(documentation_map=locked, findings=inspect_map(locked))
+    blockers = [finding for finding in preflight["findings"] if finding.severity == "blocker"]
     if blockers:
         raise ValidationError({"map": blockers[0].detail})
     if (
@@ -899,7 +916,7 @@ def read_baseline(baseline: DocumentationMapBaseline) -> bytes:
         content = source.read(MAX_BASELINE_BYTES + 1)
     if len(content) > MAX_BASELINE_BYTES or hashlib.sha256(content).hexdigest() != baseline.content_digest:
         raise ValidationError("The retained map baseline failed its integrity check.")
-    return content
+    return bytes(content)
 
 
 def portal_maps_for_organization(organization_id: UUID) -> QuerySet[DocumentationMapBaseline]:

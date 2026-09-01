@@ -1,0 +1,21 @@
+# ADR 0097: Structured topics and publication preflight
+
+Status: accepted for issues #30 and #31.
+
+## Decision
+
+TekDocs keeps Markdown canonical. A structured document declares one versioned topic type: unstructured, procedure, troubleshooting, reference, system overview, or change runbook. Semantic section identity uses portable Markdown comments of the form `<!-- tekdocs:section purpose -->` immediately before a heading. The immutable block revision records the topic type and schema version, so older revisions are never reinterpreted or rewritten.
+
+Conversion is explicit and previewed. It removes only prior TekDocs semantic marker comments, retains all authored headings and content, places retained content in the first guided section, and adds the remaining required sections. Templates carry the topic contract into enrolled documents. Publication and portable-export manifests retain the topic type and schema version.
+
+One preflight service owns stable machine codes and severity. It checks the exact audience-resolved composition before a STATIC publication and normalizes documentation-map baseline checks through the same service boundary. Preview is read-only. Publication runs the check again after locking the document composition and creates no publication, signature, artifact, event, notification, or portal projection when a blocker exists. Warnings remain reviewable but do not bypass blockers.
+
+Telemetry contains only scope class and finding codes. It does not log authored content, resolved values, customer identifiers, or inaccessible dependency details.
+
+## Compatibility
+
+Existing documents and historical revisions default to unstructured schema version 1. New manifest fields are additive. The semantic comments remain valid ordinary Markdown in external tools and are ignored by renderers. Later schema versions must remain parseable and may not rewrite historical revisions.
+
+## Consequences
+
+Authors receive guided structure without adopting DITA XML or a schema designer. Required semantics can be renamed for presentation without losing their marker identity. Extra unmarked sections remain allowed. Missing, duplicate, or malformed required markers block publication; empty or out-of-order sections warn unless a later versioned policy explicitly changes the maintained severity catalog.

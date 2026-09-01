@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from django.http import Http404, HttpResponse
@@ -42,6 +42,7 @@ from .models import (
     DocumentPublication,
     DocumentReviewState,
 )
+from .preflight import run_map_preflight
 from .rls import OrganizationRLSMode, bind_local_rls_scope
 from .scoping import DataScope
 
@@ -119,11 +120,11 @@ class MapEntrySerializer(serializers.Serializer):
         if entry.label:
             return entry.label
         if entry.document_id:
-            return entry.document.entity.display_name
+            return cast(Document, entry.document).entity.display_name
         if entry.publication_id:
-            return entry.publication.title
+            return cast(DocumentPublication, entry.publication).title
         if entry.subordinate_map_id:
-            return entry.subordinate_map.entity.display_name
+            return cast(DocumentationMap, entry.subordinate_map).entity.display_name
         return entry.external_url
 
 
@@ -216,7 +217,7 @@ def _workspace(request: Any, organization_entity_id: UUID | None, permission: Pe
 
 
 def _map_payload(record: DocumentationMap) -> dict[str, object]:
-    return DocumentationMapSerializer(record).data
+    return dict(DocumentationMapSerializer(record).data)
 
 
 def _list(request: Any, organization_entity_id: UUID | None) -> Response:
@@ -273,14 +274,15 @@ def _review(request: Any, organization_entity_id: UUID | None, map_entity_id: UU
 def _preview(request: Any, organization_entity_id: UUID | None, map_entity_id: UUID) -> Response:
     workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
     record = map_for_workspace(workspace, map_entity_id)
-    findings: list[MapFinding] = inspect_map(record)
+    preflight = run_map_preflight(documentation_map=record, findings=inspect_map(record))
+    findings: list[MapFinding] = preflight["findings"]
     return Response(
         MapPreviewSerializer(
             {
                 "map": record,
                 "findings": findings,
-                "blocker_count": sum(item.severity == "blocker" for item in findings),
-                "warning_count": sum(item.severity == "warning" for item in findings),
+                "blocker_count": preflight["counts"]["blocker"],
+                "warning_count": preflight["counts"]["warning"],
             }
         ).data
     )
@@ -321,8 +323,11 @@ def _download(
     workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
     baseline = _baseline(workspace, map_entity_id, baseline_id)
     response = HttpResponse(read_baseline(baseline), content_type="application/zip")
-    response["Content-Disposition"] = content_disposition_header(
-        True, f"documentation-map-{baseline.documentation_map.entity_id}-baseline-{baseline.id}.zip"
+    response["Content-Disposition"] = (
+        content_disposition_header(
+            True, f"documentation-map-{baseline.documentation_map.entity_id}-baseline-{baseline.id}.zip"
+        )
+        or "attachment"
     )
     response["Cache-Control"] = "private, no-store"
     return response
@@ -600,6 +605,8 @@ class ClientPortalDocumentationMapDownloadView(APIView):
         except serializers.ValidationError as exc:
             raise Http404 from exc
         response = HttpResponse(content, content_type="application/zip")
-        response["Content-Disposition"] = content_disposition_header(True, f"{baseline.revision.title}-handoff.zip")
+        response["Content-Disposition"] = (
+            content_disposition_header(True, f"{baseline.revision.title}-handoff.zip") or "attachment"
+        )
         response["Cache-Control"] = "private, no-store"
         return response

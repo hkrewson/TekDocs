@@ -420,6 +420,13 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .publication-form > label, .publication-form-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .publication-form textarea { min-height: 88px; resize: vertical; }
 .publication-form-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.publication-preflight { margin: 14px 0; padding: 12px 0; border-block: 1px solid var(--border); }
+.publication-preflight h3 { margin: 0 0 6px; font-size: 14px; }
+.publication-preflight p { margin: 0; color: var(--muted); }
+.publication-preflight ul { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.publication-preflight li { display: grid; gap: 2px; padding-left: 10px; border-left: 2px solid var(--border-strong); }
+.publication-preflight li strong { font-size: 13px; text-transform: capitalize; }
+.publication-preflight li span { color: var(--muted); font-size: 13px; }
 .publication-lifecycle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0 0 16px; border: 1px solid var(--border); background: var(--border); }
 .publication-lifecycle div { padding: 10px 12px; background: var(--surface); }
 .publication-lifecycle dt { color: var(--muted); font-size: 12px; }
@@ -620,6 +627,20 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-detail-fields input, .document-detail-fields select, .reuse-resolution input, .reuse-resolution select, .reuse-document select { min-height: 38px; padding: 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .document-detail-fields .checkbox-field { align-self: center; }
 .document-context-panel .document-actions { margin-top: 14px; flex-wrap: wrap; }
+.document-topic-picker { margin: 16px 0; padding: 0; border: 0; }
+.document-topic-picker > p { margin: 4px 0 12px; color: var(--muted); }
+.document-topic-picker > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.document-topic-picker label { display: flex; align-items: flex-start; gap: 9px; padding: 11px; border: 1px solid var(--border); border-radius: 7px; cursor: pointer; }
+.document-topic-picker label:has(input:checked) { border-color: var(--accent); background: var(--surface-subtle); }
+.document-topic-picker span { display: grid; gap: 2px; }
+.document-topic-picker small { color: var(--muted); line-height: 1.35; }
+.document-topic-settings label { display: grid; max-width: 420px; gap: 6px; }
+.document-check { margin-block: 4px 12px; }
+.document-check .section-heading { align-items: center; margin-bottom: 0; }
+.document-check ul { display: grid; gap: 7px; margin: 12px 0 0; padding: 0; list-style: none; }
+.document-check li { display: grid; gap: 2px; padding-left: 10px; border-left: 2px solid var(--border-strong); }
+.document-check li span { color: var(--muted); font-size: 13px; }
+@media (max-width: 720px) { .document-topic-picker > div { grid-template-columns: 1fr; } }
 .document-operations { display: grid; gap: 14px; }
 .document-review-form { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
 .document-review-form h3, .document-review-form p { margin: 0; }

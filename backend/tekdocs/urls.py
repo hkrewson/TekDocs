@@ -130,6 +130,7 @@ from apps.core.document_source_views import (
     OrganizationDocumentRemoteSourceView,
 )
 from apps.core.document_views import (
+    DocumentTopicSchemaView,
     MSPDocumentAttachmentDetailView,
     MSPDocumentAttachmentDownloadView,
     MSPDocumentAttachmentListCreateView,
@@ -144,6 +145,7 @@ from apps.core.document_views import (
     MSPDocumentPlacementDetailView,
     MSPDocumentPlacementListCreateView,
     MSPDocumentPlacementReuseView,
+    MSPDocumentPreflightView,
     MSPDocumentPrimaryFileView,
     MSPDocumentPublicationApproveView,
     MSPDocumentPublicationArtifactDownloadView,
@@ -162,6 +164,7 @@ from apps.core.document_views import (
     MSPDocumentRevisionListView,
     MSPDocumentSearchView,
     MSPDocumentTemplateInstantiateView,
+    MSPDocumentTopicConversionView,
     MSPFileBackedDocumentCreateView,
     MSPMarkdownImportView,
     OrganizationDocumentAttachmentDetailView,
@@ -178,6 +181,7 @@ from apps.core.document_views import (
     OrganizationDocumentPlacementDetailView,
     OrganizationDocumentPlacementListCreateView,
     OrganizationDocumentPlacementReuseView,
+    OrganizationDocumentPreflightView,
     OrganizationDocumentPrimaryFileView,
     OrganizationDocumentPublicationApproveView,
     OrganizationDocumentPublicationArtifactDownloadView,
@@ -197,6 +201,7 @@ from apps.core.document_views import (
     OrganizationDocumentTemplateLibraryView,
     OrganizationDocumentTemplateRolloutApplyView,
     OrganizationDocumentTemplateRolloutPreviewView,
+    OrganizationDocumentTopicConversionView,
     OrganizationFileBackedDocumentCreateView,
     OrganizationMarkdownImportView,
 )
@@ -579,6 +584,7 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path("api/v1/documents/topic-schemas", DocumentTopicSchemaView.as_view(), name="document-topic-schemas"),
     path(
         "api/v1/documentation-maps",
         MSPDocumentationMapListCreateView.as_view(),
@@ -655,6 +661,16 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/preflight",
+        MSPDocumentPreflightView.as_view(),
+        name="msp-document-preflight",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/topic-conversion",
+        MSPDocumentTopicConversionView.as_view(),
+        name="msp-document-topic-conversion",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/operations",
@@ -1973,6 +1989,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/preflight",
+        OrganizationDocumentPreflightView.as_view(),
+        name="organization-document-preflight",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/topic-conversion",
+        OrganizationDocumentTopicConversionView.as_view(),
+        name="organization-document-topic-conversion",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/operations",

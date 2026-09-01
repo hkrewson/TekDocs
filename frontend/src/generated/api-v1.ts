@@ -788,6 +788,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/preflight": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_msp_preflight"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/primary-file": {
         readonly parameters: {
             readonly query?: never;
@@ -1092,6 +1108,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/topic-conversion": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documents_msp_topic_conversion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/block-library": {
         readonly parameters: {
             readonly query?: never;
@@ -1196,6 +1228,22 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["documents_msp_search"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/documents/topic-schemas": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_topic_schema_catalog"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -5092,6 +5140,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/preflight": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_organization_preflight"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/primary-file": {
         readonly parameters: {
             readonly query?: never;
@@ -5358,6 +5422,22 @@ export interface paths {
         readonly get: operations["document_revisions_organization_retrieve"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/topic-conversion": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["documents_organization_topic_conversion"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -7495,6 +7575,17 @@ export interface components {
             readonly parent_id: string | null;
             readonly revision_number: number;
             readonly checksum: string;
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_schema_version: number;
             readonly created_by: string | null;
             /** Format: date-time */
             readonly created_at: string;
@@ -7507,6 +7598,17 @@ export interface components {
             readonly parent_id: string | null;
             readonly revision_number: number;
             readonly checksum: string;
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_schema_version: number;
             readonly created_by: string | null;
             /** Format: date-time */
             readonly created_at: string;
@@ -8749,6 +8851,17 @@ export interface components {
              * @enum {string}
              */
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_schema_version: number;
             readonly is_template: boolean;
             readonly library_visible: boolean;
             readonly collection: string;
@@ -8845,6 +8958,17 @@ export interface components {
             readonly is_template: boolean;
             /** @default false */
             readonly library_visible: boolean;
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @default unstructured
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
         };
         readonly DocumentFacet: {
             readonly value: string;
@@ -8971,6 +9095,39 @@ export interface components {
             readonly markdown: string;
             /** @default false */
             readonly library_visible: boolean;
+        };
+        readonly DocumentPreflight: {
+            readonly version: string;
+            readonly scope: string;
+            /** Format: uuid */
+            readonly scope_id: string;
+            readonly composition_digest: string;
+            /**
+             * @description * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_visible";
+            readonly valid: boolean;
+            readonly counts: {
+                readonly [key: string]: number;
+            };
+            readonly findings: readonly components["schemas"]["DocumentPreflightFinding"][];
+        };
+        readonly DocumentPreflightFinding: {
+            readonly code: string;
+            /**
+             * @description * `blocker` - blocker
+             *     * `warning` - warning
+             *     * `info` - info
+             * @enum {string}
+             */
+            readonly severity: "blocker" | "warning" | "info";
+            readonly summary: string;
+            readonly remediation: string;
+            readonly target: string;
+            readonly section_id: string | null;
+            readonly line: number | null;
         };
         readonly DocumentPrimaryFile: {
             /** Format: uuid */
@@ -9225,6 +9382,17 @@ export interface components {
              * @enum {string}
              */
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_schema_version: number;
             readonly is_template: boolean;
             readonly library_visible: boolean;
             readonly collection: string;
@@ -9345,6 +9513,43 @@ export interface components {
                 readonly [key: string]: unknown;
             }[];
         };
+        readonly DocumentTopicConversion: {
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            /** Format: uuid */
+            readonly base_revision_id: string;
+            /** @default false */
+            readonly apply: boolean;
+        };
+        readonly DocumentTopicConversionPreview: {
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly topic_schema_version: number;
+            /** Format: uuid */
+            readonly base_revision_id: string;
+            readonly original_markdown: string;
+            readonly converted_markdown: string;
+            readonly findings: readonly {
+                readonly [key: string]: unknown;
+            }[];
+        };
+        readonly DocumentTopicConversionResult: components["schemas"]["DocumentTopicConversionPreview"] | components["schemas"]["Document"];
         readonly DocumentUpdate: {
             readonly title: string;
             readonly markdown?: string;
@@ -9362,6 +9567,17 @@ export interface components {
             readonly is_template: boolean;
             /** @default false */
             readonly library_visible: boolean;
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @default unstructured
+             * @enum {string}
+             */
+            readonly topic_type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
             /** Format: uuid */
             readonly base_revision_id: string;
         };
@@ -12366,6 +12582,18 @@ export interface components {
             readonly has_more: boolean;
             readonly next_cursor: string | null;
         };
+        readonly PreflightCode: {
+            readonly code: string;
+            /**
+             * @description * `blocker` - blocker
+             *     * `warning` - warning
+             *     * `info` - info
+             * @enum {string}
+             */
+            readonly severity: "blocker" | "warning" | "info";
+            readonly summary: string;
+            readonly remediation: string;
+        };
         readonly ProductWrite: {
             readonly name: string;
             /**
@@ -12997,6 +13225,32 @@ export interface components {
             /** Format: uuid */
             readonly vlan_id?: string | null;
             /** @default  */
+            readonly description: string;
+        };
+        readonly TopicSchema: {
+            /**
+             * @description * `unstructured` - Unstructured
+             *     * `procedure` - Procedure
+             *     * `troubleshooting` - Troubleshooting
+             *     * `reference` - Reference
+             *     * `system_overview` - System overview
+             *     * `change_runbook` - Change runbook
+             * @enum {string}
+             */
+            readonly type: "unstructured" | "procedure" | "troubleshooting" | "reference" | "system_overview" | "change_runbook";
+            readonly label: string;
+            readonly description: string;
+            readonly schema_version: number;
+            readonly sections: readonly components["schemas"]["TopicSection"][];
+        };
+        readonly TopicSchemaCatalog: {
+            readonly schema_version: number;
+            readonly topics: readonly components["schemas"]["TopicSchema"][];
+            readonly preflight_codes: readonly components["schemas"]["PreflightCode"][];
+        };
+        readonly TopicSection: {
+            readonly id: string;
+            readonly label: string;
             readonly description: string;
         };
         readonly UnifiedWorkspaceSearchFacet: {
@@ -15406,6 +15660,29 @@ export interface operations {
             };
         };
     };
+    readonly documents_msp_preflight: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentPreflight"];
+                };
+            };
+        };
+    };
     readonly document_primary_file_msp_replace: {
         readonly parameters: {
             readonly query?: never;
@@ -16096,6 +16373,35 @@ export interface operations {
             };
         };
     };
+    readonly documents_msp_topic_conversion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTopicConversion"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTopicConversion"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTopicConversion"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentTopicConversionResult"];
+                };
+            };
+        };
+    };
     readonly document_blocks_msp_library: {
         readonly parameters: {
             readonly query?: never;
@@ -16301,6 +16607,27 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["DocumentSearchResult"];
+                };
+            };
+        };
+    };
+    readonly document_topic_schema_catalog: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TopicSchemaCatalog"];
                 };
             };
         };
@@ -26575,6 +26902,30 @@ export interface operations {
             };
         };
     };
+    readonly documents_organization_preflight: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentPreflight"];
+                };
+            };
+        };
+    };
     readonly document_primary_file_organization_replace: {
         readonly parameters: {
             readonly query?: never;
@@ -27196,6 +27547,36 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["BlockRevisionDetail"];
+                };
+            };
+        };
+    };
+    readonly documents_organization_topic_conversion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTopicConversion"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTopicConversion"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTopicConversion"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentTopicConversionResult"];
                 };
             };
         };

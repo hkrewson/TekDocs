@@ -178,6 +178,60 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
 
 
 @pytest.mark.django_db
+def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner_client, installation):
+    created_response = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Router replacement", "markdown": "Replace the failed router.", "topic_type": "procedure"},
+        content_type="application/json",
+    )
+    assert created_response.status_code == 201
+    created = created_response.json()
+    assert created["topic_type"] == "procedure"
+    assert created["topic_schema_version"] == 1
+    assert "<!-- tekdocs:section purpose -->" in created["markdown"]
+    original_revision = created["current_revision_id"]
+
+    preflight_response = owner_client.get(
+        reverse("msp-document-preflight", kwargs={"document_entity_id": created["id"]}),
+        {"audience": "msp_internal"},
+    )
+    assert preflight_response.status_code == 200
+    assert preflight_response.json()["valid"] is True
+    assert preflight_response.json()["version"] == "tekdocs-preflight/v1"
+    assert not [item for item in preflight_response.json()["findings"] if item["severity"] == "blocker"]
+
+    conversion_url = reverse("msp-document-topic-conversion", kwargs={"document_entity_id": created["id"]})
+    preview_response = owner_client.post(
+        conversion_url,
+        {"topic_type": "troubleshooting", "base_revision_id": original_revision, "apply": False},
+        content_type="application/json",
+    )
+    assert preview_response.status_code == 200
+    assert preview_response.json()["topic_type"] == "troubleshooting"
+    assert "<!-- tekdocs:section condition -->" in preview_response.json()["converted_markdown"]
+    assert Document.objects.get(entity_id=created["id"]).topic_type == "procedure"
+
+    applied_response = owner_client.post(
+        conversion_url,
+        {"topic_type": "troubleshooting", "base_revision_id": original_revision, "apply": True},
+        content_type="application/json",
+    )
+    assert applied_response.status_code == 200
+    assert applied_response.json()["topic_type"] == "troubleshooting"
+    assert applied_response.json()["current_revision_id"] != original_revision
+    historical = BlockRevision.objects.get(id=original_revision)
+    assert historical.topic_type == "procedure"
+    assert "<!-- tekdocs:section purpose -->" in historical.markdown
+    stale_preview = owner_client.post(
+        conversion_url,
+        {"topic_type": "reference", "base_revision_id": original_revision, "apply": False},
+        content_type="application/json",
+    )
+    assert stale_preview.status_code == 409
+    assert stale_preview.json()["code"] == "revision_conflict"
+
+
+@pytest.mark.django_db
 def test_remote_document_source_retains_reviewable_change_before_explicit_apply(
     owner_client, installation, monkeypatch
 ):
@@ -371,9 +425,9 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
         assert publication_payload["manifest"]["attachments"][0]["checksum"] == attachment["checksum"]
         assert publication_payload["manifest"]["relationship_graph"]["family"] == "document"
         assert publication_payload["manifest"]["relationship_graph"]["root_entity_id"] == created["id"]
-        assert {
-            item["label"] for item in publication_payload["manifest"]["relationship_graph"]["nodes"]
-        } == {"Access standard"}
+        assert {item["label"] for item in publication_payload["manifest"]["relationship_graph"]["nodes"]} == {
+            "Access standard"
+        }
         assert publication_payload["reason"] == "Approved access policy"
         assert publication_payload["audience"] == "client_visible"
         assert publication_payload["lifecycle_state"] == "pending_approval"
@@ -658,6 +712,7 @@ flowchart LR
         png=png,
     )
     monkeypatch.setattr("apps.core.publications.render_diagram_exports", lambda *_args, **_kwargs: (diagram,))
+    monkeypatch.setattr("apps.core.preflight.render_diagram_exports", lambda *_args, **_kwargs: (diagram,))
 
     with override_settings(MEDIA_ROOT=tmp_path):
         response = owner_client.post(
@@ -1585,9 +1640,7 @@ def test_removing_owned_block_archives_its_identity_without_orphaning_content(ow
 
 
 @pytest.mark.django_db
-def test_placement_audiences_filter_publications_before_snapshot_provenance(
-    owner_client, installation, tmp_path
-):
+def test_placement_audiences_filter_publications_before_snapshot_provenance(owner_client, installation, tmp_path):
     client_org = organization(installation.tenant, "Audience Client")
     route_kwargs = {"organization_entity_id": client_org.entity_id}
     created = owner_client.post(
@@ -1739,9 +1792,7 @@ def test_placement_audience_rejects_widening_nested_or_primary_content(owner_cli
     with pytest.raises(DatabaseError, match="child placement cannot widen parent audience"), transaction.atomic():
         DocumentPlacement.objects.filter(id=valid_child["id"]).update(audience_profile="shared")
     with pytest.raises(DatabaseError, match="primary document placement must remain shared"), transaction.atomic():
-        DocumentPlacement.objects.filter(id=created["placements"][0]["id"]).update(
-            audience_profile="client_visible"
-        )
+        DocumentPlacement.objects.filter(id=created["placements"][0]["id"]).update(audience_profile="client_visible")
 
 
 @pytest.mark.django_db

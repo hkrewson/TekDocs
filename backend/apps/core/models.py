@@ -3460,6 +3460,15 @@ class DocumentReviewState(models.TextChoices):
     CHANGES_REQUESTED = "changes_requested", "Changes requested"
 
 
+class DocumentTopicType(models.TextChoices):
+    UNSTRUCTURED = "unstructured", "Unstructured"
+    PROCEDURE = "procedure", "Procedure"
+    TROUBLESHOOTING = "troubleshooting", "Troubleshooting"
+    REFERENCE = "reference", "Reference"
+    SYSTEM_OVERVIEW = "system_overview", "System overview"
+    CHANGE_RUNBOOK = "change_runbook", "Change runbook"
+
+
 class Document(TimestampedModel):
     """A Markdown document owned by exactly one MSP or organization workspace."""
 
@@ -3476,6 +3485,12 @@ class Document(TimestampedModel):
         choices=DocumentCategory.choices,
         default=DocumentCategory.GENERAL,
     )
+    topic_type = models.CharField(
+        max_length=32,
+        choices=DocumentTopicType.choices,
+        default=DocumentTopicType.UNSTRUCTURED,
+    )
+    topic_schema_version = models.PositiveSmallIntegerField(default=1)
     is_template = models.BooleanField(default=False)
     library_visible = models.BooleanField(default=False)
     collection = models.CharField(max_length=120, blank=True)
@@ -3528,6 +3543,14 @@ class Document(TimestampedModel):
             models.CheckConstraint(
                 condition=models.Q(category__in=DocumentCategory.values),
                 name="document_category_supported",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(topic_type__in=DocumentTopicType.values),
+                name="document_topic_type_supported",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(topic_schema_version__gte=1),
+                name="document_topic_schema_positive",
             ),
             models.CheckConstraint(
                 condition=models.Q(review_state__in=DocumentReviewState.values),
@@ -4463,6 +4486,12 @@ class BlockRevision(models.Model):
     revision_number = models.PositiveIntegerField()
     markdown = models.TextField(blank=True)
     checksum = models.CharField(max_length=64)
+    topic_type = models.CharField(
+        max_length=32,
+        choices=DocumentTopicType.choices,
+        default=DocumentTopicType.UNSTRUCTURED,
+    )
+    topic_schema_version = models.PositiveSmallIntegerField(default=1)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -4480,6 +4509,10 @@ class BlockRevision(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["block", "revision_number"], name="unique_block_revision_number"),
             models.CheckConstraint(condition=models.Q(revision_number__gte=1), name="block_revision_number_positive"),
+            models.CheckConstraint(
+                condition=models.Q(topic_type__in=DocumentTopicType.values),
+                name="block_revision_topic_type_supported",
+            ),
         ]
         indexes = [
             models.Index(

@@ -142,6 +142,20 @@ describe('documentation placement API client', () => {
     expect(browserDocumentsClient.publicationExportUrl(scope, 'doc', 'publication', 'docx')).toContain('/publications/publication/export?export_format=docx')
   })
 
+  it('previews a topic conversion and checks the exact publication audience', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ valid: true }), { status: 200 })))
+    const scope = { organizationId: 'org' }
+
+    await browserDocumentsClient.preflight!(scope, 'document/id', 'client_visible')
+    await browserDocumentsClient.convertTopic!(scope, 'document/id', 'troubleshooting', 'revision/id', false)
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/document%2Fid/preflight?audience=client_visible')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/document%2Fid/topic-conversion')
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('POST')
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ topic_type: 'troubleshooting', base_revision_id: 'revision/id', apply: false }))
+  })
+
   it('repeats the field message a rejected request came back with', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({

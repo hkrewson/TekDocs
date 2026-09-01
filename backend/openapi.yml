@@ -2557,6 +2557,34 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/preflight:
+    get:
+      operationId: documents_msp_preflight
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPreflight'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/{document_entity_id}/primary-file:
     post:
       operationId: document_primary_file_msp_replace
@@ -3495,6 +3523,46 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/{document_entity_id}/topic-conversion:
+    post:
+      operationId: documents_msp_topic_conversion
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTopicConversionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/block-library:
     get:
       operationId: document_blocks_msp_library
@@ -3765,6 +3833,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentSearchResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/documents/topic-schemas:
+    get:
+      operationId: document_topic_schema_catalog
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicSchemaCatalog'
           description: ''
           headers:
             X-Request-ID:
@@ -17202,6 +17291,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/preflight:
+    get:
+      operationId: documents_organization_preflight
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPreflight'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/primary-file:
     post:
       operationId: document_primary_file_organization_replace
@@ -18148,6 +18271,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockRevisionDetail'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/topic-conversion:
+    post:
+      operationId: documents_organization_topic_conversion
+      parameters:
+      - in: path
+        name: document_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTopicConversion'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTopicConversionResult'
           description: ''
           headers:
             X-Request-ID:
@@ -26146,6 +26315,25 @@ components:
           type: integer
         checksum:
           type: string
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        topic_schema_version:
+          type: integer
         created_by:
           type: string
           nullable: true
@@ -26164,6 +26352,8 @@ components:
       - is_current
       - parent_id
       - revision_number
+      - topic_schema_version
+      - topic_type
     BlockRevisionDetail:
       type: object
       properties:
@@ -26178,6 +26368,25 @@ components:
           type: integer
         checksum:
           type: string
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        topic_schema_version:
+          type: integer
         created_by:
           type: string
           nullable: true
@@ -26203,6 +26412,8 @@ components:
       - markdown
       - parent_id
       - revision_number
+      - topic_schema_version
+      - topic_type
     BlockRevisionResult:
       type: object
       properties:
@@ -29179,6 +29390,25 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        topic_schema_version:
+          type: integer
         is_template:
           type: boolean
         library_visible:
@@ -29373,6 +29603,8 @@ components:
       - template_enrollment_id
       - template_source_id
       - title
+      - topic_schema_version
+      - topic_type
       - updated_at
     DocumentAttachment:
       type: object
@@ -29448,6 +29680,24 @@ components:
         library_visible:
           type: boolean
           default: false
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+          default: unstructured
       required:
       - title
     DocumentFacet:
@@ -29719,6 +29969,82 @@ components:
         library_visible:
           type: boolean
           default: false
+    DocumentPreflight:
+      type: object
+      properties:
+        version:
+          type: string
+        scope:
+          type: string
+        scope_id:
+          type: string
+          format: uuid
+        composition_digest:
+          type: string
+        audience:
+          enum:
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: 489f26fd4031dd3a
+        valid:
+          type: boolean
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPreflightFinding'
+      required:
+      - audience
+      - composition_digest
+      - counts
+      - findings
+      - scope
+      - scope_id
+      - valid
+      - version
+    DocumentPreflightFinding:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          enum:
+          - blocker
+          - warning
+          - info
+          type: string
+          description: |-
+            * `blocker` - blocker
+            * `warning` - warning
+            * `info` - info
+          x-spec-enum-id: 616fe441e9ec34a1
+        summary:
+          type: string
+        remediation:
+          type: string
+        target:
+          type: string
+        section_id:
+          type: string
+          nullable: true
+        line:
+          type: integer
+          nullable: true
+      required:
+      - code
+      - line
+      - remediation
+      - section_id
+      - severity
+      - summary
+      - target
     DocumentPrimaryFile:
       type: object
       properties:
@@ -30324,6 +30650,25 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        topic_schema_version:
+          type: integer
         is_template:
           type: boolean
         library_visible:
@@ -30521,6 +30866,8 @@ components:
       - template_enrollment_id
       - template_source_id
       - title
+      - topic_schema_version
+      - topic_type
       - updated_at
     DocumentSearchResult:
       type: object
@@ -30669,6 +31016,80 @@ components:
       - enrollment_id
       - removed
       - up_to_date
+    DocumentTopicConversion:
+      type: object
+      properties:
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        base_revision_id:
+          type: string
+          format: uuid
+        apply:
+          type: boolean
+          default: false
+      required:
+      - base_revision_id
+      - topic_type
+    DocumentTopicConversionPreview:
+      type: object
+      properties:
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        topic_schema_version:
+          type: integer
+        base_revision_id:
+          type: string
+          format: uuid
+        original_markdown:
+          type: string
+        converted_markdown:
+          type: string
+        findings:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - base_revision_id
+      - converted_markdown
+      - findings
+      - original_markdown
+      - topic_schema_version
+      - topic_type
+    DocumentTopicConversionResult:
+      oneOf:
+      - $ref: '#/components/schemas/DocumentTopicConversionPreview'
+      - $ref: '#/components/schemas/Document'
     DocumentUpdate:
       type: object
       properties:
@@ -30701,6 +31122,24 @@ components:
         library_visible:
           type: boolean
           default: false
+        topic_type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+          default: unstructured
         base_revision_id:
           type: string
           format: uuid
@@ -37466,6 +37905,31 @@ components:
       - has_more
       - next_cursor
       - results
+    PreflightCode:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          enum:
+          - blocker
+          - warning
+          - info
+          type: string
+          description: |-
+            * `blocker` - blocker
+            * `warning` - warning
+            * `info` - info
+          x-spec-enum-id: 616fe441e9ec34a1
+        summary:
+          type: string
+        remediation:
+          type: string
+      required:
+      - code
+      - remediation
+      - severity
+      - summary
     ProductWrite:
       type: object
       properties:
@@ -38980,6 +39444,72 @@ components:
       required:
       - cidr
       - name
+    TopicSchema:
+      type: object
+      properties:
+        type:
+          enum:
+          - unstructured
+          - procedure
+          - troubleshooting
+          - reference
+          - system_overview
+          - change_runbook
+          type: string
+          description: |-
+            * `unstructured` - Unstructured
+            * `procedure` - Procedure
+            * `troubleshooting` - Troubleshooting
+            * `reference` - Reference
+            * `system_overview` - System overview
+            * `change_runbook` - Change runbook
+          x-spec-enum-id: d198934f750d0e10
+        label:
+          type: string
+        description:
+          type: string
+        schema_version:
+          type: integer
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicSection'
+      required:
+      - description
+      - label
+      - schema_version
+      - sections
+      - type
+    TopicSchemaCatalog:
+      type: object
+      properties:
+        schema_version:
+          type: integer
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicSchema'
+        preflight_codes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreflightCode'
+      required:
+      - preflight_codes
+      - schema_version
+      - topics
+    TopicSection:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - id
+      - label
     UnifiedWorkspaceSearchFacet:
       type: object
       properties:

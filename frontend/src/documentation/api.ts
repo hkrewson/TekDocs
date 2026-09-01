@@ -4,6 +4,7 @@ export type DocumentScope = { organizationId?: string }
 export type DocumentCategory = 'general' | 'policy' | 'procedure' | 'guide' | 'reference'
 export type DocumentHealthStatus = 'current' | 'stale' | 'unreviewed' | 'unowned' | 'pending' | 'changes_requested'
 export type DocumentReviewState = 'unreviewed' | 'pending' | 'approved' | 'changes_requested'
+export type DocumentTopicType = 'unstructured' | 'procedure' | 'troubleshooting' | 'reference' | 'system_overview' | 'change_runbook'
 export type DocumentFilters = {
   q?: string
   category?: DocumentCategory | ''
@@ -43,6 +44,8 @@ export type DocumentRecord = {
   owner_organization_name: string | null
   is_reference: boolean
   category: DocumentCategory
+  topic_type?: DocumentTopicType
+  topic_schema_version?: number
   is_template: boolean
   library_visible: boolean
   collection?: string
@@ -122,7 +125,7 @@ export type DocumentPublicationDetail = DocumentPublication & {
   sanitized_html: string
   manifest: Record<string, unknown>
 }
-export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'> & { library_visible?: boolean }
+export type DocumentInput = Pick<DocumentRecord, 'title' | 'markdown' | 'category' | 'is_template'> & { library_visible?: boolean; topic_type?: DocumentTopicType }
 export type DocumentUpdateInput = DocumentInput & { base_revision_id: string }
 export type DocumentRestructureNotice = { code: string; detail: string }
 export type DocumentRestructureSection = {
@@ -153,6 +156,9 @@ export type DocumentRestructureResult = {
   section_count: number
   document: DocumentRecord
 }
+export type PreflightFinding = { code: string; severity: 'blocker' | 'warning' | 'info'; summary: string; remediation: string; target: string; section_id: string | null; line: number | null }
+export type DocumentPreflight = { version: string; scope: 'document'; scope_id: string; composition_digest: string; audience: PublicationAudience; valid: boolean; counts: Record<'blocker' | 'warning' | 'info', number>; findings: PreflightFinding[] }
+export type TopicConversionPreview = { topic_type: DocumentTopicType; topic_schema_version: number; base_revision_id: string; original_markdown: string; converted_markdown: string; findings: { code: string; severity: string; section_id?: string; line?: number }[] }
 export type DocumentFacet = { value: string; count: number }
 export type DocumentResult = {
   results: DocumentRecord[]
@@ -305,6 +311,8 @@ export interface DocumentsClient {
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
+  preflight?(scope: DocumentScope, id: string, audience: PublicationAudience): Promise<DocumentPreflight>
+  convertTopic?(scope: DocumentScope, id: string, topicType: DocumentTopicType, baseRevisionId: string, apply: boolean): Promise<TopicConversionPreview | DocumentRecord>
   operationsChoices?(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentOperationsChoice[]>
   updateOperations?(scope: DocumentScope, id: string, input: DocumentOperationsInput): Promise<DocumentRecord>
   requestReview?(scope: DocumentScope, id: string, reviewerId: string, note: string): Promise<DocumentRecord>
@@ -493,6 +501,10 @@ export const browserDocumentsClient: DocumentsClient = {
     return mutateForm<DocumentRecord>(`${collectionPath(scope)}/file-backed`, form)
   },
   update: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}`, 'PUT', input),
+  async preflight(scope, id, audience) {
+    return parse<DocumentPreflight>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/preflight?audience=${encodeURIComponent(audience)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
+  },
+  convertTopic: (scope, id, topicType, baseRevisionId, apply) => mutate<TopicConversionPreview | DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/topic-conversion`, 'POST', { topic_type: topicType, base_revision_id: baseRevisionId, apply }),
   async operationsChoices(scope, signal) {
     return parse<DocumentOperationsChoice[]>(await fetch(`${collectionPath(scope)}/operations/choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },

@@ -49,6 +49,7 @@ from .models import (
     PublicationControlAction,
 )
 from .outbox import OutboxTopic, enqueue_outbox_event
+from .preflight import run_document_preflight
 from .relationships import relationship_graph_projection
 from .rendering import (
     RenderedAttachment,
@@ -205,6 +206,12 @@ def publish_document(
                 locked_document, resolved = lock_document_composition(document, audience=audience)
             except PlacementConflict as exc:
                 raise PublicationConflict(str(exc)) from exc
+            preflight = run_document_preflight(
+                workspace=workspace, document=locked_document, resolved=resolved, audience=audience
+            )
+            blockers = [item for item in preflight["findings"] if item["severity"] == "blocker"]
+            if blockers:
+                raise PublicationConflict(f"Preflight blocked publication: {blockers[0]['summary']}")
             if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
                 raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
 
@@ -377,6 +384,13 @@ def publish_document(
                 },
                 "title": locked_document.entity.display_name,
                 "category": locked_document.category,
+                "topic_type": locked_document.topic_type,
+                "topic_schema_version": locked_document.topic_schema_version,
+                "preflight": {
+                    "version": preflight["version"],
+                    "composition_digest": preflight["composition_digest"],
+                    "counts": preflight["counts"],
+                },
                 "reason": reason,
                 "audience": audience,
                 "retention": retention,

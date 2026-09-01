@@ -10,7 +10,7 @@ from django.http import FileResponse, Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
 from django.utils.text import slugify
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, PolymorphicProxySerializer, extend_schema
 from rest_framework import serializers
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
@@ -60,6 +60,7 @@ from .documents import (
     document_restructure_preview,
     documents_for_scope,
     instantiate_document_template,
+    primary_placement,
     remove_document_placement,
     remove_listing_reference,
     resolve_document,
@@ -81,6 +82,8 @@ from .models import (
     DocumentPublicationArtifact,
     DocumentTemplateEnrollment,
 )
+from .preflight import catalog as preflight_catalog
+from .preflight import run_document_preflight
 from .publications import (
     PublicationConflict,
     approve_publication,
@@ -109,6 +112,8 @@ from .serializers import (
     DocumentOperationsWriteSerializer,
     DocumentPlacementUpdateSerializer,
     DocumentPlacementWriteSerializer,
+    DocumentPreflightQuerySerializer,
+    DocumentPreflightSerializer,
     DocumentPrimaryFileSerializer,
     DocumentPublicationControlWriteSerializer,
     DocumentPublicationDetailSerializer,
@@ -126,6 +131,8 @@ from .serializers import (
     DocumentTemplateRolloutApplySerializer,
     DocumentTemplateRolloutPreviewSerializer,
     DocumentTemplateRolloutResultSerializer,
+    DocumentTopicConversionPreviewSerializer,
+    DocumentTopicConversionSerializer,
     DocumentUpdateSerializer,
     EntityMentionResultSerializer,
     EntityMentionSearchQuerySerializer,
@@ -134,7 +141,10 @@ from .serializers import (
     ReuseImpactSerializer,
     RevisionConflictSerializer,
     SharedBlockUpdateSerializer,
+    TopicSchemaCatalogSerializer,
 )
+from .topic_schemas import catalog as topic_catalog
+from .topic_schemas import inspect_markdown, seed_markdown
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
 
 _BYTE_RANGE = re.compile(r"bytes=(\d{0,20})-(\d{0,20})")
@@ -313,9 +323,11 @@ def _decide_review(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
 
 def _operations_choices(workspace: ResolvedWorkspace) -> Response:
     choices = []
-    memberships = TenantMembership.objects.filter(
-        tenant=workspace.member.tenant, user__is_active=True
-    ).select_related("user").order_by("user__display_name", "user_id")
+    memberships = (
+        TenantMembership.objects.filter(tenant=workspace.member.tenant, user__is_active=True)
+        .select_related("user")
+        .order_by("user__display_name", "user_id")
+    )
     for membership in memberships:
         context = require_installation_member(membership.user)
         if not context_has_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization):
@@ -344,6 +356,7 @@ def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[
         category=serializer.validated_data["category"],
         is_template=serializer.validated_data["is_template"],
         library_visible=serializer.validated_data["library_visible"],
+        topic_type=serializer.validated_data["topic_type"],
     )
     return Response(
         DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
@@ -382,6 +395,68 @@ def _retrieve(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Respons
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
     return Response(DocumentSerializer(_document(workspace, document_entity_id), context=context).data)
+
+
+def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    serializer = DocumentPreflightQuerySerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    document = _document(workspace, document_entity_id)
+    try:
+        resolved = resolve_document(document, audience=serializer.validated_data["audience"])
+    except PlacementConflict as conflict:
+        return Response({"code": "composition.invalid", "detail": str(conflict)}, status=409)
+    return Response(
+        run_document_preflight(
+            workspace=workspace, document=document, resolved=resolved, audience=serializer.validated_data["audience"]
+        )
+    )
+
+
+def _convert_topic(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
+    document = _document(workspace, document_entity_id)
+    _mutate_workspace(request, workspace, document)
+    serializer = DocumentTopicConversionSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    primary_revision = primary_placement(document).block.current_revision
+    if primary_revision is None:
+        return Response(
+            {"code": "composition.invalid", "detail": "The document has no current primary revision."}, status=409
+        )
+    if primary_revision.id != serializer.validated_data["base_revision_id"]:
+        conflict = RevisionConflict(
+            submitted_base_revision_id=serializer.validated_data["base_revision_id"],
+            current_revision=primary_revision,
+            base_revision=primary_revision.block.revisions.filter(
+                id=serializer.validated_data["base_revision_id"]
+            ).first(),
+        )
+        return _revision_conflict_response(conflict)
+    converted = seed_markdown(serializer.validated_data["topic_type"], primary_revision.markdown)
+    preview = {
+        "topic_type": serializer.validated_data["topic_type"],
+        "topic_schema_version": 1,
+        "base_revision_id": str(serializer.validated_data["base_revision_id"]),
+        "original_markdown": primary_revision.markdown,
+        "converted_markdown": converted,
+        "findings": inspect_markdown(serializer.validated_data["topic_type"], converted),
+    }
+    if not serializer.validated_data["apply"]:
+        return Response(preview)
+    try:
+        update_document(
+            document=document,
+            actor_id=request.user.pk,
+            title=document.entity.display_name,
+            markdown=converted,
+            base_revision_id=serializer.validated_data["base_revision_id"],
+            category=document.category,
+            is_template=document.is_template,
+            library_visible=document.library_visible,
+            topic_type=serializer.validated_data["topic_type"],
+        )
+    except RevisionConflict as conflict:
+        return _revision_conflict_response(conflict)
+    return _retrieve(workspace, document_entity_id)
 
 
 def _mutate_workspace(
@@ -1271,6 +1346,35 @@ class MSPDocumentSearchView(APIView):
         return _search(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
 
 
+class DocumentTopicSchemaView(APIView):
+    @extend_schema(operation_id="document_topic_schema_catalog", responses={200: TopicSchemaCatalogSerializer})
+    def get(self, request):  # type: ignore[no-untyped-def]
+        require_installation_member(request.user)
+        return Response({"schema_version": 1, "topics": topic_catalog(), "preflight_codes": preflight_catalog()})
+
+
+class MSPDocumentPreflightView(APIView):
+    @extend_schema(operation_id="documents_msp_preflight", responses={200: DocumentPreflightSerializer})
+    def get(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _preflight(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), document_entity_id, request)
+
+
+class MSPDocumentTopicConversionView(APIView):
+    @extend_schema(
+        operation_id="documents_msp_topic_conversion",
+        request=DocumentTopicConversionSerializer,
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="DocumentTopicConversionResult",
+                serializers=[DocumentTopicConversionPreviewSerializer, DocumentSerializer],
+                resource_type_field_name=None,
+            )
+        },
+    )
+    def post(self, request, document_entity_id):  # type: ignore[no-untyped-def]
+        return _convert_topic(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
+
+
 class MSPDocumentOperationsChoicesView(APIView):
     @extend_schema(
         operation_id="documents_msp_operations_choices",
@@ -1636,8 +1740,36 @@ class OrganizationDocumentListCreateView(APIView):
 class OrganizationDocumentSearchView(APIView):
     @extend_schema(operation_id="documents_organization_search", responses={200: DocumentSearchResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _search(
-            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        return _search(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request)
+
+
+class OrganizationDocumentPreflightView(APIView):
+    @extend_schema(operation_id="documents_organization_preflight", responses={200: DocumentPreflightSerializer})
+    def get(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _preflight(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
+            document_entity_id,
+            request,
+        )
+
+
+class OrganizationDocumentTopicConversionView(APIView):
+    @extend_schema(
+        operation_id="documents_organization_topic_conversion",
+        request=DocumentTopicConversionSerializer,
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="DocumentTopicConversionResult",
+                serializers=[DocumentTopicConversionPreviewSerializer, DocumentSerializer],
+                resource_type_field_name=None,
+            )
+        },
+    )
+    def post(self, request, organization_entity_id, document_entity_id):  # type: ignore[no-untyped-def]
+        return _convert_topic(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT),
+            document_entity_id,
+            request,
         )
 
 

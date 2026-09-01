@@ -25,6 +25,7 @@ from .models import (
     DocumentPublication,
     DocumentPublicationControlEvent,
     DocumentReviewState,
+    DocumentTopicType,
     LocationKind,
     Organization,
     OrganizationAccessMode,
@@ -312,6 +313,9 @@ class DocumentCreateSerializer(serializers.Serializer):
     )
     is_template = serializers.BooleanField(required=False, default=False)
     library_visible = serializers.BooleanField(required=False, default=False)
+    topic_type = serializers.ChoiceField(
+        choices=DocumentTopicType.choices, required=False, default=DocumentTopicType.UNSTRUCTURED
+    )
 
 
 class FileBackedDocumentCreateSerializer(serializers.Serializer):
@@ -330,6 +334,75 @@ class FileBackedDocumentCreateSerializer(serializers.Serializer):
 
 class DocumentUpdateSerializer(DocumentCreateSerializer):
     base_revision_id = serializers.UUIDField()
+
+
+class DocumentTopicConversionSerializer(serializers.Serializer):
+    topic_type = serializers.ChoiceField(choices=DocumentTopicType.choices)
+    base_revision_id = serializers.UUIDField()
+    apply = serializers.BooleanField(required=False, default=False)
+
+
+class DocumentPreflightQuerySerializer(serializers.Serializer):
+    audience = serializers.ChoiceField(
+        choices=PublicationAudience.choices, required=False, default=PublicationAudience.MSP_INTERNAL
+    )
+
+
+class DocumentPreflightFindingSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    severity = serializers.ChoiceField(choices=("blocker", "warning", "info"))
+    summary = serializers.CharField()
+    remediation = serializers.CharField()
+    target = serializers.CharField()
+    section_id = serializers.CharField(allow_null=True)
+    line = serializers.IntegerField(allow_null=True)
+
+
+class DocumentPreflightSerializer(serializers.Serializer):
+    version = serializers.CharField()
+    scope = serializers.CharField()
+    scope_id = serializers.UUIDField()
+    composition_digest = serializers.CharField()
+    audience = serializers.ChoiceField(choices=PublicationAudience.choices)
+    valid = serializers.BooleanField()
+    counts = serializers.DictField(child=serializers.IntegerField())
+    findings = DocumentPreflightFindingSerializer(many=True)
+
+
+class TopicSectionSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    label = serializers.CharField()
+    description = serializers.CharField()
+
+
+class TopicSchemaSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=DocumentTopicType.choices)
+    label = serializers.CharField()
+    description = serializers.CharField()
+    schema_version = serializers.IntegerField()
+    sections = TopicSectionSerializer(many=True)
+
+
+class PreflightCodeSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    severity = serializers.ChoiceField(choices=("blocker", "warning", "info"))
+    summary = serializers.CharField()
+    remediation = serializers.CharField()
+
+
+class TopicSchemaCatalogSerializer(serializers.Serializer):
+    schema_version = serializers.IntegerField()
+    topics = TopicSchemaSerializer(many=True)
+    preflight_codes = PreflightCodeSerializer(many=True)
+
+
+class DocumentTopicConversionPreviewSerializer(serializers.Serializer):
+    topic_type = serializers.ChoiceField(choices=DocumentTopicType.choices)
+    topic_schema_version = serializers.IntegerField()
+    base_revision_id = serializers.UUIDField()
+    original_markdown = serializers.CharField(allow_blank=True)
+    converted_markdown = serializers.CharField(allow_blank=True)
+    findings = serializers.ListField(child=serializers.DictField())
 
 
 class DocumentRestructureApplySerializer(serializers.Serializer):
@@ -906,6 +979,8 @@ class DocumentSerializer(serializers.Serializer):
     owner_organization_name = serializers.CharField(source="organization.entity.display_name", allow_null=True)
     is_reference = serializers.SerializerMethodField()
     category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    topic_type = serializers.ChoiceField(choices=DocumentTopicType.choices)
+    topic_schema_version = serializers.IntegerField()
     is_template = serializers.BooleanField()
     library_visible = serializers.BooleanField()
     collection = serializers.CharField(allow_blank=True)
@@ -1100,9 +1175,7 @@ class DocumentSerializer(serializers.Serializer):
         workspace = self.context.get("workspace")
         if workspace is not None:
             markdown = self._resolved(obj).markdown
-            expanded_markdown = expand_rendered_content_keys(
-                workspace=workspace, document=obj, markdown=markdown
-            )
+            expanded_markdown = expand_rendered_content_keys(workspace=workspace, document=obj, markdown=markdown)
             expanded_placements = {
                 placement.revision.id: expand_rendered_content_keys(
                     workspace=workspace,
@@ -1116,9 +1189,7 @@ class DocumentSerializer(serializers.Serializer):
                 "attachments": resolve_rendered_attachments(
                     workspace=workspace, document=obj, markdown=expanded_markdown
                 ),
-                "key_resolutions": resolve_rendered_keys(
-                    workspace=workspace, document=obj, markdown=expanded_markdown
-                ),
+                "key_resolutions": resolve_rendered_keys(workspace=workspace, document=obj, markdown=expanded_markdown),
                 "expanded_markdown": expanded_placements,
             }
         return cast(
@@ -1141,6 +1212,8 @@ class BlockRevisionSerializer(serializers.Serializer):
     parent_id = serializers.UUIDField(allow_null=True)
     revision_number = serializers.IntegerField()
     checksum = serializers.CharField()
+    topic_type = serializers.ChoiceField(choices=DocumentTopicType.choices)
+    topic_schema_version = serializers.IntegerField()
     created_by = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
     is_current = serializers.SerializerMethodField()
@@ -1211,9 +1284,7 @@ class DocumentReviewRequestWriteSerializer(serializers.Serializer):
 
 
 class DocumentReviewDecisionWriteSerializer(serializers.Serializer):
-    decision = serializers.ChoiceField(
-        choices=(DocumentReviewState.APPROVED, DocumentReviewState.CHANGES_REQUESTED)
-    )
+    decision = serializers.ChoiceField(choices=(DocumentReviewState.APPROVED, DocumentReviewState.CHANGES_REQUESTED))
     note = serializers.CharField(max_length=500, allow_blank=False)
 
 

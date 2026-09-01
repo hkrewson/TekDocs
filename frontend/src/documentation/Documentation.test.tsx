@@ -70,6 +70,17 @@ function clients() {
   const archiveAttachment = vi.fn().mockResolvedValue(undefined)
   const publication = { id: 'publication-1', source_document_id: 'doc-1', title: 'Firewall standard', category: 'policy' as const, reason: 'Approved for operations', audience: 'msp_internal' as const, retention: 'permanent' as const, retention_review_on: null, lifecycle_state: 'published' as const, supersedes_id: null, superseded_by_id: null, control_events: [{ id: 'event-1', action: 'submitted' as const, reason: 'Approved for operations', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }, { id: 'event-2', action: 'approved' as const, reason: 'Approved for MSP-internal distribution at publication time.', actor: 'Primary Owner', occurred_at: '2026-08-09T01:00:00Z' }], audience_projections: [{ audience: 'msp_staff' as const, available: true, state: 'retained' }, { audience: 'client_portal' as const, available: false, state: 'not_intended' }], artifacts: [{ id: 'pdf-1', kind: 'pdf' as const, filename: 'firewall-static.pdf', media_type: 'application/pdf', size: 1200, checksum: 'c'.repeat(64), source_attachment_id: null }], content_digest: 'a'.repeat(64), signature_algorithm: 'Ed25519' as const, signature: 'signature', public_key: 'public-key', key_fingerprint: 'b'.repeat(64), published_by: 'Primary Owner', published_at: '2026-08-09T01:00:00Z', verification: { valid: true, digest_valid: true, signature_valid: true, key_fingerprint_valid: true }, canonical_markdown: '# Firewall\n', sanitized_html: '<h1>Firewall</h1>', manifest: { format: 'tekdocs-static-publication/v2' } }
   const publish = vi.fn().mockResolvedValue(publication)
+  const preflight = vi.fn().mockResolvedValue({
+    version: 'tekdocs-preflight/v1', scope: 'document', scope_id: 'doc-1',
+    composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: true,
+    counts: { blocker: 0, warning: 0, info: 0 }, findings: [],
+  })
+  const convertTopic = vi.fn()
+    .mockResolvedValueOnce({
+      topic_type: 'procedure', topic_schema_version: 1, base_revision_id: 'revision-1',
+      original_markdown: '# Firewall', converted_markdown: '<!-- tekdocs:section purpose -->\n## Purpose\n\n# Firewall', findings: [],
+    })
+    .mockResolvedValueOnce({ ...document, topic_type: 'procedure' as const, topic_schema_version: 1, current_revision_id: 'revision-2', revision_number: 2, markdown: '<!-- tekdocs:section purpose -->\n## Purpose\n\n# Firewall' })
   const approvePublication = vi.fn().mockResolvedValue(publication)
   const withdrawPublication = vi.fn().mockResolvedValue({ ...publication, lifecycle_state: 'withdrawn' as const })
   const getPublication = vi.fn().mockResolvedValue(publication)
@@ -113,6 +124,8 @@ function clients() {
     uploadAttachment,
     replacePrimaryFile,
     archiveAttachment,
+    preflight,
+    convertTopic,
     publish,
     approvePublication,
     withdrawPublication,
@@ -139,7 +152,7 @@ function clients() {
     loadMsp: vi.fn(), loadOrganization: vi.fn(),
     searchOrganizations: vi.fn().mockResolvedValue({ results: [{ id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'] }], page: 1, page_size: 15, has_more: false }),
   }
-  return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, updateOperations, requestReview, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
+  return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, updateOperations, requestReview, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, preflight, convertTopic, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
 
 it('consolidates document filters into one keyboard-accessible menu', async () => {
@@ -196,6 +209,44 @@ it('exposes document settings and opens them before the document content', async
   expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
   expect(settingsPanel).toHaveFocus()
   expect(settingsPanel.compareDocumentPosition(screen.getByRole('article')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('previews and confirms a document type conversion without rewriting the original revision', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, convertTopic } = clients()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.selectOptions(screen.getByLabelText('Guided structure'), 'procedure')
+
+  await waitFor(() => expect(convertTopic).toHaveBeenNthCalledWith(1, {}, 'doc-1', 'procedure', 'revision-1', false))
+  await waitFor(() => expect(convertTopic).toHaveBeenNthCalledWith(2, {}, 'doc-1', 'procedure', 'revision-1', true))
+  expect(await screen.findByRole('status')).toHaveTextContent('Converted to Procedure')
+})
+
+it('shows publication findings and keeps a blocked document from publishing', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, preflight, publish } = clients()
+  preflight.mockResolvedValue({
+    version: 'tekdocs-preflight/v1', scope: 'document', scope_id: 'doc-1',
+    composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: false,
+    counts: { blocker: 1, warning: 0, info: 0 },
+    findings: [{ code: 'topic.section.missing', severity: 'blocker', summary: 'A required topic section is missing.', remediation: 'Restore the required section.', target: 'document' }],
+  })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Check document' }))
+  expect(await screen.findByText('A required topic section is missing.')).toBeVisible()
+  expect(screen.getByRole('status')).toHaveTextContent('1 publication blocker')
+
+  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
+  await user.type(screen.getByLabelText('Publication reason'), 'Operational release')
+  const publishButton = screen.getByRole('button', { name: 'Publish immutable version' })
+  await waitFor(() => expect(publishButton).toBeDisabled())
+  expect(publish).not.toHaveBeenCalled()
 })
 
 it('organizes document health and sends an assigned review request', async () => {
@@ -346,7 +397,7 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.type(screen.getByLabelText('Document title'), 'New guide')
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), 'Portable Markdown')
   await user.click(screen.getByRole('button', { name: 'Create document' }))
-  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', is_template: false, library_visible: false }))
+  await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', topic_type: 'unstructured', is_template: false, library_visible: false }))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
   await user.click(screen.getByRole('button', { name: 'Client listings' }))
   await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')

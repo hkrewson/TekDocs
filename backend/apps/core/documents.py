@@ -25,6 +25,7 @@ from .models import (
     DocumentReviewState,
     DocumentTemplateEnrollment,
     DocumentTemplateRevision,
+    DocumentTopicType,
     Entity,
     Organization,
     PlacementAudienceProfile,
@@ -35,6 +36,7 @@ from .models import (
 )
 from .rendering import attachment_ids_in_markdown, split_markdown_sections
 from .scoping import DataScope
+from .topic_schemas import seed_markdown
 
 
 class RevisionConflict(Exception):
@@ -84,7 +86,9 @@ def _canonical_checksum(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _append_block_revision(*, block: Block, actor_id: UUID, markdown: str, base_revision_id: UUID) -> BlockRevision:
+def _append_block_revision(
+    *, block: Block, actor_id: UUID, markdown: str, base_revision_id: UUID, topic_type: str | None = None
+) -> BlockRevision:
     if block.current_revision_id is None:
         raise RuntimeError("Document block has no current revision")
     current_revision = BlockRevision.objects.select_related("parent").get(pk=block.current_revision_id)
@@ -95,7 +99,8 @@ def _append_block_revision(*, block: Block, actor_id: UUID, markdown: str, base_
             current_revision=current_revision,
             base_revision=base_revision,
         )
-    if markdown == current_revision.markdown:
+    resulting_topic_type = topic_type or current_revision.topic_type
+    if markdown == current_revision.markdown and resulting_topic_type == current_revision.topic_type:
         return current_revision
     resulting_revision = BlockRevision.objects.create(
         tenant=block.tenant,
@@ -105,6 +110,8 @@ def _append_block_revision(*, block: Block, actor_id: UUID, markdown: str, base_
         revision_number=current_revision.revision_number + 1,
         markdown=markdown,
         checksum=markdown_checksum(markdown),
+        topic_type=resulting_topic_type,
+        topic_schema_version=1,
         created_by_id=actor_id,
     )
     block.current_revision = resulting_revision
@@ -137,9 +144,11 @@ def documents_for_scope(scope: DataScope) -> QuerySet[Document]:
         tenant_id=scope.tenant_id,
         archived_at__isnull=True,
     ).select_related("entity", "created_by", "replaces__entity")
-    publications = DocumentPublication.objects.filter(tenant_id=scope.tenant_id).select_related(
-        "entity", "document", "document__entity", "published_by"
-    ).prefetch_related("control_events__actor", "successors__control_events")
+    publications = (
+        DocumentPublication.objects.filter(tenant_id=scope.tenant_id)
+        .select_related("entity", "document", "document__entity", "published_by")
+        .prefetch_related("control_events__actor", "successors__control_events")
+    )
     records = Document.objects.filter(tenant_id=scope.tenant_id, archived_at__isnull=True)
     if scope.organization_id is None:
         records = records.filter(organization__isnull=True)
@@ -247,10 +256,7 @@ def resolve_document(document: Document, *, audience: str | None = None) -> Reso
 
     if audience is not None:
         resolved = [
-            item
-            for item in resolved
-            if item.placement.audience_profile
-            in (PlacementAudienceProfile.SHARED, audience)
+            item for item in resolved if item.placement.audience_profile in (PlacementAudienceProfile.SHARED, audience)
         ]
         if not resolved:
             raise PlacementConflict("The document has no content for the selected publication audience.")
@@ -262,9 +268,7 @@ def resolve_document(document: Document, *, audience: str | None = None) -> Reso
     return ResolvedDocument(markdown=markdown, placements=tuple(resolved))
 
 
-def lock_document_composition(
-    document: Document, *, audience: str | None = None
-) -> tuple[Document, ResolvedDocument]:
+def lock_document_composition(document: Document, *, audience: str | None = None) -> tuple[Document, ResolvedDocument]:
     """Lock one document, its placements, blocks, and selected immutable revisions."""
     locked = (
         Document.objects.select_for_update(of=("self",))
@@ -340,9 +344,7 @@ def document_restructure_preview(document: Document) -> dict[str, object]:
     elif primary.resolution_mode != PlacementResolutionMode.LIVE:
         blockers.append({"code": "primary_pinned", "detail": "A pinned primary content region cannot be restructured."})
     if already_converted:
-        blockers.append(
-            {"code": "already_restructured", "detail": "This document has already been restructured."}
-        )
+        blockers.append({"code": "already_restructured", "detail": "This document has already been restructured."})
     if document.is_template:
         blockers.append(
             {
@@ -435,9 +437,7 @@ def document_restructure_preview(document: Document) -> dict[str, object]:
 
 
 @transaction.atomic
-def restructure_document(
-    *, document: Document, actor_id: UUID, base_revision_id: UUID
-) -> DocumentRestructureResult:
+def restructure_document(*, document: Document, actor_id: UUID, base_revision_id: UUID) -> DocumentRestructureResult:
     """Convert one legacy content region into ordered semantic blocks atomically."""
 
     locked = Document.objects.select_for_update().select_related("entity", "tenant").get(pk=document.pk)
@@ -561,7 +561,10 @@ def create_document(
     category: str = DocumentCategory.GENERAL,
     is_template: bool = False,
     library_visible: bool = False,
+    topic_type: str = DocumentTopicType.UNSTRUCTURED,
 ) -> Document:
+    if topic_type != DocumentTopicType.UNSTRUCTURED:
+        markdown = seed_markdown(topic_type, markdown)
     document_entity = Entity.objects.create(
         tenant=tenant,
         workspace=workspace_for_owner(tenant=tenant, organization=organization),
@@ -576,6 +579,8 @@ def create_document(
         category=category,
         is_template=is_template,
         library_visible=library_visible,
+        topic_type=topic_type,
+        topic_schema_version=1,
     )
     block_entity = Entity.objects.create(
         tenant=tenant,
@@ -598,6 +603,8 @@ def create_document(
         revision_number=1,
         markdown=markdown,
         checksum=markdown_checksum(markdown),
+        topic_type=topic_type,
+        topic_schema_version=1,
         created_by_id=actor_id,
     )
     block.current_revision = revision
@@ -624,8 +631,10 @@ def update_document(
     category: str = DocumentCategory.GENERAL,
     is_template: bool = False,
     library_visible: bool = False,
+    topic_type: str | None = None,
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
+    resulting_topic_type = topic_type or locked_document.topic_type
     placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
     block = Block.objects.select_for_update().get(pk=placement.block_id)
     if (
@@ -643,6 +652,7 @@ def update_document(
         actor_id=actor_id,
         markdown=markdown,
         base_revision_id=base_revision_id,
+        topic_type=resulting_topic_type,
     )
 
     locked_document.entity.display_name = title
@@ -652,6 +662,8 @@ def update_document(
     locked_document.category = category
     locked_document.is_template = is_template
     locked_document.library_visible = library_visible
+    locked_document.topic_type = resulting_topic_type
+    locked_document.topic_schema_version = 1
     locked_document.review_state = DocumentReviewState.UNREVIEWED
     locked_document.review_requested_by = None
     locked_document.review_requested_at = None
@@ -663,6 +675,8 @@ def update_document(
             "category",
             "is_template",
             "library_visible",
+            "topic_type",
+            "topic_schema_version",
             "review_state",
             "review_requested_by",
             "review_requested_at",
@@ -697,6 +711,8 @@ def _template_manifest(source: Document) -> dict[str, object]:
     return {
         "template_document_id": str(source.entity_id),
         "title": source.entity.display_name,
+        "topic_type": source.topic_type,
+        "topic_schema_version": source.topic_schema_version,
         "blocks": [
             {
                 "source_block_id": str(item.placement.block.entity_id),
@@ -706,9 +722,7 @@ def _template_manifest(source: Document) -> dict[str, object]:
                 "name": item.placement.block.entity.display_name,
                 "depth": item.depth,
                 "audience_profile": item.placement.audience_profile,
-                "attachment_ids": sorted(
-                    str(value) for value in attachment_ids_in_markdown(item.revision.markdown)
-                ),
+                "attachment_ids": sorted(str(value) for value in attachment_ids_in_markdown(item.revision.markdown)),
             }
             for item in resolved.placements
         ],
@@ -781,6 +795,7 @@ def instantiate_document_template(
                 raise PlacementConflict("The template contains an unavailable managed attachment reference.")
 
             replacements = {item.entity_id: uuid4() for item in source_attachments}
+
             def copied_markdown(markdown: str) -> str:
                 for source_id, destination_id in replacements.items():
                     markdown = markdown.replace(
@@ -799,6 +814,7 @@ def instantiate_document_template(
                 markdown=copied_markdown(primary.revision.markdown),
                 category=category,
                 is_template=False,
+                topic_type=source.topic_type,
             )
             destination_primary = primary_placement(destination)
             placement_map: list[dict[str, object]] = [
@@ -897,8 +913,7 @@ def template_rollout_preview(
         for item in cast(list[dict[str, object]], enrollment.applied_revision.manifest.get("blocks", []))
     }
     latest_blocks = {
-        str(item["source_block_id"]): item
-        for item in cast(list[dict[str, object]], latest.manifest.get("blocks", []))
+        str(item["source_block_id"]): item for item in cast(list[dict[str, object]], latest.manifest.get("blocks", []))
     }
     placement_modes = {
         str(item["source_block_id"]): str(item["mode"])
@@ -911,15 +926,19 @@ def template_rollout_preview(
         for key in latest_blocks.keys() & applied_blocks.keys()
         if latest_blocks[key]["source_revision_id"] != applied_blocks[key]["source_revision_id"]
     ]
-    conflicts = [
-        {**item, "reason": "Copied client content is never overwritten automatically."}
-        for item in changed
-        if item["mode"] == "copy"
-    ] + [
-        {**item, "reason": "New template blocks with managed attachments require document re-instantiation."}
-        for item in added
-        if item.get("attachment_ids")
-    ] + [{**item, "reason": "Template removal requires explicit client-document editing."} for item in removed]
+    conflicts = (
+        [
+            {**item, "reason": "Copied client content is never overwritten automatically."}
+            for item in changed
+            if item["mode"] == "copy"
+        ]
+        + [
+            {**item, "reason": "New template blocks with managed attachments require document re-instantiation."}
+            for item in added
+            if item.get("attachment_ids")
+        ]
+        + [{**item, "reason": "Template removal requires explicit client-document editing."} for item in removed]
+    )
     return latest, {
         "current_revision": enrollment.applied_revision.revision_number,
         "available_revision": latest.revision_number,
@@ -939,9 +958,11 @@ def apply_template_rollout(
     expected_applied_revision_id: UUID,
     placement_rules: dict[str, str] | None = None,
 ) -> dict[str, object]:
-    locked = DocumentTemplateEnrollment.objects.select_for_update().select_related(
-        "source_template", "destination_document", "applied_revision"
-    ).get(pk=enrollment.pk)
+    locked = (
+        DocumentTemplateEnrollment.objects.select_for_update()
+        .select_related("source_template", "destination_document", "applied_revision")
+        .get(pk=enrollment.pk)
+    )
     if locked.applied_revision_id != expected_applied_revision_id:
         raise PlacementConflict("The client template enrollment changed after this preview loaded.")
     latest, preview = template_rollout_preview(enrollment=locked, actor_id=actor_id)
@@ -973,9 +994,7 @@ def apply_template_rollout(
                 )
                 destination_block_id = source_block.entity_id
             else:
-                revision = BlockRevision.objects.get(
-                    id=UUID(str(item["source_revision_id"])), block=source_block
-                )
+                revision = BlockRevision.objects.get(id=UUID(str(item["source_revision_id"])), block=source_block)
                 placement = create_document_block(
                     document=locked.destination_document,
                     actor_id=actor_id,
@@ -1124,9 +1143,7 @@ def _placement_parent(*, document: Document, parent_id: UUID | None) -> Document
     return parent
 
 
-def _placement_position(
-    *, document: Document, parent: DocumentPlacement | None, requested_position: int | None
-) -> int:
+def _placement_position(*, document: Document, parent: DocumentPlacement | None, requested_position: int | None) -> int:
     siblings = document.placements.select_for_update().filter(parent=parent)
     last_position = siblings.aggregate(value=Max("position"))["value"]
     minimum = 1 if parent is None else 0
@@ -1267,11 +1284,7 @@ def add_block_placement(
     locked_document = Document.objects.select_for_update().get(pk=document.pk)
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
-    block = (
-        Block.objects.select_for_update(of=("self",))
-        .select_related("current_revision")
-        .get(pk=block.pk)
-    )
+    block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
     if block.tenant_id != locked_document.tenant_id or block.archived_at is not None:
         raise PlacementConflict("The selected block is unavailable in this installation.")
     if block.source_document_id == locked_document.id:
@@ -1336,9 +1349,7 @@ def update_document_placement(
     audience_profile: str | None = None,
 ) -> DocumentPlacement:
     locked = (
-        DocumentPlacement.objects.select_for_update(of=("self",))
-        .select_related("block", "parent")
-        .get(pk=placement.pk)
+        DocumentPlacement.objects.select_for_update(of=("self",)).select_related("block", "parent").get(pk=placement.pk)
     )
     if resolution_mode is None:
         resolution_mode = locked.resolution_mode
@@ -1350,9 +1361,8 @@ def update_document_placement(
             raise PlacementConflict("The primary document block must remain live and shared.")
     _validate_placement_audience(parent=locked.parent, audience_profile=audience_profile)
     children = list(locked.children.select_for_update().only("audience_profile"))
-    if (
-        audience_profile != PlacementAudienceProfile.SHARED
-        and any(child.audience_profile != audience_profile for child in children)
+    if audience_profile != PlacementAudienceProfile.SHARED and any(
+        child.audience_profile != audience_profile for child in children
     ):
         raise PlacementConflict("This audience would exclude one or more nested placements.")
     pinned_revision = None

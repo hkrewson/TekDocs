@@ -30,6 +30,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("api-token-rotate", ("POST",)),
     route("api-token-revoke", ("DELETE",)),
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
+    route("document-topic-schemas", ("GET",)),
     route(
         "msp-credential-reference-list-create",
         ("GET", "POST"),
@@ -49,6 +50,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
     route("msp-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-preflight", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-document-topic-conversion", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-operations-choices", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-operations", ("PUT",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-review-request", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
@@ -1328,6 +1331,13 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
     ),
+    route("organization-document-preflight", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
+    route(
+        "organization-document-topic-conversion",
+        ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
     route(
         "organization-document-restructure",
         ("GET", "POST"),
@@ -1613,12 +1623,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.INTEGRATIONS_VIEW,
         organization_scoped=True,
     ),
-    route(
-        "organization-import-detail", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
-    ),
-    route(
-        "organization-import-row-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
-    ),
+    route("organization-import-detail", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True),
+    route("organization-import-row-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True),
     route(
         "organization-import-apply",
         ("POST",),
@@ -1631,9 +1637,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
         organization_scoped=True,
     ),
-    route(
-        "organization-import-report", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
-    ),
+    route("organization-import-report", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True),
     route(
         "organization-documentation-map-list-create",
         ("GET", "POST"),

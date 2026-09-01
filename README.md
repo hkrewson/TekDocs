@@ -24,6 +24,7 @@ The security review currently recorded by the project used Claude Opus 5 (High) 
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
 - Scoped built-in and custom roles at MSP, organization, and collection boundaries
 - Public API, personal and service tokens, signed webhooks, integration jobs, reconciliation, and sanitized Git export
+- Dry-run, idempotent Workspace imports for native bundles and documented ITFlow, IT Glue, Hudu, and TekDocs CSV mappings
 - Compliance controls, evidence, risks, reviews, and immutable evidence bundles
 
 TekDocs stores provider-neutral credential references. It does not store or retrieve customer credential values.

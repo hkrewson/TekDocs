@@ -128,8 +128,12 @@ class TenantBillingProfile(TimestampedModel):
         if self.invoice_reset_period == "yearly" and self.invoice_date_component == "none":
             raise ValidationError({"invoice_date_component": "Include a year when numbering restarts each year"})
         if self.invoice_reset_period == "monthly" and self.invoice_date_component not in {
-            "year_month", "short_year_month", "month_year", "month_short_year",
-            "year_month_code", "short_year_month_code",
+            "year_month",
+            "short_year_month",
+            "month_year",
+            "month_short_year",
+            "year_month_code",
+            "short_year_month_code",
         }:
             raise ValidationError(
                 {"invoice_date_component": "Include a year and month when numbering restarts each month"}
@@ -280,8 +284,15 @@ class InvoiceNumberSeries(TimestampedModel):
         if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.prefix):
             raise ValidationError({"prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
         if self.date_component not in {
-            "none", "year", "short_year", "year_month", "short_year_month", "month_year",
-            "month_short_year", "year_month_code", "short_year_month_code",
+            "none",
+            "year",
+            "short_year",
+            "year_month",
+            "short_year_month",
+            "month_year",
+            "month_short_year",
+            "year_month_code",
+            "short_year_month_code",
         }:
             raise ValidationError({"date_component": "Unsupported invoice date component"})
         if self.separator not in {"-", "/", ".", ""}:
@@ -293,8 +304,12 @@ class InvoiceNumberSeries(TimestampedModel):
         if self.reset_period == "yearly" and self.date_component == "none":
             raise ValidationError({"date_component": "Include a year when numbering restarts each year"})
         if self.reset_period == "monthly" and self.date_component not in {
-            "year_month", "short_year_month", "month_year", "month_short_year",
-            "year_month_code", "short_year_month_code",
+            "year_month",
+            "short_year_month",
+            "month_year",
+            "month_short_year",
+            "year_month_code",
+            "short_year_month_code",
         }:
             raise ValidationError({"date_component": "Include a year and month when numbering restarts each month"})
 
@@ -5187,6 +5202,143 @@ class IntegrationConflict(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.remote_type}:{self.remote_id}:{self.status}"
+
+
+class ImportBatchState(models.TextChoices):
+    PREVIEW_READY = "preview_ready", "Preview ready"
+    APPLYING = "applying", "Applying"
+    APPLIED = "applied", "Applied"
+    CANCELLED = "cancelled", "Cancelled"
+    FAILED = "failed", "Failed"
+
+
+class ImportRowAction(models.TextChoices):
+    CREATE = "create", "Create"
+    UPDATE = "update", "Update"
+    UNCHANGED = "unchanged", "Unchanged"
+    CONFLICT = "conflict", "Conflict"
+    REJECTED = "rejected", "Rejected"
+
+
+class ImportBatch(models.Model):
+    """Bounded import preview whose raw source bytes are never retained."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="import_batches")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="import_batches")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="import_batches", null=True, blank=True
+    )
+    source_format = models.CharField(max_length=32)
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    source_filename = models.CharField(max_length=240)
+    source_digest = models.CharField(max_length=64)
+    state = models.CharField(max_length=20, choices=ImportBatchState.choices, default=ImportBatchState.PREVIEW_READY)
+    result_counts = models.JSONField(default=dict)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_import_batches"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state__in=ImportBatchState.values), name="import_batch_state_valid"
+            ),
+            models.CheckConstraint(condition=models.Q(schema_version=1), name="import_batch_schema_v1"),
+            models.CheckConstraint(
+                condition=models.Q(source_digest__regex=r"^[0-9a-f]{64}$"),
+                name="import_batch_digest_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "created_at"), name="core_importbatch_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Import batch {self.id}"
+
+
+class ImportRow(models.Model):
+    """Normalized, value-bounded staging row and retained value-safe result."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="import_rows")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="import_rows")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="import_rows", null=True, blank=True
+    )
+    batch = models.ForeignKey(ImportBatch, on_delete=models.PROTECT, related_name="rows")
+    row_number = models.PositiveIntegerField()
+    record_type = models.CharField(max_length=40)
+    external_key = models.CharField(max_length=160)
+    fingerprint = models.CharField(max_length=64)
+    action = models.CharField(max_length=16, choices=ImportRowAction.choices)
+    reason_code = models.CharField(max_length=64, blank=True)
+    normalized_data = models.JSONField(default=dict)
+    local_entity = models.ForeignKey(
+        Entity, on_delete=models.PROTECT, related_name="import_rows", null=True, blank=True
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("row_number", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("batch", "row_number"), name="import_row_number_unique"),
+            models.CheckConstraint(
+                condition=models.Q(action__in=ImportRowAction.values), name="import_row_action_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fingerprint__regex=r"^[0-9a-f]{64}$"), name="import_row_digest_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "batch", "action"), name="core_importrow_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.record_type}:{self.external_key}:{self.action}"
+
+
+class ImportExternalKey(TimestampedModel):
+    """Stable source identity mapped to one exact-Workspace TekDocs entity."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="import_external_keys")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="import_external_keys")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="import_external_keys", null=True, blank=True
+    )
+    source_system = models.CharField(max_length=32)
+    record_type = models.CharField(max_length=40)
+    external_key = models.CharField(max_length=160)
+    local_entity = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="import_external_keys")
+    last_fingerprint = models.CharField(max_length=64)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("source_system", "record_type", "external_key", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("workspace", "source_system", "record_type", "external_key"),
+                name="import_external_key_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(last_fingerprint__regex=r"^[0-9a-f]{64}$"),
+                name="import_external_key_digest_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "source_system", "record_type"), name="core_importkey_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.source_system}:{self.record_type}:{self.external_key}"
 
 
 def git_export_upload_to(instance: "GitExportBundle", _filename: str) -> str:

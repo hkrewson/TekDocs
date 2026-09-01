@@ -370,7 +370,7 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
   vendors: { title: 'Vendors', description: 'Suppliers related to this organization through products, assets, or services.', release: '0.3.4' },
   products: { title: 'Products', description: 'Supplier product and model templates owned by this organization.', release: '0.3.3' },
   recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
-  integrations: { title: 'Integrations', description: 'Signed webhooks and provider connections scoped to this organization.', release: '0.6.3' },
+  integrations: { title: 'Integrations', description: 'Preview safe imports, manage signed webhooks, and reconcile provider data in this organization.', release: '0.6.3' },
   compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
   deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
   activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },

@@ -28,7 +28,7 @@ const topics: Record<string, HelpTopic> = {
   compliance: { title: 'Compliance', summary: 'Manage framework assignments, evidence, risks, signed bundles, and review reminders.', slug: 'Compliance' },
   activity: { title: 'Activity and audit evidence', summary: 'Review permission-aware, append-only security and business events.', slug: 'Audit-and-activity' },
   recycle_bin: { title: 'Recycle bin', summary: 'Recover archived records through the same workspace and authorization boundaries.', slug: 'Recycle-bin' },
-  integrations: { title: 'Integrations', summary: 'Configure scoped tokens, webhooks, read-only synchronization, reconciliation, and exports.', slug: 'Integrations-and-API' },
+  integrations: { title: 'Integrations', summary: 'Preview safe imports, configure scoped webhooks and read-only synchronization, reconcile changes, and create sanitized exports.', slug: 'Integrations-and-API' },
   settings: { title: 'Account security', summary: 'Manage profile details, sessions, MFA, recovery codes, and API tokens.', slug: 'Account-security' },
   staff: { title: 'Staff and invitations', summary: 'Invite MSP staff, review invitation delivery and expiry, and continue into role and client assignment.', slug: 'People-and-access' },
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },

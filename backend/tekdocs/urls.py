@@ -218,6 +218,16 @@ from apps.core.domain_views import (
     OrganizationDomainMonitoringView,
     OrganizationDomainReviewView,
 )
+from apps.core.import_views import (
+    ImportApplyView,
+    ImportBatchListCreateView,
+    ImportCancelView,
+    ImportReportView,
+    ImportRowListView,
+    ImportTemplateView,
+    MSPImportBatchDetailView,
+    OrganizationImportBatchDetailView,
+)
 from apps.core.integration_views import (
     GitExportDownloadView,
     GitExportListCreateView,
@@ -857,6 +867,39 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/git-exports/<uuid:bundle_id>/download",
         GitExportDownloadView.as_view(),
         name="msp-git-export-download",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports", ImportBatchListCreateView.as_view(), name="msp-import-list-create"
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/templates/<str:record_type>",
+        ImportTemplateView.as_view(),
+        name="msp-import-template",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/<uuid:batch_id>",
+        MSPImportBatchDetailView.as_view(),
+        name="msp-import-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/<uuid:batch_id>/rows",
+        ImportRowListView.as_view(),
+        name="msp-import-row-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/<uuid:batch_id>/apply",
+        ImportApplyView.as_view(),
+        name="msp-import-apply",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/<uuid:batch_id>/cancel",
+        ImportCancelView.as_view(),
+        name="msp-import-cancel",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/imports/<uuid:batch_id>/report",
+        ImportReportView.as_view(),
+        name="msp-import-report",
     ),
     path(
         "api/v1/workspaces/msp/compliance/frameworks",
@@ -2057,6 +2100,41 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/git-exports/<uuid:bundle_id>/download",
         GitExportDownloadView.as_view(),
         name="organization-git-export-download",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports",
+        ImportBatchListCreateView.as_view(),
+        name="organization-import-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/templates/<str:record_type>",
+        ImportTemplateView.as_view(),
+        name="organization-import-template",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/<uuid:batch_id>",
+        OrganizationImportBatchDetailView.as_view(),
+        name="organization-import-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/<uuid:batch_id>/rows",
+        ImportRowListView.as_view(),
+        name="organization-import-row-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/<uuid:batch_id>/apply",
+        ImportApplyView.as_view(),
+        name="organization-import-apply",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/<uuid:batch_id>/cancel",
+        ImportCancelView.as_view(),
+        name="organization-import-cancel",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/imports/<uuid:batch_id>/report",
+        ImportReportView.as_view(),
+        name="organization-import-report",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/compliance/frameworks",

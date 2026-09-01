@@ -7,6 +7,7 @@ from django.utils import timezone
 from .certificate_monitoring import process_certificate_monitoring_run, schedule_due_certificate_monitoring
 from .document_sources import fetch_remote_document
 from .domain_monitoring import process_domain_monitoring_run, schedule_due_domain_monitoring
+from .imports import purge_expired_import_staging
 from .integrations import process_sync_job, purge_integration_logs, schedule_due_connections
 from .models import (
     CertificateMonitorRun,
@@ -162,6 +163,20 @@ def purge_expired_integration_logs() -> int:
         mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
         with system_rls_scope(scope, organization_mode=mode):
             total += purge_integration_logs(tenant=installation.tenant)
+    return total
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def purge_expired_import_rows() -> int:
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    total = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with system_rls_scope(scope, organization_mode=mode):
+            total += purge_expired_import_staging()
     return total
 
 

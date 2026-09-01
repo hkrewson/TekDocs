@@ -147,6 +147,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-git-export-download", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route(
+        "msp-import-list-create",
+        ("GET", "POST"),
+        PermissionKey.INTEGRATIONS_VIEW,
+        (PermissionKey.INTEGRATIONS_MANAGE,),
+    ),
+    route("msp-import-template", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route("msp-import-detail", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route("msp-import-row-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route("msp-import-apply", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-import-cancel", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-import-report", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route(
         "msp-compliance-framework-list-create",
         ("GET", "POST"),
         PermissionKey.COMPLIANCE_VIEW,
@@ -1568,6 +1580,40 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET",),
         PermissionKey.INTEGRATIONS_VIEW,
         organization_scoped=True,
+    ),
+    route(
+        "organization-import-list-create",
+        ("GET", "POST"),
+        PermissionKey.INTEGRATIONS_VIEW,
+        (PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-import-template",
+        ("GET",),
+        PermissionKey.INTEGRATIONS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-import-detail", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
+    ),
+    route(
+        "organization-import-row-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
+    ),
+    route(
+        "organization-import-apply",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-import-cancel",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-import-report", ("GET",), PermissionKey.INTEGRATIONS_VIEW, organization_scoped=True
     ),
     route(
         "organization-compliance-framework-list-create",

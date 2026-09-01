@@ -154,6 +154,9 @@ DOCUMENT_RLS_TABLES = {
     "core_dataflowsnapshot",
     "core_tenantbillingprofile",
     "core_taxrate",
+    "core_importbatch",
+    "core_importrow",
+    "core_importexternalkey",
 }
 
 

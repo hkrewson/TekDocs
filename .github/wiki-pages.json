@@ -24,6 +24,7 @@
     {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true},
     {"slug": "Recycle-bin", "audience": "end_user", "contextual": true},
     {"slug": "Integrations-and-API", "audience": "api", "contextual": true},
+    {"slug": "Imports-and-migration", "audience": "operator"},
     {"slug": "Account-security", "audience": "end_user", "contextual": true},
     {"slug": "Roles-and-permissions", "audience": "security", "contextual": true},
     {"slug": "Notifications", "audience": "operator", "contextual": true},

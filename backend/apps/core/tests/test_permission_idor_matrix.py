@@ -170,6 +170,12 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-integration-connection-rotate": ("connection_id",),
         "msp-integration-conflict-resolve": ("conflict_id",),
         "msp-git-export-download": ("bundle_id",),
+        "msp-import-template": ("record_type",),
+        "msp-import-detail": ("batch_id",),
+        "msp-import-row-list": ("batch_id",),
+        "msp-import-apply": ("batch_id",),
+        "msp-import-cancel": ("batch_id",),
+        "msp-import-report": ("batch_id",),
         "msp-compliance-framework-detail": ("framework_entity_id",),
         "msp-compliance-catalog-revision-list-create": ("framework_entity_id",),
         "msp-compliance-catalog-revision-detail": ("framework_entity_id", "revision_number"),
@@ -210,6 +216,13 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-integration-conflict-resolve": ("organization_entity_id", "conflict_id"),
         "organization-git-export-list-create": ("organization_entity_id",),
         "organization-git-export-download": ("organization_entity_id", "bundle_id"),
+        "organization-import-list-create": ("organization_entity_id",),
+        "organization-import-template": ("organization_entity_id", "record_type"),
+        "organization-import-detail": ("organization_entity_id", "batch_id"),
+        "organization-import-row-list": ("organization_entity_id", "batch_id"),
+        "organization-import-apply": ("organization_entity_id", "batch_id"),
+        "organization-import-cancel": ("organization_entity_id", "batch_id"),
+        "organization-import-report": ("organization_entity_id", "batch_id"),
         "organization-compliance-framework-list-create": ("organization_entity_id",),
         "organization-compliance-framework-detail": ("organization_entity_id", "framework_entity_id"),
         "organization-compliance-catalog-revision-list-create": (
@@ -524,6 +537,11 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
     }
     if route_name in {"msp-recycle-bin-restore", "organization-recycle-bin-restore"}:
         kwargs = {"record_type": "site", "record_id": value}
+        if route_name.startswith("organization-"):
+            kwargs["organization_entity_id"] = value
+        return kwargs
+    if route_name in {"msp-import-template", "organization-import-template"}:
+        kwargs = {"record_type": "sites"}
         if route_name.startswith("organization-"):
             kwargs["organization_entity_id"] = value
         return kwargs

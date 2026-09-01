@@ -323,6 +323,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.core.tasks.purge_expired_integration_logs",
         "schedule": 86400.0,
     },
+    "purge-expired-import-rows": {
+        "task": "apps.core.tasks.purge_expired_import_rows",
+        "schedule": 86400.0,
+    },
     "schedule-domain-monitoring": {
         "task": "apps.core.tasks.schedule_domain_monitoring",
         "schedule": 3600.0,

@@ -87,6 +87,25 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
+test('document filters use one accessible disclosure menu', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/documentation')
+
+  const trigger = page.locator('.document-filter-trigger')
+  await trigger.click()
+  const menu = page.getByRole('dialog', { name: 'Document filters' })
+  await expect(menu.locator('details')).toHaveCount(5)
+  await menu.getByText('Category', { exact: true }).click()
+  await menu.getByRole('radio', { name: 'Guide' }).check()
+  await expect(trigger).toHaveAccessibleName('Filters (1)')
+  await menu.getByRole('button', { name: 'Clear all filters' }).click()
+  await expect(trigger).toHaveAccessibleName('Filters')
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(trigger).toBeFocused()
+  expect((await new AxeBuilder({ page }).include('.document-index').withTags(wcag22Tags).analyze()).violations).toEqual([])
+})
+
 test('excluded modules are unavailable and accounting redirects to invoices', async ({ page }) => {
   await mockAuthenticated(page)
 

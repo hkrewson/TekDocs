@@ -142,6 +142,45 @@ function clients() {
   return { documents, workspaces, getDocument, createDocument, createFileBacked, replacePrimaryFile, updateDocument, updateOperations, requestReview, previewRestructure, applyRestructure, addReference, addPlacement, updatePlacement, removePlacement, getReuseImpact, updateSharedBlock, detachPlacement, searchMentionEntities, searchBlockLibrary, instantiateTemplate, importMarkdown, uploadAttachment, archiveAttachment, publish, approvePublication, withdrawPublication, getPublication, saveRemoteSource, checkRemoteSource, applyRemoteObservation, publication, listKeyBindings, declareKeyBinding, archiveKeyBinding, listDocumentKeys, browseKeyBindings, keyBinding }
 }
 
+it('consolidates document filters into one keyboard-accessible menu', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const listDocuments = vi.fn().mockResolvedValue({
+    results: [document, sourceDocument],
+    count: 2,
+    collections: [{ value: 'Security standards', count: 1 }],
+    tags: [{ value: 'firewall', count: 1 }],
+    health: [{ value: 'unowned', count: 1 }],
+  })
+  documents.list = listDocuments
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  const filterButton = await screen.findByRole('button', { name: 'Filters' })
+  expect(screen.queryByRole('dialog', { name: 'Document filters' })).not.toBeInTheDocument()
+  await user.click(filterButton)
+
+  const menu = screen.getByRole('dialog', { name: 'Document filters' })
+  expect(menu.querySelectorAll('details')).toHaveLength(5)
+  expect(within(menu).getByText('Category')).toBeVisible()
+  expect(within(menu).getByText('Collection')).toBeVisible()
+  expect(within(menu).getByText('Tag')).toBeVisible()
+  expect(within(menu).getByText('Health')).toBeVisible()
+  expect(within(menu).getByText('Type')).toBeVisible()
+
+  await user.click(within(menu).getByText('Category'))
+  await user.click(within(menu).getByRole('radio', { name: 'Policy' }))
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith({}, expect.any(AbortSignal), expect.objectContaining({ category: 'policy' })))
+  expect(filterButton).toHaveAccessibleName('Filters (1)')
+
+  await user.click(within(menu).getByRole('button', { name: 'Clear all filters' }))
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith({}, expect.any(AbortSignal), expect.objectContaining({ category: '', collection: '', tag: '', health: '', template: 'all' })))
+  expect(filterButton).toHaveAccessibleName('Filters')
+
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog', { name: 'Document filters' })).not.toBeInTheDocument()
+  expect(filterButton).toHaveFocus()
+})
+
 it('exposes document settings and opens them before the document content', async () => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()

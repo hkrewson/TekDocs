@@ -25,7 +25,14 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
   const markdownChange = useRef(onMarkdownChange)
   const tabsId = useId()
   const tabRefs = useRef<Record<EditorMode, HTMLButtonElement | null>>({ wysiwyg: null, markdown: null, preview: null, help: null })
+  const requestedTabFocus = useRef<EditorMode | null>(null)
   useEffect(() => { markdownChange.current = onMarkdownChange }, [onMarkdownChange])
+
+  useEffect(() => {
+    if (requestedTabFocus.current !== mode) return
+    tabRefs.current[mode]?.focus()
+    requestedTabFocus.current = null
+  }, [mode])
 
   useEffect(() => {
     if (mode !== 'wysiwyg' || !editorRoot.current) return
@@ -104,8 +111,8 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
     if (nextIndex === null) return
     event.preventDefault()
     const nextMode = editorModes[nextIndex]
+    requestedTabFocus.current = nextMode
     selectMode(nextMode)
-    tabRefs.current[nextMode]?.focus()
   }
 
   const tab = (tabMode: EditorMode, label: string) => (

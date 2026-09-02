@@ -207,15 +207,6 @@ def publish_document(
                 locked_document, resolved = lock_document_composition(document, audience=audience)
             except PlacementConflict as exc:
                 raise PublicationConflict(str(exc)) from exc
-            preflight = run_document_preflight(
-                workspace=workspace, document=locked_document, resolved=resolved, audience=audience
-            )
-            blockers = [item for item in preflight["findings"] if item["severity"] == "blocker"]
-            if blockers:
-                raise PublicationConflict(f"Preflight blocked publication: {blockers[0]['summary']}")
-            if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
-                raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
-
             published_at = timezone.now()
             encoded_timestamp = _timestamp(published_at)
             try:
@@ -231,7 +222,18 @@ def publish_document(
                     resolved_at=encoded_timestamp,
                 )
             except KeyFreezeConflict as exc:
+                # Publication callers need the precise, safe conflict so an
+                # author can correct cycles, placement, audience, or limits.
                 raise PublicationConflict(str(exc)) from exc
+            preflight = run_document_preflight(
+                workspace=workspace, document=locked_document, resolved=resolved, audience=audience
+            )
+            blockers = [item for item in preflight["findings"] if item["severity"] == "blocker"]
+            if blockers:
+                raise PublicationConflict(f"Preflight blocked publication: {blockers[0]['summary']}")
+            if len(resolved.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
+                raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")
+
             frozen_markdown = frozen_keys.markdown
             if len(frozen_markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
                 raise PublicationConflict("The resolved publication exceeds the 2 MiB rendering limit.")

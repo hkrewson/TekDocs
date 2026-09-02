@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.utils import timezone
@@ -12,6 +14,15 @@ from .scoping import DataScope
 
 class SiteHierarchyError(ValueError):
     pass
+
+
+def _validate_timezone(value: str) -> None:
+    if not value:
+        return
+    try:
+        ZoneInfo(value)
+    except ZoneInfoNotFoundError as exc:
+        raise ValidationError({"timezone": "Use a valid IANA timezone name."}) from exc
 
 
 def locations_for_scope(scope: DataScope) -> QuerySet[Location]:
@@ -65,6 +76,7 @@ def create_site(
     timezone: str,
     phone: str,
 ) -> Site:
+    _validate_timezone(timezone)
     entity = Entity.objects.create(
         tenant=tenant,
         workspace=workspace_for_owner(tenant=tenant, organization=organization),
@@ -92,6 +104,8 @@ def create_site(
 
 @transaction.atomic
 def update_site(*, site: Site, actor_id: UUID, **values: str) -> Site:
+    if "timezone" in values:
+        _validate_timezone(values["timezone"])
     site.entity.display_name = values.pop("name")
     site.entity.save(update_fields=("display_name", "updated_at"))
     for field, value in values.items():

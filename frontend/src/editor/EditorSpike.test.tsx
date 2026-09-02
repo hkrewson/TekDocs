@@ -82,4 +82,17 @@ describe('editor feasibility spike', () => {
     expect(screen.getByText('==verify this==')).toBeInTheDocument()
     expect(screen.getByText(/Raw HTML, MDX, scripts/)).toBeInTheDocument()
   })
+
+  it('moves focus with the selected editor tab after its panel renders', async () => {
+    const user = userEvent.setup()
+    render(<EditorSpike />)
+
+    const markdownTab = screen.getByRole('tab', { name: 'Markdown' })
+    await user.click(markdownTab)
+    await user.keyboard('{ArrowRight}')
+
+    const previewTab = screen.getByRole('tab', { name: 'Preview' })
+    expect(previewTab).toHaveAttribute('aria-selected', 'true')
+    expect(previewTab).toHaveFocus()
+  })
 })

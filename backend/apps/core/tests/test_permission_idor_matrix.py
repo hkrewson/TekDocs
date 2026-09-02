@@ -298,6 +298,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-invoice-issue": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-pdf": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-csv": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-accounting-export": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-event-create": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-deliver": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-line-list-create": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-line-detail": ("organization_entity_id", "invoice_entity_id", "line_id"),

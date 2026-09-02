@@ -7,7 +7,7 @@ from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -23,6 +23,7 @@ from .models import (
     Entity,
     EntityVisibility,
     Invoice,
+    InvoiceLifecycleEvent,
     InvoiceState,
     PublicationAudience,
     PublicationControlAction,
@@ -37,10 +38,14 @@ PORTAL_DOCUMENT_SCAN_LIMIT = 100
 
 
 class PortalInvoiceResultSerializer(serializers.Serializer):
-    results = InvoiceSerializer(many=True)
+    results = serializers.SerializerMethodField()
     count = serializers.IntegerField()
     has_more = serializers.BooleanField()
     next_cursor = serializers.CharField(allow_null=True)
+
+    @extend_schema_field(InvoiceSerializer(many=True))
+    def get_results(self, value):  # type: ignore[no-untyped-def]
+        return InvoiceSerializer(value["results"], many=True, context={"portal": True}).data
 
 
 def _decode_portal_invoice_cursor(value: str | None, *, member):  # type: ignore[no-untyped-def]
@@ -94,7 +99,10 @@ def _portal_invoices(request) -> QuerySet[Invoice]:  # type: ignore[no-untyped-d
             state=InvoiceState.ISSUED,
         )
         .select_related("entity", "organization", "artifact")
-        .prefetch_related("lines")
+        .prefetch_related(
+            "lines",
+            Prefetch("lifecycle_events", queryset=InvoiceLifecycleEvent.objects.order_by("occurred_at", "id")),
+        )
         .order_by("-invoice_date", "-created_at", "id")
     )
 
@@ -140,7 +148,9 @@ class ClientPortalInvoiceListView(APIView):
 class ClientPortalInvoiceDetailView(APIView):
     @extend_schema(operation_id="client_portal_invoices_retrieve", responses={200: InvoiceSerializer})
     def get(self, request, invoice_entity_id):  # type: ignore[no-untyped-def]
-        response = Response(InvoiceSerializer(_portal_invoice(request, invoice_entity_id)).data)
+        response = Response(
+            InvoiceSerializer(_portal_invoice(request, invoice_entity_id), context={"portal": True}).data
+        )
         response["Cache-Control"] = "private, no-store"
         return response
 

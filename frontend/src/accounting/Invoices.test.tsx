@@ -47,7 +47,7 @@ const draft: InvoiceDraft = {
 
 function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
   const settings = {
-    configured: true, issue_ready: true, legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
+    configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
     address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
     billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
     payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none', invoice_separator: '-',
@@ -69,8 +69,10 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     saveIssueSettings: vi.fn().mockResolvedValue(settings),
     issue: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) }),
     deliver: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }),
+    recordEvent: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001' }),
     pdfUrl: vi.fn().mockReturnValue('/invoice.pdf'),
     csvUrl: vi.fn().mockReturnValue('/invoice.csv'),
+    accountingExportUrl: vi.fn().mockReturnValue('/invoice-accounting.json'),
     ...overrides,
   }
 }
@@ -84,7 +86,7 @@ describe('Invoices', () => {
     expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Invoice settings' })).not.toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
-    expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/accounting')
+    expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/invoices')
   })
 
   it('shows exact draft totals and creates a snapshotted origin line', async () => {
@@ -170,6 +172,31 @@ describe('Invoices', () => {
 
     await waitFor(() => expect(deliver).toHaveBeenCalledWith(workspace, 'invoice-1', 'accounts@example.invalid'))
     expect(await screen.findByText(/Delivery count 1/)).toBeInTheDocument()
+  })
+
+  it('records an idempotent accounting handoff and payment projection', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', lifecycle_state: 'issued' as const, reconciliation_state: 'unsynchronized' as const, paid_amount: '0.00', balance_amount: '137.50', lifecycle_events: [] }
+    const synchronized = { ...issued, lifecycle_state: 'externally_synchronized' as const, reconciliation_state: 'synchronized' as const, lifecycle_events: [{ id: 'event-1', event_type: 'accounting_synchronized', occurred_at: '2026-08-29T14:00:00Z', recorded_at: '2026-08-29T14:00:00Z', actor: 'Invoice Owner', provider: 'ledger', external_id: 'evt-1', amount: null, currency: '', related_invoice_id: null, note: 'Invoice 44' }] }
+    const recordEvent = vi.fn().mockResolvedValue(synchronized)
+    render(<Invoices workspace={workspace} client={invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], can_manage: true, can_issue: true }),
+      recordEvent,
+    })} />)
+
+    expect(await screen.findByRole('link', { name: 'Accounting export' })).toHaveAttribute('href', '/invoice-accounting.json')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Record update' }).at(-1)!)
+    fireEvent.change(screen.getByLabelText('Update type'), { target: { value: 'accounting_synchronized' } })
+    fireEvent.change(screen.getByLabelText('Accounting provider'), { target: { value: 'ledger' } })
+    fireEvent.change(screen.getByLabelText('External record ID'), { target: { value: 'evt-1' } })
+    fireEvent.change(screen.getByLabelText('Provider event ID'), { target: { value: 'ledger:evt-1' } })
+    fireEvent.change(screen.getByLabelText('Reference or note'), { target: { value: 'Invoice 44' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Record update' }).at(-1)!)
+
+    await waitFor(() => expect(recordEvent).toHaveBeenCalledWith(workspace, 'invoice-1', expect.objectContaining({
+      event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'evt-1', idempotency_key: 'ledger:evt-1',
+    })))
+    expect(await screen.findAllByText('Synchronized')).not.toHaveLength(0)
+    expect(screen.getByText('Synchronized to accounting')).toBeInTheDocument()
   })
 
   it('shows a bounded error state when the workspace request fails', async () => {

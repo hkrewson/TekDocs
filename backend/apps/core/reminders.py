@@ -24,6 +24,7 @@ SOURCE_TYPES: dict[str, frozenset[str]] = {
     ReminderDomain.INVENTORY.value: frozenset({"client_asset", "software_license", "commercial_contract"}),
     ReminderDomain.DOMAIN.value: frozenset({"registered_domain", "managed_hostname"}),
     ReminderDomain.DOCUMENTATION.value: frozenset({"document"}),
+    ReminderDomain.INVOICE.value: frozenset({"invoice"}),
 }
 
 

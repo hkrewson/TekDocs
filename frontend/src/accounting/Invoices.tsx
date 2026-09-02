@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, FileCheck2, Mail, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Download, FileCheck2, History, Mail, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link } from 'react-router'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate } from '../i18n/localization'
+import type { MessageId } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { InvoiceClient, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
 
@@ -16,6 +17,15 @@ type LineForm = {
   tax_rate_name: string
   tax_rate_value: string
   tax_inclusive: boolean
+}
+type EventForm = {
+  event_type: 'payment_recorded' | 'payment_reversed' | 'accounting_synchronized' | 'accounting_rejected' | 'accounting_duplicate' | 'accounting_changed' | 'voided' | 'credited'
+  amount: string
+  provider: string
+  external_id: string
+  idempotency_key: string
+  related_invoice_id: string
+  note: string
 }
 
 function isoDate(offsetDays = 0) {
@@ -32,6 +42,7 @@ const emptyDraft = (): DraftForm => ({
   notes: '',
 })
 const emptyLine = (): LineForm => ({ originKey: '', description: '', quantity: '1.000', unit_amount: '', tax_rate_id: '', tax_rate_name: '', tax_rate_value: '0', tax_inclusive: false })
+const emptyEvent = (): EventForm => ({ event_type: 'payment_recorded', amount: '', provider: '', external_id: '', idempotency_key: '', related_invoice_id: '', note: '' })
 
 function draftForm(record: InvoiceDraft): DraftForm {
   return {
@@ -74,10 +85,11 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
   const [canIssue, setCanIssue] = useState(false)
   const [needsSettings, setNeedsSettings] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'delivery'>('none')
+  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'delivery' | 'event'>('none')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
   const [line, setLine] = useState<LineForm>(emptyLine)
+  const [eventValue, setEventValue] = useState<EventForm>(emptyEvent)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deliveryRecipient, setDeliveryRecipient] = useState('')
@@ -172,12 +184,12 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
         {canManage && <button type="button" className="primary-button" aria-label={translate('accounting.newDraft')} onClick={() => { setDraft(emptyDraft()); setEditor('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('accounting.newDraft')}</span></button>}
       </div>
     </header>
-    {error && <div className="form-message error" role="alert">{error}{needsSettings && <> <Link to="/accounting">{translate('accounting.openSettings')}</Link></>}</div>}
+    {error && <div className="form-message error" role="alert">{error}{needsSettings && <> <Link to="/invoices">{translate('accounting.openSettings')}</Link></>}</div>}
     {phase === 'loading' && <section className="content-section" role="status">{translate('accounting.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.unavailable')}</h2><p>{translate('accounting.loadFailed')}</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
       <section className="content-section inventory-index">
-        {records.length === 0 ? <p className="empty-state">{translate('accounting.empty')}</p> : <ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => setSelectedId(record.id)}><strong>{record.number || formatPlainDate(record.invoice_date)}</strong><span>{record.state === 'draft' ? translate('accounting.draft') : translate('accounting.issued')} · {record.currency} {record.total}</span></button></li>)}</ul>}
+        {records.length === 0 ? <p className="empty-state">{translate('accounting.empty')}</p> : <ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => setSelectedId(record.id)}><strong>{record.number || formatPlainDate(record.invoice_date)}</strong><span>{record.state === 'draft' ? translate('accounting.draft') : `${lifecycleLabel(record.lifecycle_state ?? 'issued')} · ${reconciliationLabel(record.reconciliation_state ?? 'unsynchronized')}`} · {record.currency} {record.total}</span></button></li>)}</ul>}
       </section>
       <section className="content-section inventory-detail">
         {selected ? <>
@@ -194,9 +206,18 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
           {selected.state === 'issued' && <div className="form-actions">
             <a className="secondary-button" href={client.pdfUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a>
             <a className="secondary-button" href={client.csvUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadCsv')}</a>
+            <a className="secondary-button" href={client.accountingExportUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.accountingExport')}</a>
             {canIssue && <button type="button" className="primary-button" disabled={busy} onClick={() => { setDeliveryRecipient(''); setEditor('delivery') }}><Mail size={15} aria-hidden="true" />{translate('accounting.deliver')}</button>}
+            {canIssue && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
           </div>}
           {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate('accounting.deliveredProof', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
+          {selected.state === 'issued' && <dl className="inventory-provenance">
+            <div><dt>{translate('accounting.lifecycle')}</dt><dd>{lifecycleLabel(selected.lifecycle_state ?? 'issued')}</dd></div>
+            <div><dt>{translate('accounting.reconciliation')}</dt><dd>{reconciliationLabel(selected.reconciliation_state ?? 'unsynchronized')}</dd></div>
+            <div><dt>{translate('accounting.paid')}</dt><dd>{selected.currency} {selected.paid_amount ?? '0.00'}</dd></div>
+            <div><dt>{translate('accounting.balance')}</dt><dd>{selected.currency} {selected.balance_amount ?? selected.total}</dd></div>
+          </dl>}
+          {selected.state === 'issued' && (selected.lifecycle_events?.length ?? 0) > 0 && <section aria-labelledby="invoice-history-heading"><div className="section-heading"><h3 id="invoice-history-heading">{translate('accounting.history')}</h3></div><ol className="invoice-event-list">{[...(selected.lifecycle_events ?? [])].reverse().map((item) => <li key={item.id}><div><strong>{eventLabel(item.event_type)}</strong><span>{formatPlainDate(item.occurred_at.slice(0, 10))}{item.actor ? ` · ${item.actor}` : ''}</span></div><span>{item.amount ? `${item.currency} ${item.amount}` : item.provider || item.note}</span></li>)}</ol></section>}
           <div className="section-heading"><h3>{translate('accounting.lines')}</h3>{canManage && selected.state === 'draft' && <button type="button" className="secondary-button" onClick={() => beginLine()}><Plus size={15} />{translate('accounting.addLine')}</button>}</div>
           {selected.lines.length === 0 ? <p className="empty-state">{translate('accounting.noLines')}</p> : <ul className="inventory-list">{selected.lines.map((item) => <li key={item.id}><div><strong>{item.description}</strong><span>{item.quantity} × {item.currency} {item.unit_amount}{item.tax_rate_name ? ` · ${item.tax_rate_name}` : ''}</span></div><div><strong>{item.currency} {item.total}</strong>{canManage && selected.state === 'draft' && <div className="form-actions"><button type="button" className="text-button" aria-label={translate('accounting.editLine', { description: item.description })} onClick={() => beginLine(item)}>{translate('common.edit')}</button><button type="button" className="text-button" aria-label={translate('accounting.deleteLine', { description: item.description })} onClick={() => { void perform(() => client.removeLine(workspace, selected.id, item.id)) }}>{translate('common.remove')}</button></div>}</div></li>)}</ul>}
           <dl className="inventory-provenance">
@@ -210,8 +231,31 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected.id, draft)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
     {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input autoFocus type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
+    {editor === 'event' && selected && <InvoiceEventEditor value={eventValue} setValue={setEventValue} invoices={records.filter((item) => item.state === 'issued' && item.id !== selected.id)} currency={selected.currency} busy={busy} cancel={() => setEditor('none')} submit={() => { const payment = eventValue.event_type === 'payment_recorded' || eventValue.event_type === 'payment_reversed'; const provider = eventValue.event_type.startsWith('accounting_'); void perform(() => client.recordEvent(workspace, selected.id, { event_type: eventValue.event_type, occurred_at: new Date().toISOString(), amount: payment ? eventValue.amount : null, currency: payment ? selected.currency : '', provider: provider ? eventValue.provider : '', external_id: provider ? eventValue.external_id : '', idempotency_key: provider ? eventValue.idempotency_key : `tekdocs:invoice:${selected.id}:${eventValue.event_type}:${crypto.randomUUID()}`, related_invoice_id: eventValue.related_invoice_id || null, note: eventValue.note })) }} />}
   </>
 }
+
+function InvoiceEventEditor({ value, setValue, invoices, currency, busy, cancel, submit }: { value: EventForm; setValue: (value: EventForm) => void; invoices: InvoiceDraft[]; currency: string; busy: boolean; cancel: () => void; submit: () => void }) {
+  const payment = value.event_type === 'payment_recorded' || value.event_type === 'payment_reversed'
+  const provider = value.event_type.startsWith('accounting_')
+  const linked = value.event_type === 'voided' || value.event_type === 'credited'
+  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-event-title"><form className="record-form" onSubmit={(formEvent) => { formEvent.preventDefault(); submit() }}><div className="section-heading"><h2 id="invoice-event-title">{translate('accounting.recordUpdate')}</h2></div><label><span>{translate('accounting.updateType')}</span><select autoFocus value={value.event_type} onChange={(event) => setValue({ ...value, event_type: event.target.value as EventForm['event_type'] })}>{EVENT_OPTIONS.map(([key, label]) => <option key={key} value={key}>{translate(label)}</option>)}</select></label>
+    {payment && <label><span>{translate('accounting.paymentAmount')} ({currency})</span><input required type="number" min="0.0001" step="0.0001" value={value.amount} onChange={(event) => setValue({ ...value, amount: event.target.value })} /></label>}
+    {provider && <><label><span>{translate('accounting.provider')}</span><input required maxLength={80} value={value.provider} onChange={(event) => setValue({ ...value, provider: event.target.value })} /></label><label><span>{translate('accounting.externalId')}</span><input required maxLength={160} value={value.external_id} onChange={(event) => setValue({ ...value, external_id: event.target.value })} /></label><label><span>{translate('accounting.idempotencyKey')}</span><input required maxLength={160} value={value.idempotency_key} onChange={(event) => setValue({ ...value, idempotency_key: event.target.value })} /></label></>}
+    {linked && invoices.length > 0 && <label><span>{translate('accounting.relatedInvoice')}</span><select value={value.related_invoice_id} onChange={(event) => setValue({ ...value, related_invoice_id: event.target.value })}><option value="">{translate('accounting.noRelatedInvoice')}</option>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number}</option>)}</select></label>}
+    <label><span>{translate('accounting.updateNote')}</span><textarea required={linked} maxLength={500} rows={3} value={value.note} onChange={(event) => setValue({ ...value, note: event.target.value })} /></label><div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.saving') : translate('accounting.recordUpdate')}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></form></section>
+}
+
+const EVENT_OPTIONS: ReadonlyArray<readonly [EventForm['event_type'], MessageId]> = [
+  ['payment_recorded', 'accounting.paymentRecorded'], ['payment_reversed', 'accounting.paymentReversed'],
+  ['accounting_synchronized', 'accounting.synchronized'], ['accounting_rejected', 'accounting.rejected'],
+  ['accounting_duplicate', 'accounting.duplicate'], ['accounting_changed', 'accounting.externallyChanged'],
+  ['voided', 'accounting.voided'], ['credited', 'accounting.credited'],
+]
+
+function eventLabel(value: string) { return translate(`accounting.event.${value}` as MessageId) }
+function lifecycleLabel(value: string) { return translate(`accounting.lifecycle.${value}` as MessageId) }
+function reconciliationLabel(value: string) { return translate(`accounting.reconciliation.${value}` as MessageId) }
 
 function DraftEditor({ value, setValue, busy, title, cancel, submit }: { value: DraftForm; setValue: (value: DraftForm) => void; busy: boolean; title: string; cancel: () => void; submit: () => void }) {
   function save(event: FormEvent) { event.preventDefault(); submit() }

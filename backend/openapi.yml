@@ -21183,6 +21183,41 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/accounting-export:
+    get:
+      operationId: workspaces_organizations_invoices_accounting_export_retrieve
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/csv:
     get:
       operationId: workspaces_organizations_invoices_csv_retrieve
@@ -21265,6 +21300,52 @@ paths:
       - cookieAuth: []
       responses:
         '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/events:
+    post:
+      operationId: workspaces_organizations_invoices_events_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceLifecycleEventWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceLifecycleEventWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceLifecycleEventWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
           content:
             application/json:
               schema:
@@ -33212,7 +33293,29 @@ components:
           nullable: true
         delivery_count:
           type: integer
+        lifecycle_state:
+          type: string
+          readOnly: true
+        reconciliation_state:
+          type: string
+          readOnly: true
+        paid_amount:
+          type: string
+          readOnly: true
+        balance_amount:
+          type: string
+          readOnly: true
+        last_event_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+        lifecycle_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLifecycleEvent'
       required:
+      - balance_amount
       - content_digest
       - created_at
       - currency
@@ -33223,9 +33326,14 @@ components:
       - invoice_date
       - issued_at
       - key_fingerprint
+      - last_event_at
+      - lifecycle_events
+      - lifecycle_state
       - lines
       - notes
       - number
+      - paid_amount
+      - reconciliation_state
       - reference
       - signature_algorithm
       - state
@@ -33868,6 +33976,10 @@ components:
           type: boolean
         issue_ready:
           type: boolean
+        readiness_issues:
+          type: array
+          items:
+            type: string
         legal_name:
           type: string
         address_line_1:
@@ -33925,8 +34037,114 @@ components:
       - payment_terms_days
       - phone
       - postal_code
+      - readiness_issues
       - region
       - tax_registration
+    InvoiceLifecycleEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        recorded_at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+          nullable: true
+          readOnly: true
+        provider:
+          type: string
+        external_id:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        currency:
+          type: string
+        related_invoice_id:
+          type: string
+          format: uuid
+          nullable: true
+        note:
+          type: string
+      required:
+      - actor
+      - amount
+      - currency
+      - event_type
+      - external_id
+      - id
+      - note
+      - occurred_at
+      - provider
+      - recorded_at
+      - related_invoice_id
+    InvoiceLifecycleEventWrite:
+      type: object
+      properties:
+        event_type:
+          enum:
+          - accounting_synchronized
+          - accounting_rejected
+          - accounting_duplicate
+          - accounting_changed
+          - payment_recorded
+          - payment_reversed
+          - voided
+          - credited
+          type: string
+          description: |-
+            * `accounting_synchronized` - accounting_synchronized
+            * `accounting_rejected` - accounting_rejected
+            * `accounting_duplicate` - accounting_duplicate
+            * `accounting_changed` - accounting_changed
+            * `payment_recorded` - payment_recorded
+            * `payment_reversed` - payment_reversed
+            * `voided` - voided
+            * `credited` - credited
+          x-spec-enum-id: e9f90c292898e56b
+        occurred_at:
+          type: string
+          format: date-time
+        provider:
+          type: string
+          default: ''
+          maxLength: 80
+        external_id:
+          type: string
+          default: ''
+          maxLength: 160
+        idempotency_key:
+          type: string
+          default: ''
+          maxLength: 160
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        currency:
+          type: string
+          default: ''
+          maxLength: 3
+        related_invoice_id:
+          type: string
+          format: uuid
+          nullable: true
+        note:
+          type: string
+          default: ''
+          maxLength: 500
+      required:
+      - event_type
     InvoiceLine:
       type: object
       properties:
@@ -38208,6 +38426,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Invoice'
+          readOnly: true
         count:
           type: integer
         has_more:

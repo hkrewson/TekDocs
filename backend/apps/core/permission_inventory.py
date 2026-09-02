@@ -592,6 +592,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-invoice-accounting-export",
+        ("GET",),
+        PermissionKey.INVOICES_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-event-create",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_ISSUE,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-invoice-deliver",
         ("POST",),
         mutations=(PermissionKey.INVOICES_ISSUE,),

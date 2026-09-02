@@ -4,7 +4,7 @@ import { InvoiceRequestError } from './api'
 import { InvoiceSettings } from './InvoiceSettings'
 
 const settings = {
-  configured: true, issue_ready: true, legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
+  configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
   address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
   billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
   payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none' as const, invoice_separator: '-' as const,
@@ -35,6 +35,7 @@ describe('InvoiceSettings', () => {
 
     await waitFor(() => expect(saveIssueSettings).toHaveBeenCalledWith(expect.objectContaining({ invoice_prefix: 'MSP', invoice_reset_period: 'monthly' })))
     expect(saveIssueSettings.mock.calls[0][0]).not.toHaveProperty('country_choices')
+    expect(saveIssueSettings.mock.calls[0][0]).not.toHaveProperty('readiness_issues')
     expect(await screen.findByText('Invoice settings saved.')).toBeInTheDocument()
   })
 

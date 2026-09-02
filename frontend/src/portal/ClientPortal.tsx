@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, FileText, LogOut } from 'lucide-react'
 import { translate } from '../i18n/localization'
+import type { MessageId } from '../i18n/localization'
 import { useCallback, useEffect, useState } from 'react'
 import type { AuthenticatedContext } from '../auth/api'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
@@ -148,7 +149,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         {selectedInvoice ? <article className="content-section portal-document-detail">
           <div className="portal-document-actions"><button className="secondary-button" type="button" onClick={() => setSelectedInvoice(null)}><ArrowLeft size={16} aria-hidden="true" />{translate('portal.allInvoices')}</button><span className="visibility-label client-visible">{translate('portal.clientVisible')}</span></div>
           <header><p className="eyebrow">{translate('portal.issuedInvoice')}</p><h2>{selectedInvoice.number}</h2><p>{selectedInvoice.reference || translate('portal.invoiceReferenceFallback')}</p></header>
-          <dl className="inventory-provenance"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{new Date(`${selectedInvoice.invoice_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{new Date(`${selectedInvoice.due_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.total')}</dt><dd><strong>{selectedInvoice.currency} {selectedInvoice.total}</strong></dd></div></dl>
+          <dl className="inventory-provenance"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{new Date(`${selectedInvoice.invoice_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{new Date(`${selectedInvoice.due_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.lifecycle')}</dt><dd>{portalInvoiceState(selectedInvoice.lifecycle_state ?? 'issued')}</dd></div><div><dt>{translate('accounting.total')}</dt><dd><strong>{selectedInvoice.currency} {selectedInvoice.total}</strong></dd></div><div><dt>{translate('accounting.paid')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.paid_amount ?? '0.00'}</dd></div><div><dt>{translate('accounting.balance')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.balance_amount ?? selectedInvoice.total}</dd></div></dl>
           {selectedInvoice.notes && <p>{selectedInvoice.notes}</p>}
           <section aria-labelledby="portal-invoice-lines"><h3 id="portal-invoice-lines">{translate('accounting.lines')}</h3><ul className="inventory-list">{selectedInvoice.lines.map((line) => <li key={line.id}><div><strong>{line.description}</strong><span>{line.quantity} × {line.currency} {line.unit_amount}</span></div><strong>{line.currency} {line.total}</strong></li>)}</ul></section>
           <div className="form-actions"><a className="secondary-button" href={portalClient.invoicePdfUrl(selectedInvoice.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a><a className="secondary-button" href={portalClient.invoiceCsvUrl(selectedInvoice.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadCsv')}</a></div>
@@ -167,7 +168,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           {invoicePhase === 'loading' && <p role="status">{translate('portal.loadingInvoices')}</p>}
           {invoicePhase === 'error' && <p role="alert">{translate('portal.invoiceLoadFailed')}</p>}
           {invoicePhase === 'ready' && invoices.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noInvoices')}</p></div>}
-          {invoicePhase === 'ready' && invoices.length > 0 && <ul className="portal-document-list">{invoices.map((invoice) => <li key={invoice.id}><button type="button" disabled={detailLoading} onClick={() => { void openInvoice(invoice) }}><span><strong>{invoice.number}</strong><small>{invoice.currency} {invoice.total} · {translate('accounting.dueDate')} {new Date(`${invoice.due_date}T00:00:00`).toLocaleDateString()}</small></span><span className="visibility-label client-visible">{translate('accounting.issued')}</span></button></li>)}</ul>}
+          {invoicePhase === 'ready' && invoices.length > 0 && <ul className="portal-document-list">{invoices.map((invoice) => <li key={invoice.id}><button type="button" disabled={detailLoading} onClick={() => { void openInvoice(invoice) }}><span><strong>{invoice.number}</strong><small>{invoice.currency} {invoice.total} · {translate('accounting.dueDate')} {new Date(`${invoice.due_date}T00:00:00`).toLocaleDateString()}</small></span><span className="visibility-label client-visible">{portalInvoiceState(invoice.lifecycle_state ?? 'issued')}</span></button></li>)}</ul>}
           {invoicePhase === 'ready' && invoiceCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMoreInvoices} onClick={() => { void loadInvoices(invoiceCursor) }}>{loadingMoreInvoices ? translate('portal.loadingInvoices') : translate('portal.loadMoreInvoices')}</button></div>}
         </section>
         <section className="content-section" aria-labelledby="portal-maps-heading">
@@ -188,4 +189,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
       </main>
     </div>
   )
+}
+
+function portalInvoiceState(value: string) {
+  return translate(`accounting.lifecycle.${value}` as MessageId)
 }

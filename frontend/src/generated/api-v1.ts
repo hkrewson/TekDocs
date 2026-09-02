@@ -6228,6 +6228,22 @@ export interface paths {
         readonly patch: operations["workspaces_organizations_invoices_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/accounting-export": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_invoices_accounting_export_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/csv": {
         readonly parameters: {
             readonly query?: never;
@@ -6254,6 +6270,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_organizations_invoices_deliver_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/events": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_events_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -10445,6 +10477,13 @@ export interface components {
             /** Format: date-time */
             readonly delivered_at: string | null;
             readonly delivery_count: number;
+            readonly lifecycle_state: string;
+            readonly reconciliation_state: string;
+            readonly paid_amount: string;
+            readonly balance_amount: string;
+            /** Format: date-time */
+            readonly last_event_at: string | null;
+            readonly lifecycle_events: readonly components["schemas"]["InvoiceLifecycleEvent"][];
         };
         readonly InvoiceCountryChoice: {
             readonly value: string;
@@ -10758,6 +10797,7 @@ export interface components {
         readonly InvoiceIssueSettingsResult: {
             readonly configured: boolean;
             readonly issue_ready: boolean;
+            readonly readiness_issues: readonly string[];
             readonly legal_name: string;
             readonly address_line_1: string;
             readonly address_line_2: string;
@@ -10776,6 +10816,54 @@ export interface components {
             readonly invoice_sequence_digits: number;
             readonly invoice_reset_period: string;
             readonly country_choices: readonly components["schemas"]["InvoiceCountryChoice"][];
+        };
+        readonly InvoiceLifecycleEvent: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly event_type: string;
+            /** Format: date-time */
+            readonly occurred_at: string;
+            /** Format: date-time */
+            readonly recorded_at: string;
+            readonly actor: string | null;
+            readonly provider: string;
+            readonly external_id: string;
+            /** Format: decimal */
+            readonly amount: string | null;
+            readonly currency: string;
+            /** Format: uuid */
+            readonly related_invoice_id: string | null;
+            readonly note: string;
+        };
+        readonly InvoiceLifecycleEventWrite: {
+            /**
+             * @description * `accounting_synchronized` - accounting_synchronized
+             *     * `accounting_rejected` - accounting_rejected
+             *     * `accounting_duplicate` - accounting_duplicate
+             *     * `accounting_changed` - accounting_changed
+             *     * `payment_recorded` - payment_recorded
+             *     * `payment_reversed` - payment_reversed
+             *     * `voided` - voided
+             *     * `credited` - credited
+             * @enum {string}
+             */
+            readonly event_type: "accounting_synchronized" | "accounting_rejected" | "accounting_duplicate" | "accounting_changed" | "payment_recorded" | "payment_reversed" | "voided" | "credited";
+            /** Format: date-time */
+            readonly occurred_at?: string;
+            /** @default  */
+            readonly provider: string;
+            /** @default  */
+            readonly external_id: string;
+            /** @default  */
+            readonly idempotency_key: string;
+            /** Format: decimal */
+            readonly amount?: string | null;
+            /** @default  */
+            readonly currency: string;
+            /** Format: uuid */
+            readonly related_invoice_id?: string | null;
+            /** @default  */
+            readonly note: string;
         };
         readonly InvoiceLine: {
             /** Format: uuid */
@@ -29899,6 +29987,32 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_invoices_accounting_export_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_invoices_csv_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -29953,6 +30067,36 @@ export interface operations {
         };
         readonly responses: {
             readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_events_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceLifecycleEventWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceLifecycleEventWrite"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceLifecycleEventWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

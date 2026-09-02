@@ -610,6 +610,142 @@ class InvoiceLine(TimestampedModel):
             raise ValidationError({"unit_amount": str(exc)}) from exc
 
 
+class InvoiceEventType(models.TextChoices):
+    ISSUED = "issued", "Issued"
+    DELIVERY_SUCCEEDED = "delivery_succeeded", "Delivery succeeded"
+    DELIVERY_FAILED = "delivery_failed", "Delivery failed"
+    ACCOUNTING_SYNCHRONIZED = "accounting_synchronized", "Accounting synchronized"
+    ACCOUNTING_REJECTED = "accounting_rejected", "Accounting rejected"
+    ACCOUNTING_DUPLICATE = "accounting_duplicate", "Accounting duplicate"
+    ACCOUNTING_CHANGED = "accounting_changed", "Externally changed"
+    PAYMENT_RECORDED = "payment_recorded", "Payment recorded"
+    PAYMENT_REVERSED = "payment_reversed", "Payment reversed"
+    VOIDED = "voided", "Voided by reference"
+    CREDITED = "credited", "Credited by reference"
+    REMINDER_SENT = "reminder_sent", "Reminder sent"
+
+
+class InvoiceLifecycleEvent(models.Model):
+    """An immutable observation about an issued invoice; never financial authority."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_lifecycle_events")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="invoice_lifecycle_events"
+    )
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="lifecycle_events")
+    event_type = models.CharField(max_length=32, choices=InvoiceEventType.choices)
+    occurred_at = models.DateTimeField()
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_invoice_lifecycle_events",
+        null=True,
+        blank=True,
+    )
+    provider = models.CharField(max_length=80, blank=True)
+    external_id = models.CharField(max_length=160, blank=True)
+    idempotency_key = models.CharField(max_length=160, blank=True)
+    amount = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    currency = models.CharField(max_length=3, blank=True)
+    related_invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.PROTECT,
+        related_name="referenced_by_lifecycle_events",
+        null=True,
+        blank=True,
+    )
+    note = models.CharField(max_length=500, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("occurred_at", "recorded_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("invoice", "idempotency_key"),
+                condition=~models.Q(idempotency_key=""),
+                name="invoice_event_idempotency_unique",
+            ),
+            models.UniqueConstraint(
+                fields=("tenant", "provider", "external_id"),
+                condition=~models.Q(provider="") & ~models.Q(external_id=""),
+                name="invoice_provider_event_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(event_type__in=InvoiceEventType.values),
+                name="invoice_event_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(amount__isnull=True, currency="")
+                    | models.Q(amount__gt=0, currency__regex=r"^[A-Z]{3}$")
+                ),
+                name="invoice_event_amount_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "invoice", "occurred_at"),
+                name="core_invevent_scope_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.invoice} · {self.get_event_type_display()}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Invoice lifecycle events are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Invoice lifecycle events are retained")
+
+    def clean(self) -> None:
+        from .money import MoneyError, normalize_currency, validate_amount
+
+        if self.invoice_id and (
+            self.invoice.tenant_id != self.tenant_id
+            or self.invoice.organization_id != self.organization_id
+            or self.invoice.state != InvoiceState.ISSUED
+        ):
+            raise ValidationError("Invoice lifecycle event must use an issued invoice in the same Workspace")
+        related_invoice = self.related_invoice if self.related_invoice_id else None
+        if related_invoice is not None and (
+            related_invoice.tenant_id != self.tenant_id
+            or related_invoice.organization_id != self.organization_id
+            or related_invoice.state != InvoiceState.ISSUED
+            or related_invoice.id == self.invoice_id
+        ):
+            raise ValidationError("Related invoice must be a different issued invoice in the same Workspace")
+        payment_types = {InvoiceEventType.PAYMENT_RECORDED, InvoiceEventType.PAYMENT_REVERSED}
+        if self.event_type in payment_types:
+            if self.amount is None or not self.currency:
+                raise ValidationError("Payment events require an amount and currency")
+            try:
+                self.currency = normalize_currency(self.currency)
+                validate_amount(self.amount, self.currency)
+            except MoneyError as exc:
+                raise ValidationError({"amount": str(exc)}) from exc
+            if self.currency != self.invoice.currency:
+                raise ValidationError("Payment event currency must match the invoice")
+        elif self.amount is not None or self.currency:
+            raise ValidationError("Only payment events may carry an amount")
+        provider_types = {
+            InvoiceEventType.ACCOUNTING_SYNCHRONIZED,
+            InvoiceEventType.ACCOUNTING_REJECTED,
+            InvoiceEventType.ACCOUNTING_DUPLICATE,
+            InvoiceEventType.ACCOUNTING_CHANGED,
+        }
+        if self.event_type in provider_types and not (self.provider and self.external_id and self.idempotency_key):
+            raise ValidationError("Accounting events require provider, external ID, and idempotency key")
+        if self.event_type in {InvoiceEventType.VOIDED, InvoiceEventType.CREDITED} and not self.note.strip():
+            raise ValidationError("Void and credit events require a reference note")
+
+
 class InstallationState(models.Model):
     """The single, migration-created installation bootstrap record."""
 
@@ -6719,6 +6855,7 @@ class ReminderDomain(models.TextChoices):
     INVENTORY = "inventory", "Inventory"
     DOMAIN = "domain", "Domain"
     DOCUMENTATION = "documentation", "Documentation"
+    INVOICE = "invoice", "Invoice"
 
 
 class ReminderRecurrence(models.TextChoices):

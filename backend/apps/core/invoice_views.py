@@ -21,18 +21,23 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 from .countries import COUNTRY_CHOICES
 from .invoicing import (
     InvoiceError,
+    InvoiceLifecycle,
     configure_issue_settings,
     create_invoice,
     create_line,
     delete_invoice,
     delete_line,
     deliver_invoice,
+    invoice_accounting_export,
     invoice_amounts,
     invoice_csv_bytes,
+    invoice_lifecycle,
     invoice_pdf_bytes,
     invoices_for_scope,
     issue_invoice,
     line_amounts,
+    record_delivery_failure,
+    record_invoice_event,
     update_invoice,
     update_line,
 )
@@ -40,8 +45,11 @@ from .models import (
     CatalogProduct,
     ContractCost,
     Invoice,
+    InvoiceEventType,
+    InvoiceLifecycleEvent,
     InvoiceLine,
     InvoiceNumberSeries,
+    InvoiceState,
     ServiceRate,
     TaxRate,
     TenantBillingProfile,
@@ -151,6 +159,49 @@ class InvoiceLineSerializer(serializers.Serializer):
         return item.service_rate_id or item.contract_cost_id
 
 
+class InvoiceLifecycleEventSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    event_type = serializers.CharField()
+    occurred_at = serializers.DateTimeField()
+    recorded_at = serializers.DateTimeField()
+    actor = serializers.SerializerMethodField()
+    provider = serializers.CharField(allow_blank=True)
+    external_id = serializers.CharField(allow_blank=True)
+    amount = serializers.DecimalField(max_digits=18, decimal_places=4, allow_null=True)
+    currency = serializers.CharField(allow_blank=True)
+    related_invoice_id = serializers.UUIDField(source="related_invoice.entity_id", allow_null=True)
+    note = serializers.CharField(allow_blank=True)
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_actor(self, item):  # type: ignore[no-untyped-def]
+        if item.actor is None:
+            return None
+        return item.actor.get_full_name() or item.actor.get_username()
+
+
+class InvoiceLifecycleEventWriteSerializer(StrictSerializer):
+    event_type = serializers.ChoiceField(
+        choices=(
+            InvoiceEventType.ACCOUNTING_SYNCHRONIZED,
+            InvoiceEventType.ACCOUNTING_REJECTED,
+            InvoiceEventType.ACCOUNTING_DUPLICATE,
+            InvoiceEventType.ACCOUNTING_CHANGED,
+            InvoiceEventType.PAYMENT_RECORDED,
+            InvoiceEventType.PAYMENT_REVERSED,
+            InvoiceEventType.VOIDED,
+            InvoiceEventType.CREDITED,
+        )
+    )
+    occurred_at = serializers.DateTimeField(required=False, default=timezone.now)
+    provider = serializers.CharField(max_length=80, allow_blank=True, required=False, default="")
+    external_id = serializers.CharField(max_length=160, allow_blank=True, required=False, default="")
+    idempotency_key = serializers.CharField(max_length=160, allow_blank=True, required=False, default="")
+    amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, allow_null=True)
+    currency = serializers.CharField(max_length=3, allow_blank=True, required=False, default="")
+    related_invoice_id = serializers.UUIDField(required=False, allow_null=True)
+    note = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+
+
 class InvoiceSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     state = serializers.CharField()
@@ -172,6 +223,12 @@ class InvoiceSerializer(serializers.Serializer):
     key_fingerprint = serializers.CharField(allow_blank=True)
     delivered_at = serializers.DateTimeField(allow_null=True)
     delivery_count = serializers.IntegerField()
+    lifecycle_state = serializers.SerializerMethodField()
+    reconciliation_state = serializers.SerializerMethodField()
+    paid_amount = serializers.SerializerMethodField()
+    balance_amount = serializers.SerializerMethodField()
+    last_event_at = serializers.SerializerMethodField()
+    lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
 
     def to_representation(self, instance):  # type: ignore[no-untyped-def]
         rendered = super().to_representation(instance)
@@ -184,9 +241,41 @@ class InvoiceSerializer(serializers.Serializer):
                 "key_fingerprint",
                 "delivered_at",
                 "delivery_count",
+                "lifecycle_state",
+                "reconciliation_state",
+                "paid_amount",
+                "balance_amount",
+                "last_event_at",
+                "lifecycle_events",
             ):
                 rendered.pop(field, None)
+        elif self.context.get("portal"):
+            for field in ("lifecycle_events", "reconciliation_state", "last_event_at"):
+                rendered.pop(field, None)
         return rendered
+
+    def _lifecycle(self, item: Invoice) -> InvoiceLifecycle:
+        return invoice_lifecycle(item)
+
+    @extend_schema_field(serializers.CharField())
+    def get_lifecycle_state(self, item):  # type: ignore[no-untyped-def]
+        return self._lifecycle(item).state
+
+    @extend_schema_field(serializers.CharField())
+    def get_reconciliation_state(self, item):  # type: ignore[no-untyped-def]
+        return self._lifecycle(item).reconciliation_state
+
+    @extend_schema_field(serializers.CharField())
+    def get_paid_amount(self, item):  # type: ignore[no-untyped-def]
+        return render_amount(self._lifecycle(item).paid_amount, item.currency)
+
+    @extend_schema_field(serializers.CharField())
+    def get_balance_amount(self, item):  # type: ignore[no-untyped-def]
+        return render_amount(self._lifecycle(item).balance_amount, item.currency)
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_last_event_at(self, item):  # type: ignore[no-untyped-def]
+        return self._lifecycle(item).last_event_at
 
     def _amount(self, item, field: str) -> str:  # type: ignore[no-untyped-def]
         return render_amount(getattr(invoice_amounts(item), field), item.currency)
@@ -264,6 +353,7 @@ class InvoiceCountryChoiceSerializer(serializers.Serializer):
 class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
     configured = serializers.BooleanField()
     issue_ready = serializers.BooleanField()
+    readiness_issues = serializers.ListField(child=serializers.CharField())
     legal_name = serializers.CharField(allow_blank=True)
     address_line_1 = serializers.CharField(allow_blank=True)
     address_line_2 = serializers.CharField(allow_blank=True)
@@ -362,9 +452,25 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         sequence_digits=profile.invoice_sequence_digits,
         reset_period=profile.invoice_reset_period,
     ).first()
+    readiness_issues = []
+    for value, message in (
+        (profile.legal_name, "Add the legal business name."),
+        (profile.address_line_1, "Add the business street address."),
+        (profile.city, "Add the business city."),
+        (profile.postal_code, "Add the business postal code."),
+        (profile.country_code, "Choose the business country."),
+        (profile.billing_email, "Add the invoice contact email."),
+        (profile.default_currency, "Choose the default currency."),
+        (profile.invoice_prefix, "Configure invoice numbering."),
+    ):
+        if not str(value).strip():
+            readiness_issues.append(message)
+    if series is None:
+        readiness_issues.append("Save a valid invoice numbering format.")
     return {
         "configured": configured and series is not None,
-        "issue_ready": configured and series is not None and profile.is_issue_ready,
+        "issue_ready": configured and series is not None and profile.is_issue_ready and not readiness_issues,
+        "readiness_issues": readiness_issues,
         "legal_name": profile.legal_name,
         "address_line_1": profile.address_line_1,
         "address_line_2": profile.address_line_2,
@@ -495,6 +601,64 @@ class InvoiceCSVDownloadView(APIView):
         return _invoice_download_response(_invoice(workspace, invoice_entity_id), "csv")
 
 
+class InvoiceAccountingExportView(APIView):
+    @extend_schema(responses={(200, "application/json"): dict})
+    def get(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VIEW)
+        invoice = _invoice(workspace, invoice_entity_id)
+        try:
+            payload = invoice_accounting_export(invoice)
+        except InvoiceError as exc:
+            return Response({"detail": str(exc)}, status=409)
+        response = Response(payload)
+        response["Content-Disposition"] = f'attachment; filename="{invoice.number}-accounting.json"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class InvoiceLifecycleEventView(APIView):
+    @extend_schema(request=InvoiceLifecycleEventWriteSerializer, responses={201: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
+        serializer = InvoiceLifecycleEventWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        event_type = str(values.pop("event_type"))
+        related_id = values.pop("related_invoice_id", None)
+        related = _invoice(workspace, related_id) if related_id else None
+        if event_type in {InvoiceEventType.VOIDED, InvoiceEventType.CREDITED}:
+            _require_recent_session(request)
+        invoice = _invoice(workspace, invoice_entity_id)
+        idempotency_key = str(values.get("idempotency_key", ""))
+        provider = str(values.get("provider", ""))
+        external_id = str(values.get("external_id", ""))
+        existing = None
+        if idempotency_key:
+            existing = InvoiceLifecycleEvent.objects.filter(
+                invoice=invoice, idempotency_key=idempotency_key
+            ).first()
+        if existing is None and provider and external_id:
+            existing = InvoiceLifecycleEvent.objects.filter(
+                tenant=workspace.member.tenant, provider=provider, external_id=external_id
+            ).first()
+        if existing is not None:
+            if existing.invoice_id != invoice.id or existing.event_type != event_type:
+                raise serializers.ValidationError({"detail": "The idempotency identity is already in use."})
+            return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
+        try:
+            record_invoice_event(
+                invoice=invoice,
+                event_type=event_type,
+                actor_id=request.user.pk,
+                related_invoice=related,
+                **values,
+            )
+        except (InvoiceError, DjangoValidationError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data, status=201)
+
+
 class InvoiceDeliveryView(APIView):
     @extend_schema(request=InvoiceDeliverySerializer, responses={200: InvoiceSerializer})
     def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
@@ -502,14 +666,21 @@ class InvoiceDeliveryView(APIView):
         _require_recent_session(request)
         serializer = InvoiceDeliverySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        invoice = _invoice(workspace, invoice_entity_id)
         try:
             record = deliver_invoice(
-                invoice=_invoice(workspace, invoice_entity_id),
+                invoice=invoice,
                 recipient=serializer.validated_data["recipient"],
                 actor_id=request.user.pk,
             )
         except (InvoiceError, DjangoValidationError) as exc:
+            if invoice.state == InvoiceState.ISSUED:
+                record_delivery_failure(invoice=invoice, actor_id=request.user.pk, note="Delivery was not confirmed.")
             raise serializers.ValidationError({"detail": str(exc)}) from exc
+        except Exception as exc:
+            if invoice.state == InvoiceState.ISSUED:
+                record_delivery_failure(invoice=invoice, actor_id=request.user.pk, note="Delivery was not confirmed.")
+            raise serializers.ValidationError({"detail": "Invoice delivery failed; retry is safe."}) from exc
         return Response(InvoiceSerializer(record).data)
 
 

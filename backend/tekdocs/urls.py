@@ -284,10 +284,12 @@ from apps.core.inventory_views import (
     ClientVendorListView,
 )
 from apps.core.invoice_views import (
+    InvoiceAccountingExportView,
     InvoiceCSVDownloadView,
     InvoiceDeliveryView,
     InvoiceDetailView,
     InvoiceIssueView,
+    InvoiceLifecycleEventView,
     InvoiceLineDetailView,
     InvoiceLineListCreateView,
     InvoiceListCreateView,
@@ -1531,6 +1533,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/csv",
         InvoiceCSVDownloadView.as_view(),
         name="organization-invoice-csv",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/accounting-export",
+        InvoiceAccountingExportView.as_view(),
+        name="organization-invoice-accounting-export",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/events",
+        InvoiceLifecycleEventView.as_view(),
+        name="organization-invoice-event-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/deliver",

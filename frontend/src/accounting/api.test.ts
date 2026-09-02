@@ -25,6 +25,7 @@ describe('invoice API client', () => {
     await browserInvoiceClient.saveIssueSettings({ invoice_prefix: 'INV' })
     await browserInvoiceClient.issue(workspace, 'invoice/1')
     await browserInvoiceClient.deliver(workspace, 'invoice/1', 'accounts@example.invalid')
+    await browserInvoiceClient.recordEvent(workspace, 'invoice/1', { event_type: 'payment_recorded' })
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/msp/invoice-settings',
@@ -44,6 +45,11 @@ describe('invoice API client', () => {
     )
     expect(browserInvoiceClient.pdfUrl(workspace, 'invoice/1')).toContain('/invoice%2F1/pdf')
     expect(browserInvoiceClient.csvUrl(workspace, 'invoice/1')).toContain('/invoice%2F1/csv')
+    expect(browserInvoiceClient.accountingExportUrl(workspace, 'invoice/1')).toContain('/invoice%2F1/accounting-export')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/invoices/invoice%2F1/events',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ event_type: 'payment_recorded' }) }),
+    )
     const issue = vi.mocked(fetch).mock.calls.find(
       ([path, options]) => typeof path === 'string' && path.endsWith('/issue') && options?.method === 'POST',
     )

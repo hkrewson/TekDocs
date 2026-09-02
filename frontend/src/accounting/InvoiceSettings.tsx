@@ -30,6 +30,7 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
     const payload: Record<string, unknown> = { ...value }
     delete payload.configured
     delete payload.issue_ready
+    delete payload.readiness_issues
     delete payload.country_choices
     return payload
   }
@@ -94,10 +95,13 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
     {phase === 'ready' && value && <form className="content-section record-form invoice-settings-form" onSubmit={(event) => { void save(event) }}>
       {message === 'saved' && <div className="form-message success" role="status">{translate('accounting.settingsSaved')}</div>}
       {message === 'error' && !reauthenticationRequired && <div className="form-message error" role="alert">{errorMessage || translate('accounting.settingsFailed')}</div>}
+      {!value.issue_ready && value.readiness_issues.length > 0 && <div className="form-message" role="status"><strong>{translate('accounting.settingsIncomplete')}</strong><ul>{value.readiness_issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>}
       <div className="form-grid">
         <fieldset className="record-form-section wide-field"><legend>{translate('accounting.businessDetails')}</legend><div className="form-grid">
           <Field autoFocus label={translate('accounting.legalName')} value={value.legal_name} onChange={(legal_name) => setValue({ ...value, legal_name })} />
           <Field label={translate('accounting.billingEmail')} type="email" value={value.billing_email} onChange={(billing_email) => setValue({ ...value, billing_email })} />
+          <Field label={translate('accounting.phone')} value={value.phone} required={false} onChange={(phone) => setValue({ ...value, phone })} />
+          <Field label={translate('accounting.taxRegistration')} value={value.tax_registration} required={false} onChange={(tax_registration) => setValue({ ...value, tax_registration })} />
           <Field label={translate('accounting.addressLine1')} value={value.address_line_1} onChange={(address_line_1) => setValue({ ...value, address_line_1 })} />
           <Field label={translate('accounting.addressLine2')} value={value.address_line_2} required={false} onChange={(address_line_2) => setValue({ ...value, address_line_2 })} />
           <Field label={translate('accounting.city')} value={value.city} onChange={(city) => setValue({ ...value, city })} />

@@ -26,7 +26,6 @@ from apps.core.documents import create_document
 from apps.core.invoicing import create_invoice, create_line
 from apps.core.models import (
     AuditEvent,
-    BlockRevision,
     CustomFieldDefinition,
     DataFlowRevision,
     DataFlowSnapshot,
@@ -463,12 +462,18 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss(mig
         cursor.execute("SELECT markdown FROM core_block WHERE id = %s", [block.id])
         assert cursor.fetchone() == ("# Preserved revision\n",)
     call_command("migrate", "core", "0049", verbosity=0, interactive=False)
-    preserved_revision = BlockRevision.objects.get(block_id=block.id)
-    assert preserved_revision.markdown == "# Preserved revision\n"
-    assert preserved_revision.checksum
     with connection.cursor() as cursor:
+        # Query the historical 0049 shape directly. The current model may have
+        # fields introduced after this deliberately pinned migration state.
+        cursor.execute(
+            "SELECT id, markdown, checksum FROM core_blockrevision WHERE block_id = %s",
+            [block.id],
+        )
+        revision_id, revision_markdown, revision_checksum = cursor.fetchone()
+        assert revision_markdown == "# Preserved revision\n"
+        assert revision_checksum
         cursor.execute("SELECT current_revision_id FROM core_block WHERE id = %s", [block.id])
-        assert cursor.fetchone() == (preserved_revision.id,)
+        assert cursor.fetchone() == (revision_id,)
         cursor.execute(
             "SELECT resolution_mode FROM core_documentplacement "
             "WHERE document_id = %s AND parent_id IS NULL AND position = 0",
@@ -479,10 +484,15 @@ def test_latest_isolation_migration_reverses_and_reapplies_without_data_loss(mig
     call_command("migrate", "core", "0019", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(
+            "SELECT relname FROM pg_class WHERE relname = ANY(%s)",
+            [list(RLS_TABLES)],
+        )
+        tables_present_at_0019 = {row[0] for row in cursor.fetchall()}
+        cursor.execute(
             "SELECT relname FROM pg_class WHERE relname = ANY(%s) AND relrowsecurity AND relforcerowsecurity",
             [list(RLS_TABLES)],
         )
-        assert {row[0] for row in cursor.fetchall()} == set(RLS_TABLES) - DOCUMENT_RLS_TABLES
+        assert {row[0] for row in cursor.fetchall()} == tables_present_at_0019 - DOCUMENT_RLS_TABLES
 
     # Restore to the current head of both apps so the assertions below observe the
     # round trip. Never name an explicit target here: a pinned revision silently

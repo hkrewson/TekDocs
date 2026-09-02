@@ -38,6 +38,26 @@ export type InvoiceDraft = {
   key_fingerprint?: string
   delivered_at?: string | null
   delivery_count?: number
+  lifecycle_state?: 'issued' | 'delivered' | 'externally_synchronized' | 'partially_paid' | 'paid' | 'overdue' | 'voided' | 'credited'
+  reconciliation_state?: 'unsynchronized' | 'synchronized' | 'rejected' | 'duplicate' | 'externally_changed'
+  paid_amount?: string
+  balance_amount?: string
+  last_event_at?: string | null
+  lifecycle_events?: InvoiceLifecycleEvent[]
+}
+
+export type InvoiceLifecycleEvent = {
+  id: string
+  event_type: string
+  occurred_at: string
+  recorded_at: string
+  actor: string | null
+  provider: string
+  external_id: string
+  amount: string | null
+  currency: string
+  related_invoice_id: string | null
+  note: string
 }
 
 export type InvoiceOrigin = {
@@ -57,6 +77,7 @@ export type InvoiceDateComponent = 'none' | 'year' | 'short_year' | 'year_month'
 export type InvoiceIssueSettings = {
   configured: boolean
   issue_ready: boolean
+  readiness_issues: string[]
   legal_name: string
   address_line_1: string
   address_line_2: string
@@ -90,8 +111,10 @@ export interface InvoiceClient {
   saveIssueSettings(values: object): Promise<InvoiceIssueSettings>
   issue(workspace: WorkspaceContext, invoiceId: string): Promise<InvoiceDraft>
   deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
+  recordEvent(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
   pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
   csvUrl(workspace: WorkspaceContext, invoiceId: string): string
+  accountingExportUrl(workspace: WorkspaceContext, invoiceId: string): string
 }
 
 export class InvoiceRequestError extends Error {
@@ -157,6 +180,8 @@ export const browserInvoiceClient: InvoiceClient = {
   saveIssueSettings: (values) => mutate('/api/v1/workspaces/msp/invoice-settings', 'PUT', values),
   issue: (workspace, invoiceId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/issue`, 'POST'),
   deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
+  recordEvent: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/events`, 'POST', values),
   pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,
   csvUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/csv`,
+  accountingExportUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/accounting-export`,
 }

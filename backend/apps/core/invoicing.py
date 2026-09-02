@@ -5,7 +5,8 @@ import csv
 import hashlib
 import io
 import json
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
@@ -28,10 +29,15 @@ from .models import (
     EntityVisibility,
     Invoice,
     InvoiceArtifact,
+    InvoiceEventType,
+    InvoiceLifecycleEvent,
     InvoiceLine,
     InvoiceNumberSeries,
     InvoiceState,
     Organization,
+    ReminderDomain,
+    ReminderRecurrence,
+    ReminderSchedule,
     ServiceRate,
     TaxRate,
     Tenant,
@@ -48,6 +54,60 @@ class InvoiceError(ValueError):
 
 
 ISSUED_SIGNATURE_FORMAT = "tekdocs-issued-invoice/v1"
+ACCOUNTING_EXPORT_FORMAT = "tekdocs-accounting-invoice/v1"
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceLifecycle:
+    state: str
+    reconciliation_state: str
+    paid_amount: Decimal
+    balance_amount: Decimal
+    last_event_at: datetime | None
+
+
+def invoice_lifecycle(invoice: Invoice, *, today: date | None = None) -> InvoiceLifecycle:
+    paid = Decimal("0")
+    reconciliation = "unsynchronized"
+    terminal = ""
+    last_event_at: datetime | None = None
+    for event in invoice.lifecycle_events.all():
+        if last_event_at is None or event.occurred_at > last_event_at:
+            last_event_at = event.occurred_at
+        if event.event_type == InvoiceEventType.PAYMENT_RECORDED and event.amount is not None:
+            paid += event.amount
+        elif event.event_type == InvoiceEventType.PAYMENT_REVERSED and event.amount is not None:
+            paid = max(Decimal("0"), paid - event.amount)
+        elif event.event_type == InvoiceEventType.ACCOUNTING_SYNCHRONIZED:
+            reconciliation = "synchronized"
+        elif event.event_type == InvoiceEventType.ACCOUNTING_REJECTED:
+            reconciliation = "rejected"
+        elif event.event_type == InvoiceEventType.ACCOUNTING_DUPLICATE:
+            reconciliation = "duplicate"
+        elif event.event_type == InvoiceEventType.ACCOUNTING_CHANGED:
+            reconciliation = "externally_changed"
+        elif event.event_type == InvoiceEventType.VOIDED:
+            terminal = "voided"
+        elif event.event_type == InvoiceEventType.CREDITED:
+            terminal = "credited"
+    total = invoice_amounts(invoice).total
+    balance = max(Decimal("0"), total - paid)
+    current_day = today or timezone.localdate()
+    if terminal:
+        state = terminal
+    elif paid >= total:
+        state = "paid"
+    elif paid > 0:
+        state = "partially_paid"
+    elif invoice.due_date < current_day:
+        state = "overdue"
+    elif reconciliation == "synchronized":
+        state = "externally_synchronized"
+    elif invoice.delivery_count:
+        state = "delivered"
+    else:
+        state = "issued"
+    return InvoiceLifecycle(state, reconciliation, paid, balance, last_event_at)
 
 
 def _issued_invoice(invoice: Invoice) -> Invoice:
@@ -131,6 +191,109 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
+def invoice_accounting_export(invoice: Invoice) -> dict[str, object]:
+    issued = _issued_invoice(invoice)
+    amounts = invoice_amounts(issued)
+    return {
+        "format": ACCOUNTING_EXPORT_FORMAT,
+        "idempotency_key": f"tekdocs:invoice:{issued.entity_id}:v1",
+        "invoice_id": str(issued.entity_id),
+        "number": issued.number,
+        "invoice_date": issued.invoice_date.isoformat(),
+        "due_date": issued.due_date.isoformat(),
+        "currency": issued.currency,
+        "reference": issued.reference,
+        "issuer": issued.issuer_snapshot,
+        "customer": issued.customer_snapshot,
+        "lines": [
+            {
+                "position": line.position,
+                "description": line.description,
+                "quantity": str(line.quantity),
+                "unit_amount": render_amount(line.unit_amount, issued.currency),
+                "tax_rate_name": line.tax_rate_name,
+                "tax_rate_value": str(line.tax_rate_value),
+                "tax_inclusive": line.tax_inclusive,
+                "net": render_amount(line_amounts(line).net, issued.currency),
+                "tax": render_amount(line_amounts(line).tax, issued.currency),
+                "total": render_amount(line_amounts(line).total, issued.currency),
+            }
+            for line in issued.lines.all()
+        ],
+        "subtotal": render_amount(amounts.subtotal, issued.currency),
+        "tax_total": render_amount(amounts.tax_total, issued.currency),
+        "total": render_amount(amounts.total, issued.currency),
+        "content_digest": issued.content_digest,
+    }
+
+
+@transaction.atomic
+def record_invoice_event(
+    *,
+    invoice: Invoice,
+    event_type: str,
+    occurred_at: datetime,
+    actor_id: UUID | None,
+    provider: str = "",
+    external_id: str = "",
+    idempotency_key: str = "",
+    amount: Decimal | None = None,
+    currency: str = "",
+    related_invoice: Invoice | None = None,
+    note: str = "",
+) -> InvoiceLifecycleEvent:
+    locked = Invoice.objects.select_for_update().select_related("tenant", "organization").get(pk=invoice.pk)
+    _issued_invoice(locked)
+    existing = None
+    if idempotency_key.strip():
+        existing = InvoiceLifecycleEvent.objects.filter(
+            invoice=locked, idempotency_key=idempotency_key.strip()
+        ).first()
+    if existing is None and provider.strip() and external_id.strip():
+        existing = InvoiceLifecycleEvent.objects.filter(
+            tenant=locked.tenant, provider=provider.strip(), external_id=external_id.strip()
+        ).first()
+    if existing is not None:
+        if existing.invoice_id != locked.id or existing.event_type != event_type:
+            raise InvoiceError("The idempotency identity is already in use")
+        return existing
+    event = InvoiceLifecycleEvent(
+        tenant=locked.tenant,
+        organization=locked.organization,
+        invoice=locked,
+        event_type=event_type,
+        occurred_at=occurred_at,
+        actor_id=actor_id,
+        provider=provider.strip(),
+        external_id=external_id.strip(),
+        idempotency_key=idempotency_key.strip(),
+        amount=amount,
+        currency=currency,
+        related_invoice=related_invoice,
+        note=note.strip(),
+    )
+    _validate(event)
+    event.save()  # type: ignore[no-untyped-call]
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action=f"invoice.{event_type}",
+        entity_id=locked.entity_id,
+        metadata={"provider": provider.strip()} if provider else {},
+    )
+    return event
+
+
+def record_delivery_failure(*, invoice: Invoice, actor_id: UUID, note: str) -> None:
+    record_invoice_event(
+        invoice=invoice,
+        event_type=InvoiceEventType.DELIVERY_FAILED,
+        occurred_at=timezone.now(),
+        actor_id=actor_id,
+        note=note[:500],
+    )
+
+
 @transaction.atomic
 def deliver_invoice(*, invoice: Invoice, recipient: str, actor_id: UUID) -> Invoice:
     locked = (
@@ -172,6 +335,13 @@ def deliver_invoice(*, invoice: Invoice, recipient: str, actor_id: UUID) -> Invo
         entity_id=locked.entity_id,
         metadata={"delivery_count": locked.delivery_count + 1},
     )
+    record_invoice_event(
+        invoice=locked,
+        event_type=InvoiceEventType.DELIVERY_SUCCEEDED,
+        occurred_at=delivered_at,
+        actor_id=actor_id,
+        note="Invoice email accepted for delivery.",
+    )
     return invoices_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
@@ -179,7 +349,13 @@ def invoices_for_scope(scope: DataScope) -> QuerySet[Invoice]:
     return (
         Invoice.scoped.for_scope(scope)
         .select_related("entity", "organization")
-        .prefetch_related(Prefetch("lines", queryset=InvoiceLine.objects.select_related("catalog_product__entity")))
+        .prefetch_related(
+            Prefetch("lines", queryset=InvoiceLine.objects.select_related("catalog_product__entity")),
+            Prefetch(
+                "lifecycle_events",
+                queryset=InvoiceLifecycleEvent.objects.select_related("actor", "related_invoice"),
+            ),
+        )
         .order_by("-invoice_date", "-created_at", "id")
     )
 
@@ -341,6 +517,8 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         raise InvoiceError("Configure the invoice issuer before issuing") from exc
     if not profile.is_issue_ready:
         raise InvoiceError("Complete the invoice issuer identity before issuing")
+    if any(line.tax_rate_value > 0 for line in lines) and not profile.tax_registration.strip():
+        raise InvoiceError("Add the issuer tax registration before issuing a taxed invoice")
     try:
         series = InvoiceNumberSeries.objects.select_for_update().get(tenant=locked.tenant, **_series_values(profile))
     except InvoiceNumberSeries.DoesNotExist as exc:
@@ -464,6 +642,35 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         action="invoice.issued",
         entity_id=locked.entity_id,
         metadata={},
+    )
+    record_invoice_event(
+        invoice=locked,
+        event_type=InvoiceEventType.ISSUED,
+        occurred_at=issued_at,
+        actor_id=actor_id,
+        idempotency_key=f"tekdocs:invoice:{locked.entity_id}:issued:v1",
+    )
+    reminder_entity = Entity.objects.create(
+        tenant=locked.tenant,
+        workspace=workspace_for_owner(tenant=locked.tenant, organization=locked.organization),
+        organization=locked.organization,
+        entity_type="reminder_schedule",
+        display_name=f"Invoice {number} due",
+        visibility=EntityVisibility.MSP_PRIVATE,
+    )
+    ReminderSchedule.objects.create(
+        tenant=locked.tenant,
+        workspace=reminder_entity.workspace,
+        organization=locked.organization,
+        entity=reminder_entity,
+        source_entity=locked.entity,
+        domain=ReminderDomain.INVOICE,
+        kind="invoice_due",
+        title=f"Invoice {number} due",
+        due_on=locked.due_date,
+        lead_days=min(profile.payment_terms_days, 7),
+        recurrence=ReminderRecurrence.NONE,
+        created_by_id=actor_id,
     )
     return locked
 

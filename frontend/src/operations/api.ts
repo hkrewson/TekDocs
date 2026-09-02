@@ -5,7 +5,7 @@ export type ReminderRecord = {
   id: string
   source_entity_id: string
   source: string
-  domain: 'compliance' | 'inventory' | 'domain' | 'documentation'
+  domain: 'compliance' | 'inventory' | 'domain' | 'documentation' | 'invoice'
   kind: string
   title: string
   due_on: string

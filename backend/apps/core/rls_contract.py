@@ -97,6 +97,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_invoice",
     "core_invoiceartifact",
     "core_invoiceline",
+    "core_invoicelifecycleevent",
 )
 
 TENANT_SCOPED_TABLES = (

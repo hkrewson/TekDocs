@@ -42,6 +42,7 @@ from .rendering import (
     render_markdown,
     render_pdf,
 )
+from .taxonomies import document_taxonomy_manifest
 from .workspaces import ResolvedWorkspace
 
 EXPORT_FORMATS = frozenset({"md", "html", "pdf", "docx", "bundle"})
@@ -243,6 +244,7 @@ def resolve_export_snapshot(
         "category": locked_document.category,
         "topic_type": locked_document.topic_type,
         "topic_schema_version": locked_document.topic_schema_version,
+        "taxonomies": document_taxonomy_manifest(locked_document),
         "key_resolutions": list(frozen_keys.manifest_records),
         "placements": [
             {

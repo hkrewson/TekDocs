@@ -3614,6 +3614,204 @@ class Document(TimestampedModel):
             raise ValidationError("Document entity must use the document workspace scope")
 
 
+class TaxonomyBinding(models.TextChoices):
+    DOCUMENT_TAGS = "document_tags", "Document tags"
+    TECHNOLOGY = "technology", "Technology"
+    SERVICE_FAMILY = "service_family", "Service family"
+    PLATFORM = "platform", "Platform"
+    RISK_LEVEL = "risk_level", "Risk level"
+    SUPPORT_TIER = "support_tier", "Support tier"
+    COMPLIANCE_DOMAIN = "compliance_domain", "Compliance domain"
+    DOCUMENT_SUBJECT = "document_subject", "Document subject"
+
+
+class TaxonomyTermStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    RETIRED = "retired", "Retired"
+
+
+class Taxonomy(TimestampedModel):
+    """Stable MSP-owned identity for an append-only controlled vocabulary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="taxonomies")
+    key = models.SlugField(max_length=80)
+    binding = models.CharField(max_length=40, choices=TaxonomyBinding.choices)
+    current_version = models.ForeignKey(
+        "TaxonomyVersion", on_delete=models.PROTECT, related_name="current_for", null=True, blank=True
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "key"), name="unique_taxonomy_key_per_tenant"),
+            models.CheckConstraint(
+                condition=models.Q(binding__in=TaxonomyBinding.values), name="taxonomy_binding_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "binding", "archived_at"), name="core_taxonomy_binding_idx")]
+
+    def __str__(self) -> str:
+        return self.key
+
+
+class TaxonomyVersion(models.Model):
+    """Immutable definition snapshot; terms point at exactly one version."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="taxonomy_versions")
+    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="versions")
+    version = models.PositiveIntegerField()
+    label = models.CharField(max_length=120)
+    description = models.CharField(max_length=500, blank=True)
+    allow_local_terms = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_taxonomy_versions"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("taxonomy", "version"), name="unique_taxonomy_version"),
+            models.CheckConstraint(condition=models.Q(version__gte=1), name="taxonomy_version_positive"),
+        ]
+        ordering = ("taxonomy_id", "version")
+
+    def __str__(self) -> str:
+        return f"{self.taxonomy.key} v{self.version}"
+
+
+class TaxonomyTerm(models.Model):
+    """One immutable term definition inside a taxonomy version."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="taxonomy_terms")
+    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="terms")
+    version = models.ForeignKey(TaxonomyVersion, on_delete=models.PROTECT, related_name="terms")
+    stable_key = models.SlugField(max_length=80)
+    label = models.CharField(max_length=120)
+    description = models.CharField(max_length=500, blank=True)
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, related_name="children", null=True, blank=True)
+    aliases = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=16, choices=TaxonomyTermStatus.choices, default=TaxonomyTermStatus.ACTIVE)
+    replacement_key = models.SlugField(max_length=80, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("version", "stable_key"), name="unique_term_key_per_taxonomy_version"),
+            models.CheckConstraint(
+                condition=models.Q(status__in=TaxonomyTermStatus.values), name="taxonomy_term_status_valid"
+            ),
+        ]
+        ordering = ("sort_order", "label", "stable_key")
+        indexes = [models.Index(fields=("tenant", "taxonomy", "version"), name="core_taxonomy_term_lookup_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.taxonomy.key}:{self.stable_key}"
+
+
+class OrganizationTaxonomyTerm(TimestampedModel):
+    """A client-local term permitted by one MSP taxonomy definition."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="organization_taxonomy_terms")
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="organization_taxonomy_terms")
+    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="organization_terms")
+    taxonomy_version = models.ForeignKey(TaxonomyVersion, on_delete=models.PROTECT, related_name="organization_terms")
+    stable_key = models.SlugField(max_length=80)
+    label = models.CharField(max_length=120)
+    description = models.CharField(max_length=500, blank=True)
+    aliases = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_organization_taxonomy_terms"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organization", "taxonomy", "stable_key"), name="unique_local_term_key_per_taxonomy"
+            )
+        ]
+        ordering = ("label", "stable_key")
+        indexes = [
+            models.Index(
+                fields=("tenant", "organization", "taxonomy", "archived_at"),
+                name="core_local_taxonomy_lookup_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.organization_id}:{self.taxonomy.key}:{self.stable_key}"
+
+
+class DocumentTaxonomyTerm(TimestampedModel):
+    """A live document selection pinned to the exact term definition used."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_taxonomy_terms")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="document_taxonomy_terms", null=True, blank=True
+    )
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="taxonomy_terms")
+    taxonomy = models.ForeignKey(Taxonomy, on_delete=models.PROTECT, related_name="document_assignments")
+    term = models.ForeignKey(
+        TaxonomyTerm, on_delete=models.PROTECT, related_name="document_assignments", null=True, blank=True
+    )
+    local_term = models.ForeignKey(
+        OrganizationTaxonomyTerm,
+        on_delete=models.PROTECT,
+        related_name="document_assignments",
+        null=True,
+        blank=True,
+    )
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(term__isnull=False, local_term__isnull=True)
+                    | models.Q(term__isnull=True, local_term__isnull=False)
+                ),
+                name="document_taxonomy_exactly_one_term",
+            ),
+            models.UniqueConstraint(
+                fields=("document", "taxonomy", "term"),
+                condition=models.Q(term__isnull=False),
+                name="unique_document_taxonomy_term",
+            ),
+            models.UniqueConstraint(
+                fields=("document", "taxonomy", "local_term"),
+                condition=models.Q(local_term__isnull=False),
+                name="unique_document_local_taxonomy_term",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "organization", "document"), name="core_doc_taxonomy_scope_idx"),
+            models.Index(fields=("tenant", "taxonomy", "term"), name="core_doc_taxonomy_term_idx"),
+        ]
+
+    def __str__(self) -> str:
+        selected = self.term or self.local_term
+        return f"{self.document_id}:{self.taxonomy.key}:{selected.stable_key if selected else 'missing'}"
+
+
 class DocumentTemplateRevision(TimestampedModel):
     """An immutable composition manifest for one MSP-owned reusable template."""
 

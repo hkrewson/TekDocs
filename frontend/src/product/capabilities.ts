@@ -16,6 +16,7 @@ export const capabilityRegistry = {
   products: { label: 'Products', path: '/products', group: 'Relationships', status: 'supported', scopes: ['msp', 'organization'] },
   invoices: { label: 'Invoices', path: '/invoices', group: 'Business', status: 'supported', scopes: ['msp', 'organization'] },
   custom_fields: { label: 'Custom fields', path: '/custom-fields', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },
+  taxonomies: { label: 'Taxonomies', path: '/taxonomies', group: 'Governance', status: 'supported', scopes: ['msp'] },
   compliance: { label: 'Compliance', path: '/compliance', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },
   deadlines: { label: 'Reminders', path: '/deadlines', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },
   activity: { label: 'Activity', path: '/activity', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },

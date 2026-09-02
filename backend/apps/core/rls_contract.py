@@ -7,6 +7,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_customfielddefinition",
     "core_personassociation",
     "core_document",
+    "core_documenttaxonomyterm",
+    "core_organizationtaxonomyterm",
     "core_block",
     "core_blockrevision",
     "core_documentplacement",
@@ -114,6 +116,9 @@ TENANT_SCOPED_TABLES = (
     "core_notificationpreference",
     "core_notificationemaildelivery",
     "core_documenttemplaterevision",
+    "core_taxonomy",
+    "core_taxonomyversion",
+    "core_taxonomyterm",
     "core_webhookoutbounddelivery",
     "core_webhookinboundreceipt",
 )

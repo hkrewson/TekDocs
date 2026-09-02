@@ -39,6 +39,7 @@ from .models import (
 )
 from .relationships import SEARCHABLE_ENTITY_TYPES
 from .rendering import render_markdown
+from .taxonomies import document_tag_labels, document_term_records
 
 
 def _clean_name(value: str) -> str:
@@ -985,7 +986,8 @@ class DocumentSerializer(serializers.Serializer):
     is_template = serializers.BooleanField()
     library_visible = serializers.BooleanField()
     collection = serializers.CharField(allow_blank=True)
-    tags = serializers.ListField(child=serializers.CharField())
+    tags = serializers.SerializerMethodField()
+    taxonomy_terms = serializers.SerializerMethodField()
     owner_id = serializers.UUIDField(allow_null=True)
     owner_name = serializers.CharField(source="owner.display_name", allow_null=True)
     review_due_on = serializers.DateField(allow_null=True)
@@ -1027,6 +1029,37 @@ class DocumentSerializer(serializers.Serializer):
     def get_is_reference(self, obj: Document) -> bool:
         workspace_organization_id = self.context.get("workspace_organization_id")
         return workspace_organization_id is not None and obj.organization_id is None
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_tags(self, obj: Document) -> list[str]:
+        return document_tag_labels(obj)
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_taxonomy_terms(self, obj: Document) -> list[dict[str, object]]:
+        result = []
+        for assignment in document_term_records(obj):
+            selected = assignment.term or assignment.local_term
+            if selected is None:
+                continue
+            if assignment.term is not None:
+                version = assignment.term.version
+            elif assignment.local_term is not None:
+                version = assignment.local_term.taxonomy_version
+            else:
+                continue
+            result.append(
+                {
+                    "id": selected.id,
+                    "taxonomy_id": assignment.taxonomy_id,
+                    "taxonomy_key": assignment.taxonomy.key,
+                    "taxonomy_version": version.version,
+                    "stable_key": selected.stable_key,
+                    "label": selected.label,
+                    "description": selected.description,
+                    "local": assignment.local_term_id is not None,
+                }
+            )
+        return result
 
     def _template_enrollment(self, obj: Document):  # type: ignore[no-untyped-def]
         try:
@@ -1270,6 +1303,9 @@ class DocumentOperationsWriteSerializer(serializers.Serializer):
         max_length=20,
         required=False,
         default=list,
+    )
+    taxonomy_term_ids = serializers.ListField(
+        child=serializers.UUIDField(), max_length=20, required=False, allow_empty=True
     )
 
 

@@ -220,6 +220,43 @@ it('exposes document settings and opens them before the document content', async
   expect(settingsPanel.compareDocumentPosition(screen.getByRole('article')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
+it('searches governed terms by alias and permits explicitly allowed client-local terms', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const catalog = {
+    id: 'taxonomy-1', key: 'technology', binding: 'document_tags',
+    current_version: {
+      id: 'taxonomy-version-1', version: 1, label: 'Technology', description: 'Products and platforms.', allow_local_terms: true,
+      terms: [
+        { id: 'term-entra', stable_key: 'entra-id', label: 'Entra ID', description: 'Identity platform.', parent_key: '', aliases: ['Azure AD'], status: 'active' as const, replacement_key: '', sort_order: 0 },
+        { id: 'term-intune', stable_key: 'intune', label: 'Intune', description: 'Device management.', parent_key: '', aliases: [], status: 'active' as const, replacement_key: '', sort_order: 1 },
+      ],
+    },
+  }
+  documents.listTaxonomies = vi.fn().mockResolvedValue({ results: [catalog], count: 1 })
+  const createLocalTerm = vi.fn().mockResolvedValue({
+    ...catalog,
+    current_version: { ...catalog.current_version, terms: [...catalog.current_version.terms, { id: 'term-client', stable_key: 'client-app', label: 'Client App', description: '', parent_key: '', aliases: [], status: 'active' as const, replacement_key: '', sort_order: 2, local: true }] },
+  })
+  documents.createLocalTaxonomyTerm = createLocalTerm
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.type(await screen.findByLabelText('Find a term'), 'azure')
+  expect(screen.getByText('Entra ID')).toBeVisible()
+  expect(screen.queryByText('Intune')).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Add client term' }))
+  await user.type(screen.getByLabelText('Stable key'), 'client-app')
+  await user.type(screen.getByLabelText('Label'), 'Client App')
+  await user.click(screen.getByRole('button', { name: 'Create client term' }))
+  await waitFor(() => expect(createLocalTerm).toHaveBeenCalledWith(
+    { organizationId: 'org-1' }, 'taxonomy-1',
+    { stable_key: 'client-app', label: 'Client App', description: '', aliases: [] },
+  ))
+})
+
 it('previews and confirms a document type conversion without rewriting the original revision', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, convertTopic } = clients()

@@ -708,11 +708,14 @@ def _template_manifest(source: Document) -> dict[str, object]:
     if not source.is_template or source.organization_id is not None:
         raise PlacementConflict("Client rollout requires an MSP-owned reusable template.")
     resolved = resolve_document(source)
+    from .taxonomies import document_taxonomy_manifest
+
     return {
         "template_document_id": str(source.entity_id),
         "title": source.entity.display_name,
         "topic_type": source.topic_type,
         "topic_schema_version": source.topic_schema_version,
+        "taxonomies": document_taxonomy_manifest(source),
         "blocks": [
             {
                 "source_block_id": str(item.placement.block.entity_id),
@@ -816,6 +819,9 @@ def instantiate_document_template(
                 is_template=False,
                 topic_type=source.topic_type,
             )
+            from .taxonomies import copy_document_taxonomy_terms
+
+            copy_document_taxonomy_terms(source=source, destination=destination, actor_id=actor_id)
             destination_primary = primary_placement(destination)
             placement_map: list[dict[str, object]] = [
                 {
@@ -1026,6 +1032,13 @@ def apply_template_rollout(
             mapped["applied_revision_id"] = str(item["source_revision_id"])
         elif mapped["mode"] == "live":
             mapped["applied_revision_id"] = str(item["source_revision_id"])
+    from .taxonomies import copy_document_taxonomy_terms
+
+    copy_document_taxonomy_terms(
+        source=locked.source_template,
+        destination=locked.destination_document,
+        actor_id=actor_id,
+    )
     locked.applied_revision = latest
     locked.placement_map = placement_map
     locked.last_applied_by_id = actor_id

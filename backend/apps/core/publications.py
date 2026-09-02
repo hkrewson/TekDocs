@@ -58,6 +58,7 @@ from .rendering import (
     render_markdown,
     render_pdf,
 )
+from .taxonomies import document_taxonomy_manifest
 from .workspaces import ResolvedWorkspace
 
 MANIFEST_VERSION = "tekdocs-static-publication/v4"
@@ -386,6 +387,7 @@ def publish_document(
                 "category": locked_document.category,
                 "topic_type": locked_document.topic_type,
                 "topic_schema_version": locked_document.topic_schema_version,
+                "taxonomies": document_taxonomy_manifest(locked_document),
                 "preflight": {
                     "version": preflight["version"],
                     "composition_digest": preflight["composition_digest"],

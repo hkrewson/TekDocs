@@ -32,6 +32,9 @@ CAPABILITY_REGISTRY: dict[str, CapabilityDefinition] = {
     "custom_fields": CapabilityDefinition(
         "Custom fields", "/custom-fields", CapabilityStatus.SUPPORTED, PermissionKey.CUSTOM_FIELDS_VIEW
     ),
+    "taxonomies": CapabilityDefinition(
+        "Taxonomies", "/taxonomies", CapabilityStatus.SUPPORTED, PermissionKey.CUSTOM_FIELDS_VIEW
+    ),
     "documentation": CapabilityDefinition(
         "Documentation", "/documentation", CapabilityStatus.SUPPORTED, PermissionKey.DOCUMENTS_VIEW
     ),

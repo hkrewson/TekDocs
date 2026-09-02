@@ -31,6 +31,7 @@ import {
   UserPlus,
   ScrollText,
   Trash2,
+  Tags,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ import { browserComplianceClient } from './compliance/api'
 import type { ComplianceClient } from './compliance/api'
 import { browserCustomFieldsClient } from './custom-fields/api'
 import type { CustomFieldsClient } from './custom-fields/api'
+import { browserTaxonomiesClient } from './taxonomies/api'
 import { browserCredentialReferencesClient } from './credential-references/api'
 import type { CredentialReferencesClient } from './credential-references/api'
 import { browserDocumentsClient } from './documentation/api'
@@ -91,6 +93,7 @@ const AccessControl = lazy(async () => ({ default: (await import('./access-contr
 const ClientPortal = lazy(async () => ({ default: (await import('./portal/ClientPortal')).ClientPortal }))
 const CredentialReferences = lazy(async () => ({ default: (await import('./credential-references/CredentialReferences')).CredentialReferences }))
 const CustomFields = lazy(async () => ({ default: (await import('./custom-fields/CustomFields')).CustomFields }))
+const Taxonomies = lazy(async () => ({ default: (await import('./taxonomies/Taxonomies')).Taxonomies }))
 const Documentation = lazy(async () => ({ default: (await import('./documentation/Documentation')).Documentation }))
 const NotificationDeliveryAdmin = lazy(async () => ({ default: (await import('./notifications/NotificationDeliveryAdmin')).NotificationDeliveryAdmin }))
 const Organizations = lazy(async () => ({ default: (await import('./organizations/Organizations')).Organizations }))
@@ -166,6 +169,7 @@ const navigationSections: NavigationSection[] = [
   ] },
   { label: 'Governance', items: [
     navigationItem('custom_fields', ListPlus),
+    navigationItem('taxonomies', Tags),
     navigationItem('compliance', ShieldCheck),
     navigationItem('deadlines', CalendarDays),
     navigationItem('activity', Activity),
@@ -524,6 +528,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
             <Route path="/custom-fields" element={<CustomFields workspace={null} client={customFieldsClient} />} />
+            <Route path="/taxonomies" element={<Taxonomies client={browserTaxonomiesClient} />} />
             <Route path="/recycle-bin" element={<RecycleBin workspace={null} client={recycleBinClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />

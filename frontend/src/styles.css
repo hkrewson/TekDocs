@@ -1587,8 +1587,35 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .portal-download-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
 .portal-download-list a { display: inline-flex; align-items: center; gap: 8px; }
 
+.taxonomy-editor { display: grid; gap: 18px; }
+.taxonomy-term-list { display: grid; gap: 12px; }
+.taxonomy-term-row { border: 1px solid var(--border); border-radius: 8px; margin: 0; padding: 14px; }
+.taxonomy-term-row legend { font-size: 13px; font-weight: 700; padding: 0 5px; }
+.taxonomy-term-row legend small { color: var(--muted); font-weight: 500; margin-left: 8px; }
+.taxonomy-term-row > label { display: grid; gap: 6px; margin: 10px 0; }
+.taxonomy-table, .taxonomy-migration-list { border-top: 1px solid var(--border); }
+.taxonomy-table-row { display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(120px, .8fr) minmax(140px, 1fr) minmax(170px, auto); gap: 16px; align-items: center; min-height: 52px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.taxonomy-table-row.header, .taxonomy-migration-row.header { color: var(--muted); font-size: 12px; font-weight: 700; min-height: 38px; }
+.taxonomy-table-row > span:first-child { display: grid; gap: 2px; }
+.taxonomy-table-row code { color: var(--muted); font-size: 12px; }
+.taxonomy-table-row small { color: var(--muted); }
+.taxonomy-migration-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, .6fr) minmax(140px, .8fr); gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.document-taxonomy-picker { border: 1px solid var(--border); border-radius: 8px; margin: 14px 0; padding: 14px; }
+.document-taxonomy-picker legend { font-size: 13px; font-weight: 700; padding: 0 5px; }
+.document-taxonomy-picker p { color: var(--muted); margin: 3px 0 10px; }
+.taxonomy-search { display: grid; gap: 6px; margin-bottom: 16px; max-width: 520px; }
+.taxonomy-choice-group + .taxonomy-choice-group { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; }
+.taxonomy-choice-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px 14px; margin-top: 8px; }
+.taxonomy-choice-list label { align-items: flex-start; display: flex; gap: 8px; font-weight: 500; }
+.taxonomy-choice-list input { margin-top: 3px; }
+.taxonomy-choice-list span { display: grid; gap: 2px; }
+.taxonomy-choice-list small { color: var(--muted); font-weight: 400; }
+.local-term-editor { background: var(--surface-subtle); border-left: 3px solid var(--border-strong); margin-top: 14px; padding: 12px 14px; }
+
 @media (max-width: 640px) {
   .client-portal-header { align-items: flex-start; padding: 14px 16px; }
   .client-portal-account > span { display: none; }
   .client-portal-main { padding: 20px 16px; }
+  .taxonomy-table-row, .taxonomy-migration-row { grid-template-columns: 1fr; gap: 4px; padding: 13px 0; }
+  .taxonomy-table-row.header, .taxonomy-migration-row.header { display: none; }
 }

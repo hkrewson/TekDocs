@@ -51,6 +51,8 @@ from .models import (
     SoftwareLicenseKind,
     SoftwareLicenseStatus,
     SoftwareRenewalInterval,
+    Taxonomy,
+    TaxonomyBinding,
 )
 from .network_addressing import create_subnet, create_vlan, update_subnet
 from .organizations import create_organization, update_organization
@@ -947,6 +949,13 @@ def _apply_row(batch: ImportBatch, row: ImportRow, actor_id: UUID) -> Entity:
         document = Document.objects.select_related("entity").get(
             entity=document_entity, tenant=tenant, organization=organization
         )
+        if (
+            data["tags"]
+            and Taxonomy.objects.filter(
+                tenant=tenant, binding=TaxonomyBinding.DOCUMENT_TAGS, archived_at__isnull=True
+            ).exists()
+        ):
+            raise ValueError("governed_document_tags_require_migration")
         document.collection = data["collection"]
         document.tags = data["tags"]
         document.full_clean()

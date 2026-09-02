@@ -2020,6 +2020,54 @@ export interface paths {
         readonly patch: operations["locations_msp_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/taxonomies": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["taxonomies_msp_list"];
+        readonly put?: never;
+        readonly post: operations["taxonomies_msp_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/taxonomies/{taxonomy_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["taxonomies_msp_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["taxonomies_msp_revise"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/taxonomies/migration": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["taxonomies_msp_migration"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/webhooks/inbound/{endpoint_id}": {
         readonly parameters: {
             readonly query?: never;
@@ -7236,6 +7284,38 @@ export interface paths {
         readonly patch: operations["locations_organization_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/taxonomies": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["taxonomies_organization_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/taxonomies/{taxonomy_id}/terms": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["taxonomies_organization_local_term_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/vendors": {
         readonly parameters: {
             readonly query?: never;
@@ -8872,6 +8952,9 @@ export interface components {
             readonly library_visible: boolean;
             readonly collection: string;
             readonly tags: readonly string[];
+            readonly taxonomy_terms: readonly {
+                readonly [key: string]: unknown;
+            }[];
             /** Format: uuid */
             readonly owner_id: string | null;
             readonly owner_name: string | null;
@@ -9007,6 +9090,7 @@ export interface components {
             /** @default  */
             readonly collection: string;
             readonly tags?: readonly string[];
+            readonly taxonomy_term_ids?: readonly string[];
         };
         readonly DocumentPlacement: {
             /** Format: uuid */
@@ -9407,6 +9491,9 @@ export interface components {
             readonly library_visible: boolean;
             readonly collection: string;
             readonly tags: readonly string[];
+            readonly taxonomy_terms: readonly {
+                readonly [key: string]: unknown;
+            }[];
             /** Format: uuid */
             readonly owner_id: string | null;
             readonly owner_name: string | null;
@@ -11638,6 +11725,13 @@ export interface components {
             /** Format: uuid */
             readonly user_id: string;
         };
+        readonly OrganizationTaxonomyTermWrite: {
+            readonly stable_key: string;
+            readonly label: string;
+            /** @default  */
+            readonly description: string;
+            readonly aliases?: readonly string[];
+        };
         readonly OrganizationWrite: {
             readonly name: string;
             readonly legal_name?: string;
@@ -12364,6 +12458,14 @@ export interface components {
             readonly vlan_id?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly PatchedTaxonomyVersionWrite: {
+            readonly label?: string;
+            /** @default  */
+            readonly description: string;
+            /** @default false */
+            readonly allow_local_terms: boolean;
+            readonly terms?: readonly components["schemas"]["TaxonomyTermWrite"][];
         };
         readonly PatchedVLANWrite: {
             readonly name?: string;
@@ -13242,6 +13344,143 @@ export interface components {
             readonly vlan_id?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly Taxonomy: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly key: string;
+            /**
+             * @description * `document_tags` - Document tags
+             *     * `technology` - Technology
+             *     * `service_family` - Service family
+             *     * `platform` - Platform
+             *     * `risk_level` - Risk level
+             *     * `support_tier` - Support tier
+             *     * `compliance_domain` - Compliance domain
+             *     * `document_subject` - Document subject
+             * @enum {string}
+             */
+            readonly binding: "document_tags" | "technology" | "service_family" | "platform" | "risk_level" | "support_tier" | "compliance_domain" | "document_subject";
+            readonly archived: boolean;
+            readonly current_version: components["schemas"]["TaxonomyCurrentVersion"];
+            readonly versions: readonly components["schemas"]["TaxonomyVersionSummary"][];
+            readonly impact: components["schemas"]["TaxonomyImpact"];
+        };
+        readonly TaxonomyCreate: {
+            readonly label: string;
+            /** @default  */
+            readonly description: string;
+            /** @default false */
+            readonly allow_local_terms: boolean;
+            readonly terms: readonly components["schemas"]["TaxonomyTermWrite"][];
+            readonly key: string;
+            /**
+             * @description * `document_tags` - Document tags
+             *     * `technology` - Technology
+             *     * `service_family` - Service family
+             *     * `platform` - Platform
+             *     * `risk_level` - Risk level
+             *     * `support_tier` - Support tier
+             *     * `compliance_domain` - Compliance domain
+             *     * `document_subject` - Document subject
+             * @enum {string}
+             */
+            readonly binding: "document_tags" | "technology" | "service_family" | "platform" | "risk_level" | "support_tier" | "compliance_domain" | "document_subject";
+        };
+        readonly TaxonomyCurrentVersion: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly version: number;
+            readonly label: string;
+            readonly description: string;
+            readonly allow_local_terms: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly terms: readonly components["schemas"]["TaxonomyTerm"][];
+        };
+        readonly TaxonomyImpact: {
+            readonly documents: number;
+            readonly templates: number;
+        };
+        readonly TaxonomyMigration: {
+            readonly counts: {
+                readonly [key: string]: number;
+            };
+            readonly rows: readonly components["schemas"]["TaxonomyMigrationRow"][];
+        };
+        readonly TaxonomyMigrationRow: {
+            /** Format: uuid */
+            readonly document_id: string;
+            readonly document_title: string;
+            readonly tag: string;
+            /**
+             * @description * `matched` - matched
+             *     * `unmatched` - unmatched
+             *     * `ambiguous` - ambiguous
+             * @enum {string}
+             */
+            readonly status: "matched" | "unmatched" | "ambiguous";
+            /** Format: uuid */
+            readonly term_id: string | null;
+            readonly term_label: string | null;
+        };
+        readonly TaxonomyMigrationWrite: {
+            /** @default false */
+            readonly apply: boolean;
+        };
+        readonly TaxonomyResult: {
+            readonly results: readonly components["schemas"]["Taxonomy"][];
+            readonly count: number;
+        };
+        readonly TaxonomyTerm: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly stable_key: string;
+            readonly label: string;
+            readonly description: string;
+            readonly parent_key: string;
+            readonly aliases: readonly string[];
+            /**
+             * @description * `active` - Active
+             *     * `retired` - Retired
+             * @enum {string}
+             */
+            readonly status: "active" | "retired";
+            readonly replacement_key: string;
+            readonly sort_order: number;
+            /** @default false */
+            readonly local: boolean;
+            readonly impact: {
+                readonly [key: string]: number;
+            };
+        };
+        readonly TaxonomyTermWrite: {
+            readonly stable_key: string;
+            readonly label: string;
+            /** @default  */
+            readonly description: string;
+            /** @default  */
+            readonly parent_key: string;
+            readonly aliases?: readonly string[];
+            /**
+             * @description * `active` - Active
+             *     * `retired` - Retired
+             * @default active
+             * @enum {string}
+             */
+            readonly status: "active" | "retired";
+            /** @default  */
+            readonly replacement_key: string;
+            /** @default 0 */
+            readonly sort_order: number;
+        };
+        readonly TaxonomyVersionSummary: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly version: number;
+            readonly label: string;
+            /** Format: date-time */
+            readonly created_at: string;
         };
         readonly TopicSchema: {
             /**
@@ -19086,6 +19325,132 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Location"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_msp_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TaxonomyResult"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_msp_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["TaxonomyCreate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["TaxonomyCreate"];
+                readonly "multipart/form-data": components["schemas"]["TaxonomyCreate"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Taxonomy"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_msp_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly taxonomy_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly taxonomies_msp_revise: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly taxonomy_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedTaxonomyVersionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedTaxonomyVersionWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedTaxonomyVersionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Taxonomy"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_msp_migration: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["TaxonomyMigrationWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["TaxonomyMigrationWrite"];
+                readonly "multipart/form-data": components["schemas"]["TaxonomyMigrationWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TaxonomyMigration"];
                 };
             };
         };
@@ -32654,6 +33019,59 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Location"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_organization_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TaxonomyResult"];
+                };
+            };
+        };
+    };
+    readonly taxonomies_organization_local_term_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly taxonomy_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["OrganizationTaxonomyTermWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["OrganizationTaxonomyTermWrite"];
+                readonly "multipart/form-data": components["schemas"]["OrganizationTaxonomyTermWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Taxonomy"];
                 };
             };
         };

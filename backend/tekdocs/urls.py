@@ -417,6 +417,13 @@ from apps.core.software_inventory_views import (
     SoftwareLicenseSeatDetailView,
     SoftwareLicenseSeatView,
 )
+from apps.core.taxonomy_views import (
+    MSPTaxonomyDetailView,
+    MSPTaxonomyListCreateView,
+    MSPTaxonomyMigrationView,
+    OrganizationTaxonomyListView,
+    OrganizationTaxonomyLocalTermCreateView,
+)
 from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
 from apps.core.webhook_views import (
     InboundWebhookView,
@@ -1226,6 +1233,9 @@ urlpatterns = [
         MSPCustomFieldDefinitionDetailView.as_view(),
         name="msp-custom-field-definition-detail",
     ),
+    path("api/v1/taxonomies", MSPTaxonomyListCreateView.as_view(), name="msp-taxonomy-list-create"),
+    path("api/v1/taxonomies/migration", MSPTaxonomyMigrationView.as_view(), name="msp-taxonomy-migration"),
+    path("api/v1/taxonomies/<uuid:taxonomy_id>", MSPTaxonomyDetailView.as_view(), name="msp-taxonomy-detail"),
     path(
         "api/v1/entities/<uuid:entity_id>/custom-fields",
         MSPEntityCustomFieldListView.as_view(),
@@ -2465,6 +2475,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/custom-field-definitions",
         OrganizationCustomFieldDefinitionListCreateView.as_view(),
         name="organization-custom-field-definition-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/taxonomies",
+        OrganizationTaxonomyListView.as_view(),
+        name="organization-taxonomy-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/taxonomies/<uuid:taxonomy_id>/terms",
+        OrganizationTaxonomyLocalTermCreateView.as_view(),
+        name="organization-taxonomy-local-term-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/custom-field-definitions/<uuid:definition_id>",

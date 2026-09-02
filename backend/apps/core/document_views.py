@@ -143,6 +143,7 @@ from .serializers import (
     SharedBlockUpdateSerializer,
     TopicSchemaCatalogSerializer,
 )
+from .taxonomies import document_tag_labels, document_term_records
 from .topic_schemas import catalog as topic_catalog
 from .topic_schemas import inspect_markdown, seed_markdown
 from .workspaces import ResolvedWorkspace, resolve_organization_workspace
@@ -208,8 +209,22 @@ def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) ->
         queryset = queryset.filter(owner_id=values["owner_id"])
     records = list(queryset.order_by("entity__display_name", "entity_id").distinct()[:500])
     if values["tag"]:
-        tag = values["tag"].strip().lower()
-        records = [record for record in records if tag in record.tags]
+        tag = values["tag"].strip().casefold()
+        records = [
+            record
+            for record in records
+            if tag in {value.casefold() for value in record.tags}
+            or any(
+                tag
+                in {
+                    selected.stable_key.casefold(),
+                    selected.label.casefold(),
+                    *(str(alias).casefold() for alias in selected.aliases),
+                }
+                for assignment in document_term_records(record)
+                if (selected := assignment.term or assignment.local_term) is not None
+            )
+        ]
     if values["health"]:
         records = [record for record in records if record.health_status == values["health"]]
     return records
@@ -255,7 +270,7 @@ def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
     if query:
         selected.sort(key=lambda record: (-ranks[record.id], record.entity.display_name.casefold()))
     collection_counts = Counter(record.collection for record in selected if record.collection)
-    tag_counts = Counter(tag for record in selected for tag in record.tags)
+    tag_counts = Counter(tag for record in selected for tag in document_tag_labels(record))
     health_counts = Counter(record.health_status for record in selected)
     context = {
         "workspace": workspace,

@@ -59,6 +59,7 @@ export type DocumentRecord = {
   library_visible: boolean
   collection?: string
   tags?: string[]
+  taxonomy_terms?: { id: string; taxonomy_id: string; taxonomy_key: string; taxonomy_version: number; stable_key: string; label: string; description: string; local?: boolean }[]
   owner_id?: string | null
   owner_name?: string | null
   review_due_on?: string | null
@@ -182,7 +183,9 @@ export type DocumentOperationsInput = {
   review_due_on: string | null
   collection: string
   tags: string[]
+  taxonomy_term_ids?: string[]
 }
+export type DocumentTaxonomyCatalog = { results: { id: string; key: string; binding: string; current_version: { id: string; version: number; label: string; description: string; allow_local_terms: boolean; terms: { id: string; stable_key: string; label: string; description: string; parent_key: string; aliases: string[]; status: 'active' | 'retired'; replacement_key: string; sort_order: number; local?: boolean }[] } }[]; count: number }
 export type BlockRevision = {
   id: string
   parent_id: string | null
@@ -325,6 +328,8 @@ export interface DocumentsClient {
   topicSchemas(signal?: AbortSignal): Promise<TopicSchemaCatalog>
   operationsChoices?(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentOperationsChoice[]>
   updateOperations?(scope: DocumentScope, id: string, input: DocumentOperationsInput): Promise<DocumentRecord>
+  listTaxonomies?(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentTaxonomyCatalog>
+  createLocalTaxonomyTerm?(scope: DocumentScope, taxonomyId: string, input: { stable_key: string; label: string; description: string; aliases: string[] }): Promise<DocumentTaxonomyCatalog['results'][number]>
   requestReview?(scope: DocumentScope, id: string, reviewerId: string, note: string): Promise<DocumentRecord>
   decideReview?(scope: DocumentScope, id: string, decision: 'approved' | 'changes_requested', note: string): Promise<DocumentRecord>
   previewRestructure(scope: DocumentScope, id: string): Promise<DocumentRestructurePreview>
@@ -522,6 +527,16 @@ export const browserDocumentsClient: DocumentsClient = {
     return parse<DocumentOperationsChoice[]>(await fetch(`${collectionPath(scope)}/operations/choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
   updateOperations: (scope, id, input) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/operations`, 'PUT', input),
+  async listTaxonomies(scope, signal) {
+    const path = scope.organizationId
+      ? `/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}/taxonomies`
+      : '/api/v1/taxonomies'
+    return parse<DocumentTaxonomyCatalog>(await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  createLocalTaxonomyTerm: (scope, taxonomyId, input) => {
+    if (!scope.organizationId) throw new Error('Client-local terms require a client workspace.')
+    return mutate<DocumentTaxonomyCatalog['results'][number]>(`/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}/taxonomies/${encodeURIComponent(taxonomyId)}/terms`, 'POST', input)
+  },
   requestReview: (scope, id, reviewerId, note) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/reviews`, 'POST', { reviewer_id: reviewerId, note }),
   decideReview: (scope, id, decision, note) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/reviews/decision`, 'POST', { decision, note }),
   async previewRestructure(scope, id) {

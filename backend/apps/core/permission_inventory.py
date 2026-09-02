@@ -32,6 +32,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
     route("document-topic-schemas", ("GET",)),
     route(
+        "msp-taxonomy-list-create",
+        ("GET", "POST"),
+        PermissionKey.CUSTOM_FIELDS_VIEW,
+        (PermissionKey.CUSTOM_FIELDS_MANAGE,),
+    ),
+    route("msp-taxonomy-migration", ("POST",), mutations=(PermissionKey.CUSTOM_FIELDS_MANAGE,)),
+    route(
+        "msp-taxonomy-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.CUSTOM_FIELDS_MANAGE, PermissionKey.CUSTOM_FIELDS_MANAGE),
+    ),
+    route(
         "msp-credential-reference-list-create",
         ("GET", "POST"),
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
@@ -1137,6 +1149,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "POST"),
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-taxonomy-list",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-taxonomy-local-term-create",
+        ("POST",),
+        mutations=(PermissionKey.CUSTOM_FIELDS_MANAGE,),
         organization_scoped=True,
     ),
     route("organization-document-search", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),

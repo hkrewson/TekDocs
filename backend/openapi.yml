@@ -6847,6 +6847,153 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/taxonomies:
+    get:
+      operationId: taxonomies_msp_list
+      tags:
+      - taxonomies
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: taxonomies_msp_create
+      tags:
+      - taxonomies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaxonomyCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaxonomyCreate'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/taxonomies/{taxonomy_id}:
+    patch:
+      operationId: taxonomies_msp_revise
+      parameters:
+      - in: path
+        name: taxonomy_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - taxonomies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaxonomyVersionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaxonomyVersionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaxonomyVersionWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: taxonomies_msp_archive
+      parameters:
+      - in: path
+        name: taxonomy_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - taxonomies
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/taxonomies/migration:
+    post:
+      operationId: taxonomies_msp_migration
+      tags:
+      - taxonomies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyMigrationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaxonomyMigrationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaxonomyMigrationWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyMigration'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/webhooks/inbound/{endpoint_id}:
     post:
       operationId: webhooks_inbound_create
@@ -25521,6 +25668,80 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/taxonomies:
+    get:
+      operationId: taxonomies_organization_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/taxonomies/{taxonomy_id}/terms:
+    post:
+      operationId: taxonomies_organization_local_term_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: taxonomy_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationTaxonomyTermWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationTaxonomyTermWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationTaxonomyTermWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/vendors:
     get:
       operationId: workspaces_organizations_vendors_retrieve
@@ -29431,6 +29652,13 @@ components:
           type: array
           items:
             type: string
+          readOnly: true
+        taxonomy_terms:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         owner_id:
           type: string
           format: uuid
@@ -29611,6 +29839,7 @@ components:
       - reviewer_name
       - revision_number
       - tags
+      - taxonomy_terms
       - template_applied_revision_id
       - template_enrollment_id
       - template_source_id
@@ -29792,6 +30021,12 @@ components:
           items:
             type: string
             maxLength: 40
+          maxItems: 20
+        taxonomy_term_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
           maxItems: 20
     DocumentPlacement:
       type: object
@@ -30699,6 +30934,13 @@ components:
           type: array
           items:
             type: string
+          readOnly: true
+        taxonomy_terms:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         owner_id:
           type: string
           format: uuid
@@ -30882,6 +31124,7 @@ components:
       - reviewer_name
       - revision_number
       - tags
+      - taxonomy_terms
       - template_applied_revision_id
       - template_enrollment_id
       - template_source_id
@@ -35956,6 +36199,29 @@ components:
           format: uuid
       required:
       - user_id
+    OrganizationTaxonomyTermWrite:
+      type: object
+      properties:
+        stable_key:
+          type: string
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        label:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        aliases:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+          maxItems: 20
+      required:
+      - label
+      - stable_key
     OrganizationWrite:
       type: object
       properties:
@@ -37412,6 +37678,23 @@ components:
           type: string
           default: ''
           maxLength: 4000
+    PatchedTaxonomyVersionWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        allow_local_terms:
+          type: boolean
+          default: false
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyTermWrite'
     PatchedVLANWrite:
       type: object
       properties:
@@ -39476,6 +39759,321 @@ components:
       required:
       - cidr
       - name
+    Taxonomy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        binding:
+          enum:
+          - document_tags
+          - technology
+          - service_family
+          - platform
+          - risk_level
+          - support_tier
+          - compliance_domain
+          - document_subject
+          type: string
+          description: |-
+            * `document_tags` - Document tags
+            * `technology` - Technology
+            * `service_family` - Service family
+            * `platform` - Platform
+            * `risk_level` - Risk level
+            * `support_tier` - Support tier
+            * `compliance_domain` - Compliance domain
+            * `document_subject` - Document subject
+          x-spec-enum-id: 7298e22e6edfe29b
+        archived:
+          type: boolean
+        current_version:
+          $ref: '#/components/schemas/TaxonomyCurrentVersion'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyVersionSummary'
+        impact:
+          $ref: '#/components/schemas/TaxonomyImpact'
+      required:
+      - archived
+      - binding
+      - current_version
+      - id
+      - impact
+      - key
+      - versions
+    TaxonomyCreate:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        allow_local_terms:
+          type: boolean
+          default: false
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyTermWrite'
+        key:
+          type: string
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        binding:
+          enum:
+          - document_tags
+          - technology
+          - service_family
+          - platform
+          - risk_level
+          - support_tier
+          - compliance_domain
+          - document_subject
+          type: string
+          description: |-
+            * `document_tags` - Document tags
+            * `technology` - Technology
+            * `service_family` - Service family
+            * `platform` - Platform
+            * `risk_level` - Risk level
+            * `support_tier` - Support tier
+            * `compliance_domain` - Compliance domain
+            * `document_subject` - Document subject
+          x-spec-enum-id: 7298e22e6edfe29b
+      required:
+      - binding
+      - key
+      - label
+      - terms
+    TaxonomyCurrentVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        label:
+          type: string
+        description:
+          type: string
+        allow_local_terms:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyTerm'
+      required:
+      - allow_local_terms
+      - created_at
+      - description
+      - id
+      - label
+      - terms
+      - version
+    TaxonomyImpact:
+      type: object
+      properties:
+        documents:
+          type: integer
+        templates:
+          type: integer
+      required:
+      - documents
+      - templates
+    TaxonomyMigration:
+      type: object
+      properties:
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyMigrationRow'
+      required:
+      - counts
+      - rows
+    TaxonomyMigrationRow:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        document_title:
+          type: string
+        tag:
+          type: string
+        status:
+          enum:
+          - matched
+          - unmatched
+          - ambiguous
+          type: string
+          description: |-
+            * `matched` - matched
+            * `unmatched` - unmatched
+            * `ambiguous` - ambiguous
+          x-spec-enum-id: eeb12a2da208416d
+        term_id:
+          type: string
+          format: uuid
+          nullable: true
+        term_label:
+          type: string
+          nullable: true
+      required:
+      - document_id
+      - document_title
+      - status
+      - tag
+      - term_id
+      - term_label
+    TaxonomyMigrationWrite:
+      type: object
+      properties:
+        apply:
+          type: boolean
+          default: false
+    TaxonomyResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    TaxonomyTerm:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stable_key:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        parent_key:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        status:
+          enum:
+          - active
+          - retired
+          type: string
+          description: |-
+            * `active` - Active
+            * `retired` - Retired
+          x-spec-enum-id: 07ae52baa1656ca3
+        replacement_key:
+          type: string
+        sort_order:
+          type: integer
+        local:
+          type: boolean
+          default: false
+        impact:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+      - aliases
+      - description
+      - id
+      - impact
+      - label
+      - parent_key
+      - replacement_key
+      - sort_order
+      - stable_key
+      - status
+    TaxonomyTermWrite:
+      type: object
+      properties:
+        stable_key:
+          type: string
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        label:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 500
+        parent_key:
+          type: string
+          default: ''
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        aliases:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+          maxItems: 20
+        status:
+          enum:
+          - active
+          - retired
+          type: string
+          description: |-
+            * `active` - Active
+            * `retired` - Retired
+          x-spec-enum-id: 07ae52baa1656ca3
+          default: active
+        replacement_key:
+          type: string
+          default: ''
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        sort_order:
+          type: integer
+          maximum: 100000
+          minimum: 0
+          default: 0
+      required:
+      - label
+      - stable_key
+    TaxonomyVersionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        label:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - id
+      - label
+      - version
     TopicSchema:
       type: object
       properties:

@@ -26,6 +26,7 @@ MSP_CAPABILITIES = (
     "people",
     "sites",
     "custom_fields",
+    "taxonomies",
     "documentation",
     "files",
     "assets",

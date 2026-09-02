@@ -11,7 +11,7 @@ The current column describes `0.8.46`. The 1.0 column is the release contract, n
 | Structured topic types and guided authoring | excluded | supported | TekDocs | [#30](https://github.com/hkrewson/TekDocs/issues/30) |
 | Documentation maps, baselines, and client handoff packages | supported | supported | TekDocs | — |
 | Publication preflight and documentation lint | experimental | supported | TekDocs | [#31](https://github.com/hkrewson/TekDocs/issues/31) |
-| Controlled taxonomies and tag governance | excluded | supported | TekDocs | [#32](https://github.com/hkrewson/TekDocs/issues/32) |
+| Controlled taxonomies and tag governance | supported | supported | TekDocs | — |
 | Inventory, licensing, commercial records, networks, domains, certificates, reminders, compliance | supported | supported | TekDocs records documented state; external systems may supply observations | — |
 | Entity-linked and authored diagrams | experimental | supported | TekDocs for authored diagrams and retained exports | [#41](https://github.com/hkrewson/TekDocs/issues/41), [#44](https://github.com/hkrewson/TekDocs/issues/44) |
 | Unified workspace search | experimental | supported | TekDocs | [#27](https://github.com/hkrewson/TekDocs/issues/27) |

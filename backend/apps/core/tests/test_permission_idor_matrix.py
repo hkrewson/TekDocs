@@ -94,6 +94,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-credential-reference-open": ("credential_reference_entity_id",),
         "msp-site-detail": ("site_entity_id",),
         "msp-document-detail": ("document_entity_id",),
+        "msp-document-preflight": ("document_entity_id",),
+        "msp-document-topic-conversion": ("document_entity_id",),
+        "msp-taxonomy-detail": ("taxonomy_id",),
         "msp-document-operations": ("document_entity_id",),
         "msp-document-review-request": ("document_entity_id",),
         "msp-document-review-decision": ("document_entity_id",),
@@ -411,6 +414,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-document-review-request": ("organization_entity_id", "document_entity_id"),
         "organization-document-review-decision": ("organization_entity_id", "document_entity_id"),
         "organization-document-detail": ("organization_entity_id", "document_entity_id"),
+        "organization-document-preflight": ("organization_entity_id", "document_entity_id"),
+        "organization-document-topic-conversion": ("organization_entity_id", "document_entity_id"),
         "organization-document-restructure": ("organization_entity_id", "document_entity_id"),
         "organization-document-export": ("organization_entity_id", "document_entity_id"),
         "organization-document-attachment-list-create": ("organization_entity_id", "document_entity_id"),
@@ -526,6 +531,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "location_entity_id",
         ),
         "organization-custom-field-definition-list-create": ("organization_entity_id",),
+        "organization-taxonomy-list": ("organization_entity_id",),
+        "organization-taxonomy-local-term-create": ("organization_entity_id", "taxonomy_id"),
         "organization-custom-field-definition-detail": ("organization_entity_id", "definition_id"),
         "organization-entity-custom-field-list": ("organization_entity_id", "entity_id"),
         "organization-entity-custom-field-detail": (
@@ -632,7 +639,11 @@ def test_every_cataloged_mutation_method_denies_read_only_members(contract, meth
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "contract",
-    tuple(contract for contract in AUTHENTICATED_ROUTE_PERMISSIONS if any(_kwargs_for(contract.route_name).values())),
+    tuple(
+        contract
+        for contract in AUTHENTICATED_ROUTE_PERMISSIONS
+        if "00000000-0000-4000-8000-000000000001" in _kwargs_for(contract.route_name).values()
+    ),
     ids=lambda item: item.route_name,
 )
 def test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view(contract, installation):  # type: ignore[no-untyped-def]

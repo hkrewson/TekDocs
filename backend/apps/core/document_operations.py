@@ -9,7 +9,8 @@ from django.utils import timezone
 from apps.accounts.models import TenantMembership, User
 from apps.accounts.policy import PermissionKey, context_has_permission, require_installation_member
 
-from .models import AuditEvent, Document, DocumentReviewState
+from .models import AuditEvent, Document, DocumentReviewState, Taxonomy, TaxonomyBinding
+from .taxonomies import TaxonomyError, assign_document_terms
 from .workspaces import ResolvedWorkspace
 
 
@@ -37,9 +38,7 @@ def normalize_tags(values: list[str]) -> list[str]:
     return normalized
 
 
-def _eligible_user(
-    *, workspace: ResolvedWorkspace, user_id: UUID | None, permission: PermissionKey
-) -> User | None:
+def _eligible_user(*, workspace: ResolvedWorkspace, user_id: UUID | None, permission: PermissionKey) -> User | None:
     if user_id is None:
         return None
     try:
@@ -66,13 +65,20 @@ def update_document_operations(
     review_due_on: date | None,
     collection: str,
     tags: list[str],
+    taxonomy_term_ids: list[UUID] | None = None,
 ) -> Document:
     locked = Document.objects.select_for_update().get(pk=document.pk)
     owner = _eligible_user(workspace=workspace, user_id=owner_id, permission=PermissionKey.DOCUMENTS_VIEW)
     locked.owner = owner
     locked.review_due_on = review_due_on
     locked.collection = normalize_collection(collection)
-    locked.tags = normalize_tags(tags)
+    normalized_tags = normalize_tags(tags)
+    governed_tags = Taxonomy.objects.filter(
+        tenant=locked.tenant, binding=TaxonomyBinding.DOCUMENT_TAGS, archived_at__isnull=True
+    ).exists()
+    if normalized_tags and governed_tags:
+        raise DocumentOperationsError("Use governed terms instead of free-form tags for this document.")
+    locked.tags = normalized_tags
     locked.save(update_fields=("owner", "review_due_on", "collection", "tags", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked.tenant,
@@ -81,6 +87,15 @@ def update_document_operations(
         entity_id=locked.entity_id,
         metadata={"tag_count": len(locked.tags), "has_collection": bool(locked.collection)},
     )
+    if taxonomy_term_ids is not None:
+        try:
+            assign_document_terms(document=locked, term_ids=taxonomy_term_ids, actor_id=actor_id)
+        except TaxonomyError as exc:
+            raise DocumentOperationsError(str(exc)) from exc
+        if locked.is_template and locked.organization_id is None:
+            from .documents import ensure_template_revision
+
+            ensure_template_revision(source=locked, actor_id=actor_id)
     return locked
 
 

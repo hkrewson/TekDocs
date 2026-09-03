@@ -8,7 +8,7 @@ TekDocs is an active homelab project published for people who want to run, inspe
 
 TekDocs is human-directed and built with AI assistance, primarily using OpenAI Sol. The maintainer defines the product, architecture, security boundaries, acceptance criteria, and release decisions. AI-produced implementation is treated as engineering work that must pass the same review, test, migration, isolation, and production-image gates as any other contribution.
 
-The security review currently recorded by the project used Claude Opus 5 (High) for three maintainer-directed automated review passes culminating in commit `32c72c0`. The reviewer and method are identified explicitly in the review record. This work is not represented as an independent human assessment; a future human third-party review would provide useful additional assurance.
+The security review currently recorded by the project used Claude Opus 5 (High) for three maintainer-directed automated review passes culminating in commit `32c72c0`. The reviewer and method are identified explicitly in the review record. TekDocs has not received an independent human security assessment, penetration test, or compliance audit, and 1.0 does not claim otherwise.
 
 ## Capabilities
 
@@ -183,7 +183,7 @@ The [TekDocs Wiki](https://github.com/hkrewson/TekDocs/wiki) is the public produ
 
 Documentation can also be assembled into versioned maps for operating manuals, recovery plans, onboarding, compliance, and client handoff. Map baselines retain a deterministic portable manifest, source content, checksums, and optional PDF or DOCX output.
 
-Before contributing, read `AGENTS.md`, the applicable backend or frontend instructions, and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization.
+Before contributing, read `AGENTS.md`, the applicable backend or frontend instructions, the [interface-language contract](docs/UI_LANGUAGE.md), and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization.
 
 ## License
 

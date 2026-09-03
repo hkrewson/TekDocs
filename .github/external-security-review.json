@@ -19,7 +19,7 @@
       "report_reference": "Private report: TekDocs-recheck-32c72c0.md"
     }
   ],
-  "remediation_validation": "Claude Opus 5 (High) performed three maintainer-directed automated review passes culminating in commit 32c72c0. Local Docker and PostgreSQL gates corroborate the remediation. A human third-party assessment remains required before 1.0.",
+  "remediation_validation": "Claude Opus 5 (High) performed three maintainer-directed automated review passes culminating in commit 32c72c0. Local Docker and PostgreSQL gates corroborate the remediation. This is automated evidence, not an independent human security assessment, penetration test, compliance audit, or certification.",
   "findings": [
     {
       "id": "TD-ENTITY-SEARCH-SCOPE",

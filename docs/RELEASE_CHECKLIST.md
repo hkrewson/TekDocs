@@ -26,7 +26,7 @@ The release record identifies the candidate commit and contains links or immutab
 - The product capability matrix, backend payload inventory, frontend registry, routes, navigation, help, and browser exclusions agree.
 - Production backend, frontend, and renderer image digests are recorded with SBOM and provenance-attestation verification results.
 - The supported previous-minor upgrade matrix and the documented final-0.9-to-1.0 rehearsal pass; backup restoration starts with the producing version before normal upgrade.
-- The independent security assessment from #38 has a disposition for every finding; no Critical or untriaged High finding remains.
+- The automated security assurance work from #38 is current for the candidate, has a disposition for every finding, and has no unresolved Critical or untriaged High finding. Release notes state that TekDocs has not received an independent human security assessment, penetration test, compliance audit, or certification.
 - Chromium, Firefox, WebKit, targeted mobile, keyboard, and axe results are attached or linked without retaining sensitive browser artifacts.
 - Pilot issue #39 records each participating MSP environment, completed workflow set, result, unresolved finding, and explicit go/no-go disposition without customer-sensitive data.
 - Every intentionally deferred capability is listed by issue number and agrees with `docs/PRODUCT_BOUNDARY.md`.

@@ -21,7 +21,7 @@ def require(condition: bool, message: str) -> None:
 
 def validate() -> None:
     data = json.loads(REVIEW.read_text(encoding="utf-8"))
-    require(data.get("status") == "complete", "external review status is not complete")
+    require(data.get("status") == "complete", "automated review status is not complete")
     require(isinstance(data.get("reviewer"), str) and data["reviewer"].strip(), "reviewer identity is missing")
     require(isinstance(data.get("scope_commit"), str) and COMMIT_PATTERN.fullmatch(data["scope_commit"]), "exact 40-character scope commit is missing")
     require(isinstance(data.get("report_reference"), str) and data["report_reference"].strip(), "value-free report reference is missing")
@@ -53,14 +53,14 @@ def validate() -> None:
             require(severity not in {"critical", "high"}, f"release-blocking finding cannot be accepted: {identifier}")
 
     require(not unresolved_blockers, f"unresolved Critical/High findings: {unresolved_blockers}")
-    print(f"External security review gate passed for {data['scope_commit']} with {len(findings)} triaged findings.")
+    print(f"Automated security review gate passed for {data['scope_commit']} with {len(findings)} triaged findings.")
 
 
 def main() -> int:
     try:
         validate()
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        print(f"External security review gate blocked: {error}", file=sys.stderr)
+        print(f"Automated security review gate blocked: {error}", file=sys.stderr)
         return 1
     return 0
 

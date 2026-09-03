@@ -16,7 +16,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-browser-artifact-hygiene test-e2e-live
 
 .PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal placement-audience-upgrade-rehearsal
-.PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene external-security-review-gate wiki-check test-diagram-exports diagram-export-release-gate
+.PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization test-public-beta-performance test-browser-artifact-hygiene automated-security-review-gate external-security-review-gate wiki-check test-diagram-exports diagram-export-release-gate
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
 .PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization file-export-release-gate test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
@@ -56,8 +56,10 @@ check:
 	./scripts/check-openapi.sh
 	./scripts/frontend-gate.sh check
 
-external-security-review-gate:
+automated-security-review-gate:
 	python3 scripts/check-external-security-review.py
+
+external-security-review-gate: automated-security-review-gate
 
 wiki-check:
 	./scripts/check-wiki.py $(if $(WIKI_CHECKOUT),--checkout "$(WIKI_CHECKOUT)")

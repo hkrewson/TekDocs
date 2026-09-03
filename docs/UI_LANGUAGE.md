@@ -2,6 +2,8 @@
 
 TekDocs uses direct, familiar language for people doing MSP work. Interface text exists to name something, explain a necessary choice, prevent a mistake, or tell someone how to recover. It is not marketing copy and should not narrate the interface.
 
+This contract governs words. The complete layout, hierarchy, density, control, responsive, and visual-consistency review is tracked separately in [issue #60](https://github.com/hkrewson/TekDocs/issues/60); wording and visual corrections should be delivered together when they touch the same workflow.
+
 ## Writing rules
 
 - Use the shortest familiar term that remains accurate. Prefer **Invoices** over **Accounting**, **Invoice settings** over **Issuance settings**, and **Needs review** over **Reconciliation pending**.

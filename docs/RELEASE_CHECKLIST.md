@@ -28,7 +28,7 @@ The release record identifies the candidate commit and contains links or immutab
 - The supported previous-minor upgrade matrix and the documented final-0.9-to-1.0 rehearsal pass; backup restoration starts with the producing version before normal upgrade.
 - The automated security assurance work from #38 is current for the candidate, has a disposition for every finding, and has no unresolved Critical or untriaged High finding. Release notes state that TekDocs has not received an independent human security assessment, penetration test, compliance audit, or certification.
 - The plain-language audit from #59 covers every supported workflow and its empty, loading, denied, validation, conflict, success, and failure language.
-- The complete Uncodixfy review from #60 covers every supported route, role, major state, and required viewport; retained visual exceptions have an explicit product reason.
+- The complete Uncodixfy review from #60 covers every supported route, role, major state, required viewport, and navigation group; retained visual exceptions have an explicit product reason, and every supported destination remains directly reachable through accessible desktop and mobile navigation.
 - Chromium, Firefox, WebKit, targeted mobile, keyboard, and axe results are attached or linked without retaining sensitive browser artifacts.
 - Pilot issue #39 records each participating MSP environment, completed workflow set, result, unresolved finding, and explicit go/no-go disposition without customer-sensitive data.
 - Every intentionally deferred capability is listed by issue number and agrees with `docs/PRODUCT_BOUNDARY.md`.

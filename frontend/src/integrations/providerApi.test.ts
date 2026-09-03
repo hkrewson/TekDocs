@@ -22,10 +22,10 @@ describe('provider integrations API', () => {
       new Response(JSON.stringify([]), { status: 200 }),
     )
 
-    await browserIntegrationsClient.listConnections(workspace)
+    await browserIntegrationsClient.listProviders(workspace)
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/workspaces/organizations/client%2Fone/integrations/connections',
+      '/api/v1/workspaces/organizations/client%2Fone/integrations/providers',
       expect.objectContaining({ credentials: 'same-origin', headers: { Accept: 'application/json' } }),
     )
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('api_token')

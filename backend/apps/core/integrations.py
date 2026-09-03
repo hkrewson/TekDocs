@@ -138,9 +138,10 @@ def update_connection(
     except IntegrationConnection.DoesNotExist as exc:
         raise NotFound("The integration connection is unavailable.") from exc
     connection.active = active
+    connection.health_status = "unknown" if active else "paused"
     connection.sync_interval_minutes = sync_interval_minutes
     connection.full_clean()
-    connection.save(update_fields=("active", "sync_interval_minutes", "updated_at"))
+    connection.save(update_fields=("active", "health_status", "sync_interval_minutes", "updated_at"))
     AuditEvent.objects.create(
         tenant=resolved.member.tenant,
         actor=request.user,
@@ -319,10 +320,14 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     remote_type=item.remote_type,
                     remote_id=item.remote_id,
                     fingerprint=item.fingerprint,
+                    schema_version=item.schema_version,
+                    safe_projection=item.safe_projection,
+                    source_timestamp=item.source_timestamp,
+                    provenance=item.provenance,
                 )
                 for item in page.observations
             ]
-            IntegrationObservation.objects.bulk_create(records)
+            IntegrationObservation.objects.bulk_create(records, ignore_conflicts=True)
             created = list(IntegrationObservation.objects.filter(job=job))
             _conflicts_for_observations(job, created)
             job.cursor_after = page.next_cursor
@@ -343,7 +348,25 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                 )
             else:
                 job.connection.next_sync_at = now + timedelta(minutes=job.connection.sync_interval_minutes)
-                job.connection.save(update_fields=("next_sync_at", "updated_at"))
+                job.connection.health_status = "healthy"
+                job.connection.last_successful_sync_at = now
+                job.connection.last_error_code = ""
+                job.connection.reconciliation_counts = {
+                    "observations": len(created),
+                    "review_required": IntegrationConflict.objects.filter(
+                        connection=job.connection, status=IntegrationConflictStatus.OPEN
+                    ).count(),
+                }
+                job.connection.save(
+                    update_fields=(
+                        "next_sync_at",
+                        "health_status",
+                        "last_successful_sync_at",
+                        "last_error_code",
+                        "reconciliation_counts",
+                        "updated_at",
+                    )
+                )
                 _safe_log(job=job, level="info", code="sync_completed", metrics={"observations": len(created)})
         return job
     except Exception as exc:
@@ -368,6 +391,9 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
         job.finished_at = now if job.state == IntegrationJobState.DEAD_LETTER else None
         job.available_at = now + timedelta(minutes=min(2**job.attempts, 60))
         job.save(update_fields=("state", "locked_at", "last_error_code", "finished_at", "available_at"))
+        job.connection.health_status = "failing" if job.state == IntegrationJobState.DEAD_LETTER else "degraded"
+        job.connection.last_error_code = code
+        job.connection.save(update_fields=("health_status", "last_error_code", "updated_at"))
         _safe_log(
             job=job,
             level="error" if job.state == IntegrationJobState.DEAD_LETTER else "warning",

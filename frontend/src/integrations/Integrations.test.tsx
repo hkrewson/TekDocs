@@ -16,6 +16,7 @@ const workspace: WorkspaceContext = {
 
 function providerClient(): IntegrationsClient {
   return {
+    listProviders: vi.fn().mockResolvedValue([{ key: 'netbox', label: 'NetBox', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'api_token', label: 'API token', secret: true, minimum_length: 8 }], capabilities: ['inventory_observations', 'reconciliation'], object_types: ['ipam.vlan'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 5, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1 }]),
     listConnections: vi.fn().mockResolvedValue([]), createConnection: vi.fn(), updateConnection: vi.fn(),
     rotateConnection: vi.fn(), startSync: vi.fn(),
     listJobs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
@@ -69,6 +70,7 @@ describe('Integrations', () => {
     const connection = {
       id: 'connection-1', provider: 'netbox', name: 'Primary NetBox', base_url: 'https://netbox.example.com/api/',
       credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 60,
+      health_status: 'healthy', last_successful_sync_at: '2026-08-12T00:00:01Z', last_error_code: '', rate_limit_reset_at: null, reconciliation_counts: { observations: 3 },
       next_sync_at: '2026-08-12T01:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
     } as const
     const conflict = {
@@ -104,7 +106,7 @@ describe('Integrations', () => {
     await waitFor(() => expect(provider.startSync).toHaveBeenCalledWith(workspace, connection))
     await user.click(screen.getByRole('button', { name: 'Pause' }))
     await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, false))
-    await user.click(screen.getByRole('button', { name: /Rotate Primary NetBox API token/i }))
+    await user.click(screen.getByRole('button', { name: /Rotate Primary NetBox provider credential/i }))
     await waitFor(() => expect(provider.rotateConnection).toHaveBeenCalledWith(
       workspace, expect.objectContaining({ id: connection.id }), 'replacement-token',
     ))
@@ -120,6 +122,7 @@ describe('Integrations', () => {
     vi.mocked(provider.createConnection).mockResolvedValue({
       id: 'connection-new', provider: 'netbox', name: 'Client NetBox', base_url: 'https://netbox.example.com/api/',
       credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 30,
+      health_status: 'unknown', last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null, reconciliation_counts: {},
       next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
     })
     const user = userEvent.setup()
@@ -127,7 +130,7 @@ describe('Integrations', () => {
     const { container } = render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.type(screen.getByLabelText('Name'), 'Client NetBox')
-    await user.type(screen.getByLabelText('NetBox API base URL'), 'https://netbox.example.com/api/')
+    await user.type(screen.getByLabelText('API base URL'), 'https://netbox.example.com/api/')
     await user.type(screen.getByLabelText(/API token/), 'one-time-token')
     await user.clear(screen.getByLabelText('Sync interval (minutes)'))
     await user.type(screen.getByLabelText('Sync interval (minutes)'), '30')

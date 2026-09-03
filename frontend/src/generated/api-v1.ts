@@ -8499,6 +8499,13 @@ export interface components {
             readonly sync_interval_minutes: number;
             /** Format: date-time */
             readonly next_sync_at: string;
+            readonly health_status: string;
+            /** Format: date-time */
+            readonly last_successful_sync_at: string | null;
+            readonly last_error_code: string;
+            /** Format: date-time */
+            readonly rate_limit_reset_at: string | null;
+            readonly reconciliation_counts: unknown;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
@@ -12818,9 +12825,16 @@ export interface components {
         readonly Provider: {
             readonly key: string;
             readonly label: string;
+            readonly version: string;
             readonly direction: string;
-            readonly credential_fields: readonly string[];
+            readonly credential_fields: readonly components["schemas"]["ProviderCredentialField"][];
             readonly capabilities: readonly string[];
+            readonly object_types: readonly string[];
+            readonly pagination: string;
+            readonly minimum_sync_interval_minutes: number;
+            readonly maximum_sync_interval_minutes: number;
+            readonly health_states: readonly string[];
+            readonly observation_schema_version: number;
         };
         readonly ProviderChoice: {
             /** Format: uuid */
@@ -12829,6 +12843,12 @@ export interface components {
         };
         readonly ProviderChoiceResult: {
             readonly results: readonly components["schemas"]["ProviderChoice"][];
+        };
+        readonly ProviderCredentialField: {
+            readonly key: string;
+            readonly label: string;
+            readonly secret: boolean;
+            readonly minimum_length: number;
         };
         readonly PublicationAudienceProjection: {
             readonly audience: string;

@@ -13,7 +13,13 @@ from django.urls import reverse
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.documents import create_document
 from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
-from apps.core.integration_providers import NetBoxProvider, ProviderObservation, ProviderPage
+from apps.core.integration_providers import (
+    NetBoxProvider,
+    ProviderObservation,
+    ProviderPage,
+    provider_catalog,
+    validate_provider_adapter,
+)
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
@@ -184,6 +190,38 @@ class FailingAdapter:
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
         raise ValueError("provider_response_invalid")
+
+
+def test_provider_catalog_is_a_complete_versioned_contract():
+    validate_provider_adapter(NetBoxProvider())
+    contract = provider_catalog()[0]
+    assert contract["key"] == "netbox"
+    assert contract["version"] == "1.0"
+    assert contract["direction"] == "read_only"
+    assert contract["pagination"] == "opaque_cursor"
+    assert contract["observation_schema_version"] == 1
+    assert contract["credential_fields"] == [
+        {"key": "api_token", "label": "API token", "secret": True, "minimum_length": 8}
+    ]
+
+
+@pytest.mark.django_db
+def test_duplicate_provider_objects_are_idempotent_and_safe(installation):
+    record = organization(installation, "Duplicate page client")
+    source = connection(installation, record)
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:duplicate-page")
+
+    class DuplicateAdapter(SuccessfulAdapter):
+        def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+            item = ProviderObservation("ipam.vlan", "42", "a" * 64, {"id": 42, "name": "Users"})
+            return ProviderPage((item, item), "")
+
+    completed = process_sync_job(job_id=job.id, adapter=DuplicateAdapter())
+    observation = IntegrationObservation.objects.get(job=completed)
+    assert completed.state == IntegrationJobState.SUCCEEDED
+    assert observation.safe_projection == {"id": 42, "name": "Users"}
+    assert observation.schema_version == 1
+    assert source.__class__.objects.get(pk=source.pk).health_status == "healthy"
 
 
 @pytest.mark.django_db

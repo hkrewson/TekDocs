@@ -1,7 +1,8 @@
 import type { WorkspaceContext } from '../workspaces/api'
 
-export type IntegrationConnection = { id: string; provider: 'netbox'; name: string; base_url: string; credential_configured: boolean; secret_generation: number; active: boolean; sync_interval_minutes: number; next_sync_at: string; created_at: string; updated_at: string }
-export type IntegrationConnectionDraft = { provider: 'netbox'; name: string; base_url: string; api_token: string; sync_interval_minutes: number }
+export type IntegrationProvider = { key: string; label: string; version: string; direction: 'read_only'; credential_fields: { key: string; label: string; secret: boolean; minimum_length: number }[]; capabilities: string[]; object_types: string[]; pagination: string; minimum_sync_interval_minutes: number; maximum_sync_interval_minutes: number; health_states: string[]; observation_schema_version: number }
+export type IntegrationConnection = { id: string; provider: string; name: string; base_url: string; credential_configured: boolean; secret_generation: number; active: boolean; sync_interval_minutes: number; next_sync_at: string; health_status: string; last_successful_sync_at: string | null; last_error_code: string; rate_limit_reset_at: string | null; reconciliation_counts: Record<string, number>; created_at: string; updated_at: string }
+export type IntegrationConnectionDraft = { provider: string; name: string; base_url: string; api_token: string; sync_interval_minutes: number }
 export type IntegrationJob = { id: string; connection_id: string; connection_name: string; trigger: 'manual' | 'scheduled'; state: 'pending' | 'processing' | 'succeeded' | 'dead_letter'; attempts: number; cursor_present: boolean; last_error_code: string; result_counts: Record<string, number>; available_at: string; started_at: string | null; finished_at: string | null; created_at: string }
 export type IntegrationLog = { id: string; connection_id: string; connection_name: string; job_id: string | null; level: 'info' | 'warning' | 'error'; code: string; metrics: Record<string, number>; occurred_at: string }
 export type IntegrationConflict = { id: string; connection_id: string; connection_name: string; local_entity_id: string | null; remote_type: string; remote_id: string; difference: string; status: 'open' | 'keep_local' | 'accept_remote' | 'ignored'; created_at: string; resolved_at: string | null }
@@ -9,6 +10,7 @@ export type IntegrationPage<T> = { results: T[]; page: number; page_size: number
 export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[] }; content_digest: string; byte_size: number; created_at: string }
 
 export interface IntegrationsClient {
+  listProviders(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationProvider[]>
   listConnections(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationConnection[]>
   createConnection(workspace: WorkspaceContext, draft: IntegrationConnectionDraft): Promise<IntegrationConnection>
   updateConnection(workspace: WorkspaceContext, connection: IntegrationConnection, active: boolean): Promise<IntegrationConnection>
@@ -29,6 +31,7 @@ async function parse<T>(response: Response): Promise<T> { if (!response.ok) { co
 async function mutate<T>(path: string, method: 'POST' | 'PATCH', body: unknown, extra: Record<string, string> = {}): Promise<T> { await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } }); return parse(await fetch(path, { method, credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken(), ...extra }, body: JSON.stringify(body) })) }
 
 export const browserIntegrationsClient: IntegrationsClient = {
+  listProviders: async (workspace, signal) => parse(await fetch(`${base(workspace)}/providers`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   listConnections: async (workspace, signal) => parse(await fetch(`${base(workspace)}/connections`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   createConnection: (workspace, draft) => mutate(`${base(workspace)}/connections`, 'POST', draft),
   updateConnection: (workspace, connection, active) => mutate(`${base(workspace)}/connections/${encodeURIComponent(connection.id)}`, 'PATCH', { active, sync_interval_minutes: connection.sync_interval_minutes }),

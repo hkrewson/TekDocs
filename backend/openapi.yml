@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.46
+  version: 0.4.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -28594,6 +28594,19 @@ components:
         next_sync_at:
           type: string
           format: date-time
+        health_status:
+          type: string
+        last_successful_sync_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error_code:
+          type: string
+        rate_limit_reset_at:
+          type: string
+          format: date-time
+          nullable: true
+        reconciliation_counts: {}
         created_at:
           type: string
           format: date-time
@@ -28605,10 +28618,15 @@ components:
       - base_url
       - created_at
       - credential_configured
+      - health_status
       - id
+      - last_error_code
+      - last_successful_sync_at
       - name
       - next_sync_at
       - provider
+      - rate_limit_reset_at
+      - reconciliation_counts
       - secret_generation
       - sync_interval_minutes
       - updated_at
@@ -38502,22 +38520,47 @@ components:
           type: string
         label:
           type: string
+        version:
+          type: string
         direction:
           type: string
         credential_fields:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/ProviderCredentialField'
         capabilities:
           type: array
           items:
             type: string
+        object_types:
+          type: array
+          items:
+            type: string
+        pagination:
+          type: string
+        minimum_sync_interval_minutes:
+          type: integer
+        maximum_sync_interval_minutes:
+          type: integer
+        health_states:
+          type: array
+          items:
+            type: string
+        observation_schema_version:
+          type: integer
       required:
       - capabilities
       - credential_fields
       - direction
+      - health_states
       - key
       - label
+      - maximum_sync_interval_minutes
+      - minimum_sync_interval_minutes
+      - object_types
+      - observation_schema_version
+      - pagination
+      - version
     ProviderChoice:
       type: object
       properties:
@@ -38538,6 +38581,22 @@ components:
             $ref: '#/components/schemas/ProviderChoice'
       required:
       - results
+    ProviderCredentialField:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        secret:
+          type: boolean
+        minimum_length:
+          type: integer
+      required:
+      - key
+      - label
+      - minimum_length
+      - secret
     PublicationAudienceProjection:
       type: object
       properties:

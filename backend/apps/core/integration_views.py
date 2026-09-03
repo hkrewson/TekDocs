@@ -47,12 +47,26 @@ class StrictSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
+class ProviderCredentialFieldSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+    secret = serializers.BooleanField()
+    minimum_length = serializers.IntegerField()
+
+
 class ProviderSerializer(serializers.Serializer):
     key = serializers.CharField()
     label = serializers.CharField()
+    version = serializers.CharField()
     direction = serializers.CharField()
-    credential_fields = serializers.ListField(child=serializers.CharField())
+    credential_fields = ProviderCredentialFieldSerializer(many=True)
     capabilities = serializers.ListField(child=serializers.CharField())
+    object_types = serializers.ListField(child=serializers.CharField())
+    pagination = serializers.CharField()
+    minimum_sync_interval_minutes = serializers.IntegerField()
+    maximum_sync_interval_minutes = serializers.IntegerField()
+    health_states = serializers.ListField(child=serializers.CharField())
+    observation_schema_version = serializers.IntegerField()
 
 
 class ConnectionSerializer(serializers.Serializer):
@@ -65,6 +79,11 @@ class ConnectionSerializer(serializers.Serializer):
     active = serializers.BooleanField()
     sync_interval_minutes = serializers.IntegerField()
     next_sync_at = serializers.DateTimeField()
+    health_status = serializers.CharField()
+    last_successful_sync_at = serializers.DateTimeField(allow_null=True)
+    last_error_code = serializers.CharField()
+    rate_limit_reset_at = serializers.DateTimeField(allow_null=True)
+    reconciliation_counts = serializers.JSONField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
 

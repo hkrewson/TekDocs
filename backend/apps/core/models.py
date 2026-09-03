@@ -5321,6 +5321,11 @@ class IntegrationConnection(TimestampedModel):
     active = models.BooleanField(default=True)
     sync_interval_minutes = models.PositiveIntegerField(default=60)
     next_sync_at = models.DateTimeField(default=timezone.now)
+    health_status = models.CharField(max_length=16, default="unknown")
+    last_successful_sync_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    rate_limit_reset_at = models.DateTimeField(null=True, blank=True)
+    reconciliation_counts = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_integration_connections"
     )
@@ -5340,6 +5345,10 @@ class IntegrationConnection(TimestampedModel):
             models.CheckConstraint(
                 condition=models.Q(sync_interval_minutes__gte=5) & models.Q(sync_interval_minutes__lte=10080),
                 name="integration_sync_interval_bounded",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(health_status__in=("unknown", "healthy", "degraded", "failing", "paused")),
+                name="integration_connection_health_valid",
             ),
             models.UniqueConstraint(fields=("workspace", "name"), name="integration_connection_name_unique"),
         ]
@@ -5435,6 +5444,10 @@ class IntegrationObservation(models.Model):
     remote_type = models.CharField(max_length=64)
     remote_id = models.CharField(max_length=160)
     fingerprint = models.CharField(max_length=64)
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    safe_projection = models.JSONField(default=dict, blank=True)
+    source_timestamp = models.DateTimeField(null=True, blank=True)
+    provenance = models.CharField(max_length=32, default="provider_api")
     observed_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -5446,6 +5459,9 @@ class IntegrationObservation(models.Model):
             models.UniqueConstraint(fields=("job", "remote_type", "remote_id"), name="integration_observation_unique"),
             models.CheckConstraint(
                 condition=models.Q(fingerprint__regex=r"^[0-9a-f]{64}$"), name="integration_observation_digest_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(schema_version__gte=1), name="integration_observation_schema_valid"
             ),
         ]
         indexes = [models.Index(fields=("workspace", "remote_type", "remote_id"), name="core_intobs_remote_idx")]

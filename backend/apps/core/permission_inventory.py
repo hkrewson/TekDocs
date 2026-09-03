@@ -170,6 +170,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-integration-job-cancel", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
     route("msp-integration-log-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route("msp-integration-observation-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route("msp-integration-conflict-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route("msp-integration-conflict-resolve", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
     route(
@@ -1624,6 +1625,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-integration-log-list",
+        ("GET",),
+        PermissionKey.INTEGRATIONS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-integration-observation-list",
         ("GET",),
         PermissionKey.INTEGRATIONS_VIEW,
         organization_scoped=True,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from collections.abc import Callable
@@ -7,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Protocol
 from urllib.parse import urlsplit
 
-from .integration_egress import get_provider_json
+from .integration_egress import get_provider_json, post_provider_form
 from .models import IntegrationConnection, IntegrationProvider, NetBoxObjectType
 
 
@@ -20,12 +21,16 @@ class ProviderObservation:
     source_timestamp: str | None = None
     provenance: str = "provider_api"
     schema_version: int = 1
+    state: str = "observed"
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderPage:
     observations: tuple[ProviderObservation, ...]
     next_cursor: str
+    complete_types: tuple[str, ...] = ()
+    complete_id_prefixes: tuple[tuple[str, str], ...] = ()
+    configuration_updates: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +39,8 @@ class CredentialField:
     label: str
     secret: bool = True
     minimum_length: int = 8
+    input_type: str = "password"
+    help_text: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +57,9 @@ class ProviderContract:
     maximum_sync_interval_minutes: int
     health_states: tuple[str, ...] = ("unknown", "healthy", "degraded", "failing", "paused")
     observation_schema_version: int = 1
+    default_base_url: str = ""
+    base_url_editable: bool = True
+    setup_help_url: str = ""
 
 
 class ProviderAdapter(Protocol):
@@ -89,6 +99,7 @@ class NetBoxProvider:
         pagination="opaque_cursor",
         minimum_sync_interval_minutes=5,
         maximum_sync_interval_minutes=10080,
+        default_base_url="",
     )
 
     def __init__(self, fetcher: Callable[..., dict[str, object]] = get_provider_json):
@@ -131,7 +142,392 @@ class NetBoxProvider:
             next_cursor = f"{index + 1}|{NETBOX_ENDPOINTS[index + 1][1]}"
         else:
             next_cursor = ""
-        return ProviderPage(tuple(observations), next_cursor)
+        complete = (str(remote_type),) if not next_value else ()
+        return ProviderPage(tuple(observations), next_cursor, complete)
+
+
+GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0/"
+GRAPH_LOGIN_URL = "https://login.microsoftonline.com/"
+GRAPH_AUDIENCES = {"https://graph.microsoft.com", "00000003-0000-0000-c000-000000000000"}
+GRAPH_REQUIRED_ROLES = frozenset(
+    {
+        "Organization.Read.All",
+        "User.Read.All",
+        "GroupMember.Read.All",
+        "LicenseAssignment.Read.All",
+        "DeviceManagementManagedDevices.Read.All",
+    }
+)
+GRAPH_FORBIDDEN_ROLE_MARKERS = (
+    "mail.",
+    "mailbox",
+    "files.",
+    "sites.",
+    "chat.",
+    "channelmessage",
+    "authenticationmethod",
+    "bitlocker",
+    "password",
+    "readwrite",
+)
+GRAPH_OBJECT_TYPES = (
+    "tenant",
+    "domain",
+    "user",
+    "user_license_assignment",
+    "group",
+    "group_membership",
+    "subscribed_sku",
+    "managed_device",
+)
+
+
+def _decode_access_token_claims(token: str) -> dict[str, object]:
+    try:
+        part = token.split(".")[1]
+        payload = base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
+        claims = json.loads(payload)
+    except (IndexError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("provider_token_invalid") from exc
+    if not isinstance(claims, dict):
+        raise ValueError("provider_token_invalid")
+    return claims
+
+
+def _cursor(value: str) -> dict[str, object]:
+    if not value:
+        return {"stage": "tenant", "path": "organization?$select=id,displayName,verifiedDomains"}
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("provider_cursor_invalid") from exc
+    if (
+        not isinstance(decoded, dict)
+        or not isinstance(decoded.get("stage"), str)
+        or not isinstance(decoded.get("path"), str)
+    ):
+        raise ValueError("provider_cursor_invalid")
+    return decoded
+
+
+def _encode_cursor(value: dict[str, object]) -> str:
+    return base64.urlsafe_b64encode(json.dumps(value, separators=(",", ":")).encode()).decode().rstrip("=")
+
+
+def _graph_path(value: str) -> str:
+    return url_path(value, base_url=GRAPH_BASE_URL).lstrip("/").removeprefix("v1.0/")
+
+
+def _scalar_projection(record: dict[str, object], keys: tuple[str, ...]) -> dict[str, object]:
+    return {
+        key: record[key]
+        for key in keys
+        if key in record and isinstance(record[key], str | int | float | bool | type(None))
+    }
+
+
+class MicrosoftGraphProvider:
+    key = str(IntegrationProvider.MICROSOFT_GRAPH)
+    label = "Microsoft 365"
+    contract = ProviderContract(
+        key=key,
+        label=label,
+        version="1.0",
+        direction="read_only",
+        credential_fields=(
+            CredentialField(
+                "tenant_id", "Microsoft tenant ID", False, 36, "text", "The directory (tenant) ID from Microsoft Entra."
+            ),
+            CredentialField(
+                "client_id", "Application (client) ID", False, 36, "text", "The app registration's application ID."
+            ),
+            CredentialField(
+                "client_secret", "Client secret", True, 8, "password", "Stored encrypted and never shown again."
+            ),
+        ),
+        capabilities=("identity_observations", "license_observations", "managed_device_observations", "reconciliation"),
+        object_types=GRAPH_OBJECT_TYPES,
+        pagination="opaque_cursor",
+        minimum_sync_interval_minutes=15,
+        maximum_sync_interval_minutes=10080,
+        default_base_url=GRAPH_BASE_URL,
+        base_url_editable=False,
+        setup_help_url="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
+    )
+
+    def __init__(
+        self,
+        getter: Callable[..., dict[str, object]] = get_provider_json,
+        poster: Callable[..., dict[str, object]] = post_provider_form,
+    ):
+        self._getter = getter
+        self._poster = poster
+
+    def _authorize(self, connection: IntegrationConnection, secret: str) -> tuple[str, dict[str, object]]:
+        tenant_id = str(connection.configuration.get("tenant_id", ""))
+        client_id = str(connection.configuration.get("client_id", ""))
+        token_payload = self._poster(
+            base_url=GRAPH_LOGIN_URL,
+            relative_path=f"{tenant_id}/oauth2/v2.0/token",
+            fields={
+                "client_id": client_id,
+                "client_secret": secret,
+                "scope": "https://graph.microsoft.com/.default",
+                "grant_type": "client_credentials",
+            },
+        )
+        token = token_payload.get("access_token")
+        if not isinstance(token, str) or len(token) > 16384:
+            raise ValueError("provider_token_invalid")
+        claims = _decode_access_token_claims(token)
+        roles = claims.get("roles")
+        issuer = claims.get("iss")
+        application_id = claims.get("azp") or claims.get("appid")
+        allowed_issuers = {
+            f"https://sts.windows.net/{tenant_id}/",
+            f"https://login.microsoftonline.com/{tenant_id}/v2.0",
+        }
+        if (
+            claims.get("tid") != tenant_id
+            or claims.get("aud") not in GRAPH_AUDIENCES
+            or issuer not in allowed_issuers
+            or application_id != client_id
+            or not isinstance(roles, list)
+            or any(not isinstance(item, str) for item in roles)
+        ):
+            raise ValueError("provider_token_invalid")
+        role_set = set(roles)
+        if GRAPH_REQUIRED_ROLES - role_set:
+            raise ValueError("provider_permissions_missing")
+        if any(marker in role.casefold() for role in role_set for marker in GRAPH_FORBIDDEN_ROLE_MARKERS):
+            raise ValueError("provider_permissions_excessive")
+        fingerprint = _fingerprint(sorted(role_set))
+        existing = connection.configuration.get("scope_fingerprint")
+        if existing and existing != fingerprint:
+            raise ValueError("provider_permission_drift")
+        return token, {"scope_fingerprint": fingerprint, "validated_tenant_id": tenant_id}
+
+    def fetch_page(self, connection: IntegrationConnection, *, secret: str, cursor: str) -> ProviderPage:
+        token, configuration_updates = self._authorize(connection, secret)
+        state = _cursor(cursor)
+        stage, path = str(state["stage"]), str(state["path"])
+        payload = self._getter(base_url=GRAPH_BASE_URL, relative_path=path, authorization=f"Bearer {token}")
+        values = payload.get("value")
+        if not isinstance(values, list) or len(values) > 1000:
+            raise ValueError("provider_response_invalid")
+        observations: list[ProviderObservation] = []
+        complete: tuple[str, ...] = ()
+        complete_prefixes: list[tuple[str, str]] = []
+        next_value = payload.get("@odata.nextLink")
+        next_path = _graph_path(next_value) if isinstance(next_value, str) else ""
+        if next_value is not None and not isinstance(next_value, str):
+            raise ValueError("provider_response_invalid")
+
+        if stage == "tenant":
+            if len(values) != 1 or not isinstance(values[0], dict) or not isinstance(values[0].get("id"), str):
+                raise ValueError("provider_tenant_validation_failed")
+            record = values[0]
+            if record["id"] != connection.configuration.get("tenant_id"):
+                raise ValueError("provider_tenant_validation_failed")
+            observations.append(
+                ProviderObservation(
+                    "tenant", record["id"], _fingerprint(record), _scalar_projection(record, ("id", "displayName"))
+                )
+            )
+            domains = record.get("verifiedDomains", [])
+            if not isinstance(domains, list):
+                raise ValueError("provider_response_invalid")
+            for domain in domains:
+                if isinstance(domain, dict) and isinstance(domain.get("name"), str):
+                    projection = _scalar_projection(domain, ("name", "isDefault", "isInitial", "type"))
+                    observations.append(ProviderObservation("domain", domain["name"], _fingerprint(domain), projection))
+            complete = ("tenant", "domain")
+            next_cursor = _encode_cursor(
+                {
+                    "stage": "users",
+                    "path": str(
+                        connection.configuration.get("users_delta_link")
+                        or (
+                            "users/delta?$select=id,displayName,userPrincipalName,accountEnabled,"
+                            "createdDateTime,assignedLicenses"
+                        )
+                    ),
+                    "incremental": bool(connection.configuration.get("users_delta_link")),
+                }
+            )
+        elif stage == "users":
+            incremental = bool(state.get("incremental"))
+            for record in values:
+                if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                    raise ValueError("provider_response_invalid")
+                retired = "@removed" in record
+                projection = _scalar_projection(
+                    record, ("id", "displayName", "userPrincipalName", "accountEnabled", "createdDateTime")
+                )
+                assigned = record.get("assignedLicenses")
+                complete_prefixes.append(("user_license_assignment", f"{record['id']}:"))
+                if isinstance(assigned, list):
+                    projection["assignedLicenseCount"] = len(assigned)
+                    for license_record in assigned:
+                        if not isinstance(license_record, dict) or not isinstance(license_record.get("skuId"), str):
+                            raise ValueError("provider_response_invalid")
+                        license_projection = {"userId": record["id"], "skuId": license_record["skuId"]}
+                        observations.append(
+                            ProviderObservation(
+                                "user_license_assignment",
+                                f"{record['id']}:{license_record['skuId']}",
+                                _fingerprint(license_projection),
+                                license_projection,
+                                state="retired" if retired else "observed",
+                            )
+                        )
+                observations.append(
+                    ProviderObservation(
+                        "user",
+                        record["id"],
+                        _fingerprint(record),
+                        projection,
+                        state="retired" if retired else "observed",
+                    )
+                )
+            delta = payload.get("@odata.deltaLink")
+            if next_path:
+                next_cursor = _encode_cursor({"stage": "users", "path": next_path, "incremental": incremental})
+            elif isinstance(delta, str):
+                configuration_updates["users_delta_link"] = _graph_path(delta)
+                complete = () if incremental else ("user", "user_license_assignment")
+                next_cursor = _encode_cursor(
+                    {"stage": "groups", "path": "groups?$top=20&$select=id,displayName,securityEnabled,mailEnabled"}
+                )
+            else:
+                raise ValueError("provider_response_invalid")
+        elif stage == "groups":
+            group_ids: list[str] = []
+            for record in values:
+                if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                    raise ValueError("provider_response_invalid")
+                group_ids.append(record["id"])
+                observations.append(
+                    ProviderObservation(
+                        "group",
+                        record["id"],
+                        _fingerprint(record),
+                        _scalar_projection(record, ("id", "displayName", "securityEnabled", "mailEnabled")),
+                    )
+                )
+            if group_ids:
+                next_cursor = _encode_cursor(
+                    {
+                        "stage": "members",
+                        "path": f"groups/{group_ids[0]}/members?$select=id",
+                        "groups": group_ids,
+                        "group_index": 0,
+                        "groups_next": next_path,
+                    }
+                )
+            elif next_path:
+                next_cursor = _encode_cursor({"stage": "groups", "path": next_path})
+            else:
+                complete = ("group", "group_membership")
+                next_cursor = _encode_cursor(
+                    {
+                        "stage": "skus",
+                        "path": "subscribedSkus?$select=id,skuId,skuPartNumber,consumedUnits,prepaidUnits",
+                    }
+                )
+        elif stage == "members":
+            groups = state.get("groups")
+            group_index = state.get("group_index")
+            if (
+                not isinstance(groups, list)
+                or not all(isinstance(item, str) for item in groups)
+                or not isinstance(group_index, int)
+                or group_index >= len(groups)
+            ):
+                raise ValueError("provider_cursor_invalid")
+            group_id = groups[group_index]
+            for record in values:
+                if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                    raise ValueError("provider_response_invalid")
+                identity = f"{group_id}:{record['id']}"
+                projection = {"groupId": group_id, "memberId": record["id"]}
+                observations.append(
+                    ProviderObservation("group_membership", identity, _fingerprint(projection), projection)
+                )
+            if next_path:
+                next_cursor = _encode_cursor({**state, "path": next_path})
+            elif group_index + 1 < len(groups):
+                next_cursor = _encode_cursor(
+                    {
+                        **state,
+                        "path": f"groups/{groups[group_index + 1]}/members?$select=id",
+                        "group_index": group_index + 1,
+                    }
+                )
+            elif state.get("groups_next"):
+                next_cursor = _encode_cursor({"stage": "groups", "path": state["groups_next"]})
+            else:
+                complete = ("group", "group_membership")
+                next_cursor = _encode_cursor(
+                    {
+                        "stage": "skus",
+                        "path": "subscribedSkus?$select=id,skuId,skuPartNumber,consumedUnits,prepaidUnits",
+                    }
+                )
+        elif stage in {"skus", "devices"}:
+            remote_type = "subscribed_sku" if stage == "skus" else "managed_device"
+            keys = (
+                ("id", "skuId", "skuPartNumber", "consumedUnits")
+                if stage == "skus"
+                else (
+                    "id",
+                    "deviceName",
+                    "operatingSystem",
+                    "osVersion",
+                    "complianceState",
+                    "managedDeviceOwnerType",
+                    "lastSyncDateTime",
+                    "manufacturer",
+                    "model",
+                    "serialNumber",
+                )
+            )
+            for record in values:
+                if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                    raise ValueError("provider_response_invalid")
+                projection = _scalar_projection(record, keys)
+                if stage == "skus" and isinstance(record.get("prepaidUnits"), dict):
+                    enabled = record["prepaidUnits"].get("enabled")
+                    if isinstance(enabled, int):
+                        projection["enabledUnits"] = enabled
+                observations.append(
+                    ProviderObservation(remote_type, record["id"], _fingerprint(record), projection)
+                )
+            if next_path:
+                next_cursor = _encode_cursor({"stage": stage, "path": next_path})
+            elif stage == "skus":
+                complete = (remote_type,)
+                next_cursor = _encode_cursor(
+                    {
+                        "stage": "devices",
+                        "path": (
+                            "deviceManagement/managedDevices?$select=id,deviceName,operatingSystem,osVersion,"
+                            "complianceState,managedDeviceOwnerType,lastSyncDateTime,manufacturer,model,serialNumber"
+                        ),
+                    }
+                )
+            else:
+                complete = (remote_type,)
+                next_cursor = ""
+        else:
+            raise ValueError("provider_cursor_invalid")
+        return ProviderPage(
+            tuple(observations),
+            next_cursor,
+            complete,
+            tuple(complete_prefixes) if stage == "users" and bool(state.get("incremental")) else (),
+            configuration_updates,
+        )
 
 
 def url_path(value: str, *, base_url: str) -> str:
@@ -149,7 +545,10 @@ def url_path(value: str, *, base_url: str) -> str:
     return f"{path}?{parsed.query}" if parsed.query else path
 
 
-PROVIDERS: dict[str, ProviderAdapter] = {str(IntegrationProvider.NETBOX): NetBoxProvider()}
+PROVIDERS: dict[str, ProviderAdapter] = {
+    str(IntegrationProvider.NETBOX): NetBoxProvider(),
+    str(IntegrationProvider.MICROSOFT_GRAPH): MicrosoftGraphProvider(),
+}
 
 
 def validate_provider_adapter(adapter: ProviderAdapter) -> None:
@@ -169,9 +568,14 @@ def validate_provider_adapter(adapter: ProviderAdapter) -> None:
 def validate_provider_page(adapter: ProviderAdapter, page: ProviderPage) -> None:
     """Enforce the same bounded observation contract for every provider adapter."""
 
-    if not isinstance(page.next_cursor, str) or len(page.next_cursor) > 500:
+    if not isinstance(page.next_cursor, str) or len(page.next_cursor) > 10000:
         raise ValueError("provider_cursor_invalid")
     if len(page.observations) > 1000:
+        raise ValueError("provider_response_invalid")
+    if any(
+        remote_type not in adapter.contract.object_types or not prefix
+        for remote_type, prefix in page.complete_id_prefixes
+    ):
         raise ValueError("provider_response_invalid")
     identities: dict[tuple[str, str], str] = {}
     for observation in page.observations:
@@ -184,6 +588,7 @@ def validate_provider_page(adapter: ProviderAdapter, page: ProviderPage) -> None
             or len(observation.fingerprint) != 64
             or any(character not in "0123456789abcdef" for character in observation.fingerprint)
             or observation.schema_version != adapter.contract.observation_schema_version
+            or observation.state not in {"observed", "retired"}
             or not isinstance(observation.safe_projection, dict)
             or any(
                 not isinstance(value, str | int | float | bool | type(None))

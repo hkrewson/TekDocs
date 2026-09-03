@@ -54,10 +54,10 @@ describe('provider integrations API', () => {
 
     await browserIntegrationsClient.createConnection(workspace, {
       provider: 'netbox', name: 'Primary', base_url: 'https://netbox.example.com/api/',
-      api_token: 'one-time-token', sync_interval_minutes: 60,
+      credentials: { api_token: 'one-time-token' }, sync_interval_minutes: 60,
     })
     await browserIntegrationsClient.updateConnection(workspace, connection, false)
-    await browserIntegrationsClient.rotateConnection(workspace, connection, 'replacement-token')
+    await browserIntegrationsClient.rotateConnection(workspace, connection, { api_token: 'replacement-token' })
     await browserIntegrationsClient.startSync(workspace, connection)
     await browserIntegrationsClient.cancelJob(workspace, job)
     await browserIntegrationsClient.resolveConflict(workspace, conflict, 'keep_local')

@@ -3140,6 +3140,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/integrations/observations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_observations_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/integrations/providers": {
         readonly parameters: {
             readonly query?: never;
@@ -6132,6 +6148,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/observations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_observations_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/providers": {
         readonly parameters: {
             readonly query?: never;
@@ -8542,16 +8574,27 @@ export interface components {
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
+            readonly provider_details: {
+                readonly [key: string]: string;
+            };
         };
         readonly ConnectionWrite: {
             /**
              * @description * `netbox` - netbox
+             *     * `microsoft_graph` - microsoft_graph
              * @enum {string}
              */
-            readonly provider: "netbox";
+            readonly provider: "netbox" | "microsoft_graph";
             readonly name: string;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @default
+             */
             readonly base_url: string;
+            readonly credentials?: {
+                readonly [key: string]: string;
+            };
+            /** @default  */
             readonly api_token: string;
             /** @default 60 */
             readonly sync_interval_minutes: number;
@@ -8688,6 +8731,10 @@ export interface components {
             readonly reference_url: string;
         };
         readonly CredentialRotation: {
+            readonly credentials?: {
+                readonly [key: string]: string;
+            };
+            /** @default  */
             readonly api_token: string;
         };
         readonly CustomFieldDefinition: {
@@ -11785,6 +11832,29 @@ export interface components {
             /** Format: uuid */
             readonly publication_id: string | null;
         };
+        readonly Observation: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly connection_id: string;
+            readonly connection_name: string;
+            readonly remote_type: string;
+            readonly remote_id: string;
+            readonly safe_projection: unknown;
+            /** Format: date-time */
+            readonly source_timestamp: string | null;
+            readonly state: string;
+            /** Format: date-time */
+            readonly observed_at: string;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly ObservationPage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["Observation"][];
+        };
         readonly ObservationWrite: {
             /**
              * @description * `A` - A
@@ -12867,6 +12937,9 @@ export interface components {
             readonly maximum_sync_interval_minutes: number;
             readonly health_states: readonly string[];
             readonly observation_schema_version: number;
+            readonly default_base_url: string;
+            readonly base_url_editable: boolean;
+            readonly setup_help_url: string;
         };
         readonly ProviderChoice: {
             /** Format: uuid */
@@ -12881,6 +12954,8 @@ export interface components {
             readonly label: string;
             readonly secret: boolean;
             readonly minimum_length: number;
+            readonly input_type: string;
+            readonly help_text: string;
         };
         readonly PublicationAudienceProjection: {
             readonly audience: string;
@@ -21585,7 +21660,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody: {
+        readonly requestBody?: {
             readonly content: {
                 readonly "application/json": components["schemas"]["CredentialRotation"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["CredentialRotation"];
@@ -22068,6 +22143,27 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_observations_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ObservationPage"];
                 };
             };
         };
@@ -29237,7 +29333,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody: {
+        readonly requestBody?: {
             readonly content: {
                 readonly "application/json": components["schemas"]["CredentialRotation"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["CredentialRotation"];
@@ -29742,6 +29838,29 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_observations_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ObservationPage"];
                 };
             };
         };

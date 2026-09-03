@@ -83,15 +83,15 @@ test-webhooks:
 	./scripts/frontend-gate.sh test
 
 test-integrations:
-	docker compose run --rm migrate pytest apps/core/tests/test_integrations.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_integrations.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
 test-integration-stabilization:
-	docker compose run --rm migrate pytest apps/core/tests/test_integration_stabilization.py apps/core/tests/test_integrations.py apps/core/tests/test_webhooks.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_api_contracts.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_integrations.py apps/core/tests/test_webhooks.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_api_contracts.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh check
 
 test-integration-validation:
-	docker compose run --rm migrate pytest apps/core/tests/test_api_contracts.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_webhooks.py apps/core/tests/test_integrations.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_api_contracts.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_webhooks.py apps/core/tests/test_integrations.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 	./scripts/frontend-gate.sh test
 
 test-monitoring-stabilization:

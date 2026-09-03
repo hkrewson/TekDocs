@@ -204,7 +204,7 @@ def test_missing_remote_identity_becomes_reviewable_retirement_without_local_del
 
     class EmptyAdapter(SuccessfulAdapter):
         def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
-            return ProviderPage((), "")
+            return ProviderPage((), "", complete_types=("ipam.vlan",))
 
     process_sync_job(job_id=second.id, adapter=EmptyAdapter())
 

@@ -137,6 +137,48 @@ def test_connection_api_encrypts_token_and_never_returns_it(installation, monkey
 
 
 @pytest.mark.django_db
+def test_microsoft_connection_fixes_graph_origin_and_separates_secret_configuration(installation, monkeypatch):
+    record = organization(installation, "Microsoft client")
+    browser = Client()
+    browser.force_login(installation.owner)
+    monkeypatch.setattr("apps.core.integrations.did_recently_authenticate", lambda _request: True)
+    path = reverse(
+        "organization-integration-connection-list-create",
+        kwargs={"organization_entity_id": record.entity_id},
+    )
+    tenant_id = "11111111-1111-1111-1111-111111111111"
+    client_id = "22222222-2222-2222-2222-222222222222"
+    response = browser.post(
+        path,
+        data=json.dumps(
+            {
+                "provider": "microsoft_graph",
+                "name": "Client Microsoft 365",
+                "credentials": {
+                    "tenant_id": tenant_id,
+                    "client_id": client_id,
+                    "client_secret": "microsoft-client-secret",
+                },
+                "sync_interval_minutes": 60,
+            }
+        ),
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    assert response.json()["base_url"] == "https://graph.microsoft.com/v1.0/"
+    assert response.json()["provider_details"] == {
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "permission_status": "not_validated",
+    }
+    assert "client_secret" not in response.content.decode()
+    stored = IntegrationConnection.objects.get(name="Client Microsoft 365")
+    assert stored.configuration == {"tenant_id": tenant_id, "client_id": client_id}
+    envelope = json.dumps(stored.secret_envelope)
+    assert "microsoft-client-secret" not in envelope
+
+
+@pytest.mark.django_db
 def test_connection_listing_is_exact_workspace(installation, monkeypatch):
     first = organization(installation, "First client")
     second = organization(installation, "Second client")
@@ -152,6 +194,38 @@ def test_connection_listing_is_exact_workspace(installation, monkeypatch):
     )
     assert response.status_code == 200
     assert [item["name"] for item in response.json()] == ["First source"]
+
+
+@pytest.mark.django_db
+def test_observation_api_returns_only_safe_exact_workspace_projections(installation):
+    first = organization(installation, "Observed client")
+    second = organization(installation, "Sibling observed client")
+    first_connection = connection(installation, first, name="Observed source")
+    second_connection = connection(installation, second, name="Sibling source")
+    for source, key in ((first_connection, "visible"), (second_connection, "hidden")):
+        job = enqueue_sync(connection=source, trigger="manual", idempotency_key=f"observation:{key}")
+        IntegrationObservation.objects.create(
+            tenant=source.tenant,
+            workspace=source.workspace,
+            organization=source.organization,
+            job=job,
+            remote_type="user",
+            remote_id=key,
+            fingerprint="a" * 64,
+            safe_projection={"displayName": key},
+        )
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(
+        reverse(
+            "organization-integration-observation-list",
+            kwargs={"organization_entity_id": first.entity_id},
+        )
+    )
+    assert response.status_code == 200
+    assert [item["remote_id"] for item in response.json()["results"]] == ["visible"]
+    assert response.json()["results"][0]["safe_projection"] == {"displayName": "visible"}
+    assert "fingerprint" not in response.content.decode()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -181,6 +255,7 @@ class SuccessfulAdapter:
         return ProviderPage(
             observations=(ProviderObservation("ipam.vlan", "42", "a" * 64),),
             next_cursor="",
+            complete_types=("ipam.vlan",),
         )
 
 
@@ -206,7 +281,14 @@ def test_provider_catalog_is_a_complete_versioned_contract():
     assert contract["pagination"] == "opaque_cursor"
     assert contract["observation_schema_version"] == 1
     assert contract["credential_fields"] == [
-        {"key": "api_token", "label": "API token", "secret": True, "minimum_length": 8}
+        {
+            "key": "api_token",
+            "label": "API token",
+            "secret": True,
+            "minimum_length": 8,
+            "input_type": "password",
+            "help_text": "",
+        }
     ]
 
 

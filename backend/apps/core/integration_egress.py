@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlencode, urljoin, urlsplit
 
 import urllib3
 from django.core.exceptions import ValidationError
@@ -43,7 +43,9 @@ def validate_integration_base_url(value: str) -> str:
     return normalized if normalized.endswith("/") else f"{normalized}/"
 
 
-def get_provider_json(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:
+def _provider_json_request(
+    *, base_url: str, relative_path: str, method: str, headers: dict[str, str], body: bytes | None = None
+) -> dict[str, Any]:
     """GET one pinned, bounded provider page without following redirects."""
 
     base = validate_integration_base_url(base_url)
@@ -71,9 +73,10 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
     )
     try:
         response = pool.urlopen(
-            "GET",
+            method,
             request_path,
-            headers={"Host": target.hostname, "Accept": "application/json", "Authorization": authorization},
+            headers={"Host": target.hostname, "Accept": "application/json", **headers},
+            body=body,
             redirect=False,
             assert_same_host=False,
             preload_content=False,
@@ -82,6 +85,12 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
             retry_at = _retry_at(response.headers.get("Retry-After", "60"))
             response.close()
             raise ProviderRateLimited(retry_at)
+        if response.status == 410:
+            response.close()
+            raise WebhookEgressError("provider_cursor_expired")
+        if response.status in {400, 401, 403}:
+            response.close()
+            raise WebhookEgressError("provider_authentication_failed")
         if response.status != 200:
             response.close()
             raise WebhookEgressError("provider_http_error")
@@ -101,3 +110,26 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
         raise WebhookEgressError("provider_connection_failed") from exc
     finally:
         pool.close()
+
+
+def get_provider_json(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:
+    """GET one pinned, bounded provider page without following redirects."""
+
+    return _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method="GET",
+        headers={"Authorization": authorization},
+    )
+
+
+def post_provider_form(*, base_url: str, relative_path: str, fields: dict[str, str]) -> dict[str, Any]:
+    """POST a bounded form to a pinned provider endpoint without retaining request values."""
+
+    return _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        body=urlencode(fields).encode("utf-8"),
+    )

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
+from uuid import UUID as UUIDValue
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
@@ -47,12 +49,58 @@ ALLOWED_LOG_CODES = frozenset(
 )
 
 
-def _validate_provider_secret(value: str) -> bytes:
+def _validate_provider_secret(value: str, *, field: str = "api_token") -> bytes:
     encoded = value.encode()
     contains_control_character = any(ord(character) < 32 or ord(character) == 127 for character in value)
     if len(encoded) < 8 or len(encoded) > 4096 or contains_control_character:
-        raise ValidationError({"api_token": "Enter a valid provider API token without control characters."})
+        raise ValidationError({field: "Enter a valid credential without control characters."})
     return encoded
+
+
+def _provider_credentials(
+    provider: str, values: dict[str, str], legacy_token: str = ""
+) -> tuple[bytes, dict[str, object]]:
+    adapter = PROVIDERS[provider]
+    supplied = dict(values)
+    if legacy_token and provider == IntegrationProvider.NETBOX:
+        supplied["api_token"] = legacy_token
+    expected = {field.key for field in adapter.contract.credential_fields}
+    if set(supplied) != expected:
+        raise ValidationError({"credentials": "Provide every credential field shown for this provider."})
+    configuration: dict[str, object] = {}
+    secrets: dict[str, str] = {}
+    for field in adapter.contract.credential_fields:
+        value = supplied[field.key]
+        if not isinstance(value, str) or len(value) < field.minimum_length or len(value) > 4096:
+            raise ValidationError({"credentials": f"Enter a valid {field.label.lower()}."})
+        _validate_provider_secret(value, field="credentials")
+        if not field.secret:
+            try:
+                normalized = str(UUIDValue(value))
+            except ValueError as exc:
+                raise ValidationError({"credentials": f"{field.label} must be a UUID."}) from exc
+            configuration[field.key] = normalized
+        else:
+            secrets[field.key] = value
+    if provider == IntegrationProvider.NETBOX:
+        return secrets["api_token"].encode(), configuration
+    return json.dumps(secrets, sort_keys=True, separators=(",", ":")).encode(), configuration
+
+
+def _secret_for_provider(connection: IntegrationConnection, payload: bytes) -> str:
+    decoded = payload.decode()
+    if connection.provider == IntegrationProvider.NETBOX:
+        return decoded
+    try:
+        values = json.loads(decoded)
+    except json.JSONDecodeError as exc:
+        raise ValueError("provider_credential_invalid") from exc
+    if not isinstance(values, dict):
+        raise ValueError("provider_credential_invalid")
+    client_secret = values.get("client_secret")
+    if not isinstance(client_secret, str):
+        raise ValueError("provider_credential_invalid")
+    return client_secret
 
 
 def resolve_integration_workspace(
@@ -87,8 +135,9 @@ def create_connection(
     organization_entity_id: UUID | None,
     provider: str,
     name: str,
-    base_url: str,
-    api_token: str,
+    base_url: str = "",
+    credentials: dict[str, str] | None = None,
+    api_token: str = "",
     sync_interval_minutes: int,
 ) -> IntegrationConnection:
     _recent_session(request)
@@ -102,7 +151,17 @@ def create_connection(
     normalized_name = " ".join(name.split())
     if not normalized_name or any(ord(character) < 32 for character in normalized_name):
         raise ValidationError({"name": "Enter a visible connection name without control characters."})
-    encoded_token = _validate_provider_secret(api_token)
+    encoded_token, configuration = _provider_credentials(provider, credentials or {}, api_token)
+    adapter = PROVIDERS[provider]
+    if not (
+        adapter.contract.minimum_sync_interval_minutes
+        <= sync_interval_minutes
+        <= adapter.contract.maximum_sync_interval_minutes
+    ):
+        raise ValidationError({"sync_interval_minutes": "Choose an interval allowed by this provider."})
+    selected_base_url = adapter.contract.default_base_url if not adapter.contract.base_url_editable else base_url
+    if not selected_base_url:
+        raise ValidationError({"base_url": "Enter the provider API base URL."})
     connection_id = uuid4()
     connection = IntegrationConnection(
         id=connection_id,
@@ -111,8 +170,8 @@ def create_connection(
         organization=resolved.organization,
         provider=provider,
         name=normalized_name,
-        base_url=validate_integration_base_url(base_url),
-        configuration={},
+        base_url=validate_integration_base_url(selected_base_url),
+        configuration=configuration,
         secret_envelope=encrypt_integration_secret(
             secret=encoded_token, tenant_id=resolved.member.tenant.id, connection_id=connection_id, generation=1
         ),
@@ -145,6 +204,13 @@ def update_connection(
         raise NotFound("The integration connection is unavailable.") from exc
     connection.active = active
     connection.health_status = "unknown" if active else "paused"
+    adapter = PROVIDERS[connection.provider]
+    if not (
+        adapter.contract.minimum_sync_interval_minutes
+        <= sync_interval_minutes
+        <= adapter.contract.maximum_sync_interval_minutes
+    ):
+        raise ValidationError({"sync_interval_minutes": "Choose an interval allowed by this provider."})
     connection.sync_interval_minutes = sync_interval_minutes
     connection.full_clean()
     connection.save(update_fields=("active", "health_status", "sync_interval_minutes", "updated_at"))
@@ -161,7 +227,12 @@ def update_connection(
 
 @transaction.atomic
 def rotate_connection_secret(
-    *, request: Any, organization_entity_id: UUID | None, connection_id: UUID, api_token: str
+    *,
+    request: Any,
+    organization_entity_id: UUID | None,
+    connection_id: UUID,
+    credentials: dict[str, str] | None = None,
+    api_token: str = "",
 ) -> IntegrationConnection:
     _recent_session(request)
     resolved = resolve_integration_workspace(
@@ -171,7 +242,11 @@ def rotate_connection_secret(
         connection = connections_for_workspace(resolved).select_for_update().get(pk=connection_id)
     except IntegrationConnection.DoesNotExist as exc:
         raise NotFound("The integration connection is unavailable.") from exc
-    encoded_token = _validate_provider_secret(api_token)
+    encoded_token, configuration = _provider_credentials(connection.provider, credentials or {}, api_token)
+    connection.configuration = {**connection.configuration, **configuration}
+    if connection.provider == IntegrationProvider.MICROSOFT_GRAPH:
+        connection.configuration.pop("scope_fingerprint", None)
+        connection.configuration.pop("validated_tenant_id", None)
     connection.secret_generation += 1
     connection.secret_envelope = encrypt_integration_secret(
         secret=encoded_token,
@@ -179,7 +254,18 @@ def rotate_connection_secret(
         connection_id=connection.id,
         generation=connection.secret_generation,
     )
-    connection.save(update_fields=("secret_envelope", "secret_generation", "updated_at"))
+    connection.health_status = "unknown"
+    connection.last_error_code = ""
+    connection.save(
+        update_fields=(
+            "secret_envelope",
+            "secret_generation",
+            "configuration",
+            "health_status",
+            "last_error_code",
+            "updated_at",
+        )
+    )
     AuditEvent.objects.create(
         tenant=resolved.member.tenant,
         actor=request.user,
@@ -294,14 +380,16 @@ def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[Inte
         )
 
 
-def _retired_observations(job: IntegrationSyncJob) -> list[IntegrationObservation]:
+def _retired_observations(job: IntegrationSyncJob, complete_types: tuple[str, ...]) -> list[IntegrationObservation]:
+    if not complete_types:
+        return []
     current_keys = set(
         IntegrationObservation.objects.filter(
             job__connection=job.connection, job__sync_run_id=job.sync_run_id
         ).values_list("remote_type", "remote_id")
     )
     latest = (
-        IntegrationObservation.objects.filter(job__connection=job.connection)
+        IntegrationObservation.objects.filter(job__connection=job.connection, remote_type__in=complete_types)
         .exclude(job__sync_run_id=job.sync_run_id)
         .order_by("remote_type", "remote_id", "-observed_at")
         .distinct("remote_type", "remote_id")
@@ -323,6 +411,49 @@ def _retired_observations(job: IntegrationSyncJob) -> list[IntegrationObservatio
         for item in latest
         if item.state == "observed" and (item.remote_type, item.remote_id) not in current_keys
     ]
+
+
+def _retired_prefix_observations(
+    job: IntegrationSyncJob, complete_id_prefixes: tuple[tuple[str, str], ...]
+) -> list[IntegrationObservation]:
+    retired: list[IntegrationObservation] = []
+    for remote_type, prefix in complete_id_prefixes:
+        current_keys = set(
+            IntegrationObservation.objects.filter(
+                job__connection=job.connection,
+                job__sync_run_id=job.sync_run_id,
+                remote_type=remote_type,
+                remote_id__startswith=prefix,
+            ).values_list("remote_id", flat=True)
+        )
+        latest = (
+            IntegrationObservation.objects.filter(
+                job__connection=job.connection,
+                remote_type=remote_type,
+                remote_id__startswith=prefix,
+            )
+            .exclude(job__sync_run_id=job.sync_run_id)
+            .order_by("remote_id", "-observed_at")
+            .distinct("remote_id")
+        )
+        retired.extend(
+            IntegrationObservation(
+                tenant=job.tenant,
+                workspace=job.workspace,
+                organization=job.organization,
+                job=job,
+                remote_type=item.remote_type,
+                remote_id=item.remote_id,
+                fingerprint=item.fingerprint,
+                schema_version=item.schema_version,
+                safe_projection={},
+                provenance="provider_delta_absence",
+                state="retired",
+            )
+            for item in latest
+            if item.state == "observed" and item.remote_id not in current_keys
+        )
+    return retired
 
 
 @transaction.atomic
@@ -372,12 +503,13 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
         job.save(update_fields=("state", "locked_at", "started_at", "attempts", "last_error_code"))
         _safe_log(job=job, level="info", code="sync_started", metrics={"attempt": job.attempts})
     try:
-        secret = decrypt_integration_secret(
+        secret_payload = decrypt_integration_secret(
             envelope_payload=job.connection.secret_envelope,
             tenant_id=job.tenant_id,
             connection_id=job.connection_id,
             generation=job.connection.secret_generation,
-        ).decode()
+        )
+        secret = _secret_for_provider(job.connection, secret_payload)
         selected = adapter or PROVIDERS[job.connection.provider]
         validate_provider_adapter(selected)
         page = selected.fetch_page(job.connection, secret=secret, cursor=job.cursor_before)
@@ -399,15 +531,26 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     safe_projection=item.safe_projection,
                     source_timestamp=item.source_timestamp,
                     provenance=item.provenance,
+                    state=item.state,
                 )
                 for item in page.observations
             ]
             IntegrationObservation.objects.bulk_create(records, ignore_conflicts=True)
             created = list(IntegrationObservation.objects.filter(job=job))
-            if not page.next_cursor:
-                retired = _retired_observations(job)
+            if page.complete_types:
+                retired = _retired_observations(job, page.complete_types)
                 IntegrationObservation.objects.bulk_create(retired, ignore_conflicts=True)
                 created = list(IntegrationObservation.objects.filter(job=job))
+            if page.complete_id_prefixes:
+                retired = _retired_prefix_observations(job, page.complete_id_prefixes)
+                IntegrationObservation.objects.bulk_create(retired, ignore_conflicts=True)
+                created = list(IntegrationObservation.objects.filter(job=job))
+            if page.configuration_updates:
+                allowed_updates = {"scope_fingerprint", "validated_tenant_id", "users_delta_link"}
+                if set(page.configuration_updates) - allowed_updates:
+                    raise ValueError("provider_configuration_invalid")
+                job.connection.configuration = {**job.connection.configuration, **page.configuration_updates}
+                job.connection.save(update_fields=("configuration", "updated_at"))
             _conflicts_for_observations(job, created)
             job.cursor_after = page.next_cursor
             job.state = IntegrationJobState.SUCCEEDED
@@ -427,16 +570,25 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     now=now,
                 )
             else:
+                run_observations = IntegrationObservation.objects.filter(
+                    job__connection=job.connection, job__sync_run_id=job.sync_run_id
+                )
+                observation_count = run_observations.count()
+                type_counts = {
+                    f"{row['remote_type']}_count": row["count"]
+                    for row in run_observations.values("remote_type").annotate(count=Count("id"))
+                }
                 job.connection.next_sync_at = now + timedelta(minutes=job.connection.sync_interval_minutes)
                 job.connection.health_status = "healthy"
                 job.connection.last_successful_sync_at = now
                 job.connection.last_error_code = ""
                 job.connection.rate_limit_reset_at = None
                 job.connection.reconciliation_counts = {
-                    "observations": len(created),
+                    "observations": observation_count,
                     "review_required": IntegrationConflict.objects.filter(
                         connection=job.connection, status=IntegrationConflictStatus.OPEN
                     ).count(),
+                    **type_counts,
                 }
                 job.connection.save(
                     update_fields=(
@@ -462,6 +614,15 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                 "provider_content_type_invalid",
                 "provider_response_too_large",
                 "provider_connection_failed",
+                "provider_authentication_failed",
+                "provider_cursor_expired",
+                "provider_token_invalid",
+                "provider_credential_invalid",
+                "provider_permissions_missing",
+                "provider_permissions_excessive",
+                "provider_permission_drift",
+                "provider_tenant_validation_failed",
+                "provider_configuration_invalid",
                 "provider_rate_limited",
                 "destination_not_public",
                 "dns_unavailable",
@@ -483,11 +644,25 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                 if isinstance(exc, ProviderRateLimited)
                 else now + timedelta(minutes=min(2**job.attempts, 60))
             )
-            job.save(update_fields=("state", "locked_at", "last_error_code", "finished_at", "available_at"))
+            if code == "provider_cursor_expired" and job.connection.provider == IntegrationProvider.MICROSOFT_GRAPH:
+                job.cursor_before = ""
+                job.connection.configuration.pop("users_delta_link", None)
+            job.save(
+                update_fields=(
+                    "state",
+                    "locked_at",
+                    "last_error_code",
+                    "finished_at",
+                    "available_at",
+                    "cursor_before",
+                )
+            )
             job.connection.health_status = "failing" if job.state == IntegrationJobState.DEAD_LETTER else "degraded"
             job.connection.last_error_code = code
             job.connection.rate_limit_reset_at = exc.retry_at if isinstance(exc, ProviderRateLimited) else None
-            job.connection.save(update_fields=("health_status", "last_error_code", "rate_limit_reset_at", "updated_at"))
+            job.connection.save(
+                update_fields=("health_status", "last_error_code", "rate_limit_reset_at", "configuration", "updated_at")
+            )
             _safe_log(
                 job=job,
                 level="error" if job.state == IntegrationJobState.DEAD_LETTER else "warning",

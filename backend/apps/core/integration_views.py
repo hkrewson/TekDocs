@@ -32,6 +32,7 @@ from .models import (
     IntegrationConflictStatus,
     IntegrationConnection,
     IntegrationLogEvent,
+    IntegrationObservation,
     IntegrationProvider,
     IntegrationSyncJob,
 )
@@ -53,6 +54,8 @@ class ProviderCredentialFieldSerializer(serializers.Serializer):
     label = serializers.CharField()
     secret = serializers.BooleanField()
     minimum_length = serializers.IntegerField()
+    input_type = serializers.CharField()
+    help_text = serializers.CharField()
 
 
 class ProviderSerializer(serializers.Serializer):
@@ -68,6 +71,9 @@ class ProviderSerializer(serializers.Serializer):
     maximum_sync_interval_minutes = serializers.IntegerField()
     health_states = serializers.ListField(child=serializers.CharField())
     observation_schema_version = serializers.IntegerField()
+    default_base_url = serializers.CharField()
+    base_url_editable = serializers.BooleanField()
+    setup_help_url = serializers.CharField()
 
 
 class ConnectionSerializer(serializers.Serializer):
@@ -87,16 +93,34 @@ class ConnectionSerializer(serializers.Serializer):
     reconciliation_counts = serializers.JSONField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    provider_details = serializers.SerializerMethodField()
 
     def get_credential_configured(self, connection: IntegrationConnection) -> bool:
         return bool(connection.secret_envelope)
+
+    def get_provider_details(self, connection: IntegrationConnection) -> dict[str, str]:
+        if connection.provider != IntegrationProvider.MICROSOFT_GRAPH:
+            return {}
+        return {
+            "tenant_id": str(connection.configuration.get("tenant_id", "")),
+            "client_id": str(connection.configuration.get("client_id", "")),
+            "permission_status": "verified" if connection.configuration.get("scope_fingerprint") else "not_validated",
+        }
 
 
 class ConnectionWriteSerializer(StrictSerializer):
     provider = serializers.ChoiceField(choices=IntegrationProvider.values)
     name = serializers.CharField(min_length=1, max_length=100, trim_whitespace=True)
-    base_url = serializers.URLField(max_length=500)
-    api_token = serializers.CharField(min_length=8, max_length=4096, trim_whitespace=False, write_only=True)
+    base_url = serializers.URLField(max_length=500, required=False, allow_blank=True, default="")
+    credentials = serializers.DictField(
+        child=serializers.CharField(max_length=4096, trim_whitespace=False),
+        required=False,
+        default=dict,
+        write_only=True,
+    )
+    api_token = serializers.CharField(
+        min_length=8, max_length=4096, trim_whitespace=False, write_only=True, required=False, default=""
+    )
     sync_interval_minutes = serializers.IntegerField(min_value=5, max_value=10080, default=60)
 
 
@@ -106,7 +130,15 @@ class ConnectionUpdateSerializer(StrictSerializer):
 
 
 class CredentialRotationSerializer(StrictSerializer):
-    api_token = serializers.CharField(min_length=8, max_length=4096, trim_whitespace=False, write_only=True)
+    credentials = serializers.DictField(
+        child=serializers.CharField(max_length=4096, trim_whitespace=False),
+        required=False,
+        default=dict,
+        write_only=True,
+    )
+    api_token = serializers.CharField(
+        min_length=8, max_length=4096, trim_whitespace=False, write_only=True, required=False, default=""
+    )
 
 
 class JobSerializer(serializers.Serializer):
@@ -149,6 +181,22 @@ class LogSerializer(serializers.Serializer):
 
 class LogPageSerializer(OffsetPageSerializer):
     results = LogSerializer(many=True)
+
+
+class ObservationSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    connection_id = serializers.UUIDField(source="job.connection_id")
+    connection_name = serializers.CharField(source="job.connection.name")
+    remote_type = serializers.CharField()
+    remote_id = serializers.CharField()
+    safe_projection = serializers.JSONField()
+    source_timestamp = serializers.DateTimeField(allow_null=True)
+    state = serializers.CharField()
+    observed_at = serializers.DateTimeField()
+
+
+class ObservationPageSerializer(OffsetPageSerializer):
+    results = ObservationSerializer(many=True)
 
 
 class ConflictSerializer(serializers.Serializer):
@@ -327,6 +375,32 @@ class IntegrationLogListView(APIView):
             Response(
                 {
                     "results": LogSerializer(page.records, many=True).data,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                }
+            )
+        )
+
+
+class IntegrationObservationListView(APIView):
+    @extend_schema(responses={200: ObservationPageSerializer})
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_VIEW)
+        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        page = paginate(
+            IntegrationObservation.scoped.for_scope(workspace.data_scope)
+            .filter(workspace_id=workspace.data_scope.workspace_id)
+            .select_related("job__connection")
+            .order_by("-observed_at", "id"),
+            **query.validated_data,
+        )
+        return _private(
+            Response(
+                {
+                    "results": ObservationSerializer(page.records, many=True).data,
                     "page": page.page,
                     "page_size": page.page_size,
                     "count": page.count,

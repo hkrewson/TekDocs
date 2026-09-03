@@ -17,7 +17,8 @@ The current column describes `0.8.46`. The 1.0 column is the release contract, n
 | Unified workspace search | experimental | supported | TekDocs | [#27](https://github.com/hkrewson/TekDocs/issues/27) |
 | Bulk import and dry-run reconciliation | experimental | supported | TekDocs | [#28](https://github.com/hkrewson/TekDocs/issues/28) |
 | Provider-neutral integration framework | experimental | supported | External system remains authoritative unless a connector contract says otherwise | [#34](https://github.com/hkrewson/TekDocs/issues/34) |
-| Microsoft 365/Entra/Intune, HaloPSA, and NinjaOne projections | excluded | supported | Named external systems | [#35](https://github.com/hkrewson/TekDocs/issues/35), [#36](https://github.com/hkrewson/TekDocs/issues/36), [#37](https://github.com/hkrewson/TekDocs/issues/37) |
+| Microsoft 365/Entra/Intune read-only observations | supported | supported | Named external system | [#35](https://github.com/hkrewson/TekDocs/issues/35) |
+| HaloPSA and NinjaOne projections | excluded | supported | Named external systems | [#36](https://github.com/hkrewson/TekDocs/issues/36), [#37](https://github.com/hkrewson/TekDocs/issues/37) |
 | Invoice drafting, issuance, delivery, lifecycle projection, retained artifacts, accounting handoff | experimental | supported | TekDocs issues invoices; accounting systems own the ledger and settlement | [#33](https://github.com/hkrewson/TekDocs/issues/33) |
 | Native ticketing/PSA workflow | excluded | excluded | External PSA or help desk | [#58](https://github.com/hkrewson/TekDocs/issues/58), [#36](https://github.com/hkrewson/TekDocs/issues/36) |
 | General ledger, expenses, purchasing, payroll, tax filing | excluded | excluded | External accounting/payroll system | [#48](https://github.com/hkrewson/TekDocs/issues/48) |

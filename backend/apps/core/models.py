@@ -5298,6 +5298,7 @@ class WebhookInboundReceipt(models.Model):
 
 class IntegrationProvider(models.TextChoices):
     NETBOX = "netbox", "NetBox"
+    MICROSOFT_GRAPH = "microsoft_graph", "Microsoft 365"
 
 
 class IntegrationConnection(TimestampedModel):
@@ -5391,8 +5392,8 @@ class IntegrationSyncJob(models.Model):
     idempotency_key = models.CharField(max_length=160)
     trigger = models.CharField(max_length=20, default="scheduled")
     state = models.CharField(max_length=20, choices=IntegrationJobState.choices, default=IntegrationJobState.PENDING)
-    cursor_before = models.CharField(max_length=500, blank=True)
-    cursor_after = models.CharField(max_length=500, blank=True)
+    cursor_before = models.CharField(max_length=10000, blank=True)
+    cursor_after = models.CharField(max_length=10000, blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
     available_at = models.DateTimeField(default=timezone.now)
     locked_at = models.DateTimeField(null=True, blank=True)

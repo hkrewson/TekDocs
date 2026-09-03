@@ -15,6 +15,7 @@ from apps.accounts.policy import PermissionKey, require_permission
 
 from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageSerializer, paginate
 from .git_exports import create_git_export
+from .halopsa import halo_ticket_summaries
 from .integration_providers import provider_catalog
 from .integrations import (
     cancel_sync_job,
@@ -99,13 +100,17 @@ class ConnectionSerializer(serializers.Serializer):
         return bool(connection.secret_envelope)
 
     def get_provider_details(self, connection: IntegrationConnection) -> dict[str, str]:
-        if connection.provider != IntegrationProvider.MICROSOFT_GRAPH:
-            return {}
-        return {
-            "tenant_id": str(connection.configuration.get("tenant_id", "")),
-            "client_id": str(connection.configuration.get("client_id", "")),
-            "permission_status": "verified" if connection.configuration.get("scope_fingerprint") else "not_validated",
-        }
+        if connection.provider == IntegrationProvider.MICROSOFT_GRAPH:
+            return {
+                "tenant_id": str(connection.configuration.get("tenant_id", "")),
+                "client_id": str(connection.configuration.get("client_id", "")),
+                "permission_status": "verified"
+                if connection.configuration.get("scope_fingerprint")
+                else "not_validated",
+            }
+        if connection.provider == IntegrationProvider.HALOPSA:
+            return {"client_id": str(connection.configuration.get("client_id", ""))}
+        return {}
 
 
 class ConnectionWriteSerializer(StrictSerializer):
@@ -199,6 +204,24 @@ class ObservationPageSerializer(OffsetPageSerializer):
     results = ObservationSerializer(many=True)
 
 
+class HaloTicketSummarySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    number = serializers.CharField()
+    title = serializers.CharField()
+    status = serializers.CharField()
+    priority = serializers.CharField()
+    assigned_team = serializers.CharField()
+    assigned_agent = serializers.CharField()
+    respond_by = serializers.DateTimeField(allow_null=True)
+    fix_by = serializers.DateTimeField(allow_null=True)
+    opened_at = serializers.DateTimeField(allow_null=True)
+    closed_at = serializers.DateTimeField(allow_null=True)
+    source_updated_at = serializers.DateTimeField()
+    source_last_synced_at = serializers.DateTimeField(allow_null=True)
+    stale = serializers.BooleanField()
+    external_url = serializers.URLField(allow_blank=True)
+
+
 class ConflictSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     connection_id = serializers.UUIDField()
@@ -256,6 +279,13 @@ class IntegrationProviderCatalogView(APIView):
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_VIEW)
         return _private(Response(provider_catalog()))
+
+
+class HaloTicketSummaryListView(APIView):
+    @extend_schema(responses={200: HaloTicketSummarySerializer(many=True)})
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_VIEW)
+        return _private(Response(HaloTicketSummarySerializer(halo_ticket_summaries(workspace), many=True).data))
 
 
 class IntegrationConnectionListCreateView(APIView):

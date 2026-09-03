@@ -5,10 +5,11 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from urllib.parse import urlsplit
 
-from .integration_egress import get_provider_json, post_provider_form
+from .integration_egress import get_provider_json, post_provider_form, post_provider_form_basic
 from .models import IntegrationConnection, IntegrationProvider, NetBoxObjectType
 
 
@@ -500,9 +501,7 @@ class MicrosoftGraphProvider:
                     enabled = record["prepaidUnits"].get("enabled")
                     if isinstance(enabled, int):
                         projection["enabledUnits"] = enabled
-                observations.append(
-                    ProviderObservation(remote_type, record["id"], _fingerprint(record), projection)
-                )
+                observations.append(ProviderObservation(remote_type, record["id"], _fingerprint(record), projection))
             if next_path:
                 next_cursor = _encode_cursor({"stage": stage, "path": next_path})
             elif stage == "skus":
@@ -530,6 +529,212 @@ class MicrosoftGraphProvider:
         )
 
 
+HALO_OBJECT_TYPES = ("client", "site", "contact", "contract", "ticket")
+HALO_STAGES = (
+    ("clients", "Client", "clients", "client"),
+    ("sites", "Site", "sites", "site"),
+    ("contacts", "Users", "users", "contact"),
+    ("contracts", "Agreement", "agreements", "contract"),
+    ("tickets", "Tickets", "tickets", "ticket"),
+)
+HALO_PAGE_SIZE = 100
+HALO_CLOSED_TICKET_WINDOW = timedelta(days=90)
+
+
+def _halo_scalar(record: dict[str, object], *keys: str) -> dict[str, object]:
+    return {
+        key: record[key]
+        for key in keys
+        if key in record and isinstance(record[key], str | int | float | bool | type(None))
+    }
+
+
+def _halo_timestamp(record: dict[str, object], *keys: str) -> str | None:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _halo_ticket_is_current(record: dict[str, object], *, now: datetime | None = None) -> bool:
+    closed = record.get("dateclosed")
+    if closed in (None, ""):
+        return True
+    if not isinstance(closed, str):
+        raise ValueError("provider_response_invalid")
+    try:
+        closed_at = datetime.fromisoformat(closed.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("provider_response_invalid") from exc
+    if closed_at.tzinfo is None:
+        closed_at = closed_at.replace(tzinfo=UTC)
+    return closed_at >= (now or datetime.now(UTC)) - HALO_CLOSED_TICKET_WINDOW
+
+
+def _halo_cursor(value: str) -> tuple[int, int]:
+    if not value:
+        return 0, 1
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("provider_cursor_invalid") from exc
+    if (
+        not isinstance(decoded, dict)
+        or not isinstance(decoded.get("stage"), int)
+        or not isinstance(decoded.get("page"), int)
+        or decoded["stage"] < 0
+        or decoded["stage"] >= len(HALO_STAGES)
+        or decoded["page"] < 1
+    ):
+        raise ValueError("provider_cursor_invalid")
+    return decoded["stage"], decoded["page"]
+
+
+def _halo_encode_cursor(stage: int, page: int) -> str:
+    return _encode_cursor({"stage": stage, "page": page})
+
+
+class HaloPSAProvider:
+    key = str(IntegrationProvider.HALOPSA)
+    label = "HaloPSA"
+    contract = ProviderContract(
+        key=key,
+        label=label,
+        version="1.0",
+        direction="read_only",
+        credential_fields=(
+            CredentialField(
+                "client_id",
+                "API application client ID",
+                False,
+                8,
+                "text",
+                "From Configuration → Integrations → Halo API.",
+            ),
+            CredentialField(
+                "client_secret",
+                "API application client secret",
+                True,
+                8,
+                "password",
+                "Stored encrypted and never shown again.",
+            ),
+        ),
+        capabilities=("psa_observations", "external_ticket_search", "reconciliation"),
+        object_types=HALO_OBJECT_TYPES,
+        pagination="opaque_cursor",
+        minimum_sync_interval_minutes=15,
+        maximum_sync_interval_minutes=10080,
+        default_base_url="",
+        base_url_editable=True,
+        setup_help_url="https://halopsa.com/guides/article/?kbid=1499",
+    )
+
+    def __init__(
+        self,
+        getter: Callable[..., dict[str, object]] = get_provider_json,
+        poster: Callable[..., dict[str, object]] = post_provider_form_basic,
+    ):
+        self._getter = getter
+        self._poster = poster
+
+    def _authorize(self, connection: IntegrationConnection, secret: str) -> str:
+        payload = self._poster(
+            base_url=connection.base_url,
+            relative_path="auth/token",
+            fields={"grant_type": "client_credentials", "scope": "all"},
+            username=str(connection.configuration.get("client_id", "")),
+            password=secret,
+        )
+        token = payload.get("access_token")
+        if not isinstance(token, str) or not 16 <= len(token) <= 16384:
+            raise ValueError("provider_token_invalid")
+        token_type = payload.get("token_type", "Bearer")
+        if not isinstance(token_type, str) or token_type.casefold() != "bearer":
+            raise ValueError("provider_token_invalid")
+        return token
+
+    def fetch_page(self, connection: IntegrationConnection, *, secret: str, cursor: str) -> ProviderPage:
+        token = self._authorize(connection, secret)
+        stage_index, page_number = _halo_cursor(cursor)
+        _stage, endpoint, collection_key, remote_type = HALO_STAGES[stage_index]
+        payload = self._getter(
+            base_url=connection.base_url,
+            relative_path=f"api/{endpoint}?page_no={page_number}&page_size={HALO_PAGE_SIZE}&includeinactive=true",
+            authorization=f"Bearer {token}",
+        )
+        values = payload.get(collection_key)
+        if not isinstance(values, list) or len(values) > HALO_PAGE_SIZE:
+            raise ValueError("provider_response_invalid")
+        observations: list[ProviderObservation] = []
+        for record in values:
+            if not isinstance(record, dict) or not isinstance(record.get("id"), int | str):
+                raise ValueError("provider_response_invalid")
+            if remote_type == "ticket" and not _halo_ticket_is_current(record):
+                continue
+            remote_id = str(record["id"])
+            if remote_type == "client":
+                projection = _halo_scalar(record, "id", "name", "inactive", "toplevel_id")
+            elif remote_type == "site":
+                projection = _halo_scalar(record, "id", "name", "client_id", "client_name", "inactive")
+            elif remote_type == "contact":
+                projection = _halo_scalar(
+                    record, "id", "name", "emailaddress", "client_id", "client_name", "site_id", "site_name", "inactive"
+                )
+            elif remote_type == "contract":
+                projection = _halo_scalar(
+                    record, "id", "name", "reference", "client_id", "client_name", "start_date", "end_date", "status"
+                )
+            else:
+                projection = _halo_scalar(
+                    record,
+                    "id",
+                    "summary",
+                    "client_id",
+                    "client_name",
+                    "site_id",
+                    "status_id",
+                    "statusname",
+                    "priority_id",
+                    "priority",
+                    "team",
+                    "agent_id",
+                    "agent_name",
+                    "respondbydate",
+                    "fixbydate",
+                    "dateoccurred",
+                    "dateclosed",
+                    "lastactiondate",
+                )
+                projection["external_url"] = f"{connection.base_url.rstrip('/')}/tickets?id={remote_id}"
+            observations.append(
+                ProviderObservation(
+                    remote_type,
+                    remote_id,
+                    _fingerprint(record),
+                    projection,
+                    _halo_timestamp(record, "last_modified", "lastactiondate", "dateoccurred"),
+                )
+            )
+        record_count = payload.get("record_count")
+        if record_count is not None and not isinstance(record_count, int):
+            raise ValueError("provider_response_invalid")
+        has_more = len(values) == HALO_PAGE_SIZE and (
+            record_count is None or page_number * HALO_PAGE_SIZE < record_count
+        )
+        if has_more:
+            next_cursor = _halo_encode_cursor(stage_index, page_number + 1)
+            complete: tuple[str, ...] = ()
+        elif stage_index + 1 < len(HALO_STAGES):
+            next_cursor = _halo_encode_cursor(stage_index + 1, 1)
+            complete = (remote_type,)
+        else:
+            next_cursor = ""
+            complete = (remote_type,)
+        return ProviderPage(tuple(observations), next_cursor, complete)
+
+
 def url_path(value: str, *, base_url: str) -> str:
     parsed = urlsplit(value)
     base = urlsplit(base_url)
@@ -548,6 +753,7 @@ def url_path(value: str, *, base_url: str) -> str:
 PROVIDERS: dict[str, ProviderAdapter] = {
     str(IntegrationProvider.NETBOX): NetBoxProvider(),
     str(IntegrationProvider.MICROSOFT_GRAPH): MicrosoftGraphProvider(),
+    str(IntegrationProvider.HALOPSA): HaloPSAProvider(),
 }
 
 

@@ -254,6 +254,7 @@ from apps.core.import_views import (
 from apps.core.integration_views import (
     GitExportDownloadView,
     GitExportListCreateView,
+    HaloTicketSummaryListView,
     IntegrationConflictListView,
     IntegrationConflictResolveView,
     IntegrationConnectionDetailView,
@@ -916,6 +917,11 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/providers",
         IntegrationProviderCatalogView.as_view(),
         name="msp-integration-provider-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/halo/tickets",
+        HaloTicketSummaryListView.as_view(),
+        name="msp-halopsa-ticket-summary-list",
     ),
     path(
         "api/v1/workspaces/msp/integrations/connections",
@@ -2213,6 +2219,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/providers",
         IntegrationProviderCatalogView.as_view(),
         name="organization-integration-provider-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/halo/tickets",
+        HaloTicketSummaryListView.as_view(),
+        name="organization-halopsa-ticket-summary-list",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections",

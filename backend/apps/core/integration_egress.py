@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
@@ -131,5 +132,27 @@ def post_provider_form(*, base_url: str, relative_path: str, fields: dict[str, s
         relative_path=relative_path,
         method="POST",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
+        body=urlencode(fields).encode("utf-8"),
+    )
+
+
+def post_provider_form_basic(
+    *, base_url: str, relative_path: str, fields: dict[str, str], username: str, password: str
+) -> dict[str, Any]:
+    """POST a bounded form with HTTP Basic client authentication.
+
+    The encoded authorization value is constructed only at the egress boundary and is
+    never returned or retained.
+    """
+
+    authorization = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+    return _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method="POST",
+        headers={
+            "Authorization": f"Basic {authorization}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
         body=urlencode(fields).encode("utf-8"),
     )

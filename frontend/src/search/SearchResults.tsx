@@ -15,10 +15,12 @@ import { workspaceSearchResultTypes } from './api'
 
 const resultTypeLabelIds: Record<WorkspaceSearchResultType, MessageId> = {
   organization: 'search.type.organization', person: 'search.type.person', site: 'search.type.site', location: 'search.type.location', document: 'search.type.document', file: 'search.type.file', asset: 'search.type.asset', product: 'search.type.product', model: 'search.type.model', license: 'search.type.license', service: 'search.type.service', credential_reference: 'search.type.credentialReference', domain: 'search.type.domain', certificate: 'search.type.certificate', network: 'search.type.network', data_flow: 'search.type.dataFlow',
+  external_ticket: 'search.type.externalTicket',
 }
 
 const resultTypeSingularLabelIds: Record<WorkspaceSearchResultType, MessageId> = {
   organization: 'search.typeSingle.organization', person: 'search.typeSingle.person', site: 'search.typeSingle.site', location: 'search.typeSingle.location', document: 'search.typeSingle.document', file: 'search.typeSingle.file', asset: 'search.typeSingle.asset', product: 'search.typeSingle.product', model: 'search.typeSingle.model', license: 'search.typeSingle.license', service: 'search.typeSingle.service', credential_reference: 'search.typeSingle.credentialReference', domain: 'search.typeSingle.domain', certificate: 'search.typeSingle.certificate', network: 'search.typeSingle.network', data_flow: 'search.typeSingle.dataFlow',
+  external_ticket: 'search.typeSingle.externalTicket',
 }
 
 function resultKey(query: string, resultType: string, page: number) {
@@ -123,14 +125,21 @@ export function SearchResults({ workspace, client }: {
             : <>
               <ul className="search-result-list">
                 {visible?.results.map((result) => <li key={result.id}>
-                  <Link to={result.target}>
+                  {result.result_type === 'external_ticket' ? <a href={result.target} target="_blank" rel="noreferrer">
                     <span>
                       <strong>{result.title}</strong>
                       {result.excerpt && <span className="search-result-excerpt">{result.excerpt}</span>}
                       <small>{reviewLabel(result.review_state) ? translate('search.resultMetadataReviewed', { type: translate(resultTypeSingularLabelIds[result.result_type]), workspace: result.workspace_label, updated: formatInstantDate(result.updated_at), review: reviewLabel(result.review_state) ?? '' }) : translate('search.resultMetadata', { type: translate(resultTypeSingularLabelIds[result.result_type]), workspace: result.workspace_label, updated: formatInstantDate(result.updated_at) })}</small>
                     </span>
                     <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
+                  </a> : <Link to={result.target}>
+                    <span>
+                      <strong>{result.title}</strong>
+                      {result.excerpt && <span className="search-result-excerpt">{result.excerpt}</span>}
+                      <small>{reviewLabel(result.review_state) ? translate('search.resultMetadataReviewed', { type: translate(resultTypeSingularLabelIds[result.result_type]), workspace: result.workspace_label, updated: formatInstantDate(result.updated_at), review: reviewLabel(result.review_state) ?? '' }) : translate('search.resultMetadata', { type: translate(resultTypeSingularLabelIds[result.result_type]), workspace: result.workspace_label, updated: formatInstantDate(result.updated_at) })}</small>
+                    </span>
+                    <ArrowRight size={16} aria-hidden="true" />
+                  </Link>}
                 </li>)}
               </ul>
               <nav className="collection-pagination" aria-label={translate('search.resultPages')}>

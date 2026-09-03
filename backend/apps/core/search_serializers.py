@@ -17,6 +17,7 @@ SEARCH_RESULT_TYPES = (
     "certificate",
     "network",
     "data_flow",
+    "external_ticket",
 )
 
 

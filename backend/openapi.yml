@@ -6487,9 +6487,10 @@ paths:
           - certificate
           - network
           - data_flow
+          - external_ticket
           - ''
           type: string
-          x-spec-enum-id: c21fae85431bd963
+          x-spec-enum-id: ab53b827ac9ecf93
           default: ''
         description: |-
           * `organization` - organization
@@ -6508,6 +6509,7 @@ paths:
           * `certificate` - certificate
           * `network` - network
           * `data_flow` - data_flow
+          * `external_ticket` - external_ticket
       tags:
       - search
       security:
@@ -9631,6 +9633,29 @@ paths:
               schema:
                 type: string
                 format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/halo/tickets:
+    get:
+      operationId: workspaces_msp_integrations_halo_tickets_list
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HaloTicketSummary'
           description: ''
           headers:
             X-Request-ID:
@@ -20240,6 +20265,36 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/halo/tickets:
+    get:
+      operationId: workspaces_organizations_integrations_halo_tickets_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HaloTicketSummary'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/integrations/imports:
     get:
       operationId: workspaces_organizations_integrations_imports_retrieve
@@ -25449,9 +25504,10 @@ paths:
           - certificate
           - network
           - data_flow
+          - external_ticket
           - ''
           type: string
-          x-spec-enum-id: c21fae85431bd963
+          x-spec-enum-id: ab53b827ac9ecf93
           default: ''
         description: |-
           * `organization` - organization
@@ -25470,6 +25526,7 @@ paths:
           * `certificate` - certificate
           * `network` - network
           * `data_flow` - data_flow
+          * `external_ticket` - external_ticket
       tags:
       - workspaces
       security:
@@ -28752,11 +28809,13 @@ components:
           enum:
           - netbox
           - microsoft_graph
+          - halopsa
           type: string
           description: |-
             * `netbox` - netbox
             * `microsoft_graph` - microsoft_graph
-          x-spec-enum-id: c85a94f70014d6a6
+            * `halopsa` - halopsa
+          x-spec-enum-id: e0ed80d5d331ec43
         name:
           type: string
           maxLength: 100
@@ -32425,6 +32484,68 @@ components:
             type: string
             format: uuid
           maxItems: 250
+    HaloTicketSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        assigned_team:
+          type: string
+        assigned_agent:
+          type: string
+        respond_by:
+          type: string
+          format: date-time
+          nullable: true
+        fix_by:
+          type: string
+          format: date-time
+          nullable: true
+        opened_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        source_updated_at:
+          type: string
+          format: date-time
+        source_last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        stale:
+          type: boolean
+        external_url:
+          type: string
+          format: uri
+      required:
+      - assigned_agent
+      - assigned_team
+      - closed_at
+      - external_url
+      - fix_by
+      - id
+      - number
+      - opened_at
+      - priority
+      - respond_by
+      - source_last_synced_at
+      - source_updated_at
+      - stale
+      - status
+      - title
     Handoff:
       type: object
       properties:
@@ -40651,6 +40772,7 @@ components:
           - certificate
           - network
           - data_flow
+          - external_ticket
           type: string
           description: |-
             * `organization` - organization
@@ -40669,7 +40791,8 @@ components:
             * `certificate` - certificate
             * `network` - network
             * `data_flow` - data_flow
-          x-spec-enum-id: c21fae85431bd963
+            * `external_ticket` - external_ticket
+          x-spec-enum-id: ab53b827ac9ecf93
         label:
           type: string
         count:
@@ -40703,6 +40826,7 @@ components:
           - certificate
           - network
           - data_flow
+          - external_ticket
           type: string
           description: |-
             * `organization` - organization
@@ -40721,7 +40845,8 @@ components:
             * `certificate` - certificate
             * `network` - network
             * `data_flow` - data_flow
-          x-spec-enum-id: c21fae85431bd963
+            * `external_ticket` - external_ticket
+          x-spec-enum-id: ab53b827ac9ecf93
         entity_type:
           type: string
         title:

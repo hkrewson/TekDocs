@@ -80,18 +80,21 @@ describe('provider integrations API', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Provider denied.' } }), { status: 403 }))
 
     await browserIntegrationsClient.listJobs(workspace)
     await browserIntegrationsClient.listLogs(workspace)
     await browserIntegrationsClient.listConflicts(workspace)
     await browserIntegrationsClient.listGitExports(workspace)
+    await browserIntegrationsClient.listHaloTickets(workspace)
     await expect(browserIntegrationsClient.listConnections(workspace)).rejects.toThrow('Provider denied.')
     expect(fetchMock.mock.calls.map(([path]) => requestPath(path))).toEqual([
       '/api/v1/workspaces/organizations/client%2Fone/integrations/jobs?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/logs?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/conflicts?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/git-exports',
+      '/api/v1/workspaces/organizations/client%2Fone/integrations/halo/tickets',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/connections',
     ])
   })

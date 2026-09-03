@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import CharField, Prefetch, Q, QuerySet
 from django.db.models.functions import Cast
 
+from .halopsa import halo_ticket_summaries
 from .models import DocumentPlacement, Entity, EntityVisibility, PlacementAudienceProfile
 from .relationships import visible_entities_for_workspace
 from .workspaces import ResolvedWorkspace
@@ -74,6 +75,7 @@ RESULT_TYPE_LABELS = {
     "certificate": "Certificates",
     "network": "Networks",
     "data_flow": "Data flows",
+    "external_ticket": "External tickets",
 }
 
 # Only values already exposed by their normal read surfaces belong here. In
@@ -434,9 +436,7 @@ def _candidate_queryset(workspace: ResolvedWorkspace, query: str) -> QuerySet[En
         .order_by("id")
     )
     select_related = tuple(
-        lookup
-        for entity_type in candidate_types
-        for lookup in SELECT_RELATED_BY_ENTITY_TYPE.get(entity_type, ())
+        lookup for entity_type in candidate_types for lookup in SELECT_RELATED_BY_ENTITY_TYPE.get(entity_type, ())
     )
     return (
         candidates.select_related(*select_related)
@@ -523,18 +523,52 @@ def search_workspace(
     ranked = [_rank(entity, query, terms) for entity in candidates[:MAX_MATCHES]]
     ranked = [hit for hit in ranked if hit.score > 0]
     ranked.sort(key=lambda hit: (-hit.score, hit.entity.display_name.casefold(), hit.result_type, str(hit.entity.id)))
-    facet_counts = Counter(hit.result_type for hit in ranked)
+    projected = [_projection(hit, workspace) for hit in ranked]
+    folded_query = _fold(query)
+    external_results: list[dict[str, object]] = []
+    for ticket in halo_ticket_summaries(workspace):
+        number = str(ticket["number"])
+        title = str(ticket["title"])
+        folded_number, folded_title = _fold(number), _fold(title)
+        if folded_query not in folded_number and not all(term in folded_title for term in terms):
+            continue
+        score = 1_100 if folded_number == folded_query else 900 if folded_title.startswith(folded_query) else 650
+        external_results.append(
+            {
+                "id": ticket["id"],
+                "result_type": "external_ticket",
+                "entity_type": "external_ticket",
+                "title": f"#{number} {title}".strip(),
+                "excerpt": " · ".join(value for value in (str(ticket["status"]), str(ticket["priority"])) if value),
+                "workspace_label": workspace.organization.entity.display_name
+                if workspace.organization
+                else workspace.member.tenant.name,
+                "target": ticket["external_url"],
+                "score": score,
+                "updated_at": ticket["source_updated_at"],
+                "review_state": None,
+            }
+        )
+    projected.extend(external_results)
+    projected.sort(
+        key=lambda hit: (
+            -(hit["score"] if isinstance(hit["score"], int) else 0),
+            str(hit["title"]).casefold(),
+            str(hit["id"]),
+        )
+    )
+    facet_counts = Counter(str(hit["result_type"]) for hit in projected)
     facets = [
         {"value": value, "label": RESULT_TYPE_LABELS[value], "count": facet_counts[value]}
-        for value in RESULT_TYPE_ENTITY_TYPES
+        for value in (*RESULT_TYPE_ENTITY_TYPES, "external_ticket")
         if facet_counts[value]
     ]
-    selected = [hit for hit in ranked if not result_type or hit.result_type == result_type]
+    selected = [hit for hit in projected if not result_type or hit["result_type"] == result_type]
     count = len(selected)
     offset = (page - 1) * page_size
     page_results = selected[offset : offset + page_size]
     return {
-        "results": [_projection(hit, workspace) for hit in page_results],
+        "results": page_results,
         "facets": facets,
         "page": page,
         "page_size": page_size,

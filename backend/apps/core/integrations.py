@@ -7,8 +7,9 @@ from uuid import UUID, uuid4
 from uuid import UUID as UUIDValue
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
+from django.db import connection as database_connection
 from django.db import transaction
-from django.db.models import Count, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
@@ -19,18 +20,24 @@ from .integration_providers import PROVIDERS, ProviderAdapter, validate_provider
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
+    CommercialContract,
+    Entity,
     IntegrationConflict,
     IntegrationConflictStatus,
     IntegrationConnection,
+    IntegrationEntityMapping,
     IntegrationJobState,
     IntegrationLogEvent,
     IntegrationObservation,
     IntegrationProvider,
     IntegrationSyncJob,
     NetBoxReference,
+    Organization,
+    PersonAssociation,
     Tenant,
     workspace_for_owner,
 )
+from .rls import OrganizationRLSMode, bind_local_rls_scope, system_rls_scope_if_postgresql
 from .scoping import DataScope
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
@@ -74,12 +81,15 @@ def _provider_credentials(
         if not isinstance(value, str) or len(value) < field.minimum_length or len(value) > 4096:
             raise ValidationError({"credentials": f"Enter a valid {field.label.lower()}."})
         _validate_provider_secret(value, field="credentials")
-        if not field.secret:
+        if not field.secret and provider == IntegrationProvider.MICROSOFT_GRAPH:
             try:
                 normalized = str(UUIDValue(value))
             except ValueError as exc:
                 raise ValidationError({"credentials": f"{field.label} must be a UUID."}) from exc
             configuration[field.key] = normalized
+        elif not field.secret:
+            _validate_provider_secret(value, field="credentials")
+            configuration[field.key] = value.strip()
         else:
             secrets[field.key] = value
     if provider == IntegrationProvider.NETBOX:
@@ -340,6 +350,9 @@ def _safe_log(*, job: IntegrationSyncJob, level: str, code: str, metrics: dict[s
 
 
 def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[IntegrationObservation]) -> None:
+    if job.connection.provider == IntegrationProvider.HALOPSA:
+        _halo_conflicts_for_observations(job, observations)
+        return
     if job.connection.provider != IntegrationProvider.NETBOX:
         return
     references = {
@@ -376,6 +389,136 @@ def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[Inte
                 "difference": difference,
                 "remote_fingerprint": observation.fingerprint,
                 "local_fingerprint": reference.observed_fingerprint if reference else "",
+            },
+        )
+
+
+def _halo_client_organization(job: IntegrationSyncJob, remote_client_id: object) -> Organization | None:
+    if remote_client_id is None:
+        return job.organization
+    mapping = (
+        IntegrationEntityMapping.objects.filter(
+            connection=job.connection,
+            remote_type="client",
+            remote_id=str(remote_client_id),
+        )
+        .select_related("local_entity__organization_record")
+        .first()
+    )
+    return getattr(mapping.local_entity, "organization_record", None) if mapping else None
+
+
+def _unique_halo_candidate(job: IntegrationSyncJob, observation: IntegrationObservation) -> Entity | None:
+    projection = observation.safe_projection
+    name = str(projection.get("name", "")).strip()
+    if observation.remote_type == "client" and name:
+        candidates = Entity.objects.filter(
+            tenant=job.tenant,
+            entity_type="organization",
+            archived_at__isnull=True,
+        ).filter(Q(display_name__iexact=name) | Q(organization_record__legal_name__iexact=name))
+    else:
+        organization = _halo_client_organization(job, projection.get("client_id"))
+        if organization is None:
+            return None
+        scope = DataScope.organization(job.tenant, organization)
+        try:
+            with system_rls_scope_if_postgresql(scope, organization_mode=OrganizationRLSMode.ORGANIZATION):
+                if observation.remote_type == "site" and name:
+                    candidates = Entity.objects.filter(
+                        tenant=job.tenant,
+                        organization=organization,
+                        entity_type="site",
+                        archived_at__isnull=True,
+                    ).filter(Q(display_name__iexact=name) | Q(site_record__code__iexact=name))
+                elif observation.remote_type == "contact":
+                    email = str(projection.get("emailaddress", "")).strip()
+                    associations = PersonAssociation.objects.filter(
+                        tenant=job.tenant,
+                        organization=organization,
+                        archived_at__isnull=True,
+                    )
+                    if email:
+                        associations = associations.filter(person__email__iexact=email)
+                    elif name:
+                        associations = associations.filter(
+                            Q(person__entity__display_name__iexact=name) | Q(person__preferred_name__iexact=name)
+                        )
+                    else:
+                        return None
+                    candidates = Entity.objects.filter(id__in=associations.values("person__entity_id"))
+                elif observation.remote_type == "contract" and name:
+                    reference = str(projection.get("reference", "")).strip()
+                    contracts = CommercialContract.objects.filter(
+                        tenant=job.tenant,
+                        organization=organization,
+                        archived_at__isnull=True,
+                    )
+                    contracts = (
+                        contracts.filter(reference__iexact=reference)
+                        if reference
+                        else contracts.filter(entity__display_name__iexact=name)
+                    )
+                    candidates = Entity.objects.filter(id__in=contracts.values("entity_id"))
+                else:
+                    return None
+                matches = list(candidates.order_by("id")[:2])
+        finally:
+            # SET LOCAL scope values survive savepoint release. Restore the sync
+            # worker's owner scope after this narrow organization lookup.
+            if database_connection.vendor == "postgresql":
+                owner_scope = DataScope.owner(job.tenant, job.organization)
+                owner_mode = OrganizationRLSMode.ORGANIZATION if job.organization_id else OrganizationRLSMode.MSP_ONLY
+                bind_local_rls_scope(owner_scope, organization_mode=owner_mode)
+        return matches[0] if len(matches) == 1 else None
+    matches = list(candidates.order_by("id")[:2])
+    return matches[0] if len(matches) == 1 else None
+
+
+def _halo_conflicts_for_observations(job: IntegrationSyncJob, observations: list[IntegrationObservation]) -> None:
+    mappings = {
+        (item.remote_type, item.remote_id): item
+        for item in IntegrationEntityMapping.objects.filter(connection=job.connection).select_related("local_entity")
+    }
+    for observation in observations:
+        if observation.remote_type == "ticket":
+            continue
+        mapping = mappings.get((observation.remote_type, observation.remote_id))
+        candidate = mapping.local_entity if mapping else _unique_halo_candidate(job, observation)
+        if observation.state == "observed" and mapping is None and candidate is not None:
+            mapping = IntegrationEntityMapping.objects.create(
+                tenant=job.tenant,
+                workspace=job.workspace,
+                organization=job.organization,
+                connection=job.connection,
+                remote_type=observation.remote_type,
+                remote_id=observation.remote_id,
+                local_entity=candidate,
+                observed_fingerprint=observation.fingerprint,
+                last_observed_at=observation.observed_at,
+            )
+            mappings[(observation.remote_type, observation.remote_id)] = mapping
+        elif observation.state == "observed" and mapping is not None:
+            mapping.observed_fingerprint = observation.fingerprint
+            mapping.last_observed_at = observation.observed_at
+            mapping.save(update_fields=("observed_fingerprint", "last_observed_at", "updated_at"))
+        difference = "retired_remote" if observation.state == "retired" else "unmatched" if candidate is None else ""
+        if not difference:
+            continue
+        IntegrationConflict.objects.update_or_create(
+            connection=job.connection,
+            remote_type=observation.remote_type,
+            remote_id=observation.remote_id,
+            status=IntegrationConflictStatus.OPEN,
+            defaults={
+                "tenant": job.tenant,
+                "workspace": job.workspace,
+                "organization": job.organization,
+                "observation": observation,
+                "local_entity": candidate if candidate and candidate.workspace_id == job.workspace_id else None,
+                "difference": difference,
+                "remote_fingerprint": observation.fingerprint,
+                "local_fingerprint": mapping.observed_fingerprint if mapping else "",
             },
         )
 
@@ -714,6 +857,21 @@ def resolve_conflict(
             reference.observed_fingerprint = conflict.remote_fingerprint
             reference.last_observed_at = timezone.now()
             reference.save(update_fields=("observed_fingerprint", "last_observed_at", "updated_at"))
+        observation = conflict.observation
+        if conflict.connection.provider == IntegrationProvider.HALOPSA and observation is not None:
+            IntegrationEntityMapping.objects.update_or_create(
+                connection=conflict.connection,
+                remote_type=conflict.remote_type,
+                remote_id=conflict.remote_id,
+                defaults={
+                    "tenant": conflict.tenant,
+                    "workspace": conflict.workspace,
+                    "organization": conflict.organization,
+                    "local_entity": conflict.local_entity,
+                    "observed_fingerprint": conflict.remote_fingerprint,
+                    "last_observed_at": observation.observed_at,
+                },
+            )
     conflict.status = resolution
     conflict.resolved_by = actor
     conflict.resolved_at = timezone.now()

@@ -19,6 +19,7 @@ function providerClient(): IntegrationsClient {
     listProviders: vi.fn().mockResolvedValue([
       { key: 'netbox', label: 'NetBox', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'api_token', label: 'API token', secret: true, minimum_length: 8, input_type: 'password', help_text: '' }], capabilities: ['inventory_observations', 'reconciliation'], object_types: ['ipam.vlan'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 5, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: '' },
       { key: 'microsoft_graph', label: 'Microsoft 365', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'tenant_id', label: 'Microsoft tenant ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The directory ID.' }, { key: 'client_id', label: 'Application (client) ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The application ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['identity_observations'], object_types: ['user'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://graph.microsoft.com/v1.0/', base_url_editable: false, setup_help_url: 'https://learn.microsoft.com/' },
+      { key: 'halopsa', label: 'HaloPSA', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'Client ID', secret: false, minimum_length: 1, input_type: 'text', help_text: 'Dedicated Halo API application client ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['psa_observations', 'external_ticket_search', 'reconciliation'], object_types: ['client', 'site', 'contact', 'contract', 'ticket'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: 'https://halopsa.com/guides/article/?kbid=1499' },
     ]),
     listConnections: vi.fn().mockResolvedValue([]), createConnection: vi.fn(), updateConnection: vi.fn(),
     rotateConnection: vi.fn(), startSync: vi.fn(),
@@ -29,6 +30,7 @@ function providerClient(): IntegrationsClient {
     listConflicts: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     resolveConflict: vi.fn(), listGitExports: vi.fn().mockResolvedValue([]), createGitExport: vi.fn(),
     gitExportDownloadUrl: vi.fn().mockReturnValue('/download'),
+    listHaloTickets: vi.fn().mockResolvedValue([]),
   }
 }
 
@@ -183,6 +185,35 @@ describe('Integrations', () => {
       provider: 'microsoft_graph', name: 'Client Microsoft 365', base_url: 'https://graph.microsoft.com/v1.0/',
       credentials: { tenant_id: '11111111-1111-1111-1111-111111111111', client_id: '22222222-2222-2222-2222-222222222222', client_secret: 'microsoft-client-secret' },
       sync_interval_minutes: 15,
+    }))
+  })
+
+  it('uses the HaloPSA base URL and dedicated client credentials', async () => {
+    const provider = providerClient()
+    vi.mocked(provider.createConnection).mockResolvedValue({
+      id: 'connection-halo', provider: 'halopsa', name: 'Primary HaloPSA',
+      base_url: 'https://support.example.com/', provider_details: { client_id: 'tekdocs-reader' },
+      credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 30,
+      health_status: 'unknown', last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null,
+      reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    })
+    const user = userEvent.setup()
+    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+
+    await user.click(await screen.findByRole('button', { name: 'New connection' }))
+    await user.selectOptions(screen.getByLabelText('Provider'), 'halopsa')
+    await user.type(screen.getByLabelText('Name'), 'Primary HaloPSA')
+    await user.type(screen.getByLabelText('API base URL'), 'https://support.example.com/')
+    await user.type(screen.getByLabelText(/^Client ID/), 'tekdocs-reader')
+    await user.type(screen.getByLabelText(/Client secret/), 'halo-client-secret')
+    await user.clear(screen.getByLabelText('Sync interval (minutes)'))
+    await user.type(screen.getByLabelText('Sync interval (minutes)'), '30')
+    await user.click(screen.getByRole('button', { name: 'Save connection' }))
+
+    await waitFor(() => expect(provider.createConnection).toHaveBeenCalledWith(workspace, {
+      provider: 'halopsa', name: 'Primary HaloPSA', base_url: 'https://support.example.com/',
+      credentials: { client_id: 'tekdocs-reader', client_secret: 'halo-client-secret' },
+      sync_interval_minutes: 30,
     }))
   })
 })

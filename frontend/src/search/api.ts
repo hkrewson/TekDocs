@@ -17,6 +17,7 @@ export const workspaceSearchResultTypes = [
   'certificate',
   'network',
   'data_flow',
+  'external_ticket',
 ] as const
 
 export type WorkspaceSearchResultType = typeof workspaceSearchResultTypes[number]

@@ -55,6 +55,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_integrationconnection",
     "core_integrationsyncjob",
     "core_integrationobservation",
+    "core_integrationentitymapping",
     "core_integrationlogevent",
     "core_integrationconflict",
     "core_importbatch",

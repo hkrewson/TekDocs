@@ -5299,6 +5299,7 @@ class WebhookInboundReceipt(models.Model):
 class IntegrationProvider(models.TextChoices):
     NETBOX = "netbox", "NetBox"
     MICROSOFT_GRAPH = "microsoft_graph", "Microsoft 365"
+    HALOPSA = "halopsa", "HaloPSA"
 
 
 class IntegrationConnection(TimestampedModel):
@@ -5480,6 +5481,52 @@ class IntegrationObservation(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Integration observations are append-only")
+
+
+class IntegrationEntityMapping(TimestampedModel):
+    """A reviewed stable link from one provider identity to one TekDocs entity."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="integration_entity_mappings")
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="integration_entity_mappings")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT, related_name="integration_entity_mappings", null=True, blank=True
+    )
+    connection = models.ForeignKey(IntegrationConnection, on_delete=models.PROTECT, related_name="entity_mappings")
+    remote_type = models.CharField(max_length=64)
+    remote_id = models.CharField(max_length=160)
+    local_entity = models.ForeignKey(Entity, on_delete=models.PROTECT, related_name="integration_mappings")
+    observed_fingerprint = models.CharField(max_length=64)
+    last_observed_at = models.DateTimeField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("remote_type", "remote_id", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("connection", "remote_type", "remote_id"), name="integration_entity_mapping_remote_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(observed_fingerprint__regex=r"^[0-9a-f]{64}$"),
+                name="integration_entity_mapping_digest_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "local_entity"), name="core_intmap_local_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.remote_type}:{self.remote_id} → {self.local_entity_id}"
+
+    def clean(self) -> None:
+        if self.connection_id and (
+            self.connection.tenant_id != self.tenant_id
+            or self.connection.workspace_id != self.workspace_id
+            or self.connection.organization_id != self.organization_id
+        ):
+            raise ValidationError("Integration mapping and connection scopes must match")
+        if self.local_entity_id and self.local_entity.tenant_id != self.tenant_id:
+            raise ValidationError("Integration mapping entity must belong to its tenant")
 
 
 class IntegrationLogEvent(models.Model):

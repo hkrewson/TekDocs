@@ -7,6 +7,7 @@ export type IntegrationJob = { id: string; connection_id: string; connection_nam
 export type IntegrationLog = { id: string; connection_id: string; connection_name: string; job_id: string | null; level: 'info' | 'warning' | 'error'; code: string; metrics: Record<string, number>; occurred_at: string }
 export type IntegrationObservation = { id: string; connection_id: string; connection_name: string; remote_type: string; remote_id: string; safe_projection: Record<string, string | number | boolean | null>; source_timestamp: string | null; state: 'observed' | 'retired'; observed_at: string }
 export type IntegrationConflict = { id: string; connection_id: string; connection_name: string; local_entity_id: string | null; remote_type: string; remote_id: string; difference: string; status: 'open' | 'keep_local' | 'accept_remote' | 'ignored'; created_at: string; resolved_at: string | null }
+export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }
 export type IntegrationPage<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean }
 export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[] }; content_digest: string; byte_size: number; created_at: string }
 
@@ -26,6 +27,7 @@ export interface IntegrationsClient {
   listGitExports(workspace: WorkspaceContext, signal?: AbortSignal): Promise<GitExportBundle[]>
   createGitExport(workspace: WorkspaceContext, documentIds: string[], publicationIds: string[]): Promise<GitExportBundle>
   gitExportDownloadUrl(workspace: WorkspaceContext, bundle: GitExportBundle): string
+  listHaloTickets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<HaloTicketSummary[]>
 }
 
 function base(workspace: WorkspaceContext) { return workspace.kind === 'msp' ? '/api/v1/workspaces/msp/integrations' : `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/integrations` }
@@ -49,4 +51,5 @@ export const browserIntegrationsClient: IntegrationsClient = {
   listGitExports: async (workspace, signal) => parse(await fetch(`${base(workspace)}/git-exports`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   createGitExport: (workspace, document_ids, publication_ids) => mutate(`${base(workspace)}/git-exports`, 'POST', { document_ids, publication_ids }),
   gitExportDownloadUrl: (workspace, bundle) => `${base(workspace)}/git-exports/${encodeURIComponent(bundle.id)}/download`,
+  listHaloTickets: async (workspace, signal) => parse(await fetch(`${base(workspace)}/halo/tickets`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
 }

@@ -2980,6 +2980,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/integrations/halo/tickets": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_integrations_halo_tickets_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/integrations/imports": {
         readonly parameters: {
             readonly query?: never;
@@ -5988,6 +6004,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/halo/tickets": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_integrations_halo_tickets_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/imports": {
         readonly parameters: {
             readonly query?: never;
@@ -8582,9 +8614,10 @@ export interface components {
             /**
              * @description * `netbox` - netbox
              *     * `microsoft_graph` - microsoft_graph
+             *     * `halopsa` - halopsa
              * @enum {string}
              */
-            readonly provider: "netbox" | "microsoft_graph";
+            readonly provider: "netbox" | "microsoft_graph" | "halopsa";
             readonly name: string;
             /**
              * Format: uri
@@ -10129,6 +10162,31 @@ export interface components {
         readonly GitExportWrite: {
             readonly document_ids?: readonly string[];
             readonly publication_ids?: readonly string[];
+        };
+        readonly HaloTicketSummary: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly number: string;
+            readonly title: string;
+            readonly status: string;
+            readonly priority: string;
+            readonly assigned_team: string;
+            readonly assigned_agent: string;
+            /** Format: date-time */
+            readonly respond_by: string | null;
+            /** Format: date-time */
+            readonly fix_by: string | null;
+            /** Format: date-time */
+            readonly opened_at: string | null;
+            /** Format: date-time */
+            readonly closed_at: string | null;
+            /** Format: date-time */
+            readonly source_updated_at: string;
+            /** Format: date-time */
+            readonly source_last_synced_at: string | null;
+            readonly stale: boolean;
+            /** Format: uri */
+            readonly external_url: string;
         };
         readonly Handoff: {
             /** Format: uuid */
@@ -13744,9 +13802,10 @@ export interface components {
              *     * `certificate` - certificate
              *     * `network` - network
              *     * `data_flow` - data_flow
+             *     * `external_ticket` - external_ticket
              * @enum {string}
              */
-            readonly value: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow";
+            readonly value: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "external_ticket";
             readonly label: string;
             readonly count: number;
         };
@@ -13770,9 +13829,10 @@ export interface components {
              *     * `certificate` - certificate
              *     * `network` - network
              *     * `data_flow` - data_flow
+             *     * `external_ticket` - external_ticket
              * @enum {string}
              */
-            readonly result_type: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow";
+            readonly result_type: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "external_ticket";
             readonly entity_type: string;
             readonly title: string;
             readonly excerpt: string;
@@ -19262,8 +19322,9 @@ export interface operations {
                  *     * `certificate` - certificate
                  *     * `network` - network
                  *     * `data_flow` - data_flow
+                 *     * `external_ticket` - external_ticket
                  */
-                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "";
+                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "external_ticket" | "";
             };
             readonly header?: never;
             readonly path?: never;
@@ -21747,6 +21808,27 @@ export interface operations {
                 };
                 content: {
                     readonly "application/zip": string;
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_halo_tickets_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["HaloTicketSummary"][];
                 };
             };
         };
@@ -29429,6 +29511,29 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_integrations_halo_tickets_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["HaloTicketSummary"][];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_integrations_imports_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -33091,8 +33196,9 @@ export interface operations {
                  *     * `certificate` - certificate
                  *     * `network` - network
                  *     * `data_flow` - data_flow
+                 *     * `external_ticket` - external_ticket
                  */
-                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "";
+                readonly result_type?: "organization" | "person" | "site" | "location" | "document" | "file" | "asset" | "product" | "model" | "license" | "service" | "credential_reference" | "domain" | "certificate" | "network" | "data_flow" | "external_ticket" | "";
             };
             readonly header?: never;
             readonly path: {

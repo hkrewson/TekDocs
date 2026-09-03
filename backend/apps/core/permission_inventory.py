@@ -154,6 +154,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-document-publication-manifest", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-publication-artifact-download", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-integration-provider-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
+    route("msp-halopsa-ticket-summary-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route(
         "msp-integration-connection-list-create",
         ("GET", "POST"),
@@ -1587,6 +1588,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-integration-provider-list",
+        ("GET",),
+        PermissionKey.INTEGRATIONS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-halopsa-ticket-summary-list",
         ("GET",),
         PermissionKey.INTEGRATIONS_VIEW,
         organization_scoped=True,

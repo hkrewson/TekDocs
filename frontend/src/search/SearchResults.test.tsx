@@ -55,4 +55,17 @@ describe('SearchResults', () => {
     expect(screen.getByText(/Enter at least two characters/)).toBeInTheDocument()
     expect(search).not.toHaveBeenCalled()
   })
+
+  it('opens provider ticket results outside TekDocs', async () => {
+    const search = vi.fn().mockResolvedValue({
+      ...firstPage,
+      results: [{ id: 'ticket-1042', result_type: 'external_ticket', entity_type: 'external_ticket', title: '#1042 Printer queue unavailable', excerpt: 'In progress · High', workspace_label: 'Acme Dental', target: 'https://support.example.com/tickets?id=1042', score: 900, updated_at: '2026-09-01T12:00:00Z', review_state: null }],
+      count: 1,
+      has_more: false,
+    })
+    render(<MemoryRouter initialEntries={['/search?q=1042']}><SearchResults workspace={null} client={{ search }} /></MemoryRouter>)
+
+    expect(await screen.findByRole('link', { name: /#1042 Printer queue unavailable/ })).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: /#1042 Printer queue unavailable/ })).toHaveAttribute('href', 'https://support.example.com/tickets?id=1042')
+  })
 })

@@ -630,9 +630,7 @@ class InvoiceLifecycleEvent(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoice_lifecycle_events")
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.PROTECT, related_name="invoice_lifecycle_events"
-    )
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoice_lifecycle_events")
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="lifecycle_events")
     event_type = models.CharField(max_length=32, choices=InvoiceEventType.choices)
     occurred_at = models.DateTimeField()
@@ -680,8 +678,7 @@ class InvoiceLifecycleEvent(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(amount__isnull=True, currency="")
-                    | models.Q(amount__gt=0, currency__regex=r"^[A-Z]{3}$")
+                    models.Q(amount__isnull=True, currency="") | models.Q(amount__gt=0, currency__regex=r"^[A-Z]{3}$")
                 ),
                 name="invoice_event_amount_consistent",
             ),
@@ -5377,6 +5374,7 @@ class IntegrationJobState(models.TextChoices):
     PROCESSING = "processing", "Processing"
     SUCCEEDED = "succeeded", "Succeeded"
     DEAD_LETTER = "dead_letter", "Dead letter"
+    CANCELLED = "cancelled", "Cancelled"
 
 
 class IntegrationSyncJob(models.Model):
@@ -5389,6 +5387,7 @@ class IntegrationSyncJob(models.Model):
         Organization, on_delete=models.PROTECT, related_name="integration_sync_jobs", null=True, blank=True
     )
     connection = models.ForeignKey(IntegrationConnection, on_delete=models.PROTECT, related_name="sync_jobs")
+    sync_run_id = models.UUIDField(default=uuid.uuid4, editable=False)
     idempotency_key = models.CharField(max_length=160)
     trigger = models.CharField(max_length=20, default="scheduled")
     state = models.CharField(max_length=20, choices=IntegrationJobState.choices, default=IntegrationJobState.PENDING)
@@ -5448,6 +5447,7 @@ class IntegrationObservation(models.Model):
     safe_projection = models.JSONField(default=dict, blank=True)
     source_timestamp = models.DateTimeField(null=True, blank=True)
     provenance = models.CharField(max_length=32, default="provider_api")
+    state = models.CharField(max_length=16, default="observed")
     observed_at = models.DateTimeField(auto_now_add=True)
 
     objects = models.Manager()
@@ -5462,6 +5462,9 @@ class IntegrationObservation(models.Model):
             ),
             models.CheckConstraint(
                 condition=models.Q(schema_version__gte=1), name="integration_observation_schema_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(state__in=("observed", "retired")), name="integration_observation_state_valid"
             ),
         ]
         indexes = [models.Index(fields=("workspace", "remote_type", "remote_id"), name="core_intobs_remote_idx")]
@@ -5569,7 +5572,7 @@ class IntegrationConflict(TimestampedModel):
                 name="integration_conflict_status_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(difference__in=("unmatched", "changed")),
+                condition=models.Q(difference__in=("unmatched", "changed", "retired_remote")),
                 name="integration_conflict_difference_valid",
             ),
             models.CheckConstraint(

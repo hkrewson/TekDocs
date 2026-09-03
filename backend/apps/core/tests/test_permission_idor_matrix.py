@@ -220,6 +220,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-integration-provider-list": ("organization_entity_id",),
         "organization-integration-connection-list-create": ("organization_entity_id",),
         "organization-integration-job-list-create": ("organization_entity_id",),
+        "organization-integration-job-cancel": ("organization_entity_id", "job_id"),
         "organization-integration-log-list": ("organization_entity_id",),
         "organization-integration-conflict-list": ("organization_entity_id",),
         "organization-integration-conflict-resolve": ("organization_entity_id", "conflict_id"),

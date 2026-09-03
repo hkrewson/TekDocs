@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -12,6 +14,28 @@ from .approved_egress import pinned_https_pool
 from .webhook_egress import WebhookEgressError, resolve_webhook_target, validate_webhook_url
 
 MAX_INTEGRATION_RESPONSE_BYTES = 1024 * 1024
+MAX_RETRY_AFTER_SECONDS = 60 * 60
+
+
+class ProviderRateLimited(WebhookEgressError):
+    def __init__(self, retry_at: datetime):
+        super().__init__("provider_rate_limited")
+        self.retry_at = retry_at
+
+
+def _retry_at(value: str, *, now: datetime | None = None) -> datetime:
+    current = now or datetime.now(UTC)
+    try:
+        seconds = int(value)
+        requested = current + timedelta(seconds=max(1, seconds))
+    except ValueError:
+        try:
+            requested = parsedate_to_datetime(value)
+            if requested.tzinfo is None:
+                requested = requested.replace(tzinfo=UTC)
+        except (TypeError, ValueError, OverflowError):
+            requested = current + timedelta(minutes=1)
+    return min(max(requested, current + timedelta(seconds=1)), current + timedelta(seconds=MAX_RETRY_AFTER_SECONDS))
 
 
 def validate_integration_base_url(value: str) -> str:
@@ -54,6 +78,10 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
             assert_same_host=False,
             preload_content=False,
         )
+        if response.status == 429:
+            retry_at = _retry_at(response.headers.get("Retry-After", "60"))
+            response.close()
+            raise ProviderRateLimited(retry_at)
         if response.status != 200:
             response.close()
             raise WebhookEgressError("provider_http_error")

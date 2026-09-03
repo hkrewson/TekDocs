@@ -14,6 +14,7 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.documents import create_document
 from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
 from apps.core.integration_providers import (
+    PROVIDERS,
     NetBoxProvider,
     ProviderObservation,
     ProviderPage,
@@ -59,9 +60,7 @@ def test_static_manifest_credential_metadata_is_not_exportable():
     assert _manifest_has_credential_reference(
         {"entities": [{"id": str(uuid.uuid4()), "entity_type": "credential_reference"}]}
     )
-    assert not _manifest_has_credential_reference(
-        {"entities": [{"id": str(uuid.uuid4()), "entity_type": "network"}]}
-    )
+    assert not _manifest_has_credential_reference({"entities": [{"id": str(uuid.uuid4()), "entity_type": "network"}]})
 
 
 def organization(installation, name):  # type: ignore[no-untyped-def]
@@ -173,7 +172,8 @@ def test_database_rejects_a_cross_workspace_job_connection(installation):
 
 class SuccessfulAdapter:
     key = "netbox"
-    label = "Fake NetBox"
+    label = NetBoxProvider.label
+    contract = NetBoxProvider.contract
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
         assert secret == TEST_PROVIDER_TOKEN
@@ -186,14 +186,19 @@ class SuccessfulAdapter:
 
 class FailingAdapter:
     key = "netbox"
-    label = "Fake NetBox"
+    label = NetBoxProvider.label
+    contract = NetBoxProvider.contract
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
         raise ValueError("provider_response_invalid")
 
 
+@pytest.mark.parametrize("adapter", (*PROVIDERS.values(), SuccessfulAdapter()), ids=lambda item: item.label)
+def test_every_registered_and_fake_provider_obeys_the_reusable_contract(adapter):  # type: ignore[no-untyped-def]
+    validate_provider_adapter(adapter)
+
+
 def test_provider_catalog_is_a_complete_versioned_contract():
-    validate_provider_adapter(NetBoxProvider())
     contract = provider_catalog()[0]
     assert contract["key"] == "netbox"
     assert contract["version"] == "1.0"
@@ -319,9 +324,7 @@ def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_lin
     with first.artifact.open("rb") as stored:
         content = stored.read()
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
-        exported_markdown = archive.read(
-            f"documents/runbook--{document.entity_id}.md"
-        )
+        exported_markdown = archive.read(f"documents/runbook--{document.entity_id}.md")
         export_manifest = json.loads(archive.read("tekdocs-export.json"))
     assert b"start.1password.com" not in exported_markdown
     assert b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in exported_markdown

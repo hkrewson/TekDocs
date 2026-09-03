@@ -259,6 +259,7 @@ from apps.core.integration_views import (
     IntegrationConnectionDetailView,
     IntegrationConnectionListCreateView,
     IntegrationConnectionRotateView,
+    IntegrationJobCancelView,
     IntegrationJobListCreateView,
     IntegrationLogListView,
     IntegrationProviderCatalogView,
@@ -934,6 +935,11 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/jobs",
         IntegrationJobListCreateView.as_view(),
         name="msp-integration-job-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/jobs/<uuid:job_id>/cancel",
+        IntegrationJobCancelView.as_view(),
+        name="msp-integration-job-cancel",
     ),
     path("api/v1/workspaces/msp/integrations/logs", IntegrationLogListView.as_view(), name="msp-integration-log-list"),
     path(
@@ -2221,6 +2227,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/jobs",
         IntegrationJobListCreateView.as_view(),
         name="organization-integration-job-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/jobs/<uuid:job_id>/cancel",
+        IntegrationJobCancelView.as_view(),
+        name="organization-integration-job-cancel",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/logs",

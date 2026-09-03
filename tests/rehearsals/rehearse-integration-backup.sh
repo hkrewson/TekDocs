@@ -46,11 +46,19 @@ compose_for "$restore_project" up -d --wait db
 compose_for "$restore_project" run --rm migrate
 compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
   < "$backup_directory/postgres.dump"
-compose_for "$restore_project" create backend >/dev/null
+# Create the application image and its media volume without asking Compose to
+# resolve service dependencies before their restore-side images exist.
+compose_for "$restore_project" build backend
+compose_for "$restore_project" up --no-start --no-deps backend >/dev/null
 docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_directory:/backup:ro" \
   postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
   tar -xzf /backup/media.tar.gz -C /restore
-compose_for "$restore_project" up -d --build --wait backend worker scheduler
+# Build every restore-side application image before Compose starts the graph. The
+# source project cleanup removes its local images. BuildKit can also coalesce the
+# renderer out of a multi-service Compose build, so give it the exact local tag
+# that Compose will resolve for the restore project.
+docker build -t "${restore_project}-diagram-renderer" "$repository_root/renderer" >/dev/null
+compose_for "$restore_project" up -d --wait backend worker scheduler
 compose_for "$restore_project" exec -T -e TEKDOCS_FIXTURE_MODE=verify \
   -e TEKDOCS_FIXTURE_PROVIDER_TOKEN="$provider_token" backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/integration-runtime-fixture.py"

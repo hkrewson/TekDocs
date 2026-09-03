@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceContext } from '../workspaces/api'
-import type { IntegrationConflict, IntegrationConnection } from './providerApi'
+import type { IntegrationConflict, IntegrationConnection, IntegrationJob } from './providerApi'
 import { browserIntegrationsClient } from './providerApi'
 
 const workspace: WorkspaceContext = {
@@ -50,6 +50,7 @@ describe('provider integrations API', () => {
     })
     const connection = { id: 'connection/one', active: true, sync_interval_minutes: 60 } as IntegrationConnection
     const conflict = { id: 'conflict/one' } as IntegrationConflict
+    const job = { id: 'job/one' } as IntegrationJob
 
     await browserIntegrationsClient.createConnection(workspace, {
       provider: 'netbox', name: 'Primary', base_url: 'https://netbox.example.com/api/',
@@ -58,16 +59,18 @@ describe('provider integrations API', () => {
     await browserIntegrationsClient.updateConnection(workspace, connection, false)
     await browserIntegrationsClient.rotateConnection(workspace, connection, 'replacement-token')
     await browserIntegrationsClient.startSync(workspace, connection)
+    await browserIntegrationsClient.cancelJob(workspace, job)
     await browserIntegrationsClient.resolveConflict(workspace, conflict, 'keep_local')
     await browserIntegrationsClient.createGitExport(workspace, ['document-1'], [])
 
     const mutations = fetchMock.mock.calls.filter(([path]) => requestPath(path) !== '/_allauth/browser/v1/auth/session')
-    expect(mutations).toHaveLength(6)
+    expect(mutations).toHaveLength(7)
     for (const [, request] of mutations) {
       expect(new Headers(request?.headers).get('X-CSRFToken')).toBe('integration-csrf')
     }
     expect(requestPath(mutations[2][0])).toContain('/connections/connection%2Fone/rotate')
-    expect(requestPath(mutations[4][0])).toContain('/conflicts/conflict%2Fone/resolve')
+    expect(requestPath(mutations[4][0])).toContain('/jobs/job%2Fone/cancel')
+    expect(requestPath(mutations[5][0])).toContain('/conflicts/conflict%2Fone/resolve')
     expect(JSON.stringify(mutations[0]?.[1]?.body)).toContain('one-time-token')
   })
 

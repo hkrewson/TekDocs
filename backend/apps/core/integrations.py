@@ -12,8 +12,8 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 
 from apps.accounts.policy import PermissionKey, require_permission
 
-from .integration_egress import validate_integration_base_url
-from .integration_providers import PROVIDERS, ProviderAdapter
+from .integration_egress import ProviderRateLimited, validate_integration_base_url
+from .integration_providers import PROVIDERS, ProviderAdapter, validate_provider_adapter, validate_provider_page
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
@@ -37,7 +37,13 @@ MAX_JOB_ATTEMPTS = 8
 JOB_LEASE = timedelta(minutes=10)
 LOG_RETENTION = timedelta(days=30)
 ALLOWED_LOG_CODES = frozenset(
-    {"sync_started", "sync_page_succeeded", "sync_retry_scheduled", "sync_dead_lettered", "sync_completed"}
+    {
+        "sync_started",
+        "sync_page_succeeded",
+        "sync_retry_scheduled",
+        "sync_dead_lettered",
+        "sync_completed",
+    }
 )
 
 
@@ -198,6 +204,7 @@ def enqueue_sync(
     requested_by_id: UUID | None = None,
     idempotency_key: str = "",
     cursor: str = "",
+    sync_run_id: UUID | None = None,
     now: Any = None,
 ) -> IntegrationSyncJob:
     now = now or timezone.now()
@@ -211,6 +218,7 @@ def enqueue_sync(
             "organization": connection.organization,
             "trigger": trigger,
             "cursor_before": cursor,
+            "sync_run_id": sync_run_id or uuid4(),
             "requested_by_id": requested_by_id,
             "available_at": now,
         },
@@ -258,9 +266,13 @@ def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[Inte
         key = (observation.remote_type, observation.remote_id)
         reference = references.get(key)
         difference = (
-            "unmatched"
-            if reference is None
-            else ("changed" if reference.observed_fingerprint != observation.fingerprint else "")
+            "retired_remote"
+            if observation.state == "retired"
+            else (
+                "unmatched"
+                if reference is None
+                else ("changed" if reference.observed_fingerprint != observation.fingerprint else "")
+            )
         )
         if not difference:
             continue
@@ -282,24 +294,83 @@ def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[Inte
         )
 
 
+def _retired_observations(job: IntegrationSyncJob) -> list[IntegrationObservation]:
+    current_keys = set(
+        IntegrationObservation.objects.filter(
+            job__connection=job.connection, job__sync_run_id=job.sync_run_id
+        ).values_list("remote_type", "remote_id")
+    )
+    latest = (
+        IntegrationObservation.objects.filter(job__connection=job.connection)
+        .exclude(job__sync_run_id=job.sync_run_id)
+        .order_by("remote_type", "remote_id", "-observed_at")
+        .distinct("remote_type", "remote_id")
+    )
+    return [
+        IntegrationObservation(
+            tenant=job.tenant,
+            workspace=job.workspace,
+            organization=job.organization,
+            job=job,
+            remote_type=item.remote_type,
+            remote_id=item.remote_id,
+            fingerprint=item.fingerprint,
+            schema_version=item.schema_version,
+            safe_projection={},
+            provenance="provider_absence",
+            state="retired",
+        )
+        for item in latest
+        if item.state == "observed" and (item.remote_type, item.remote_id) not in current_keys
+    ]
+
+
 @transaction.atomic
-def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, now: Any = None) -> IntegrationSyncJob:
-    now = now or timezone.now()
+def cancel_sync_job(*, workspace: ResolvedWorkspace, job_id: UUID, actor: Any) -> IntegrationSyncJob:
     try:
-        job = IntegrationSyncJob.objects.select_for_update().select_related("connection").get(pk=job_id)
+        job = (
+            IntegrationSyncJob.scoped.for_scope(workspace.data_scope)
+            .select_for_update()
+            .select_related("connection")
+            .get(workspace_id=workspace.data_scope.workspace_id, pk=job_id)
+        )
     except IntegrationSyncJob.DoesNotExist as exc:
         raise NotFound("The integration job is unavailable.") from exc
-    if job.state == IntegrationJobState.SUCCEEDED or job.state == IntegrationJobState.DEAD_LETTER:
+    if job.state in {IntegrationJobState.SUCCEEDED, IntegrationJobState.DEAD_LETTER, IntegrationJobState.CANCELLED}:
         return job
-    if job.locked_at and job.locked_at > now - JOB_LEASE:
-        return job
-    job.state = IntegrationJobState.PROCESSING
-    job.locked_at = now
-    job.started_at = job.started_at or now
-    job.attempts += 1
-    job.last_error_code = ""
-    job.save(update_fields=("state", "locked_at", "started_at", "attempts", "last_error_code"))
-    _safe_log(job=job, level="info", code="sync_started", metrics={"attempt": job.attempts})
+    now = timezone.now()
+    job.state = IntegrationJobState.CANCELLED
+    job.finished_at = now
+    job.locked_at = None
+    job.save(update_fields=("state", "finished_at", "locked_at"))
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=actor,
+        action="integration_sync.cancel_requested",
+        entity_id=job.id,
+        metadata={},
+    )
+    return job
+
+
+def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, now: Any = None) -> IntegrationSyncJob:
+    now = now or timezone.now()
+    with transaction.atomic():
+        try:
+            job = IntegrationSyncJob.objects.select_for_update().select_related("connection").get(pk=job_id)
+        except IntegrationSyncJob.DoesNotExist as exc:
+            raise NotFound("The integration job is unavailable.") from exc
+        if job.state in {IntegrationJobState.SUCCEEDED, IntegrationJobState.DEAD_LETTER, IntegrationJobState.CANCELLED}:
+            return job
+        if job.locked_at and job.locked_at > now - JOB_LEASE:
+            return job
+        job.state = IntegrationJobState.PROCESSING
+        job.locked_at = now
+        job.started_at = job.started_at or now
+        job.attempts += 1
+        job.last_error_code = ""
+        job.save(update_fields=("state", "locked_at", "started_at", "attempts", "last_error_code"))
+        _safe_log(job=job, level="info", code="sync_started", metrics={"attempt": job.attempts})
     try:
         secret = decrypt_integration_secret(
             envelope_payload=job.connection.secret_envelope,
@@ -308,9 +379,13 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
             generation=job.connection.secret_generation,
         ).decode()
         selected = adapter or PROVIDERS[job.connection.provider]
+        validate_provider_adapter(selected)
         page = selected.fetch_page(job.connection, secret=secret, cursor=job.cursor_before)
-        # A handled finalization failure must roll back the whole provider page before scheduling a retry.
+        validate_provider_page(selected, page)
         with transaction.atomic():
+            job = IntegrationSyncJob.objects.select_for_update().select_related("connection").get(pk=job_id)
+            if job.state == IntegrationJobState.CANCELLED:
+                return job
             records = [
                 IntegrationObservation(
                     tenant=job.tenant,
@@ -329,6 +404,10 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
             ]
             IntegrationObservation.objects.bulk_create(records, ignore_conflicts=True)
             created = list(IntegrationObservation.objects.filter(job=job))
+            if not page.next_cursor:
+                retired = _retired_observations(job)
+                IntegrationObservation.objects.bulk_create(retired, ignore_conflicts=True)
+                created = list(IntegrationObservation.objects.filter(job=job))
             _conflicts_for_observations(job, created)
             job.cursor_after = page.next_cursor
             job.state = IntegrationJobState.SUCCEEDED
@@ -344,6 +423,7 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     requested_by_id=job.requested_by_id,
                     idempotency_key=f"continuation:{job.id}",
                     cursor=page.next_cursor,
+                    sync_run_id=job.sync_run_id,
                     now=now,
                 )
             else:
@@ -351,6 +431,7 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                 job.connection.health_status = "healthy"
                 job.connection.last_successful_sync_at = now
                 job.connection.last_error_code = ""
+                job.connection.rate_limit_reset_at = None
                 job.connection.reconciliation_counts = {
                     "observations": len(created),
                     "review_required": IntegrationConflict.objects.filter(
@@ -363,6 +444,7 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                         "health_status",
                         "last_successful_sync_at",
                         "last_error_code",
+                        "rate_limit_reset_at",
                         "reconciliation_counts",
                         "updated_at",
                     )
@@ -380,27 +462,39 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                 "provider_content_type_invalid",
                 "provider_response_too_large",
                 "provider_connection_failed",
+                "provider_rate_limited",
                 "destination_not_public",
                 "dns_unavailable",
             }
             else "provider_failure"
         )
-        job.state = IntegrationJobState.DEAD_LETTER if job.attempts >= MAX_JOB_ATTEMPTS else IntegrationJobState.PENDING
-        job.locked_at = None
-        job.last_error_code = code
-        job.finished_at = now if job.state == IntegrationJobState.DEAD_LETTER else None
-        job.available_at = now + timedelta(minutes=min(2**job.attempts, 60))
-        job.save(update_fields=("state", "locked_at", "last_error_code", "finished_at", "available_at"))
-        job.connection.health_status = "failing" if job.state == IntegrationJobState.DEAD_LETTER else "degraded"
-        job.connection.last_error_code = code
-        job.connection.save(update_fields=("health_status", "last_error_code", "updated_at"))
-        _safe_log(
-            job=job,
-            level="error" if job.state == IntegrationJobState.DEAD_LETTER else "warning",
-            code="sync_dead_lettered" if job.state == IntegrationJobState.DEAD_LETTER else "sync_retry_scheduled",
-            metrics={"attempt": job.attempts},
-        )
-        return job
+        with transaction.atomic():
+            job = IntegrationSyncJob.objects.select_for_update().select_related("connection").get(pk=job_id)
+            if job.state == IntegrationJobState.CANCELLED:
+                return job
+            job.state = (
+                IntegrationJobState.DEAD_LETTER if job.attempts >= MAX_JOB_ATTEMPTS else IntegrationJobState.PENDING
+            )
+            job.locked_at = None
+            job.last_error_code = code
+            job.finished_at = now if job.state == IntegrationJobState.DEAD_LETTER else None
+            job.available_at = (
+                exc.retry_at
+                if isinstance(exc, ProviderRateLimited)
+                else now + timedelta(minutes=min(2**job.attempts, 60))
+            )
+            job.save(update_fields=("state", "locked_at", "last_error_code", "finished_at", "available_at"))
+            job.connection.health_status = "failing" if job.state == IntegrationJobState.DEAD_LETTER else "degraded"
+            job.connection.last_error_code = code
+            job.connection.rate_limit_reset_at = exc.retry_at if isinstance(exc, ProviderRateLimited) else None
+            job.connection.save(update_fields=("health_status", "last_error_code", "rate_limit_reset_at", "updated_at"))
+            _safe_log(
+                job=job,
+                level="error" if job.state == IntegrationJobState.DEAD_LETTER else "warning",
+                code="sync_dead_lettered" if job.state == IntegrationJobState.DEAD_LETTER else "sync_retry_scheduled",
+                metrics={"attempt": job.attempts},
+            )
+            return job
 
 
 def purge_integration_logs(*, tenant: Tenant, now: Any = None) -> int:

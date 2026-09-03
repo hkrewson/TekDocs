@@ -20,6 +20,7 @@ function providerClient(): IntegrationsClient {
     listConnections: vi.fn().mockResolvedValue([]), createConnection: vi.fn(), updateConnection: vi.fn(),
     rotateConnection: vi.fn(), startSync: vi.fn(),
     listJobs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
+    cancelJob: vi.fn(),
     listLogs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     listConflicts: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     resolveConflict: vi.fn(), listGitExports: vi.fn().mockResolvedValue([]), createGitExport: vi.fn(),
@@ -94,6 +95,12 @@ describe('Integrations', () => {
       available_at: '2026-08-12T00:00:00Z', started_at: null, finished_at: null,
       created_at: '2026-08-12T00:00:00Z',
     })
+    vi.mocked(provider.cancelJob).mockResolvedValue({
+      id: 'job-2', connection_id: connection.id, connection_name: connection.name, trigger: 'manual',
+      state: 'cancelled', attempts: 0, cursor_present: false, last_error_code: '', result_counts: {},
+      available_at: '2026-08-12T00:00:00Z', started_at: null, finished_at: '2026-08-12T00:00:01Z',
+      created_at: '2026-08-12T00:00:00Z',
+    })
     vi.mocked(provider.updateConnection).mockResolvedValue({ ...connection, active: false })
     vi.mocked(provider.rotateConnection).mockResolvedValue({ ...connection, secret_generation: 2 })
     vi.mocked(provider.resolveConflict).mockResolvedValue({ ...conflict, status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
@@ -104,6 +111,8 @@ describe('Integrations', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sync' }))
     await waitFor(() => expect(provider.startSync).toHaveBeenCalledWith(workspace, connection))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(provider.cancelJob).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'job-2' })))
     await user.click(screen.getByRole('button', { name: 'Pause' }))
     await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, false))
     await user.click(screen.getByRole('button', { name: /Rotate Primary NetBox provider credential/i }))

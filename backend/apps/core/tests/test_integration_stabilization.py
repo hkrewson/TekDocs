@@ -11,11 +11,12 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.core.integration_egress import MAX_INTEGRATION_RESPONSE_BYTES, get_provider_json
+from apps.core.integration_egress import MAX_INTEGRATION_RESPONSE_BYTES, ProviderRateLimited, get_provider_json
 from apps.core.integration_providers import ProviderObservation, ProviderPage
-from apps.core.integrations import JOB_LEASE, enqueue_sync, process_sync_job
-from apps.core.models import IntegrationJobState, IntegrationObservation
+from apps.core.integrations import JOB_LEASE, cancel_sync_job, enqueue_sync, process_sync_job
+from apps.core.models import IntegrationConflict, IntegrationJobState, IntegrationObservation
 from apps.core.webhook_egress import WebhookEgressError, WebhookTarget
+from apps.core.workspaces import resolve_organization_workspace
 
 from .test_integrations import SuccessfulAdapter, connection, organization
 
@@ -23,9 +24,9 @@ pytest_plugins = ("apps.core.tests.test_integrations",)
 
 
 class FakeResponse:
-    def __init__(self, *, status: int = 200, content_type: str = "application/json", body: bytes = b"{}"):
+    def __init__(self, *, status: int = 200, content_type: str = "application/json", body: bytes = b"{}", headers=None):  # type: ignore[no-untyped-def]
         self.status = status
-        self.headers = {"Content-Type": content_type}
+        self.headers = {"Content-Type": content_type, **(headers or {})}
         self.body = body
         self.closed = False
 
@@ -110,6 +111,20 @@ def test_provider_egress_rejects_redirect_content_type_size_and_invalid_json(mon
     assert response.closed
 
 
+def test_provider_egress_honors_bounded_rate_limit_without_exposing_response(monkeypatch):
+    _mock_egress(monkeypatch)
+    FakePool.response = FakeResponse(status=429, body=b"sensitive provider text", headers={"Retry-After": "999999"})
+    started = timezone.now()
+    with pytest.raises(ProviderRateLimited) as caught:
+        get_provider_json(
+            base_url="https://provider.example/api/",
+            relative_path="dcim/devices/",
+            authorization="Token x",
+        )
+    assert timedelta(seconds=1) <= caught.value.retry_at - started <= timedelta(hours=1, seconds=1)
+    assert "sensitive" not in str(caught.value)
+
+
 def test_provider_cursor_cannot_escape_with_credentials_fragment_or_non_https():
     for cursor in (
         "https://user:pass@provider.example/api/",
@@ -123,7 +138,8 @@ def test_provider_cursor_cannot_escape_with_credentials_fragment_or_non_https():
 
 class FinalizationFailureAdapter:
     key = "netbox"
-    label = "Failure after fetch"
+    label = SuccessfulAdapter.label
+    contract = SuccessfulAdapter.contract
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
         return ProviderPage((ProviderObservation("ipam.vlan", "91", "f" * 64),), "")
@@ -160,6 +176,77 @@ def test_stale_worker_lease_is_recovered_without_replaying_a_completed_job(insta
     assert completed.attempts == 2
     assert repeated.attempts == 2
     assert IntegrationObservation.objects.filter(job=job).count() == 1
+
+
+@pytest.mark.django_db
+def test_pending_job_can_be_cancelled_and_cannot_be_replayed(installation):
+    record = organization(installation, "Cancellation client")
+    source = connection(installation, record)
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:cancel")
+    workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
+
+    cancelled = cancel_sync_job(workspace=workspace, job_id=job.id, actor=installation.owner)
+    repeated = process_sync_job(job_id=job.id, adapter=SuccessfulAdapter())
+
+    assert cancelled.state == IntegrationJobState.CANCELLED
+    assert repeated.state == IntegrationJobState.CANCELLED
+    assert repeated.attempts == 0
+    assert IntegrationObservation.objects.filter(job=job).count() == 0
+
+
+@pytest.mark.django_db
+def test_missing_remote_identity_becomes_reviewable_retirement_without_local_delete(installation):
+    record = organization(installation, "Retirement client")
+    source = connection(installation, record)
+    first = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:present")
+    process_sync_job(job_id=first.id, adapter=SuccessfulAdapter())
+    second = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:missing")
+
+    class EmptyAdapter(SuccessfulAdapter):
+        def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+            return ProviderPage((), "")
+
+    process_sync_job(job_id=second.id, adapter=EmptyAdapter())
+
+    retired = IntegrationObservation.objects.get(job=second)
+    assert retired.state == "retired"
+    assert retired.provenance == "provider_absence"
+    assert retired.safe_projection == {}
+    assert IntegrationConflict.objects.get(connection=source, remote_id="42").difference == "retired_remote"
+
+
+@pytest.mark.django_db
+def test_provider_conformance_rejects_unsupported_object_types(installation):
+    record = organization(installation, "Conformance client")
+    source = connection(installation, record)
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:bad-contract")
+
+    class InvalidAdapter(SuccessfulAdapter):
+        def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+            return ProviderPage((ProviderObservation("unknown.type", "1", "a" * 64),), "")
+
+    failed = process_sync_job(job_id=job.id, adapter=InvalidAdapter())
+    assert failed.state == IntegrationJobState.PENDING
+    assert failed.last_error_code == "provider_response_invalid"
+
+
+@pytest.mark.django_db
+def test_rate_limited_job_uses_provider_retry_window(installation):
+    record = organization(installation, "Rate limit client")
+    source = connection(installation, record)
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:rate-limit")
+    retry_at = timezone.now() + timedelta(minutes=7)
+
+    class RateLimitedAdapter(SuccessfulAdapter):
+        def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+            raise ProviderRateLimited(retry_at)
+
+    retried = process_sync_job(job_id=job.id, adapter=RateLimitedAdapter())
+    source.refresh_from_db()
+    assert retried.state == IntegrationJobState.PENDING
+    assert retried.last_error_code == "provider_rate_limited"
+    assert retried.available_at == retry_at
+    assert source.rate_limit_reset_at == retry_at
 
 
 @pytest.mark.django_db

@@ -348,7 +348,7 @@ integration-upgrade-rehearsal:
 	./tests/rehearsals/rehearse-integration-upgrade.sh
 
 integration-validation-upgrade-rehearsal:
-	TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION=0.7.0 ./tests/rehearsals/rehearse-integration-upgrade.sh
+	TEKDOCS_INTEGRATION_UPGRADE_FROM_REF=fc8aec7 TEKDOCS_INTEGRATION_UPGRADE_FROM_VERSION=0.6.9 TEKDOCS_INTEGRATION_UPGRADE_TO_VERSION=$$(tr -d '[:space:]' < VERSION) ./tests/rehearsals/rehearse-integration-upgrade.sh
 
 integration-backup-rehearsal:
 	./tests/rehearsals/rehearse-integration-backup.sh

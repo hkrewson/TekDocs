@@ -6,7 +6,7 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import User
 from apps.core.documents import create_document
 from apps.core.git_exports import create_git_export
-from apps.core.integration_providers import ProviderObservation, ProviderPage
+from apps.core.integration_providers import NetBoxProvider, ProviderObservation, ProviderPage
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
@@ -21,6 +21,7 @@ from apps.core.models import (
     workspace_for_owner,
 )
 from apps.core.organizations import create_organization
+from apps.core import rls as rls_runtime
 from apps.core.rls import OrganizationRLSMode, rls_scope
 from apps.core.scoping import DataScope
 from apps.core.workspaces import resolve_organization_workspace
@@ -30,9 +31,15 @@ mode = os.environ["TEKDOCS_FIXTURE_MODE"]
 provider_token = os.environ["TEKDOCS_FIXTURE_PROVIDER_TOKEN"]
 
 
+def fixture_scope(scope, *, organization_mode):
+    scope_factory = getattr(rls_runtime, "system_rls_scope", rls_scope)
+    return scope_factory(scope, organization_mode=organization_mode)
+
+
 class FixtureAdapter:
     key = "netbox"
-    label = "Fixture provider"
+    label = NetBoxProvider.label
+    contract = NetBoxProvider.contract
 
     def fetch_page(self, connection, *, secret, cursor):
         assert secret == provider_token
@@ -50,7 +57,7 @@ if mode == "create":
     )
     scope_stack = ExitStack()
     scope_stack.enter_context(
-        rls_scope(DataScope.tenant(installed.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
+        fixture_scope(DataScope.tenant(installed.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
     )
     organization = create_organization(
         tenant=installed.tenant,
@@ -64,7 +71,7 @@ if mode == "create":
     organization_workspace = workspace_for_owner(tenant=installed.tenant, organization=organization)
     scope_stack = ExitStack()
     scope_stack.enter_context(
-        rls_scope(
+        fixture_scope(
             DataScope(installed.tenant.id, organization_workspace.id, organization.id),
             organization_mode=OrganizationRLSMode.ORGANIZATION,
         )
@@ -106,7 +113,9 @@ if mode == "create":
 elif mode == "verify":
     tenant = Tenant.objects.get(slug="integration-rehearsal-msp")
     scope_stack = ExitStack()
-    scope_stack.enter_context(rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY))
+    scope_stack.enter_context(
+        fixture_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
+    )
     owner = User.objects.get(email="integration-rehearsal@example.invalid")
     organization = Organization.objects.get(
         tenant=tenant,
@@ -116,7 +125,7 @@ elif mode == "verify":
     organization_workspace = workspace_for_owner(tenant=tenant, organization=organization)
     scope_stack = ExitStack()
     scope_stack.enter_context(
-        rls_scope(
+        fixture_scope(
             DataScope(tenant.id, organization_workspace.id, organization.id),
             organization_mode=OrganizationRLSMode.ORGANIZATION,
         )

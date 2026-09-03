@@ -140,9 +140,7 @@ def url_path(value: str, *, base_url: str) -> str:
     if parsed.fragment or parsed.username or parsed.password:
         raise ValueError("provider_cursor_invalid")
     if parsed.netloc and (
-        parsed.scheme != "https"
-        or parsed.hostname != base.hostname
-        or parsed.port not in (None, 443)
+        parsed.scheme != "https" or parsed.hostname != base.hostname or parsed.port not in (None, 443)
     ):
         raise ValueError("provider_cursor_invalid")
     path = parsed.path
@@ -166,6 +164,34 @@ def validate_provider_adapter(adapter: ProviderAdapter) -> None:
         raise ValueError("provider_contract_schedule_invalid")
     if contract.observation_schema_version < 1 or not contract.credential_fields:
         raise ValueError("provider_contract_schema_invalid")
+
+
+def validate_provider_page(adapter: ProviderAdapter, page: ProviderPage) -> None:
+    """Enforce the same bounded observation contract for every provider adapter."""
+
+    if not isinstance(page.next_cursor, str) or len(page.next_cursor) > 500:
+        raise ValueError("provider_cursor_invalid")
+    if len(page.observations) > 1000:
+        raise ValueError("provider_response_invalid")
+    identities: dict[tuple[str, str], str] = {}
+    for observation in page.observations:
+        identity = (observation.remote_type, observation.remote_id)
+        if (
+            observation.remote_type not in adapter.contract.object_types
+            or not observation.remote_id
+            or len(observation.remote_id) > 160
+            or (identity in identities and identities[identity] != observation.fingerprint)
+            or len(observation.fingerprint) != 64
+            or any(character not in "0123456789abcdef" for character in observation.fingerprint)
+            or observation.schema_version != adapter.contract.observation_schema_version
+            or not isinstance(observation.safe_projection, dict)
+            or any(
+                not isinstance(value, str | int | float | bool | type(None))
+                for value in observation.safe_projection.values()
+            )
+        ):
+            raise ValueError("provider_response_invalid")
+        identities[identity] = observation.fingerprint
 
 
 for registered_provider in PROVIDERS.values():

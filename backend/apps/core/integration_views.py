@@ -17,6 +17,7 @@ from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageS
 from .git_exports import create_git_export
 from .integration_providers import provider_catalog
 from .integrations import (
+    cancel_sync_job,
     connections_for_workspace,
     create_connection,
     enqueue_sync,
@@ -300,6 +301,14 @@ class IntegrationJobListCreateView(APIView):
             connection=connection, trigger="manual", requested_by_id=request.user.pk, idempotency_key=key
         )
         return _private(Response(JobSerializer(job).data, status=202))
+
+
+class IntegrationJobCancelView(APIView):
+    @extend_schema(request=None, responses={200: JobSerializer})
+    def post(self, request, job_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_MANAGE)
+        job = cancel_sync_job(workspace=workspace, job_id=job_id, actor=request.user)
+        return _private(Response(JobSerializer(job).data))
 
 
 class IntegrationLogListView(APIView):

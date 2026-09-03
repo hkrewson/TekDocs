@@ -7,9 +7,14 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
-from .integration_egress import get_provider_json, post_provider_form, post_provider_form_basic
+from .integration_egress import (
+    get_provider_json,
+    get_provider_json_or_list,
+    post_provider_form,
+    post_provider_form_basic,
+)
 from .models import IntegrationConnection, IntegrationProvider, NetBoxObjectType
 
 
@@ -735,6 +740,257 @@ class HaloPSAProvider:
         return ProviderPage(tuple(observations), next_cursor, complete)
 
 
+NINJAONE_OBJECT_TYPES = (
+    "organization",
+    "location",
+    "device_status",
+    "device",
+    "operating_system",
+    "health",
+    "software",
+)
+NINJAONE_STAGES = (
+    ("organizations", "v2/organizations", "organization", "list"),
+    ("locations", "v2/locations", "location", "list"),
+    ("devices", "v2/devices", "device_status", "list"),
+    ("computer_systems", "v2/queries/computer-systems", "device", "query"),
+    ("operating_systems", "v2/queries/operating-systems", "operating_system", "query"),
+    ("health", "v2/queries/device-health", "health", "query"),
+    ("software", "v2/queries/software", "software", "query"),
+)
+NINJAONE_PAGE_SIZE = 100
+
+
+def _ninja_cursor(value: str) -> dict[str, object]:
+    if not value:
+        return {"stage": 0, "position": ""}
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("provider_cursor_invalid") from exc
+    if (
+        not isinstance(decoded, dict)
+        or not isinstance(decoded.get("stage"), int)
+        or not isinstance(decoded.get("position"), str)
+        or decoded["stage"] < 0
+        or decoded["stage"] >= len(NINJAONE_STAGES)
+        or len(decoded["position"]) > 4096
+    ):
+        raise ValueError("provider_cursor_invalid")
+    return decoded
+
+
+def _ninja_encode_cursor(stage: int, position: str = "") -> str:
+    return _encode_cursor({"stage": stage, "position": position})
+
+
+def _ninja_source_timestamp(value: object) -> str | None:
+    if not isinstance(value, int | float) or value < 0:
+        return None
+    try:
+        return datetime.fromtimestamp(value / 1000 if value > 10_000_000_000 else value, UTC).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _ninja_software_id(record: dict[str, object]) -> str:
+    device_id = record.get("deviceId")
+    if not isinstance(device_id, int | str):
+        raise ValueError("provider_response_invalid")
+    product_identity = _fingerprint({"name": record.get("name"), "publisher": record.get("publisher")})[:24]
+    return f"{device_id}:{product_identity}"[:160]
+
+
+class NinjaOneProvider:
+    key = str(IntegrationProvider.NINJAONE)
+    label = "NinjaOne"
+    contract = ProviderContract(
+        key=key,
+        label=label,
+        version="1.0",
+        direction="read_only",
+        credential_fields=(
+            CredentialField(
+                "client_id",
+                "API application client ID",
+                False,
+                8,
+                "text",
+                "From Administration → Apps → API in NinjaOne.",
+            ),
+            CredentialField(
+                "client_secret",
+                "API application client secret",
+                True,
+                8,
+                "password",
+                "Stored encrypted and never shown again.",
+            ),
+        ),
+        capabilities=("rmm_observations", "asset_reconciliation", "software_observations"),
+        object_types=NINJAONE_OBJECT_TYPES,
+        pagination="opaque_cursor",
+        minimum_sync_interval_minutes=15,
+        maximum_sync_interval_minutes=10080,
+        default_base_url="https://app.ninjarmm.com/",
+        base_url_editable=True,
+        setup_help_url="https://www.ninjaone.com/docs/application-programming-interface-api/oauth-token-configuration/",
+    )
+
+    def __init__(
+        self,
+        getter: Callable[..., dict[str, object]] = get_provider_json_or_list,
+        poster: Callable[..., dict[str, object]] = post_provider_form_basic,
+    ):
+        self._getter = getter
+        self._poster = poster
+
+    def _authorize(self, connection: IntegrationConnection, secret: str) -> str:
+        payload = self._poster(
+            base_url=connection.base_url,
+            relative_path="ws/oauth/token",
+            fields={"grant_type": "client_credentials", "scope": "monitoring"},
+            username=str(connection.configuration.get("client_id", "")),
+            password=secret,
+        )
+        token = payload.get("access_token")
+        if not isinstance(token, str) or not 16 <= len(token) <= 16384:
+            raise ValueError("provider_token_invalid")
+        if str(payload.get("token_type", "Bearer")).casefold() != "bearer":
+            raise ValueError("provider_token_invalid")
+        returned_scope = payload.get("scope")
+        if isinstance(returned_scope, str) and set(returned_scope.split()) - {"monitoring"}:
+            raise ValueError("provider_permissions_excessive")
+        return token
+
+    def fetch_page(self, connection: IntegrationConnection, *, secret: str, cursor: str) -> ProviderPage:
+        token = self._authorize(connection, secret)
+        state = _ninja_cursor(cursor)
+        stage_value, position_value = state["stage"], state["position"]
+        if not isinstance(stage_value, int) or not isinstance(position_value, str):
+            raise ValueError("provider_cursor_invalid")
+        stage_index, position = stage_value, position_value
+        _stage, endpoint, remote_type, pagination = NINJAONE_STAGES[stage_index]
+        parameters: dict[str, str | int] = {"pageSize": NINJAONE_PAGE_SIZE}
+        if position:
+            parameters["after" if pagination == "list" else "cursor"] = position
+        payload = self._getter(
+            base_url=connection.base_url,
+            relative_path=f"{endpoint}?{urlencode(parameters)}",
+            authorization=f"Bearer {token}",
+        )
+        if pagination == "list":
+            values: object = payload.get("results", payload.get(_stage))
+            if values is None and isinstance(payload.get("items"), list):
+                values = payload["items"]
+        else:
+            values = payload.get("results")
+        if not isinstance(values, list) or len(values) > NINJAONE_PAGE_SIZE:
+            raise ValueError("provider_response_invalid")
+        observations: list[ProviderObservation] = []
+        for record in values:
+            if not isinstance(record, dict):
+                raise ValueError("provider_response_invalid")
+            identity = (
+                record.get("deviceId") if remote_type in {"device", "operating_system", "health"} else record.get("id")
+            )
+            if remote_type == "software":
+                remote_id = _ninja_software_id(record)
+            elif isinstance(identity, int | str):
+                remote_id = str(identity)
+            else:
+                raise ValueError("provider_response_invalid")
+            if remote_type == "organization":
+                projection = _halo_scalar(record, "id", "name")
+            elif remote_type == "location":
+                projection = _halo_scalar(record, "id", "name", "organizationId")
+            elif remote_type == "device_status":
+                projection = _halo_scalar(
+                    record,
+                    "id",
+                    "organizationId",
+                    "locationId",
+                    "nodeClass",
+                    "approvalStatus",
+                    "offline",
+                    "displayName",
+                    "systemName",
+                    "lastContact",
+                    "lastUpdate",
+                )
+            elif remote_type == "device":
+                projection = _halo_scalar(
+                    record,
+                    "deviceId",
+                    "name",
+                    "manufacturer",
+                    "model",
+                    "serialNumber",
+                    "biosSerialNumber",
+                    "assetSerialNumber",
+                    "virtualMachine",
+                    "chassisType",
+                )
+            elif remote_type == "operating_system":
+                projection = _halo_scalar(
+                    record,
+                    "deviceId",
+                    "manufacturer",
+                    "name",
+                    "architecture",
+                    "buildNumber",
+                    "releaseId",
+                    "needsReboot",
+                    "timestamp",
+                )
+            elif remote_type == "health":
+                projection = _halo_scalar(
+                    record,
+                    "deviceId",
+                    "offline",
+                    "healthStatus",
+                    "alertCount",
+                    "failedOSPatchesCount",
+                    "failedSoftwarePatchesCount",
+                    "pendingRebootReason",
+                )
+            else:
+                projection = _halo_scalar(record, "deviceId", "name", "version", "publisher", "installDate")
+            observations.append(
+                ProviderObservation(
+                    remote_type,
+                    remote_id,
+                    _fingerprint(projection),
+                    projection,
+                    _ninja_source_timestamp(
+                        record.get("timestamp") or record.get("lastUpdate") or record.get("lastContact")
+                    ),
+                )
+            )
+        next_position = ""
+        if pagination == "list" and len(values) == NINJAONE_PAGE_SIZE:
+            last_id = values[-1].get("id") if isinstance(values[-1], dict) else None
+            if not isinstance(last_id, int | str):
+                raise ValueError("provider_response_invalid")
+            next_position = str(last_id)
+        elif pagination == "query":
+            cursor_payload = payload.get("cursor")
+            if cursor_payload is not None and not isinstance(cursor_payload, dict):
+                raise ValueError("provider_response_invalid")
+            if isinstance(cursor_payload, dict):
+                name = cursor_payload.get("name")
+                offset = cursor_payload.get("offset")
+                count = cursor_payload.get("count")
+                if not isinstance(name, str) or not isinstance(offset, int) or not isinstance(count, int):
+                    raise ValueError("provider_response_invalid")
+                if offset + len(values) < count:
+                    next_position = name
+        if next_position:
+            return ProviderPage(tuple(observations), _ninja_encode_cursor(stage_index, next_position))
+        next_cursor = _ninja_encode_cursor(stage_index + 1) if stage_index + 1 < len(NINJAONE_STAGES) else ""
+        return ProviderPage(tuple(observations), next_cursor, (remote_type,))
+
+
 def url_path(value: str, *, base_url: str) -> str:
     parsed = urlsplit(value)
     base = urlsplit(base_url)
@@ -754,6 +1010,7 @@ PROVIDERS: dict[str, ProviderAdapter] = {
     str(IntegrationProvider.NETBOX): NetBoxProvider(),
     str(IntegrationProvider.MICROSOFT_GRAPH): MicrosoftGraphProvider(),
     str(IntegrationProvider.HALOPSA): HaloPSAProvider(),
+    str(IntegrationProvider.NINJAONE): NinjaOneProvider(),
 }
 
 

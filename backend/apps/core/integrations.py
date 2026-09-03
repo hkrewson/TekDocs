@@ -20,6 +20,8 @@ from .integration_providers import PROVIDERS, ProviderAdapter, validate_provider
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
+    ClientHardwareAsset,
+    ClientSoftwareInstallation,
     CommercialContract,
     Entity,
     IntegrationConflict,
@@ -34,6 +36,7 @@ from .models import (
     NetBoxReference,
     Organization,
     PersonAssociation,
+    Site,
     Tenant,
     workspace_for_owner,
 )
@@ -350,6 +353,9 @@ def _safe_log(*, job: IntegrationSyncJob, level: str, code: str, metrics: dict[s
 
 
 def _conflicts_for_observations(job: IntegrationSyncJob, observations: list[IntegrationObservation]) -> None:
+    if job.connection.provider == IntegrationProvider.NINJAONE:
+        _ninja_conflicts_for_observations(job, observations)
+        return
     if job.connection.provider == IntegrationProvider.HALOPSA:
         _halo_conflicts_for_observations(job, observations)
         return
@@ -516,6 +522,155 @@ def _halo_conflicts_for_observations(job: IntegrationSyncJob, observations: list
                 "organization": job.organization,
                 "observation": observation,
                 "local_entity": candidate if candidate and candidate.workspace_id == job.workspace_id else None,
+                "difference": difference,
+                "remote_fingerprint": observation.fingerprint,
+                "local_fingerprint": mapping.observed_fingerprint if mapping else "",
+            },
+        )
+
+
+def _ninja_organization(job: IntegrationSyncJob, remote_id: object) -> Organization | None:
+    if remote_id is None:
+        return None
+    mapping = (
+        IntegrationEntityMapping.objects.filter(
+            connection=job.connection,
+            remote_type="organization",
+            remote_id=str(remote_id),
+        )
+        .select_related("local_entity__organization_record")
+        .first()
+    )
+    return getattr(mapping.local_entity, "organization_record", None) if mapping else None
+
+
+def _ninja_device_organization(job: IntegrationSyncJob, device_id: str) -> Organization | None:
+    status = (
+        IntegrationObservation.objects.filter(
+            job__connection=job.connection,
+            remote_type="device_status",
+            remote_id=device_id,
+            state="observed",
+        )
+        .order_by("-observed_at", "-id")
+        .first()
+    )
+    return _ninja_organization(job, status.safe_projection.get("organizationId")) if status else None
+
+
+def _unique_ninja_candidate(job: IntegrationSyncJob, observation: IntegrationObservation) -> Entity | None:
+    projection = observation.safe_projection
+    name = str(projection.get("name", "")).strip()
+    if observation.remote_type == "organization" and name:
+        candidates = Entity.objects.filter(
+            tenant=job.tenant,
+            entity_type="organization",
+            archived_at__isnull=True,
+        ).filter(Q(display_name__iexact=name) | Q(organization_record__legal_name__iexact=name))
+        matches = list(candidates.order_by("id")[:2])
+        return matches[0] if len(matches) == 1 else None
+
+    if observation.remote_type == "location":
+        organization = _ninja_organization(job, projection.get("organizationId"))
+    else:
+        device_id = str(projection.get("deviceId", observation.remote_id.split(":", 1)[0]))
+        organization = _ninja_device_organization(job, device_id)
+    if organization is None:
+        return None
+    scope = DataScope.organization(job.tenant, organization)
+    try:
+        with system_rls_scope_if_postgresql(scope, organization_mode=OrganizationRLSMode.ORGANIZATION):
+            if observation.remote_type == "location" and name:
+                candidates = Entity.objects.filter(
+                    id__in=Site.objects.filter(
+                        tenant=job.tenant,
+                        organization=organization,
+                        archived_at__isnull=True,
+                    )
+                    .filter(Q(entity__display_name__iexact=name) | Q(code__iexact=name))
+                    .values("entity_id")
+                )
+            elif observation.remote_type == "device":
+                serial = str(
+                    projection.get("serialNumber")
+                    or projection.get("biosSerialNumber")
+                    or projection.get("assetSerialNumber")
+                    or ""
+                ).strip()
+                manufacturer = str(projection.get("manufacturer", "")).strip()
+                if not serial or not manufacturer:
+                    return None
+                hardware = ClientHardwareAsset.objects.filter(
+                    tenant=job.tenant,
+                    organization=organization,
+                    asset__archived_at__isnull=True,
+                    serial_number__iexact=serial,
+                ).filter(
+                    Q(asset__supplier__entity__display_name__iexact=manufacturer)
+                    | Q(asset__supplier__legal_name__iexact=manufacturer)
+                )
+                candidates = Entity.objects.filter(id__in=hardware.values("asset__entity_id"))
+            elif observation.remote_type == "software" and name:
+                publisher = str(projection.get("publisher", "")).strip()
+                installations = ClientSoftwareInstallation.objects.filter(
+                    tenant=job.tenant,
+                    organization=organization,
+                    asset__product__name__iexact=name,
+                    asset__archived_at__isnull=True,
+                )
+                if publisher:
+                    installations = installations.filter(
+                        Q(asset__supplier__entity__display_name__iexact=publisher)
+                        | Q(asset__supplier__legal_name__iexact=publisher)
+                    )
+                candidates = Entity.objects.filter(id__in=installations.values("asset__entity_id"))
+            else:
+                return None
+            matches = list(candidates.order_by("id")[:2])
+    finally:
+        if database_connection.vendor == "postgresql":
+            bind_local_rls_scope(DataScope.tenant(job.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
+    if len(matches) != 1:
+        return None
+    already_linked = IntegrationEntityMapping.objects.filter(
+        connection=job.connection,
+        remote_type=observation.remote_type,
+        local_entity=matches[0],
+    ).exclude(remote_id=observation.remote_id)
+    return None if already_linked.exists() else matches[0]
+
+
+def _ninja_conflicts_for_observations(job: IntegrationSyncJob, observations: list[IntegrationObservation]) -> None:
+    reviewable = {"organization", "location", "device", "software"}
+    mappings = {
+        (item.remote_type, item.remote_id): item
+        for item in IntegrationEntityMapping.objects.filter(connection=job.connection).select_related("local_entity")
+    }
+    for observation in observations:
+        if observation.remote_type not in reviewable:
+            continue
+        mapping = mappings.get((observation.remote_type, observation.remote_id))
+        candidate = mapping.local_entity if mapping else _unique_ninja_candidate(job, observation)
+        if observation.state == "retired":
+            difference = "retired_remote"
+        elif mapping is None:
+            difference = "changed" if candidate is not None else "unmatched"
+        elif mapping.observed_fingerprint != observation.fingerprint:
+            difference = "changed"
+        else:
+            continue
+        IntegrationConflict.objects.update_or_create(
+            connection=job.connection,
+            remote_type=observation.remote_type,
+            remote_id=observation.remote_id,
+            status=IntegrationConflictStatus.OPEN,
+            defaults={
+                "tenant": job.tenant,
+                "workspace": job.workspace,
+                "organization": job.organization,
+                "observation": observation,
+                "local_entity": None,
+                "suggested_local_entity": candidate,
                 "difference": difference,
                 "remote_fingerprint": observation.fingerprint,
                 "local_fingerprint": mapping.observed_fingerprint if mapping else "",
@@ -840,25 +995,31 @@ def resolve_conflict(
     except IntegrationConflict.DoesNotExist as exc:
         raise NotFound("The integration conflict is unavailable.") from exc
     # Accepting remote acknowledges only the external identity fingerprint. Domain records remain canonical.
-    if resolution == IntegrationConflictStatus.ACCEPT_REMOTE and conflict.local_entity_id:
-        reference = (
-            NetBoxReference.scoped.for_scope(workspace.data_scope)
-            .select_for_update()
-            .filter(
-                workspace_id=workspace.data_scope.workspace_id,
-                entity_id=conflict.local_entity_id,
-                object_type=conflict.remote_type,
-                object_id=int(conflict.remote_id),
-                archived_at__isnull=True,
+    selected_entity = conflict.local_entity or conflict.suggested_local_entity
+    if resolution == IntegrationConflictStatus.ACCEPT_REMOTE and selected_entity is not None:
+        reference = None
+        if conflict.connection.provider == IntegrationProvider.NETBOX:
+            reference = (
+                NetBoxReference.scoped.for_scope(workspace.data_scope)
+                .select_for_update()
+                .filter(
+                    workspace_id=workspace.data_scope.workspace_id,
+                    entity_id=selected_entity.id,
+                    object_type=conflict.remote_type,
+                    object_id=int(conflict.remote_id),
+                    archived_at__isnull=True,
+                )
+                .first()
             )
-            .first()
-        )
         if reference:
             reference.observed_fingerprint = conflict.remote_fingerprint
             reference.last_observed_at = timezone.now()
             reference.save(update_fields=("observed_fingerprint", "last_observed_at", "updated_at"))
         observation = conflict.observation
-        if conflict.connection.provider == IntegrationProvider.HALOPSA and observation is not None:
+        if (
+            conflict.connection.provider in {IntegrationProvider.HALOPSA, IntegrationProvider.NINJAONE}
+            and observation is not None
+        ):
             IntegrationEntityMapping.objects.update_or_create(
                 connection=conflict.connection,
                 remote_type=conflict.remote_type,
@@ -867,7 +1028,7 @@ def resolve_conflict(
                     "tenant": conflict.tenant,
                     "workspace": conflict.workspace,
                     "organization": conflict.organization,
-                    "local_entity": conflict.local_entity,
+                    "local_entity": selected_entity,
                     "observed_fingerprint": conflict.remote_fingerprint,
                     "last_observed_at": observation.observed_at,
                 },

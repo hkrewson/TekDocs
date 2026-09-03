@@ -39,7 +39,9 @@ def fixture_scope(scope, *, organization_mode):
 class FixtureAdapter:
     key = "netbox"
     label = NetBoxProvider.label
-    contract = NetBoxProvider.contract
+    # The 0.6.9 provider protocol predates explicit provider contracts. Keep
+    # this fixture runnable on both sides of the supported upgrade boundary.
+    contract = getattr(NetBoxProvider, "contract", None)
 
     def fetch_page(self, connection, *, secret, cursor):
         assert secret == provider_token

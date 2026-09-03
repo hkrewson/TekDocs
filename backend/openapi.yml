@@ -28668,6 +28668,14 @@ components:
           type: string
           format: uuid
           nullable: true
+          readOnly: true
+        local_entity_name:
+          type: string
+          readOnly: true
+        provider_values:
+          type: object
+          additionalProperties: {}
+          readOnly: true
         remote_type:
           type: string
         remote_id:
@@ -28690,6 +28698,8 @@ components:
       - difference
       - id
       - local_entity_id
+      - local_entity_name
+      - provider_values
       - remote_id
       - remote_type
       - resolved_at
@@ -28810,12 +28820,14 @@ components:
           - netbox
           - microsoft_graph
           - halopsa
+          - ninjaone
           type: string
           description: |-
             * `netbox` - netbox
             * `microsoft_graph` - microsoft_graph
             * `halopsa` - halopsa
-          x-spec-enum-id: e0ed80d5d331ec43
+            * `ninjaone` - ninjaone
+          x-spec-enum-id: 53f177a396c9520d
         name:
           type: string
           maxLength: 100
@@ -36561,15 +36573,33 @@ components:
         observed_at:
           type: string
           format: date-time
+        linked_local_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+          readOnly: true
+        linked_local_entity_name:
+          type: string
+          readOnly: true
+        accepted:
+          type: boolean
+          readOnly: true
+        stale:
+          type: boolean
+          readOnly: true
       required:
+      - accepted
       - connection_id
       - connection_name
       - id
+      - linked_local_entity_id
+      - linked_local_entity_name
       - observed_at
       - remote_id
       - remote_type
       - safe_projection
       - source_timestamp
+      - stale
       - state
     ObservationPage:
       type: object

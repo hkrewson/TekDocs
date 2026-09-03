@@ -26,7 +26,7 @@ The security review currently recorded by the project used Claude Opus 5 (High) 
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
 - Scoped built-in and custom roles at MSP, organization, and collection boundaries
 - Public API, personal and service tokens, signed webhooks, integration jobs, reconciliation, and sanitized Git export
-- Exact-Workspace read-only NetBox, Microsoft 365/Entra/Intune, and HaloPSA observations with encrypted credentials and reviewed reconciliation
+- Exact-Workspace read-only NetBox, Microsoft 365/Entra/Intune, HaloPSA, and NinjaOne observations with encrypted credentials and reviewed reconciliation
 - Dry-run, idempotent Workspace imports for native bundles and documented ITFlow, IT Glue, Hudu, and TekDocs CSV mappings
 - Compliance controls, evidence, risks, reviews, and immutable evidence bundles
 

@@ -20,6 +20,7 @@ function providerClient(): IntegrationsClient {
       { key: 'netbox', label: 'NetBox', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'api_token', label: 'API token', secret: true, minimum_length: 8, input_type: 'password', help_text: '' }], capabilities: ['inventory_observations', 'reconciliation'], object_types: ['ipam.vlan'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 5, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: '' },
       { key: 'microsoft_graph', label: 'Microsoft 365', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'tenant_id', label: 'Microsoft tenant ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The directory ID.' }, { key: 'client_id', label: 'Application (client) ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The application ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['identity_observations'], object_types: ['user'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://graph.microsoft.com/v1.0/', base_url_editable: false, setup_help_url: 'https://learn.microsoft.com/' },
       { key: 'halopsa', label: 'HaloPSA', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'Client ID', secret: false, minimum_length: 1, input_type: 'text', help_text: 'Dedicated Halo API application client ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['psa_observations', 'external_ticket_search', 'reconciliation'], object_types: ['client', 'site', 'contact', 'contract', 'ticket'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: 'https://halopsa.com/guides/article/?kbid=1499' },
+      { key: 'ninjaone', label: 'NinjaOne', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'API application client ID', secret: false, minimum_length: 8, input_type: 'text', help_text: 'From Administration → Apps → API in NinjaOne.' }, { key: 'client_secret', label: 'API application client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['rmm_observations', 'asset_reconciliation', 'software_observations'], object_types: ['organization', 'location', 'device_status', 'device', 'operating_system', 'health', 'software'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://app.ninjarmm.com/', base_url_editable: true, setup_help_url: 'https://www.ninjaone.com/docs/application-programming-interface-api/oauth-token-configuration/' },
     ]),
     listConnections: vi.fn().mockResolvedValue([]), createConnection: vi.fn(), updateConnection: vi.fn(),
     rotateConnection: vi.fn(), startSync: vi.fn(),
@@ -215,5 +216,57 @@ describe('Integrations', () => {
       credentials: { client_id: 'tekdocs-reader', client_secret: 'halo-client-secret' },
       sync_interval_minutes: 30,
     }))
+  })
+
+  it('uses a monitoring-only NinjaOne application and the selected regional API root', async () => {
+    const provider = providerClient()
+    vi.mocked(provider.createConnection).mockResolvedValue({
+      id: 'connection-ninja', provider: 'ninjaone', name: 'Primary NinjaOne',
+      base_url: 'https://eu.ninjarmm.com/', provider_details: { client_id: 'tekdocs-monitoring-reader' },
+      credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 15,
+      health_status: 'unknown', last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null,
+      reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    })
+    const user = userEvent.setup()
+    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+
+    await user.click(await screen.findByRole('button', { name: 'New connection' }))
+    await user.selectOptions(screen.getByLabelText('Provider'), 'ninjaone')
+    expect(screen.getByRole('link', { name: 'NinjaOne setup guidance' })).toHaveAttribute('href', expect.stringContaining('ninjaone.com/docs/'))
+    await user.type(screen.getByLabelText('Name'), 'Primary NinjaOne')
+    await user.clear(screen.getByLabelText('API base URL'))
+    await user.type(screen.getByLabelText('API base URL'), 'https://eu.ninjarmm.com/')
+    await user.type(screen.getByLabelText('API application client ID'), 'tekdocs-monitoring-reader')
+    await user.type(screen.getByLabelText('API application client secret'), 'ninja-secret-value')
+    await user.click(screen.getByRole('button', { name: 'Save connection' }))
+
+    await waitFor(() => expect(provider.createConnection).toHaveBeenCalledWith(workspace, {
+      provider: 'ninjaone', name: 'Primary NinjaOne', base_url: 'https://eu.ninjarmm.com/',
+      credentials: { client_id: 'tekdocs-monitoring-reader', client_secret: 'ninja-secret-value' },
+      sync_interval_minutes: 15,
+    }))
+  })
+
+  it('separates observed, linked, accepted, review, and stale provider states', async () => {
+    const provider = providerClient()
+    vi.mocked(provider.listObservations).mockResolvedValue({
+      results: [
+        { id: 'observed', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '1', safe_projection: { name: 'Observed device' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: null, accepted: false, stale: false },
+        { id: 'linked', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'health', remote_id: '2', safe_projection: { healthStatus: 'Good' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: 'asset-2', linked_local_entity_name: 'Reception laptop', accepted: false, stale: false },
+        { id: 'accepted', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'software', remote_id: '2:agent', safe_projection: { name: 'Agent' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: 'software-2', linked_local_entity_name: 'Agent install', accepted: true, stale: false },
+        { id: 'review', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '3', safe_projection: { name: 'Candidate device' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: null, accepted: false, stale: true },
+      ], page: 1, page_size: 50, count: 4, has_more: false,
+    })
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [{ id: 'conflict-3', connection_id: 'ninja', connection_name: 'NinjaOne', local_entity_id: 'asset-3', local_entity_name: 'Candidate laptop', remote_type: 'device', remote_id: '3', difference: 'changed', status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null }], page: 1, page_size: 50, count: 1, has_more: false })
+
+    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+
+    expect(await screen.findByText('Observed only')).toBeInTheDocument()
+    expect(screen.getByText('Linked observation')).toBeInTheDocument()
+    expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByText('Needs review')).toBeInTheDocument()
+    expect(screen.getByText('Reception laptop')).toBeInTheDocument()
+    expect(screen.getByText('Candidate laptop')).toBeInTheDocument()
+    expect(screen.getByText(/Stale · source observed/)).toBeInTheDocument()
   })
 })

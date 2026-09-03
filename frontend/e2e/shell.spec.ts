@@ -120,6 +120,51 @@ test('excluded modules are unavailable and accounting redirects to invoices', as
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
+test('NinjaOne setup and reconciliation states are explicit and accessible', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.route('**/integrations/providers', (route) => route.fulfill({ json: [{
+    key: 'ninjaone', label: 'NinjaOne', version: '1.0', direction: 'read_only',
+    credential_fields: [
+      { key: 'client_id', label: 'API application client ID', secret: false, minimum_length: 8, input_type: 'text', help_text: 'From Administration → Apps → API in NinjaOne.' },
+      { key: 'client_secret', label: 'API application client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted and never shown again.' },
+    ],
+    capabilities: ['rmm_observations', 'asset_reconciliation', 'software_observations'],
+    object_types: ['organization', 'location', 'device_status', 'device', 'operating_system', 'health', 'software'],
+    pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080,
+    health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1,
+    default_base_url: 'https://app.ninjarmm.com/', base_url_editable: true,
+    setup_help_url: 'https://www.ninjaone.com/docs/application-programming-interface-api/oauth-token-configuration/',
+  }] }))
+  await page.route('**/integrations/connections', (route) => route.fulfill({ json: [] }))
+  await page.route('**/integrations/jobs?*', (route) => route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false } }))
+  await page.route('**/integrations/logs?*', (route) => route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false } }))
+  await page.route('**/integrations/observations?*', (route) => route.fulfill({ json: { results: [{
+    id: crypto.randomUUID(), connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '42',
+    safe_projection: { name: 'Reception laptop' }, source_timestamp: null, state: 'observed', observed_at: '2026-09-03T00:00:00Z',
+    linked_local_entity_id: null, linked_local_entity_name: '', accepted: false, stale: true,
+  }], page: 1, page_size: 50, count: 1, has_more: false } }))
+  await page.route('**/integrations/conflicts?*', (route) => route.fulfill({ json: { results: [{
+    id: crypto.randomUUID(), connection_id: 'ninja', connection_name: 'NinjaOne', local_entity_id: 'local-asset',
+    local_entity_name: 'Reception laptop in TekDocs', remote_type: 'device', remote_id: '42', difference: 'changed',
+    provider_values: { manufacturer: 'Lenovo', model: 'T14', serialNumber: 'PF-123' },
+    status: 'open', created_at: '2026-09-03T00:00:00Z', resolved_at: null,
+  }], page: 1, page_size: 50, count: 1, has_more: false } }))
+  await page.route('**/integrations/git-exports', (route) => route.fulfill({ json: [] }))
+
+  await page.goto('/integrations')
+  await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible()
+  await expect(page.getByText('Needs review')).toBeVisible()
+  await expect(page.getByText('Reception laptop in TekDocs')).toBeVisible()
+  await expect(page.getByText(/Stale · source observed/)).toBeVisible()
+  await page.getByRole('button', { name: 'New connection' }).click()
+  const providerSelect = page.locator('.integration-connection-form select')
+  await providerSelect.selectOption('ninjaone')
+  await expect(providerSelect).toHaveValue('ninjaone')
+  await expect(page.getByRole('link', { name: 'NinjaOne setup guidance' })).toHaveAttribute('href', /ninjaone\.com/)
+  await expect(page.getByText(/read-only API application/)).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
+})
+
 test('raw Markdown remains the editable canonical representation', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/documentation')

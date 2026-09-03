@@ -5300,6 +5300,7 @@ class IntegrationProvider(models.TextChoices):
     NETBOX = "netbox", "NetBox"
     MICROSOFT_GRAPH = "microsoft_graph", "Microsoft 365"
     HALOPSA = "halopsa", "HaloPSA"
+    NINJAONE = "ninjaone", "NinjaOne"
 
 
 class IntegrationConnection(TimestampedModel):
@@ -5592,6 +5593,13 @@ class IntegrationConflict(TimestampedModel):
     local_entity = models.ForeignKey(
         Entity, on_delete=models.PROTECT, related_name="integration_conflicts", null=True, blank=True
     )
+    suggested_local_entity = models.ForeignKey(
+        Entity,
+        on_delete=models.PROTECT,
+        related_name="suggested_integration_conflicts",
+        null=True,
+        blank=True,
+    )
     remote_type = models.CharField(max_length=64)
     remote_id = models.CharField(max_length=160)
     difference = models.CharField(max_length=32)
@@ -5638,6 +5646,11 @@ class IntegrationConflict(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.remote_type}:{self.remote_id}:{self.status}"
+
+    def clean(self) -> None:
+        suggested = self.suggested_local_entity if self.suggested_local_entity_id else None
+        if suggested is not None and suggested.tenant_id != self.tenant_id:
+            raise ValidationError("Integration conflict suggestion must belong to its tenant")
 
 
 class ImportBatchState(models.TextChoices):

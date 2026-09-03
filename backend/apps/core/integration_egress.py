@@ -45,8 +45,14 @@ def validate_integration_base_url(value: str) -> str:
 
 
 def _provider_json_request(
-    *, base_url: str, relative_path: str, method: str, headers: dict[str, str], body: bytes | None = None
-) -> dict[str, Any]:
+    *,
+    base_url: str,
+    relative_path: str,
+    method: str,
+    headers: dict[str, str],
+    body: bytes | None = None,
+    allow_list: bool = False,
+) -> dict[str, Any] | list[Any]:
     """GET one pinned, bounded provider page without following redirects."""
 
     base = validate_integration_base_url(base_url)
@@ -104,7 +110,7 @@ def _provider_json_request(
         if len(body) > MAX_INTEGRATION_RESPONSE_BYTES:
             raise WebhookEgressError("provider_response_too_large")
         payload = json.loads(body)
-        if not isinstance(payload, dict):
+        if not isinstance(payload, dict) and not (allow_list and isinstance(payload, list)):
             raise WebhookEgressError("provider_response_invalid")
         return payload
     except (HTTPError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -116,24 +122,43 @@ def _provider_json_request(
 def get_provider_json(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:
     """GET one pinned, bounded provider page without following redirects."""
 
-    return _provider_json_request(
+    payload = _provider_json_request(
         base_url=base_url,
         relative_path=relative_path,
         method="GET",
         headers={"Authorization": authorization},
     )
+    if not isinstance(payload, dict):
+        raise WebhookEgressError("provider_response_invalid")
+    return payload
+
+
+def get_provider_json_or_list(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:
+    """GET a provider page and normalize an allowed top-level list."""
+
+    payload = _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method="GET",
+        headers={"Authorization": authorization},
+        allow_list=True,
+    )
+    return {"items": payload} if isinstance(payload, list) else payload
 
 
 def post_provider_form(*, base_url: str, relative_path: str, fields: dict[str, str]) -> dict[str, Any]:
     """POST a bounded form to a pinned provider endpoint without retaining request values."""
 
-    return _provider_json_request(
+    payload = _provider_json_request(
         base_url=base_url,
         relative_path=relative_path,
         method="POST",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         body=urlencode(fields).encode("utf-8"),
     )
+    if not isinstance(payload, dict):
+        raise WebhookEgressError("provider_response_invalid")
+    return payload
 
 
 def post_provider_form_basic(
@@ -146,7 +171,7 @@ def post_provider_form_basic(
     """
 
     authorization = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
-    return _provider_json_request(
+    payload = _provider_json_request(
         base_url=base_url,
         relative_path=relative_path,
         method="POST",
@@ -156,3 +181,6 @@ def post_provider_form_basic(
         },
         body=urlencode(fields).encode("utf-8"),
     )
+    if not isinstance(payload, dict):
+        raise WebhookEgressError("provider_response_invalid")
+    return payload

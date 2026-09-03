@@ -8557,6 +8557,10 @@ export interface components {
             readonly connection_name: string;
             /** Format: uuid */
             readonly local_entity_id: string | null;
+            readonly local_entity_name: string;
+            readonly provider_values: {
+                readonly [key: string]: unknown;
+            };
             readonly remote_type: string;
             readonly remote_id: string;
             readonly difference: string;
@@ -8615,9 +8619,10 @@ export interface components {
              * @description * `netbox` - netbox
              *     * `microsoft_graph` - microsoft_graph
              *     * `halopsa` - halopsa
+             *     * `ninjaone` - ninjaone
              * @enum {string}
              */
-            readonly provider: "netbox" | "microsoft_graph" | "halopsa";
+            readonly provider: "netbox" | "microsoft_graph" | "halopsa" | "ninjaone";
             readonly name: string;
             /**
              * Format: uri
@@ -11904,6 +11909,11 @@ export interface components {
             readonly state: string;
             /** Format: date-time */
             readonly observed_at: string;
+            /** Format: uuid */
+            readonly linked_local_entity_id: string | null;
+            readonly linked_local_entity_name: string;
+            readonly accepted: boolean;
+            readonly stale: boolean;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
         readonly ObservationPage: {

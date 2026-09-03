@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
 from django.http import FileResponse
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.utils import timezone
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
@@ -32,6 +34,7 @@ from .models import (
     IntegrationConflict,
     IntegrationConflictStatus,
     IntegrationConnection,
+    IntegrationEntityMapping,
     IntegrationLogEvent,
     IntegrationObservation,
     IntegrationProvider,
@@ -108,7 +111,7 @@ class ConnectionSerializer(serializers.Serializer):
                 if connection.configuration.get("scope_fingerprint")
                 else "not_validated",
             }
-        if connection.provider == IntegrationProvider.HALOPSA:
+        if connection.provider in {IntegrationProvider.HALOPSA, IntegrationProvider.NINJAONE}:
             return {"client_id": str(connection.configuration.get("client_id", ""))}
         return {}
 
@@ -198,6 +201,57 @@ class ObservationSerializer(serializers.Serializer):
     source_timestamp = serializers.DateTimeField(allow_null=True)
     state = serializers.CharField()
     observed_at = serializers.DateTimeField()
+    linked_local_entity_id = serializers.SerializerMethodField()
+    linked_local_entity_name = serializers.SerializerMethodField()
+    accepted = serializers.SerializerMethodField()
+    stale = serializers.SerializerMethodField()
+
+    def _mapping(self, observation: IntegrationObservation) -> IntegrationEntityMapping | None:
+        cache: dict[tuple[UUID, str, str], IntegrationEntityMapping | None] | None = getattr(
+            self, "_mapping_cache", None
+        )
+        if cache is None:
+            cache = {}
+            self._mapping_cache = cache
+        remote_type = (
+            "device"
+            if observation.job.connection.provider == IntegrationProvider.NINJAONE
+            and observation.remote_type in {"device_status", "operating_system", "health"}
+            else observation.remote_type
+        )
+        cache_key = (observation.job.connection_id, remote_type, observation.remote_id)
+        if cache_key not in cache:
+            cache[cache_key] = IntegrationEntityMapping.objects.select_related("local_entity").filter(
+                connection_id=observation.job.connection_id,
+                remote_type=remote_type,
+                remote_id=observation.remote_id.split(":", 1)[0] if remote_type == "device" else observation.remote_id,
+            ).first()
+        return cache[cache_key]
+
+    def get_linked_local_entity_id(self, observation: IntegrationObservation) -> UUID | None:
+        mapping = self._mapping(observation)
+        return mapping.local_entity_id if mapping else None
+
+    def get_linked_local_entity_name(self, observation: IntegrationObservation) -> str:
+        mapping = self._mapping(observation)
+        return mapping.local_entity.display_name if mapping else ""
+
+    def get_accepted(self, observation: IntegrationObservation) -> bool:
+        mapping = self._mapping(observation)
+        return bool(
+            mapping
+            and mapping.remote_type == observation.remote_type
+            and mapping.observed_fingerprint == observation.fingerprint
+        )
+
+    def get_stale(self, observation: IntegrationObservation) -> bool:
+        connection = observation.job.connection
+        return bool(
+            connection.health_status != "healthy"
+            or connection.last_successful_sync_at is None
+            or connection.last_successful_sync_at
+            < timezone.now() - timedelta(minutes=connection.sync_interval_minutes * 2)
+        )
 
 
 class ObservationPageSerializer(OffsetPageSerializer):
@@ -226,13 +280,26 @@ class ConflictSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     connection_id = serializers.UUIDField()
     connection_name = serializers.CharField(source="connection.name")
-    local_entity_id = serializers.UUIDField(allow_null=True)
+    local_entity_id = serializers.SerializerMethodField()
+    local_entity_name = serializers.SerializerMethodField()
+    provider_values = serializers.SerializerMethodField()
     remote_type = serializers.CharField()
     remote_id = serializers.CharField()
     difference = serializers.CharField()
     status = serializers.CharField()
     created_at = serializers.DateTimeField()
     resolved_at = serializers.DateTimeField(allow_null=True)
+
+    def get_local_entity_id(self, conflict: IntegrationConflict) -> UUID | None:
+        return conflict.local_entity_id or conflict.suggested_local_entity_id
+
+    def get_local_entity_name(self, conflict: IntegrationConflict) -> str:
+        entity = conflict.local_entity or conflict.suggested_local_entity
+        return entity.display_name if entity else ""
+
+    @extend_schema_field(serializers.DictField(child=serializers.JSONField()))
+    def get_provider_values(self, conflict: IntegrationConflict) -> dict[str, object]:
+        return conflict.observation.safe_projection if conflict.observation else {}
 
 
 class ConflictPageSerializer(OffsetPageSerializer):
@@ -449,7 +516,7 @@ class IntegrationConflictListView(APIView):
         page = paginate(
             IntegrationConflict.scoped.for_scope(workspace.data_scope)
             .filter(workspace_id=workspace.data_scope.workspace_id)
-            .select_related("connection"),
+            .select_related("connection", "local_entity", "suggested_local_entity", "observation"),
             **query.validated_data,
         )
         return _private(

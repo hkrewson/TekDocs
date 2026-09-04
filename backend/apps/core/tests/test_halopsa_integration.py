@@ -5,12 +5,14 @@ from datetime import timedelta
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.db import connection as database_connection
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.core.halopsa import halo_ticket_summaries
 from apps.core.integration_providers import HaloPSAProvider, ProviderObservation, ProviderPage
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import process_sync_job
@@ -23,6 +25,7 @@ from apps.core.models import (
     workspace_for_owner,
 )
 from apps.core.organizations import create_organization
+from apps.core.workspaces import resolve_organization_workspace
 
 
 @pytest.fixture
@@ -306,3 +309,16 @@ def test_global_search_returns_only_mapped_external_ticket_title_and_number(inst
     assert result["target"] == "https://support.example.invalid/tickets?id=1042"
     assert result["result_type"] == "external_ticket"
     assert "ticket body" not in response.content.decode()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_ticket_projection_works_without_an_outer_transaction(installation):
+    if database_connection.vendor != "postgresql":
+        pytest.skip("Transaction-local RLS restoration requires PostgreSQL")
+    selected = organization(installation, "Direct search client")
+    connection = halo_connection(installation)
+    observed_ticket(installation, connection, selected)
+    workspace = resolve_organization_workspace(installation.owner, entity_id=selected.entity_id)
+
+    assert database_connection.in_atomic_block is False
+    assert [item["number"] for item in halo_ticket_summaries(workspace)] == ["1042"]

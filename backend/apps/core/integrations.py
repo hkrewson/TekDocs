@@ -68,7 +68,7 @@ def _validate_provider_secret(value: str, *, field: str = "api_token") -> bytes:
 
 
 def _provider_credentials(
-    provider: str, values: dict[str, str], legacy_token: str = ""
+    provider: str, values: dict[str, str], legacy_token: str | None = None
 ) -> tuple[bytes, dict[str, object]]:
     adapter = PROVIDERS[provider]
     supplied = dict(values)
@@ -150,7 +150,7 @@ def create_connection(
     name: str,
     base_url: str = "",
     credentials: dict[str, str] | None = None,
-    api_token: str = "",
+    api_token: str | None = None,
     sync_interval_minutes: int,
 ) -> IntegrationConnection:
     _recent_session(request)
@@ -245,7 +245,7 @@ def rotate_connection_secret(
     organization_entity_id: UUID | None,
     connection_id: UUID,
     credentials: dict[str, str] | None = None,
-    api_token: str = "",
+    api_token: str | None = None,
 ) -> IntegrationConnection:
     _recent_session(request)
     resolved = resolve_integration_workspace(

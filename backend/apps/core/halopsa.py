@@ -73,7 +73,11 @@ def halo_ticket_summaries(workspace: ResolvedWorkspace) -> list[dict[str, object
                 .order_by("-observed_at", "id")[:MAX_TICKET_CANDIDATES]
             )
     finally:
-        if database_connection.vendor == "postgresql":
+        # A nested system scope leaves SET LOCAL values on the caller's outer
+        # transaction, so request code must restore them. When this helper was
+        # called without an outer transaction, the system scope itself has
+        # already committed and PostgreSQL has discarded those local values.
+        if database_connection.vendor == "postgresql" and database_connection.in_atomic_block:
             mode = (
                 OrganizationRLSMode.ORGANIZATION if workspace.organization is not None else OrganizationRLSMode.MSP_ONLY
             )

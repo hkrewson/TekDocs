@@ -52,32 +52,21 @@ def bind_local_rls_scope(
         raise ValueError("System principal mode cannot carry a user actor.")
 
     organization_id = "" if scope.organization_id is None else str(scope.organization_id)
+    settings = [
+        ("tekdocs.tenant_id", str(scope.tenant_id)),
+        ("tekdocs.workspace_id", str(scope.workspace_id)),
+        ("tekdocs.organization_id", organization_id),
+        ("tekdocs.organization_mode", organization_mode.value),
+    ]
+    if actor_user_id is not _PRESERVE_ACTOR:
+        settings.append(("tekdocs.user_id", str(actor_user_id) if isinstance(actor_user_id, UUID) else ""))
+    if principal_mode is not None:
+        settings.append(("tekdocs.principal_mode", principal_mode.value))
     with connection.cursor() as cursor:
         cursor.execute(
-            """
-            SELECT
-                set_config('tekdocs.tenant_id', %s, true),
-                set_config('tekdocs.workspace_id', %s, true),
-                set_config('tekdocs.organization_id', %s, true),
-                set_config('tekdocs.organization_mode', %s, true)
-            """,
-            [
-                str(scope.tenant_id),
-                str(scope.workspace_id),
-                organization_id,
-                organization_mode.value,
-            ],
+            "SELECT " + ", ".join("set_config(%s, %s, true)" for _setting in settings),
+            [value for setting in settings for value in setting],
         )
-        if actor_user_id is not _PRESERVE_ACTOR:
-            cursor.execute(
-                "SELECT set_config('tekdocs.user_id', %s, true)",
-                [str(actor_user_id) if isinstance(actor_user_id, UUID) else ""],
-            )
-        if principal_mode is not None:
-            cursor.execute(
-                "SELECT set_config('tekdocs.principal_mode', %s, true)",
-                [principal_mode.value],
-            )
 
 
 def current_rls_tenant_id() -> str:
@@ -106,14 +95,17 @@ def rls_scope(scope: DataScope, *, organization_mode: OrganizationRLSMode) -> It
 def system_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLSMode) -> Iterator[None]:
     """Open a transaction for a trusted tenant-scoped worker or server operation."""
 
+    restore_principal = connection.in_atomic_block
     with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT "
-                "COALESCE(current_setting('tekdocs.user_id', true), ''), "
-                "COALESCE(current_setting('tekdocs.principal_mode', true), '')"
-            )
-            previous_actor, previous_principal = cursor.fetchone()
+        previous_actor = previous_principal = ""
+        if restore_principal:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT "
+                    "COALESCE(current_setting('tekdocs.user_id', true), ''), "
+                    "COALESCE(current_setting('tekdocs.principal_mode', true), '')"
+                )
+                previous_actor, previous_principal = cursor.fetchone()
         bind_local_rls_scope(
             scope,
             organization_mode=organization_mode,
@@ -123,13 +115,14 @@ def system_rls_scope(scope: DataScope, *, organization_mode: OrganizationRLSMode
         try:
             yield
         finally:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT "
-                    "set_config('tekdocs.user_id', %s, true), "
-                    "set_config('tekdocs.principal_mode', %s, true)",
-                    [previous_actor, previous_principal],
-                )
+            if restore_principal:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT "
+                        "set_config('tekdocs.user_id', %s, true), "
+                        "set_config('tekdocs.principal_mode', %s, true)",
+                        [previous_actor, previous_principal],
+                    )
 
 
 @contextmanager

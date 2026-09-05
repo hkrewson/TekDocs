@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.accounts.policy import DataAudience
 
-from .diagram_exports import diagram_sources, render_diagram_exports
+from .diagram_exports import DiagramRenderError, diagram_sources, render_diagram_exports
 from .document_attachments import copy_attachment_content
 from .document_key_freeze import KeyFreezeConflict, freeze_document_keys
 from .entity_mentions import resolve_entity_mentions
@@ -95,6 +95,71 @@ FINDING_CATALOG = {
         "blocker",
         "A diagram cannot be rendered into retained publication artifacts.",
         "Open the diagram editor, correct the source, and run the check again.",
+    ),
+    "diagram.count.exceeded": (
+        "blocker",
+        "This document contains more diagrams than one publication can safely render.",
+        "Split the document or reduce it to 20 diagrams, then run the check again.",
+    ),
+    "diagram.directive.unsupported": (
+        "blocker",
+        "A diagram uses a Mermaid configuration directive that TekDocs does not support.",
+        "Remove the configuration block or init directive from the Mermaid source.",
+    ),
+    "diagram.output.incomplete": (
+        "blocker",
+        "The diagram renderer did not return every required publication file.",
+        "Run the check again. If it still fails, review the renderer service health.",
+    ),
+    "diagram.output.invalid": (
+        "blocker",
+        "The diagram renderer returned an invalid SVG file.",
+        "Run the check again. If it still fails, review the renderer service health.",
+    ),
+    "diagram.output.oversized": (
+        "blocker",
+        "A rendered diagram is too large to retain safely.",
+        "Simplify the diagram or divide it into smaller diagrams.",
+    ),
+    "diagram.output.unsafe": (
+        "blocker",
+        "A rendered diagram contains content TekDocs cannot retain safely.",
+        "Remove links, embedded content, or custom styling from the Mermaid source.",
+    ),
+    "diagram.raster.failed": (
+        "blocker",
+        "TekDocs could not create the diagram image required for downloads.",
+        "Run the check again. If it still fails, review the renderer service health.",
+    ),
+    "diagram.renderer.busy": (
+        "blocker",
+        "The diagram renderer is handling too many jobs.",
+        "Wait briefly, then run the check again.",
+    ),
+    "diagram.renderer.invalid_response": (
+        "blocker",
+        "The diagram renderer returned a response TekDocs could not verify.",
+        "Review the renderer service version and health, then run the check again.",
+    ),
+    "diagram.renderer.timeout": (
+        "blocker",
+        "The diagram renderer did not finish in time.",
+        "Simplify the diagram or run the check again. If it persists, review renderer capacity.",
+    ),
+    "diagram.renderer.unavailable": (
+        "blocker",
+        "The diagram renderer is unavailable.",
+        "Restore the renderer service, then run the check again.",
+    ),
+    "diagram.source.invalid": (
+        "blocker",
+        "The diagram source could not be rendered.",
+        "Open the diagram editor, correct the Mermaid source, and run the check again.",
+    ),
+    "diagram.source.oversized": (
+        "blocker",
+        "A diagram contains more than 50,000 characters.",
+        "Simplify the diagram or divide it into smaller diagrams.",
     ),
     "entity.unavailable": (
         "blocker",
@@ -192,8 +257,9 @@ def run_document_preflight(*, workspace, document: Document, resolved, audience:
                 findings.append(_finding("template.update.available", target="document-settings"))
     try:
         diagrams = diagram_sources(resolved.markdown)
-    except ValueError:
-        findings.append(_finding("diagram.render_failed", target="editor"))
+    except DiagramRenderError as error:
+        code = error.code if error.code in FINDING_CATALOG else "diagram.render_failed"
+        findings.append(_finding(code, target="editor"))
         diagrams = ()
     for diagram in diagrams:
         folded_source = diagram.source.casefold()
@@ -202,8 +268,9 @@ def run_document_preflight(*, workspace, document: Document, resolved, audience:
     if diagrams:
         try:
             render_diagram_exports(resolved.markdown, required=True)
-        except ValueError:
-            findings.append(_finding("diagram.render_failed", target="editor"))
+        except DiagramRenderError as error:
+            code = error.code if error.code in FINDING_CATALOG else "diagram.render_failed"
+            findings.append(_finding(code, target="editor"))
     findings.sort(
         key=lambda item: (
             {"blocker": 0, "warning": 1, "info": 2}[item.severity],

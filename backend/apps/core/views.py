@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.api_contracts import ApiRootSerializer
+from apps.core.diagram_exports import diagram_renderer_health
 from apps.core.models import InstallationState
 from tekdocs.version import VERSION
 
@@ -63,12 +64,25 @@ class ReadyHealthView(APIView):
                 cursor.fetchone()
         except Exception:  # noqa: BLE001
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
+        renderer = diagram_renderer_health()
+        renderer_status = {} if renderer == "not_configured" else {"diagram_renderer": renderer}
+        if renderer not in {"not_configured", "ready"}:
+            return Response(
+                {"status": "unavailable", "database": "ready", **renderer_status, "version": VERSION},
+                status=503,
+            )
         bootstrap_required = InstallationState.objects.filter(
             pk=InstallationState.SINGLETON_ID, bootstrapped_at__isnull=True
         ).exists()
         if bootstrap_required and not settings.TEKDOCS_BOOTSTRAP_TOKEN:
             return Response(
-                {"status": "unavailable", "database": "ready", "bootstrap": "unavailable", "version": VERSION},
+                {
+                    "status": "unavailable",
+                    "database": "ready",
+                    "bootstrap": "unavailable",
+                    **renderer_status,
+                    "version": VERSION,
+                },
                 status=503,
             )
-        return Response({"status": "ok", "database": "ready", "version": VERSION})
+        return Response({"status": "ok", "database": "ready", **renderer_status, "version": VERSION})

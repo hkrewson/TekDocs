@@ -11,6 +11,9 @@ import pytest
 from django.test import override_settings
 
 from apps.core.diagram_exports import (
+    MAX_DIAGRAMS,
+    MAX_SOURCE_CHARACTERS,
+    RENDERER_FAILURE_TO_DIAGRAM_CODE,
     UNRENDERED_VERSION,
     DiagramExportArtifact,
     DiagramRenderError,
@@ -66,15 +69,46 @@ def test_editable_render_falls_back_but_required_render_fails_closed():
     fallback = render_diagram_exports(MARKDOWN)
     assert fallback[0].state == "text_fallback"
     assert fallback[0].svg is None
-    with pytest.raises(DiagramRenderError, match="unavailable"):
+    with pytest.raises(DiagramRenderError, match="unavailable") as caught:
         render_diagram_exports(MARKDOWN, required=True)
+    assert caught.value.code == "diagram.renderer.unavailable"
+
+
+@pytest.mark.parametrize(
+    ("markdown", "expected_code"),
+    (
+        (
+            f"```mermaid\nflowchart LR\nA[{'x' * MAX_SOURCE_CHARACTERS}]\n```\n",
+            "diagram.source.oversized",
+        ),
+        (
+            "\n".join("```mermaid\nflowchart LR\nA-->B\n```" for _ in range(MAX_DIAGRAMS + 1)),
+            "diagram.count.exceeded",
+        ),
+        (
+            "```mermaid\n%%{init: {'theme': 'dark'}}%%\nflowchart LR\nA-->B\n```\n",
+            "diagram.directive.unsupported",
+        ),
+        (
+            "```mermaid\n---\nconfig:\n  theme: dark\n---\nflowchart LR\nA-->B\n```\n",
+            "diagram.directive.unsupported",
+        ),
+    ),
+)
+def test_source_policy_failures_have_stable_codes(markdown, expected_code):
+    with pytest.raises(DiagramRenderError) as caught:
+        diagram_sources(markdown)
+
+    assert caught.value.code == expected_code
 
 
 def test_svg_sanitizer_rejects_active_and_external_content():
-    with pytest.raises(DiagramRenderError, match="unsafe"):
+    with pytest.raises(DiagramRenderError, match="unsafe") as active:
         sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
-    with pytest.raises(DiagramRenderError, match="unsafe"):
+    assert active.value.code == "diagram.output.unsafe"
+    with pytest.raises(DiagramRenderError, match="unsafe") as external:
         sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><style>.x{fill:url(https://bad)}</style></svg>')
+    assert external.value.code == "diagram.output.unsafe"
 
 
 @pytest.mark.parametrize(
@@ -195,6 +229,20 @@ def test_isolated_renderer_is_deterministic_when_runtime_is_requested(settings):
 )
 def test_a_rejected_render_names_which_failure_the_renderer_reported(reported, expected):
     assert _rejected_detail(reported, expected_count=1) == expected
+
+
+@pytest.mark.parametrize(
+    ("renderer_code", "finding_code"),
+    (
+        ("render_failed", "diagram.source.invalid"),
+        ("renderer_timeout", "diagram.renderer.timeout"),
+        ("incomplete_render", "diagram.output.incomplete"),
+        ("oversized_render", "diagram.output.oversized"),
+        ("raster_failed", "diagram.raster.failed"),
+    ),
+)
+def test_renderer_failures_map_to_stable_preflight_codes(renderer_code, finding_code):
+    assert RENDERER_FAILURE_TO_DIAGRAM_CODE[renderer_code] == finding_code
 
 
 def test_a_successful_render_result_is_not_reported_as_a_failure():

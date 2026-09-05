@@ -1,4 +1,6 @@
+import os
 import secrets
+import time
 
 import pytest
 from django.test import override_settings
@@ -23,6 +25,26 @@ def test_readiness_checks_database(client):
     response = client.get(reverse("health-ready"))
     assert response.status_code == 200
     assert response.json()["database"] == "ready"
+
+
+@pytest.mark.django_db
+def test_readiness_reports_only_coarse_diagram_renderer_health(client, tmp_path):
+    marker = tmp_path / ".renderer-ready"
+    marker.write_text("internal value is not returned\n", encoding="utf-8")
+
+    with override_settings(TEKDOCS_DIAGRAM_JOB_DIRECTORY=str(tmp_path)):
+        ready = client.get(reverse("health-ready"))
+        assert ready.status_code == 200
+        assert ready.json()["diagram_renderer"] == "ready"
+        assert str(tmp_path) not in ready.content.decode()
+        assert "internal value" not in ready.content.decode()
+
+        old = time.time() - 30
+        os.utime(marker, (old, old))
+        stale = client.get(reverse("health-ready"))
+        assert stale.status_code == 503
+        assert stale.json()["diagram_renderer"] == "stale"
+        assert str(tmp_path) not in stale.content.decode()
 
 
 @pytest.mark.django_db

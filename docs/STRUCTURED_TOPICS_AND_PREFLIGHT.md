@@ -6,6 +6,8 @@ The topic schema catalog is available from `GET /api/v1/documents/topic-schemas`
 
 `GET .../preflight?audience=msp_internal|client_visible` returns `tekdocs-preflight/v1`, the exact composition digest, deterministic severity counts, and ordered findings. Every finding has a stable code, maintained severity, summary, remediation, edit target, and optional semantic section and line. Checks cover semantic sections, ownership and review state, keys, record links, files, remote observations, template enrollment state, and diagram rendering and accessibility. The catalog endpoint documents all current codes.
 
+Diagram checks distinguish source limits and unsupported configuration, invalid source, renderer availability, capacity and timeout, incomplete or oversized output, unsafe SVG, and raster-image failure. Findings contain only maintained language and stable codes; Mermaid source, renderer output, and filesystem paths are never copied into the response or operational log.
+
 STATIC publication reruns preflight after acquiring the composition lock. A blocker returns a publication conflict before retained state is created. Documentation-map preview and baseline creation use the same preflight service boundary; baseline creation reruns its checks under the map revision lock.
 
 The publication and portable export manifests add optional `topic_type` and `topic_schema_version` fields. Publication manifests also retain the preflight contract version, checked composition digest, and severity counts without copying finding content into the signed artifact.

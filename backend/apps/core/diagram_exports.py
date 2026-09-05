@@ -20,6 +20,7 @@ MAX_SOURCE_CHARACTERS = 50_000
 MAX_SVG_BYTES = 2 * 1024 * 1024
 MAX_PNG_BYTES = 5 * 1024 * 1024
 MAX_ACTIVE_JOBS = 8
+RENDERER_HEALTH_MAX_AGE_SECONDS = 5
 #: The renderer identifies its own version; this module does not keep a second copy to
 #: compare against. A duplicated constant cannot be updated by a dependency bump, so it
 #: would silently attest the wrong renderer in a signed manifest while every check still
@@ -46,10 +47,21 @@ RENDERER_FAILURE_CODES = frozenset(
         "oversized_raster",
     }
 )
+RENDERER_FAILURE_TO_DIAGRAM_CODE = {
+    "invalid_request": "diagram.renderer.invalid_response",
+    "render_failed": "diagram.source.invalid",
+    "renderer_timeout": "diagram.renderer.timeout",
+    "incomplete_render": "diagram.output.incomplete",
+    "oversized_render": "diagram.output.oversized",
+    "raster_failed": "diagram.raster.failed",
+    "incomplete_raster": "diagram.raster.failed",
+    "oversized_raster": "diagram.output.oversized",
+}
 _MARKDOWN = MarkdownIt("commonmark", {"html": False})
 _TITLE = re.compile(r"^\s*accTitle:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 _DESCRIPTION = re.compile(r"^\s*accDescr:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 _JOB_ID = re.compile(r"^[0-9a-f]{32}$")
+_MERMAID_DIRECTIVE = re.compile(r"^\s*%%\{", re.MULTILINE)
 _RENDERED_FENCE = re.compile(r'<pre><code class="language-mermaid">.*?</code></pre>\s*', re.DOTALL)
 _SVG_TAGS = {
     "circle",
@@ -122,7 +134,15 @@ _SVG_ATTRIBUTES = {
 
 
 class DiagramRenderError(ValueError):
-    pass
+    """A safe diagram failure with a stable preflight code.
+
+    The message may be shown to a person. It must never include Mermaid source,
+    renderer stderr, filesystem paths, or other customer-controlled values.
+    """
+
+    def __init__(self, message: str, *, code: str = "diagram.render_failed") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,9 +178,20 @@ def diagram_sources(markdown: str) -> tuple[DiagramSource, ...]:
             continue
         source = token.content.rstrip("\n")
         if len(source) > MAX_SOURCE_CHARACTERS:
-            raise DiagramRenderError("A Mermaid diagram exceeds the 50,000-character limit.")
+            raise DiagramRenderError(
+                "A Mermaid diagram exceeds the 50,000-character limit.",
+                code="diagram.source.oversized",
+            )
         if len(values) >= MAX_DIAGRAMS:
-            raise DiagramRenderError("A document may contain at most 20 Mermaid diagrams.")
+            raise DiagramRenderError(
+                "A document may contain at most 20 Mermaid diagrams.",
+                code="diagram.count.exceeded",
+            )
+        if source.lstrip().startswith("---") or _MERMAID_DIRECTIVE.search(source):
+            raise DiagramRenderError(
+                "Mermaid configuration directives are not supported.",
+                code="diagram.directive.unsupported",
+            )
         title_match = _TITLE.search(source)
         description_match = _DESCRIPTION.search(source)
         values.append(
@@ -177,11 +208,17 @@ def diagram_sources(markdown: str) -> tuple[DiagramSource, ...]:
 
 def sanitize_svg(content: bytes) -> bytes:
     if len(content) > MAX_SVG_BYTES:
-        raise DiagramRenderError("A rendered diagram exceeds the SVG size limit.")
+        raise DiagramRenderError(
+            "A rendered diagram exceeds the SVG size limit.",
+            code="diagram.output.oversized",
+        )
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise DiagramRenderError("The diagram renderer returned invalid SVG.") from exc
+        raise DiagramRenderError(
+            "The diagram renderer returned invalid SVG.",
+            code="diagram.output.invalid",
+        ) from exc
     _validate_svg_content(text)
     cleaned = nh3.clean(
         text,
@@ -196,10 +233,16 @@ def sanitize_svg(content: bytes) -> bytes:
     # url(), a scheme, or @import from a textual allowlist.
     _validate_svg_content(cleaned)
     if not cleaned.startswith("<svg") or "</svg>" not in cleaned:
-        raise DiagramRenderError("The diagram renderer returned invalid SVG.")
+        raise DiagramRenderError(
+            "The diagram renderer returned invalid SVG.",
+            code="diagram.output.invalid",
+        )
     encoded = cleaned.encode("utf-8")
     if len(encoded) > MAX_SVG_BYTES:
-        raise DiagramRenderError("A sanitized diagram exceeds the SVG size limit.")
+        raise DiagramRenderError(
+            "A sanitized diagram exceeds the SVG size limit.",
+            code="diagram.output.oversized",
+        )
     return encoded
 
 
@@ -210,18 +253,27 @@ def _validate_svg_content(text: str) -> None:
     )
     forbidden = ("<script", "<foreignobject", "javascript:", "data:", "http:", "https:", "@import")
     if any(value in scanned for value in forbidden):
-        raise DiagramRenderError("The diagram renderer returned unsafe SVG.")
+        raise DiagramRenderError(
+            "The diagram renderer returned unsafe SVG.",
+            code="diagram.output.unsafe",
+        )
     for match in re.finditer(r"url\(([^)]*)\)", text, re.IGNORECASE):
         reference = match.group(1).strip().strip("'\"")
         if not reference.startswith("#"):
-            raise DiagramRenderError("The diagram renderer returned an unsafe SVG reference.")
+            raise DiagramRenderError(
+                "The diagram renderer returned an unsafe SVG reference.",
+                code="diagram.output.unsafe",
+            )
     styles = re.findall(r"<style(?:\s[^>]*)?>(.*?)</style>", text, re.IGNORECASE | re.DOTALL)
     styles.extend(
         match.group(2)
         for match in re.finditer(r"\sstyle\s*=\s*([\"'])(.*?)\1", text, re.IGNORECASE | re.DOTALL)
     )
     if any("\\" in style for style in styles):
-        raise DiagramRenderError("The diagram renderer returned unsafe SVG styling.")
+        raise DiagramRenderError(
+            "The diagram renderer returned unsafe SVG styling.",
+            code="diagram.output.unsafe",
+        )
 
 
 def _rejected_detail(result: object, *, expected_count: int) -> str | None:
@@ -250,6 +302,26 @@ def _fallback(sources: tuple[DiagramSource, ...]) -> tuple[DiagramExportArtifact
     )
 
 
+def diagram_renderer_health() -> str:
+    """Return a coarse, value-free state for the shared renderer heartbeat."""
+
+    configured = str(getattr(settings, "TEKDOCS_DIAGRAM_JOB_DIRECTORY", "")).strip()
+    if not configured:
+        return "not_configured"
+    root = Path(configured)
+    try:
+        if not root.is_absolute() or not root.is_dir() or root.is_symlink():
+            return "unavailable"
+        marker = root / ".renderer-ready"
+        if not marker.is_file() or marker.is_symlink():
+            return "unavailable"
+        if time.time() - marker.stat().st_mtime > RENDERER_HEALTH_MAX_AGE_SECONDS:
+            return "stale"
+    except OSError:
+        return "unavailable"
+    return "ready"
+
+
 def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[DiagramExportArtifact, ...]:
     sources = diagram_sources(markdown)
     if not sources:
@@ -257,17 +329,34 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
     configured = str(getattr(settings, "TEKDOCS_DIAGRAM_JOB_DIRECTORY", "")).strip()
     if not configured:
         if required:
-            raise DiagramRenderError("The isolated diagram renderer is unavailable.")
+            raise DiagramRenderError(
+                "The isolated diagram renderer is unavailable.",
+                code="diagram.renderer.unavailable",
+            )
         return _fallback(sources)
     root = Path(configured)
     if not root.is_absolute() or not root.is_dir() or root.is_symlink():
         if required:
-            raise DiagramRenderError("The isolated diagram renderer is unavailable.")
+            raise DiagramRenderError(
+                "The isolated diagram renderer is unavailable.",
+                code="diagram.renderer.unavailable",
+            )
         return _fallback(sources)
-    active = sum(1 for item in root.iterdir() if item.is_dir() and _JOB_ID.fullmatch(item.name))
+    try:
+        active = sum(1 for item in root.iterdir() if item.is_dir() and _JOB_ID.fullmatch(item.name))
+    except OSError:
+        if required:
+            raise DiagramRenderError(
+                "The isolated diagram renderer is unavailable.",
+                code="diagram.renderer.unavailable",
+            ) from None
+        return _fallback(sources)
     if active >= MAX_ACTIVE_JOBS:
         if required:
-            raise DiagramRenderError("The isolated diagram renderer is busy.")
+            raise DiagramRenderError(
+                "The isolated diagram renderer is busy.",
+                code="diagram.renderer.busy",
+            )
         return _fallback(sources)
 
     job = root / uuid4().hex
@@ -290,19 +379,35 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
         while time.monotonic() < deadline and not result_path.is_file():
             time.sleep(0.05)
         if not result_path.is_file():
-            raise DiagramRenderError("The isolated diagram renderer timed out.")
+            raise DiagramRenderError(
+                "The isolated diagram renderer timed out.",
+                code="diagram.renderer.timeout",
+            )
         result = json.loads(result_path.read_text(encoding="utf-8"))
         detail = _rejected_detail(result, expected_count=len(sources))
         if detail is not None:
-            raise DiagramRenderError(f"The isolated diagram renderer rejected the diagram: {detail}.")
+            raise DiagramRenderError(
+                "The isolated diagram renderer rejected the diagram.",
+                code=RENDERER_FAILURE_TO_DIAGRAM_CODE.get(detail, "diagram.renderer.invalid_response"),
+            )
         # Validated above, so this is the version that actually produced the bytes below.
         renderer_version = str(result["renderer"])
         artifacts: list[DiagramExportArtifact] = []
         for source in sources:
-            svg = sanitize_svg((job / f"output-{source.index}.svg").read_bytes())
-            png = (job / f"output-{source.index}.png").read_bytes()
+            svg_path = job / f"output-{source.index}.svg"
+            png_path = job / f"output-{source.index}.png"
+            if not svg_path.is_file() or not png_path.is_file():
+                raise DiagramRenderError(
+                    "The diagram renderer did not return every requested artifact.",
+                    code="diagram.output.incomplete",
+                )
+            svg = sanitize_svg(svg_path.read_bytes())
+            png = png_path.read_bytes()
             if not png.startswith(b"\x89PNG\r\n\x1a\n") or len(png) > MAX_PNG_BYTES:
-                raise DiagramRenderError("The diagram renderer returned invalid PNG output.")
+                raise DiagramRenderError(
+                    "The diagram renderer returned invalid PNG output.",
+                    code="diagram.raster.failed",
+                )
             artifacts.append(
                 DiagramExportArtifact(
                     source=source,
@@ -315,15 +420,10 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
         return tuple(artifacts)
     except (DiagramRenderError, OSError, ValueError, json.JSONDecodeError) as error:
         if required:
-            # This catches five operationally different failures — the renderer timing
-            # out, rejecting the diagram, returning invalid PNG or unsafe SVG, and plain
-            # I/O. Collapsing them into one sentence sends an operator to read the source
-            # to find out which happened. A DiagramRenderError already carries curated
-            # text; anything else is named by type only, so a filesystem path from an
-            # OSError never reaches the caller. The cause is still suppressed rather than
-            # chained, because exception text must not reach logs.
-            cause = str(error) if isinstance(error, DiagramRenderError) else type(error).__name__
-            raise DiagramRenderError(f"A required diagram could not be rendered: {cause}") from None
+            if isinstance(error, DiagramRenderError):
+                raise error from None
+            code = "diagram.renderer.unavailable" if isinstance(error, OSError) else "diagram.renderer.invalid_response"
+            raise DiagramRenderError("A required diagram could not be rendered.", code=code) from None
         return _fallback(sources)
     finally:
         shutil.rmtree(job, ignore_errors=True)

@@ -234,6 +234,45 @@ def test_structured_topic_conversion_is_explicit_versioned_and_preflighted(owner
 
 
 @pytest.mark.django_db
+def test_diagram_preflight_returns_specific_safe_failure_and_remediation(owner_client, installation):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {
+            "title": "Configured diagram",
+            "markdown": (
+                "```mermaid\n"
+                "%%{init: {'theme': 'dark'}}%%\n"
+                "flowchart LR\n"
+                "accTitle: Request route\n"
+                "accDescr: A request travels from A to B.\n"
+                "A-->B\n"
+                "```\n"
+            ),
+        },
+        content_type="application/json",
+    ).json()
+
+    response = owner_client.get(
+        reverse("msp-document-preflight", kwargs={"document_entity_id": created["id"]}),
+        {"audience": "msp_internal"},
+    )
+
+    assert response.status_code == 200
+    report = response.json()
+    finding = next(item for item in report["findings"] if item["code"] == "diagram.directive.unsupported")
+    assert finding == {
+        "code": "diagram.directive.unsupported",
+        "severity": "blocker",
+        "summary": "A diagram uses a Mermaid configuration directive that TekDocs does not support.",
+        "remediation": "Remove the configuration block or init directive from the Mermaid source.",
+        "target": "editor",
+        "section_id": None,
+        "line": None,
+    }
+    assert report["valid"] is False
+
+
+@pytest.mark.django_db
 def test_policy_starter_markdown_is_accepted_without_duplicate_structure(owner_client, installation):
     from apps.core.topic_schemas import seed_markdown
 

@@ -279,13 +279,14 @@ it('shows publication findings and keeps a blocked document from publishing', as
     version: 'tekdocs-preflight/v1', scope: 'document', scope_id: 'doc-1',
     composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: false,
     counts: { blocker: 1, warning: 0, info: 0 },
-    findings: [{ code: 'topic.section.missing', severity: 'blocker', summary: 'A required topic section is missing.', remediation: 'Restore the required section.', target: 'document' }],
+    findings: [{ code: 'diagram.renderer.unavailable', severity: 'blocker', summary: 'The diagram renderer is unavailable.', remediation: 'Restore the renderer service, then run the check again.', target: 'editor' }],
   })
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
 
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Check document' }))
-  expect(await screen.findByText('A required topic section is missing.')).toBeVisible()
+  expect(await screen.findByText('The diagram renderer is unavailable.')).toBeVisible()
+  expect(screen.getByText('Restore the renderer service, then run the check again.')).toBeVisible()
   expect(screen.getByRole('status')).toHaveTextContent('1 publication blocker')
 
   await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))

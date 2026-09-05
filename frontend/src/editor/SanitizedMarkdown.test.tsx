@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import { flushDeferredWork } from '../test/flush'
 import { SanitizedMarkdown } from './SanitizedMarkdown'
 import { sanitizeMarkdownHtml } from './sanitize'
 
@@ -30,12 +29,18 @@ describe('sanitized Markdown preview', () => {
     const caption = await screen.findByText('Rendered diagram')
     expect(caption).toBeVisible()
     expect(caption.closest('figure')?.querySelector('pre')).toHaveTextContent('A-->B')
+    expect(view.container.querySelector('code.language-mermaid')).toBeNull()
 
-    // The component defers `root.unmount()` to a macrotask so it never unmounts a
-    // root mid-render. Unmounting here and letting that callback run keeps teardown
-    // inside the test rather than racing the end of the suite.
     view.unmount()
-    await flushDeferredWork()
     expect(screen.queryByText('Rendered diagram')).toBeNull()
+  })
+
+  it('renders a diagram when saved content replaces an ordinary block', async () => {
+    const view = render(<SanitizedMarkdown html="<p>Before editing.</p>" />)
+
+    view.rerender(<SanitizedMarkdown html={'<pre><code class="language-mermaid">flowchart LR\nA--&gt;B</code></pre>'} />)
+
+    expect(await screen.findByText('Rendered diagram')).toBeVisible()
+    expect(view.container.querySelector('code.language-mermaid')).toBeNull()
   })
 })

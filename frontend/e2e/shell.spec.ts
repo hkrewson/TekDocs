@@ -224,8 +224,39 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
 })
 
 test('guided diagrams remain portable Markdown inside the document', async ({ page, baseURL }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
   await mockAuthenticated(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route(`**/api/v1/documents/${document.id}/placements/${documentPlacementId}/reuse`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: {
+        block_id: documentBlockId, block_name: 'UniFi Network Setup Guide — content', revision_id: documentRevisionId,
+        revision_number: 1, checksum: document.checksum, markdown: document.markdown, audiences: [],
+        live_audience_count: 1, pinned_audience_count: 0, can_edit_shared: true, can_detach: false,
+        requires_mfa: false, truncated: false,
+      } })
+      return
+    }
+    const body = await route.request().postDataJSON() as { markdown: string }
+    const source = /```mermaid\n([\s\S]*?)\n```/.exec(body.markdown)?.[1] ?? ''
+    const escaped = source.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    const savedRevisionId = crypto.randomUUID()
+    await route.fulfill({ json: {
+      ...document,
+      markdown: body.markdown,
+      resolved_markdown: body.markdown,
+      current_revision_id: savedRevisionId,
+      revision_number: 2,
+      placements: [{
+        ...document.placements[0],
+        resolved_revision_id: savedRevisionId,
+        resolved_revision_number: 2,
+        resolved_markdown: body.markdown,
+        resolved_html: `<pre><code class="language-mermaid">${escaped}</code></pre>`,
+      }],
+    } })
+  })
   await page.route('**/api/v1/markdown/render', async (route) => {
     const body = await route.request().postDataJSON() as { markdown: string }
     const source = /```mermaid\n([\s\S]*?)\n```/.exec(body.markdown)?.[1] ?? ''
@@ -261,6 +292,12 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await expect(source).toHaveValue(/N2@\{ shape: hex, label: "Edge firewall<br\/>Primary gateway · 192.0.2.1" \}/)
   await expect(source).toHaveValue(/N1 -.-> N2/)
   await expect(source).not.toHaveValue(/tekdocs:/)
+
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Content saved.')).toBeVisible()
+  expect(pageErrors).toEqual([])
+  await expect(page.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
+  await expect(page.locator('.document-content-body pre > code.language-mermaid')).toHaveCount(0)
 })
 
 test('Mermaid preview renders locally with an accessible description', async ({ page, baseURL }) => {

@@ -429,7 +429,7 @@ test('first-owner browser setup enters the authenticated shell', async ({ page, 
   await page.goto('/')
   expect((await new AxeBuilder({ page }).withTags(wcag22Tags).analyze()).violations).toEqual([])
   const password = `${crypto.randomUUID()}Aa7!`
-  await page.getByLabel('Deployment token').fill(crypto.randomUUID())
+  await page.getByLabel('Setup token', { exact: true }).fill(crypto.randomUUID())
   await page.getByLabel('MSP name').fill('Example MSP')
   await page.getByLabel('Your name').fill('Primary Owner')
   await page.getByLabel('Email address').fill('owner@example.com')

@@ -50,12 +50,59 @@
     },
     {
       "id": "authentication-account-security",
-      "workflow": "First-owner setup, sign-in, MFA, invitations, account, and security settings",
-      "routes": ["/auth/*", "/settings", "/staff", "/access-control", "/notification-delivery", "/system-status"],
+      "workflow": "First-owner setup, sign-in, MFA, account invitations, password recovery, profile, sessions, and API tokens",
+      "routes": ["/auth/*", "/settings"],
       "states": ["setup", "loading", "validation", "denied", "recovery", "success", "failure"],
+      "decisions": [
+        {
+          "before": "Use your TekDocs owner account.",
+          "after": "Use your TekDocs account.",
+          "reason": "Invited staff and administrators use the same sign-in screen; the old text incorrectly implied that only owners could sign in."
+        },
+        {
+          "before": "The browser could not confirm the installation or session state.",
+          "after": "TekDocs could not load your sign-in status.",
+          "reason": "Describe what the person needs to know without exposing browser or session-state implementation details."
+        },
+        {
+          "before": "Deployment token",
+          "after": "Setup token",
+          "reason": "Setup token describes why the value is needed while the nearby instructions retain the exact server commands."
+        },
+        {
+          "before": "If that address belongs to an active account, a password reset link has been sent. The same message is shown for every address.",
+          "after": "If an active account uses that address, we sent a password reset link.",
+          "reason": "Keep the enumeration-safe response without explaining the security implementation to the person signing in."
+        },
+        {
+          "before": "Revoke",
+          "after": "Sign out",
+          "reason": "A person is ending a browser session; sign out is the familiar action and states the outcome."
+        },
+        {
+          "before": "Issue token",
+          "after": "Create token",
+          "reason": "Create is ordinary product language; issue is unnecessary credential-management jargon."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/auth/AuthGate.test.tsx",
+        "frontend/src/auth/SecuritySettings.test.tsx",
+        "frontend/e2e/invitation.spec.ts",
+        "frontend/e2e/mfa.spec.ts",
+        "frontend/e2e/password-reset.spec.ts",
+        "frontend/e2e/sessions.spec.ts"
+      ]
+    },
+    {
+      "id": "staff-access-delivery-status",
+      "workflow": "Staff administration, access control, email delivery administration, and system diagnostics",
+      "routes": ["/staff", "/access-control", "/notification-delivery", "/system-status"],
+      "states": ["loading", "empty", "invitation", "policy review", "denied", "delivery failure", "system failure"],
       "decisions": [],
       "status": "pending",
-      "next_review": "Review security consequences, recovery instructions, provider sign-in labels, and whether entered values survive each failure."
+      "next_review": "Review role and scope explanations, invitation administration, confirmation consequences, email-delivery recovery, and operator-only diagnostics without weakening exact security or failure details."
     },
     {
       "id": "organizations-people-sites",

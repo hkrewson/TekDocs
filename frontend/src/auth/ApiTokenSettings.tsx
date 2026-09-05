@@ -9,7 +9,17 @@ function readable(value: string): string {
 }
 
 function date(value: string | null): string {
-  return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : 'Never'
+  return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : translate('common.never')
+}
+
+function tokenStatus(status: ApiToken['status']): string {
+  if (status === 'active') return translate('settings.tokenActive')
+  if (status === 'expired') return translate('settings.tokenExpired')
+  return translate('settings.tokenRevoked')
+}
+
+function tokenKind(kind: ApiToken['kind']): string {
+  return kind === 'personal' ? translate('settings.personalToken') : translate('settings.serviceToken')
 }
 
 export function ApiTokenSettings({ client, context }: { client: AuthClient; context: AuthenticatedContext }) {
@@ -33,14 +43,14 @@ export function ApiTokenSettings({ client, context }: { client: AuthClient; cont
       const result = await client.listApiTokens()
       setError(null)
       setCatalog(result)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'API tokens could not be loaded.') }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : translate('settings.tokensLoadFailed')) }
   }, [client])
 
   useEffect(() => {
     let active = true
     client.listApiTokens()
       .then((result) => { if (active) { setError(null); setCatalog(result) } })
-      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'API tokens could not be loaded.') })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : translate('settings.tokensLoadFailed')) })
     return () => { active = false }
   }, [client])
 
@@ -65,36 +75,36 @@ export function ApiTokenSettings({ client, context }: { client: AuthClient; cont
       setOrganization(null)
       setQuery('')
       await load()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'The API token could not be issued.') } finally { setWorking(false) }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : translate('settings.tokenCreateFailed')) } finally { setWorking(false) }
   }
 
   const rotate = async (token: ApiToken) => {
     setWorking(true); setError(null)
-    try { setIssued(await client.rotateApiToken(token.id, 90)); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'The API token could not be rotated.') } finally { setWorking(false) }
+    try { setIssued(await client.rotateApiToken(token.id, 90)); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : translate('settings.tokenReplaceFailed')) } finally { setWorking(false) }
   }
 
   const revoke = async (token: ApiToken) => {
-    if (!window.confirm(`Revoke “${token.name}”? Existing automation will stop immediately.`)) return
+    if (!window.confirm(translate('settings.revokeTokenConfirm', { name: token.name }))) return
     setWorking(true); setError(null)
-    try { await client.revokeApiToken(token.id); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'The API token could not be revoked.') } finally { setWorking(false) }
+    try { await client.revokeApiToken(token.id); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : translate('settings.tokenRevokeFailed')) } finally { setWorking(false) }
   }
 
   return <section className="content-section api-token-settings" aria-labelledby="api-token-heading">
     <div className="section-heading settings-heading">
-      <div><h2 id="api-token-heading">API tokens</h2><p>Issue expiring credentials for one exact Workspace and an explicit set of permissions. Tokens never expand the account’s access.</p></div>
+      <div><h2 id="api-token-heading">{translate('settings.apiTokens')}</h2><p>{translate('settings.apiTokensHelp')}</p></div>
       <button className="secondary-button" type="button" onClick={() => setCreating((value) => !value)}><Plus size={15} aria-hidden="true" />{translate('auth.newToken')}</button>
     </div>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {issued && <div className="token-secret" role="alert"><KeyRound size={20} aria-hidden="true" /><div><strong>Copy this token now</strong><p>TekDocs will not display it again.</p><code>{issued.token}</code></div><button className="secondary-button" type="button" onClick={() => void navigator.clipboard.writeText(issued.token)}><Copy size={14} />{translate('common.copy')}</button><button className="icon-button" type="button" aria-label="Dismiss token" onClick={() => setIssued(null)}><X size={16} /></button></div>}
+    {issued && <div className="token-secret" role="alert"><KeyRound size={20} aria-hidden="true" /><div><strong>{translate('settings.copyTokenNow')}</strong><p>{translate('settings.copyTokenHelp')}</p><code>{issued.token}</code></div><button className="secondary-button" type="button" onClick={() => void navigator.clipboard.writeText(issued.token)}><Copy size={14} />{translate('common.copy')}</button><button className="icon-button" type="button" aria-label={translate('settings.dismissToken')} onClick={() => setIssued(null)}><X size={16} /></button></div>}
     {creating && <form className="token-create-form" onSubmit={(event) => void submit(event)}>
-      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required autoFocus /></label>
-      <label>Token type<select value={kind} onChange={(event) => { const next = event.target.value as ApiToken['kind']; setKind(next); if (next === 'service') setPermissions((current) => current.filter((key) => catalog?.permissions.some((permission) => permission.key === key && permission.service_eligible))) }}><option value="personal">Personal</option>{canManageServices && <option value="service">Service account</option>}</select></label>
-      <label>Workspace<select value={scope} onChange={(event) => { const next = event.target.value as ApiToken['workspace_scope']; setScope(next); setPermissions((current) => next === 'organization' && !current.includes('workspaces.view') ? [...current, 'workspaces.view'] : current); setOrganization(null); setOrganizations([]); setQuery('') }}><option value="msp">{context.tenant.name} · MSP</option><option value="organization">One organization</option></select></label>
-      {scope === 'organization' && <div className="token-organization-picker"><label><span>Organization</span><span className="search-input"><Search size={15} /><input type="search" value={organization?.name ?? query} onChange={(event) => { setOrganization(null); setOrganizations([]); setQuery(event.target.value) }} placeholder="Search by name" required={!organization} /></span></label>{query.trim().length >= 2 && organizations.length > 0 && <ul>{organizations.map((item) => <li key={item.id}><button type="button" onClick={() => { setOrganization(item); setQuery(item.name); setOrganizations([]) }}>{item.name}<small>{item.classifications.join(', ')}</small></button></li>)}</ul>}</div>}
-      <label>Expires after<select value={expires} onChange={(event) => setExpires(Number(event.target.value))}><option value={30}>30 days</option><option value={90}>90 days</option><option value={180}>180 days</option><option value={365}>365 days</option></select></label>
-      <fieldset><legend>Permissions</legend><div className="token-permissions">{catalog?.permissions.filter((permission) => kind === 'personal' || permission.service_eligible).map((permission) => { const required = scope === 'organization' && permission.key === 'workspaces.view'; return <label key={permission.key}><input type="checkbox" checked={permissions.includes(permission.key)} disabled={required} onChange={(event) => setPermissions((current) => event.target.checked ? [...current, permission.key] : current.filter((item) => item !== permission.key))} /><span><strong>{permission.label}</strong><small>{required ? 'Required to resolve the selected organization Workspace.' : permission.category}</small></span></label> })}</div></fieldset>
-      <div className="settings-actions"><button className="primary-button" disabled={working || permissions.length === 0 || (scope === 'organization' && !organization)}>{working ? 'Issuing…' : 'Issue token'}</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>{translate('common.cancel')}</button></div>
+      <label>{translate('settings.tokenName')}<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required autoFocus /></label>
+      <label>{translate('settings.tokenType')}<select value={kind} onChange={(event) => { const next = event.target.value as ApiToken['kind']; setKind(next); if (next === 'service') setPermissions((current) => current.filter((key) => catalog?.permissions.some((permission) => permission.key === key && permission.service_eligible))) }}><option value="personal">{translate('settings.personalToken')}</option>{canManageServices && <option value="service">{translate('settings.serviceToken')}</option>}</select></label>
+      <label>{translate('settings.workspace')}<select value={scope} onChange={(event) => { const next = event.target.value as ApiToken['workspace_scope']; setScope(next); setPermissions((current) => next === 'organization' && !current.includes('workspaces.view') ? [...current, 'workspaces.view'] : current); setOrganization(null); setOrganizations([]); setQuery('') }}><option value="msp">{context.tenant.name} · MSP</option><option value="organization">{translate('settings.oneOrganization')}</option></select></label>
+      {scope === 'organization' && <div className="token-organization-picker"><label><span>{translate('settings.organization')}</span><span className="search-input"><Search size={15} /><input type="search" value={organization?.name ?? query} onChange={(event) => { setOrganization(null); setOrganizations([]); setQuery(event.target.value) }} placeholder={translate('settings.searchByName')} required={!organization} /></span></label>{query.trim().length >= 2 && organizations.length > 0 && <ul>{organizations.map((item) => <li key={item.id}><button type="button" onClick={() => { setOrganization(item); setQuery(item.name); setOrganizations([]) }}>{item.name}<small>{item.classifications.join(', ')}</small></button></li>)}</ul>}</div>}
+      <label>{translate('settings.expiresAfter')}<select value={expires} onChange={(event) => setExpires(Number(event.target.value))}><option value={30}>{translate('settings.days30')}</option><option value={90}>{translate('settings.days90')}</option><option value={180}>{translate('settings.days180')}</option><option value={365}>{translate('settings.days365')}</option></select></label>
+      <fieldset><legend>{translate('settings.permissions')}</legend><div className="token-permissions">{catalog?.permissions.filter((permission) => kind === 'personal' || permission.service_eligible).map((permission) => { const required = scope === 'organization' && permission.key === 'workspaces.view'; return <label key={permission.key}><input type="checkbox" checked={permissions.includes(permission.key)} disabled={required} onChange={(event) => setPermissions((current) => event.target.checked ? [...current, permission.key] : current.filter((item) => item !== permission.key))} /><span><strong>{permission.label}</strong><small>{required ? translate('settings.organizationPermissionRequired') : permission.category}</small></span></label> })}</div></fieldset>
+      <div className="settings-actions"><button className="primary-button" disabled={working || permissions.length === 0 || (scope === 'organization' && !organization)}>{working ? translate('settings.issuingToken') : translate('settings.issueToken')}</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>{translate('common.cancel')}</button></div>
     </form>}
-    {catalog === null && !error ? <p className="settings-state" role="status">Loading API tokens…</p> : catalog?.tokens.length === 0 ? <p className="settings-state">No API tokens have been issued.</p> : <ul className="token-list">{catalog?.tokens.map((token) => <li key={token.id}><div><strong>{token.name}</strong><span className={`token-status ${token.status}`}>{token.status}</span><p><code>{token.display_prefix}</code> · {token.kind} · {token.organization?.name ?? `${context.tenant.name} MSP`}</p><p>{token.permissions.map(readable).join(', ')} · expires {date(token.expires_at)} · last used {date(token.last_used_at)}</p></div>{token.status === 'active' && <div className="settings-actions"><button className="secondary-button" type="button" disabled={working} onClick={() => void rotate(token)}><RefreshCw size={14} />{translate('auth.rotate')}</button><button className="danger-button" type="button" disabled={working} onClick={() => void revoke(token)}>{translate('auth.revoke')}</button></div>}</li>)}</ul>}
+    {catalog === null && !error ? <p className="settings-state" role="status">{translate('settings.loadingTokens')}</p> : catalog?.tokens.length === 0 ? <p className="settings-state">{translate('settings.noTokens')}</p> : <ul className="token-list">{catalog?.tokens.map((token) => <li key={token.id}><div><strong>{token.name}</strong><span className={`token-status ${token.status}`}>{tokenStatus(token.status)}</span><p><code>{token.display_prefix}</code> · {tokenKind(token.kind)} · {token.organization?.name ?? `${context.tenant.name} MSP`}</p><p>{token.permissions.map(readable).join(', ')} · {translate('settings.tokenDates', { expires: date(token.expires_at), lastUsed: date(token.last_used_at) })}</p></div>{token.status === 'active' && <div className="settings-actions"><button className="secondary-button" type="button" disabled={working} onClick={() => void rotate(token)}><RefreshCw size={14} />{translate('auth.rotate')}</button><button className="danger-button" type="button" disabled={working} onClick={() => void revoke(token)}>{translate('auth.revoke')}</button></div>}</li>)}</ul>}
   </section>
 }

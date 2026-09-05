@@ -88,7 +88,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   const password = `${randomBytes(24).toString('base64url')}Aa7!`
 
   await page.goto('/')
-  await page.getByLabel('Deployment token').fill(deploymentToken)
+  await page.getByLabel('Setup token', { exact: true }).fill(deploymentToken)
   await page.getByLabel('MSP name').fill('Live Workspace MSP')
   await page.getByLabel('Your name').fill('Live Workspace Owner')
   await page.getByLabel('Email address').fill(email)

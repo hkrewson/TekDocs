@@ -25,7 +25,6 @@ import { hardcodedButtonLabels } from './buttonLabels'
 const PENDING_PARAMETERISED_LABELS: Record<string, number> = {
   'src/access-control/AccessCollectionsPanel.tsx': 1,
   'src/access-control/CustomRolesPanel.tsx': 1,
-  'src/auth/AuthGate.tsx': 1,
   'src/compliance/Compliance.tsx': 1,
   'src/documentation/Documentation.tsx': 3,
   'src/inventory/Assets.tsx': 1,

@@ -161,7 +161,7 @@ def main() -> int:
     validate_shell_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
-        f"{reviewed} reviewed group, and {message_count} catalog messages checked."
+        f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."
     )
     return 0
 

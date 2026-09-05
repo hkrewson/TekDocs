@@ -48,7 +48,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
     try {
       setSessions(await client.listSessions())
     } catch (loadError) {
-      setError(errorMessage(loadError, 'Active sessions could not be loaded.'))
+      setError(errorMessage(loadError, translate('settings.sessionsLoadFailed')))
     }
   }, [client])
 
@@ -62,7 +62,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
         }
       })
       .catch((loadError: unknown) => {
-        if (active) setError(errorMessage(loadError, 'Security settings could not be loaded.'))
+        if (active) setError(errorMessage(loadError, translate('settings.securityLoadFailed')))
       })
     return () => { active = false }
   }, [client])
@@ -77,7 +77,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       if (setupError instanceof AuthRequestError && setupError.status === 401) {
         setSensitiveAction('enroll')
       } else {
-        setError(errorMessage(setupError, 'Authenticator setup could not be started.'))
+        setError(errorMessage(setupError, translate('settings.authenticatorStartFailed')))
       }
     } finally {
       setWorking(false)
@@ -100,7 +100,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       if (activationError instanceof AuthRequestError && activationError.status === 401) {
         setSensitiveAction('activate')
       } else {
-        setError(errorMessage(activationError, 'That authenticator code was not accepted.'))
+        setError(errorMessage(activationError, translate('settings.authenticatorCodeRejected')))
       }
     } finally {
       setWorking(false)
@@ -119,7 +119,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       if (sensitiveAction === 'enroll') {
         setSetup(await client.beginTotp())
       } else if (sensitiveAction === 'activate') {
-        setMfaMessage('Password confirmed. Enter the current code from your authenticator app.')
+        setMfaMessage(translate('settings.passwordConfirmed'))
       } else if (sensitiveAction === 'replace-codes') {
         const codes = await client.regenerateRecoveryCodes()
         setRecoveryCodes(codes)
@@ -131,7 +131,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       }
       setSensitiveAction(null)
     } catch (actionError) {
-      setError(errorMessage(actionError, 'The security change was not completed.'))
+      setError(errorMessage(actionError, translate('settings.securityChangeFailed')))
     } finally {
       setWorking(false)
     }
@@ -143,7 +143,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
     try {
       setSessions(await client.revokeSession(session.id))
     } catch (revokeError) {
-      setError(errorMessage(revokeError, 'The session could not be revoked.'))
+      setError(errorMessage(revokeError, translate('settings.sessionSignOutFailed')))
     } finally {
       setRevoking(null)
     }
@@ -158,9 +158,9 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       const updated = await client.updateProfile(displayName)
       setDisplayName(updated.user.display_name)
       onProfileUpdated(updated)
-      setProfileMessage('Profile updated.')
+      setProfileMessage(translate('settings.profileUpdated'))
     } catch (profileError) {
-      setError(errorMessage(profileError, 'Your profile could not be updated.'))
+      setError(errorMessage(profileError, translate('settings.profileUpdateFailed')))
     } finally {
       setSavingProfile(false)
     }
@@ -169,62 +169,62 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   return (
     <>
       <header className="page-header">
-        <div><h1>Settings</h1></div>
+        <div><h1>{translate('settings.heading')}</h1></div>
       </header>
       {error && <div className="form-error settings-error" role="alert">{error}</div>}
       <section className="content-section profile-section" aria-labelledby="profile-heading">
         <div className="section-heading settings-heading">
-          <div><h2 id="profile-heading">Profile</h2><p>Choose how your name appears in TekDocs. Your sign-in email is managed separately.</p></div>
+          <div><h2 id="profile-heading">{translate('settings.profile')}</h2><p>{translate('settings.profileHelp')}</p></div>
         </div>
         <form className="profile-settings-form" onSubmit={(event) => { void saveProfile(event) }}>
-          <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" maxLength={160} required /></label>
-          <label>Email address<input value={context.user.email} readOnly aria-readonly="true" /></label>
+          <label>{translate('settings.displayName')}<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" maxLength={160} required /></label>
+          <label>{translate('auth.emailAddress')}<input value={context.user.email} readOnly aria-readonly="true" /></label>
           <div className="settings-actions">
-            <button className="primary-button" type="submit" disabled={savingProfile || displayName.trim() === context.user.display_name}>{savingProfile ? 'Saving…' : 'Save profile'}</button>
+            <button className="primary-button" type="submit" disabled={savingProfile || displayName.trim() === context.user.display_name}>{savingProfile ? translate('common.saving') : translate('settings.saveProfile')}</button>
             {profileMessage && <span className="settings-success" role="status">{profileMessage}</span>}
           </div>
         </form>
       </section>
       <section className="content-section security-section" aria-labelledby="two-factor-heading">
         <div className="section-heading settings-heading">
-          <div><h2 id="two-factor-heading">Two-factor authentication</h2><p>Protect your account with a time-based authenticator and single-use recovery codes.</p></div>
-          {mfa?.totpEnabled && <span className="security-status"><ShieldCheck size={15} aria-hidden="true" />Enabled</span>}
+          <div><h2 id="two-factor-heading">{translate('auth.twoFactorHeading')}</h2><p>{translate('settings.twoFactorHelp')}</p></div>
+          {mfa?.totpEnabled && <span className="security-status"><ShieldCheck size={15} aria-hidden="true" />{translate('settings.enabled')}</span>}
         </div>
-        {mfa === null && !error && <p className="settings-state" role="status">Loading two-factor settings…</p>}
+        {mfa === null && !error && <p className="settings-state" role="status">{translate('settings.loadingTwoFactor')}</p>}
         {mfa && !mfa.totpEnabled && !setup && (
           <div className="security-row">
-            <div><strong>Authenticator app</strong><p>Owners must enable this before using privileged administrative actions.</p></div>
-            <button className="primary-button" type="button" disabled={working} onClick={() => { void beginSetup() }}>{working ? 'Starting…' : 'Set up authenticator'}</button>
+            <div><strong>{translate('settings.authenticatorApp')}</strong><p>{translate('settings.authenticatorRequired')}</p></div>
+            <button className="primary-button" type="button" disabled={working} onClick={() => { void beginSetup() }}>{working ? translate('auth.starting') : translate('auth.setupAuthenticator')}</button>
           </div>
         )}
         {mfaMessage && <p className="settings-success" role="status">{mfaMessage}</p>}
         {setup && sensitiveAction !== 'activate' && (
           <form className="mfa-setup" onSubmit={(event) => { void activate(event) }}>
-            <div><strong>Add TekDocs to your authenticator</strong><p>Scan the QR code with your authenticator app, then enter the current code.</p></div>
+            <div><strong>{translate('settings.addAuthenticator')}</strong><p>{translate('settings.addAuthenticatorHelp')}</p></div>
             <div className="mfa-enrollment">
               <figure className="mfa-qr-code">
                 <QRCodeSVG value={setup.totpUrl} size={192} level="M" marginSize={4} aria-hidden="true" />
-                <figcaption>Scan with your authenticator app</figcaption>
+                <figcaption>{translate('auth.scanAuthenticator')}</figcaption>
               </figure>
               <div className="mfa-manual-setup">
-                <div><strong>Can’t scan the code?</strong><p>Enter this key manually. The setup address is also available for apps that accept one.</p></div>
-                <div className="mfa-setup-value"><span>Manual key</span><code>{setup.secret}</code></div>
+                <div><strong>{translate('settings.cannotScan')}</strong><p>{translate('settings.manualSetupHelp')}</p></div>
+                <div className="mfa-setup-value"><span>{translate('settings.manualKey')}</span><code>{setup.secret}</code></div>
                 <details>
-                  <summary>Show setup address</summary>
+                  <summary>{translate('settings.showSetupAddress')}</summary>
                   <code>{setup.totpUrl}</code>
                 </details>
               </div>
             </div>
-            <label>Authentication code<input value={activationCode} onChange={(event) => setActivationCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
+            <label>{translate('auth.authenticationCode')}<input value={activationCode} onChange={(event) => setActivationCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
             <div className="settings-actions">
-              <button className="primary-button" type="submit" disabled={working}>{working ? 'Verifying…' : 'Enable two-factor authentication'}</button>
+              <button className="primary-button" type="submit" disabled={working}>{working ? translate('auth.verifying') : translate('auth.enableTwoFactor')}</button>
               <button className="secondary-button" type="button" disabled={working} onClick={() => { setSetup(null); setActivationCode('') }}>{translate('common.cancel')}</button>
             </div>
           </form>
         )}
         {mfa?.totpEnabled && !recoveryCodes && !sensitiveAction && (
           <div className="security-row">
-            <div><strong>Recovery codes</strong><p>{mfa.recoveryCodeUnused} of {mfa.recoveryCodeTotal} codes remain. Each code works once.</p></div>
+            <div><strong>{translate('settings.recoveryCodes')}</strong><p>{translate('settings.codesRemaining', { unused: mfa.recoveryCodeUnused, total: mfa.recoveryCodeTotal })}</p></div>
             <div className="settings-actions">
               <button className="secondary-button" type="button" onClick={() => setSensitiveAction('replace-codes')}>{translate('auth.replaceCodes')}</button>
               <button className="danger-button" type="button" onClick={() => setSensitiveAction('disable')}>{translate('auth.disable')}</button>
@@ -233,7 +233,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
         )}
         {recoveryCodes && (
           <div className="recovery-codes" role="region" aria-labelledby="recovery-codes-heading">
-            <div><strong id="recovery-codes-heading">Save these recovery codes now</strong><p>They will not be shown again. Store them somewhere separate from your password.</p></div>
+            <div><strong id="recovery-codes-heading">{translate('auth.saveRecoveryCodes')}</strong><p>{translate('auth.saveRecoveryCodesHelp')}</p></div>
             <ul>{recoveryCodes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
             <button className="primary-button" type="button" onClick={() => setRecoveryCodes(null)}>{translate('auth.iSavedTheseCodes')}</button>
           </div>
@@ -241,10 +241,10 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
         {sensitiveAction && (
           <form className="reauth-form" onSubmit={(event) => { void confirmSensitiveAction(event) }}>
             <KeyRound size={19} aria-hidden="true" />
-            <div><strong>Confirm your password</strong><p>{sensitiveAction === 'disable' ? 'Disabling two-factor authentication also invalidates existing recovery codes.' : sensitiveAction === 'replace-codes' ? 'Replacing recovery codes invalidates every previous code.' : sensitiveAction === 'activate' ? 'Your password confirmation expired while setup was open. Confirm it again, then enter a fresh authenticator code.' : 'Authenticator enrollment requires a recent password check.'}</p></div>
-            <label>Current password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
+            <div><strong>{translate('settings.confirmYourPassword')}</strong><p>{sensitiveAction === 'disable' ? translate('settings.disableTwoFactorHelp') : sensitiveAction === 'replace-codes' ? translate('settings.replaceCodesHelp') : sensitiveAction === 'activate' ? translate('settings.activationExpiredHelp') : translate('settings.enrollmentPasswordHelp')}</p></div>
+            <label>{translate('auth.currentPassword')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
             <div className="settings-actions">
-              <button className="primary-button" type="submit" disabled={working}>{working ? 'Confirming…' : 'Confirm change'}</button>
+              <button className="primary-button" type="submit" disabled={working}>{working ? translate('auth.confirming') : translate('settings.confirmChange')}</button>
               <button className="secondary-button" type="button" disabled={working} onClick={() => { setSensitiveAction(null); setPassword('') }}>{translate('common.cancel')}</button>
             </div>
           </form>
@@ -252,24 +252,24 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
       </section>
       <section className="content-section" aria-labelledby="active-sessions-heading">
         <div className="section-heading settings-heading">
-          <div><h2 id="active-sessions-heading">Active sessions</h2><p>Revoke any browser you no longer recognize or use.</p></div>
+          <div><h2 id="active-sessions-heading">{translate('settings.activeSessions')}</h2><p>{translate('settings.activeSessionsHelp')}</p></div>
           <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSessions() }}><RefreshCw size={15} aria-hidden="true" />{translate('common.refresh')}</button>
         </div>
-        {sessions === null && !error && <p className="settings-state" role="status">Loading active sessions…</p>}
-        {sessions?.length === 0 && <p className="settings-state">No active sessions were found.</p>}
+        {sessions === null && !error && <p className="settings-state" role="status">{translate('settings.loadingSessions')}</p>}
+        {sessions?.length === 0 && <p className="settings-state">{translate('settings.noSessions')}</p>}
         {sessions && sessions.length > 0 && (
           <ul className="session-list">
             {sessions.map((session) => (
               <li key={session.id}>
                 <Laptop size={19} aria-hidden="true" />
                 <div className="session-details">
-                  <div className="session-title"><strong>{sessionName(session.userAgent)}</strong>{session.isCurrent && <span>Current session</span>}</div>
-                  <p>{session.ip} · Last active <time dateTime={new Date(session.lastSeenAt * 1000).toISOString()}>{timestamp(session.lastSeenAt)}</time></p>
-                  <p>Signed in <time dateTime={new Date(session.createdAt * 1000).toISOString()}>{timestamp(session.createdAt)}</time></p>
+                  <div className="session-title"><strong>{sessionName(session.userAgent)}</strong>{session.isCurrent && <span>{translate('settings.currentSession')}</span>}</div>
+                  <p>{session.ip} · {translate('settings.lastActive')} <time dateTime={new Date(session.lastSeenAt * 1000).toISOString()}>{timestamp(session.lastSeenAt)}</time></p>
+                  <p>{translate('settings.signedIn')} <time dateTime={new Date(session.createdAt * 1000).toISOString()}>{timestamp(session.createdAt)}</time></p>
                 </div>
                 {session.isCurrent
-                  ? <span className="current-session-note">Sign out from the profile menu</span>
-                  : <button className="secondary-button revoke-button" type="button" disabled={revoking === session.id} onClick={() => { void revoke(session) }}>{revoking === session.id ? 'Revoking…' : 'Revoke'}</button>}
+                  ? <span className="current-session-note">{translate('settings.signOutCurrent')}</span>
+                  : <button className="secondary-button revoke-button" type="button" disabled={revoking === session.id} onClick={() => { void revoke(session) }}>{revoking === session.id ? translate('settings.revoking') : translate('settings.signOutSession')}</button>}
               </li>
             ))}
           </ul>

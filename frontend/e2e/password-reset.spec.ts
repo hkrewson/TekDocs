@@ -14,7 +14,7 @@ test('password reset request uses one accessible confirmation state', async ({ p
   await page.getByRole('button', { name: 'Send reset link' }).click()
 
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
-  await expect(page.getByText(/same message is shown for every address/i)).toBeVisible()
+  await expect(page.getByText(/if an active account uses that address/i)).toBeVisible()
 })
 
 test('password reset scrubs its key and returns to sign in after completion', async ({ page, baseURL }) => {

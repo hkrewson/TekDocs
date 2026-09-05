@@ -68,7 +68,7 @@ describe('security settings', () => {
     await user.click(await screen.findByRole('button', { name: 'New token' }))
     await user.type(screen.getByLabelText('Name'), 'Docs export')
     await user.click(screen.getByRole('checkbox', { name: /View documents/ }))
-    await user.click(screen.getByRole('button', { name: 'Issue token' }))
+    await user.click(screen.getByRole('button', { name: 'Create token' }))
 
     expect(await screen.findByText(issued.token)).toBeInTheDocument()
     expect(issueApiToken).toHaveBeenCalledWith(expect.objectContaining({
@@ -86,7 +86,7 @@ describe('security settings', () => {
     expect(await screen.findByText('Chrome on macOS')).toBeInTheDocument()
     expect(screen.getByText('Firefox on Windows')).toBeInTheDocument()
     expect(screen.getByText('Current session')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Revoke' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(revokeSession).toHaveBeenCalledWith(2)
     await waitFor(() => expect(screen.queryByText('Firefox on Windows')).not.toBeInTheDocument())
@@ -97,7 +97,7 @@ describe('security settings', () => {
     render(settings(client({ revokeSession: vi.fn().mockRejectedValue(new Error('The session could not be revoked.')) })))
 
     await screen.findByText('Firefox on Windows')
-    await user.click(screen.getByRole('button', { name: 'Revoke' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('The session could not be revoked.')
     expect(screen.getByText('Firefox on Windows')).toBeInTheDocument()

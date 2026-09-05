@@ -31,6 +31,6 @@ test('account settings lists and revokes another active browser', async ({ page,
   await page.getByRole('menuitem', { name: 'Settings' }).click()
   await expect(page.getByRole('heading', { name: 'Active sessions' })).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
-  await page.getByRole('button', { name: 'Revoke' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByText('Firefox on Windows')).not.toBeVisible()
 })

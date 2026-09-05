@@ -55,7 +55,7 @@ describe('authentication boundary', () => {
       load: vi.fn(() => new Promise<{ bootstrapRequired: boolean; context: AuthenticatedContext | null }>(() => undefined)),
     })} />)
 
-    expect(screen.getByRole('status')).toHaveTextContent('Checking installation')
+    expect(screen.getByRole('status')).toHaveTextContent('Checking sign-in status')
     expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
   })
 
@@ -73,7 +73,7 @@ describe('authentication boundary', () => {
     await screen.findByRole('heading', { name: 'Set up TekDocs' })
     expect(screen.getByText("sed -n 's/^TEKDOCS_BOOTSTRAP_TOKEN=//p' .env")).toBeVisible()
     expect(screen.getByText(/TEKDOCS_SECRET_DIRECTORY/)).toBeVisible()
-    await user.type(screen.getByLabelText('Deployment token'), deploymentToken)
+    await user.type(screen.getByLabelText('Setup token'), deploymentToken)
     await user.type(screen.getByLabelText('MSP name'), 'Example MSP')
     await user.type(screen.getByLabelText('Your name'), 'Primary Owner')
     await user.type(screen.getByLabelText('Email address'), 'owner@example.com')
@@ -185,7 +185,7 @@ describe('authentication boundary', () => {
       bootstrapAndLogin,
     })} />)
 
-    await user.type(await screen.findByLabelText('Deployment token'), crypto.randomUUID())
+    await user.type(await screen.findByLabelText('Setup token'), crypto.randomUUID())
     await user.type(screen.getByLabelText('MSP name'), 'Example MSP')
     await user.type(screen.getByLabelText('Your name'), 'Primary Owner')
     await user.type(screen.getByLabelText('Email address'), 'owner@example.com')
@@ -193,7 +193,7 @@ describe('authentication boundary', () => {
     await user.type(screen.getByLabelText('Confirm password'), `${crypto.randomUUID()}Bb8!`)
     await user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('confirmation does not match')
+    expect(await screen.findByRole('alert')).toHaveTextContent('passwords do not match')
     expect(bootstrapAndLogin).not.toHaveBeenCalled()
   })
 
@@ -278,7 +278,7 @@ describe('authentication boundary', () => {
 
     expect(requestPasswordReset).toHaveBeenCalledWith('someone@example.com')
     expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
-    expect(screen.getByText(/same message is shown for every address/i)).toBeInTheDocument()
+    expect(screen.getByText(/if an active account uses that address/i)).toBeInTheDocument()
   })
 
   it('scrubs the reset key and completes a validated password reset', async () => {

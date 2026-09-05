@@ -30,7 +30,7 @@ type AuthenticatedRenderProps = {
 }
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : 'The authentication service is unavailable.'
+  return error instanceof Error ? error.message : translate('auth.serviceUnavailable')
 }
 
 function AuthFrame({ children }: { children: ReactNode }) {
@@ -45,14 +45,14 @@ function AuthFrame({ children }: { children: ReactNode }) {
 }
 
 function LoadingState() {
-  return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />Checking installation…</div></AuthFrame>
+  return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />{translate('auth.checking')}</div></AuthFrame>
 }
 
 function ErrorState({ detail, retry }: { detail: string; retry: () => void }) {
   return (
     <AuthFrame>
-      <h1>TekDocs is unavailable</h1>
-      <p className="auth-intro">The browser could not confirm the installation or session state.</p>
+      <h1>{translate('auth.unavailableHeading')}</h1>
+      <p className="auth-intro">{translate('auth.unavailableHelp')}</p>
       <div className="form-error" role="alert">{detail}</div>
       <button className="primary-button auth-submit" type="button" onClick={retry}>{translate('auth.tryAgain')}</button>
     </AuthFrame>
@@ -73,7 +73,7 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
     event.preventDefault()
     setError(null)
     if (password !== confirmation) {
-      setError('The password confirmation does not match.')
+      setError(translate('auth.passwordMismatch'))
       return
     }
     const details = { deploymentToken, tenantName, ownerEmail, ownerDisplayName, password }
@@ -91,25 +91,25 @@ function BootstrapForm({ submit }: { submit: (details: BootstrapDetails) => Prom
 
   return (
     <AuthFrame>
-      <h1>Set up TekDocs</h1>
-      <p className="auth-intro">Create the MSP workspace and its first owner. The deployment token is read from your server’s secret configuration.</p>
+      <h1>{translate('auth.setupHeading')}</h1>
+      <p className="auth-intro">{translate('auth.setupHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>Deployment token<input value={deploymentToken} onChange={(event) => setDeploymentToken(event.target.value)} autoComplete="off" spellCheck={false} required /></label>
+        <label>{translate('auth.deploymentToken')}<input value={deploymentToken} onChange={(event) => setDeploymentToken(event.target.value)} autoComplete="off" spellCheck={false} required /></label>
         <div className="bootstrap-token-help" aria-labelledby="bootstrap-token-help-heading">
-          <p id="bootstrap-token-help-heading"><strong>Retrieve the token from the deployment shell</strong></p>
-          <p>Run this from the directory containing <code>.env</code>:</p>
+          <p id="bootstrap-token-help-heading"><strong>{translate('auth.findSetupToken')}</strong></p>
+          <p>{translate('auth.runFromEnvDirectory')}</p>
           <pre><code>sed -n 's/^TEKDOCS_BOOTSTRAP_TOKEN=//p' .env</code></pre>
-          <p>For a production secret-file deployment:</p>
+          <p>{translate('auth.productionSecretFile')}</p>
           <pre><code>secret_dir="$(sed -n 's/^TEKDOCS_SECRET_DIRECTORY=//p' .env)" &amp;&amp; cat "$secret_dir/bootstrap_token"</code></pre>
-          <p>Paste the output above. Do not share or save it in documentation.</p>
+          <p>{translate('auth.setupTokenWarning')}</p>
         </div>
-        <label>MSP name<input value={tenantName} onChange={(event) => setTenantName(event.target.value)} autoComplete="organization" required /></label>
-        <label>Your name<input value={ownerDisplayName} onChange={(event) => setOwnerDisplayName(event.target.value)} autoComplete="name" required /></label>
-        <label>Email address<input type="email" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} autoComplete="email" required /></label>
-        <label>Password<input aria-label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required /><span>Use at least 12 characters and a unique password.</span></label>
-        <label>Confirm password<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
+        <label>{translate('auth.mspName')}<input value={tenantName} onChange={(event) => setTenantName(event.target.value)} autoComplete="organization" required /></label>
+        <label>{translate('auth.yourName')}<input value={ownerDisplayName} onChange={(event) => setOwnerDisplayName(event.target.value)} autoComplete="name" required /></label>
+        <label>{translate('auth.emailAddress')}<input type="email" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} autoComplete="email" required /></label>
+        <label>{translate('auth.password')}<input aria-label={translate('auth.password')} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required /><span>{translate('auth.passwordHelp')}</span></label>
+        <label>{translate('auth.confirmPassword')}<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Creating workspace…' : 'Create workspace'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.creatingWorkspace') : translate('auth.createWorkspace')}</button>
       </form>
     </AuthFrame>
   )
@@ -193,7 +193,7 @@ function RequiredMfaSetup({ client, context, complete }: {
     try {
       await navigator.clipboard.writeText(recoveryText)
     } catch {
-      setError('Recovery codes could not be copied. Save them manually before continuing.')
+      setError(translate('auth.recoveryCopyFailed'))
     }
   }
   const downloadRecoveryCodes = () => {
@@ -207,8 +207,8 @@ function RequiredMfaSetup({ client, context, complete }: {
   if (ready) {
     return (
       <AuthFrame>
-        <h1>Setup complete</h1>
-        <p className="auth-intro">Two-factor authentication is enabled. Remove the bootstrap overlay and bootstrap-token file from the deployment after confirming this account can sign in.</p>
+        <h1>{translate('auth.setupComplete')}</h1>
+        <p className="auth-intro">{translate('auth.setupCompleteHelp')}</p>
         <button className="primary-button auth-submit" type="button" onClick={() => complete({ ...context, mfa_enrollment_required: false })}>{translate('auth.enterMspWorkspace')}</button>
       </AuthFrame>
     )
@@ -216,38 +216,38 @@ function RequiredMfaSetup({ client, context, complete }: {
 
   return (
     <AuthFrame>
-      <h1>Secure the {accountKind} account</h1>
-      <p className="auth-intro">Two-factor authentication is required before privileged TekDocs actions are available.</p>
+      <h1>{translate('auth.secureAccount', { accountKind })}</h1>
+      <p className="auth-intro">{translate('auth.secureAccountHelp')}</p>
       {error && <div className="form-error" role="alert">{error}</div>}
       {!setup && !recoveryCodes && !reauthenticationRequired && (
-        <button className="primary-button auth-submit" type="button" disabled={working} onClick={() => { void begin() }}>{working ? 'Starting…' : 'Set up authenticator'}</button>
+        <button className="primary-button auth-submit" type="button" disabled={working} onClick={() => { void begin() }}>{working ? translate('auth.starting') : translate('auth.setupAuthenticator')}</button>
       )}
       {reauthenticationRequired && (
         <form className="auth-form" onSubmit={(event) => { void confirmPassword(event) }}>
-          <label>Current password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
-          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? 'Confirming…' : 'Confirm password'}</button>
+          <label>{translate('auth.currentPassword')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
+          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? translate('auth.confirming') : translate('auth.confirmPasswordAction')}</button>
         </form>
       )}
       {setup && !reauthenticationRequired && (
         <form className="auth-form" onSubmit={(event) => { void activate(event) }}>
           <figure className="mfa-qr-code">
             <QRCodeSVG value={setup.totpUrl} size={192} level="M" marginSize={4} aria-hidden="true" />
-            <figcaption>Scan with your authenticator app</figcaption>
+            <figcaption>{translate('auth.scanAuthenticator')}</figcaption>
           </figure>
-          <details className="mfa-manual-setup"><summary>Enter a setup key manually</summary><code>{setup.secret}</code></details>
-          <label>Authentication code<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
-          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? 'Verifying…' : 'Enable two-factor authentication'}</button>
+          <details className="mfa-manual-setup"><summary>{translate('auth.enterSetupKey')}</summary><code>{setup.secret}</code></details>
+          <label>{translate('auth.authenticationCode')}<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" required autoFocus /></label>
+          <button className="primary-button auth-submit" type="submit" disabled={working}>{working ? translate('auth.verifying') : translate('auth.enableTwoFactor')}</button>
         </form>
       )}
       {recoveryCodes && (
         <div className="recovery-codes" role="region" aria-labelledby="required-recovery-heading">
-          <div><strong id="required-recovery-heading">Save these recovery codes now</strong><p>They will not be shown again. Store them separately from your password.</p></div>
+          <div><strong id="required-recovery-heading">{translate('auth.saveRecoveryCodes')}</strong><p>{translate('auth.saveRecoveryCodesHelp')}</p></div>
           <ul>{recoveryCodes.map((recoveryCode) => <li key={recoveryCode}><code>{recoveryCode}</code></li>)}</ul>
           <div className="settings-actions">
             <button className="secondary-button" type="button" onClick={() => { void copyRecoveryCodes() }}>{translate('auth.copyCodes')}</button>
             <button className="secondary-button" type="button" onClick={downloadRecoveryCodes}>{translate('auth.downloadTextFile')}</button>
           </div>
-          <label className="recovery-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />I saved the recovery codes in a secure location.</label>
+          <label className="recovery-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{translate('auth.recoveryCodesSaved')}</label>
           <button className="primary-button" type="button" disabled={!acknowledged} onClick={() => { setRecoveryCodes(null); setReady(true) }}>{translate('auth.continue')}</button>
         </div>
       )}
@@ -290,25 +290,25 @@ function SignInForm({ client, submit, forgotPassword }: {
 
   return (
     <AuthFrame>
-      <h1>Sign in</h1>
-      <p className="auth-intro">Use your TekDocs owner account.</p>
+      <h1>{translate('auth.signInHeading')}</h1>
+      <p className="auth-intro">{translate('auth.signInHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
-        <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
+        <label>{translate('auth.emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
+        <label>{translate('auth.password')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
         <button className="auth-text-button" type="button" onClick={forgotPassword}>{translate('auth.forgotPassword')}</button>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.signingIn') : translate('auth.signIn')}</button>
       </form>
       {providers.length > 0 && (
         <div className="sso-options">
-          <span>or</span>
+          <span>{translate('auth.or')}</span>
           {providers.map((provider) => (
             <form key={provider.id} method="post" action="/_allauth/browser/v1/auth/provider/redirect">
               <input type="hidden" name="csrfmiddlewaretoken" value={browserCsrfToken() ?? ''} />
               <input type="hidden" name="provider" value={provider.id} />
               <input type="hidden" name="process" value="login" />
               <input type="hidden" name="callback_url" value={`${window.location.origin}/`} />
-              <button className="secondary-button auth-submit" type="submit">Continue with {provider.name}</button>
+              <button className="secondary-button auth-submit" type="submit">{translate('auth.continueWith', { provider: provider.name })}</button>
             </form>
           ))}
         </div>
@@ -341,12 +341,12 @@ function MfaChallengeForm({ submit, cancel }: {
 
   return (
     <AuthFrame>
-      <h1>Two-factor authentication</h1>
-      <p className="auth-intro">Enter the current code from your authenticator app, or use one recovery code.</p>
+      <h1>{translate('auth.twoFactorHeading')}</h1>
+      <p className="auth-intro">{translate('auth.twoFactorChallengeHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>Authentication code<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="text" spellCheck={false} required autoFocus /></label>
+        <label>{translate('auth.authenticationCode')}<input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" inputMode="text" spellCheck={false} required autoFocus /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Verifying…' : 'Verify code'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.verifying') : translate('auth.verifyCode')}</button>
         <button className="auth-text-button auth-cancel-button" type="button" onClick={cancel}>{translate('auth.returnToSignIn')}</button>
       </form>
     </AuthFrame>
@@ -372,14 +372,14 @@ function PasswordResetRequestForm({ submit }: { submit: (email: string) => Promi
 
   return (
     <AuthFrame>
-      <h1>Reset password</h1>
-      <p className="auth-intro">Enter your account email. If it belongs to an active account, TekDocs will send a reset link.</p>
+      <h1>{translate('auth.resetPasswordHeading')}</h1>
+      <p className="auth-intro">{translate('auth.resetPasswordHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
+        <label>{translate('auth.emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Sending reset link…' : 'Send reset link'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.sendingResetLink') : translate('auth.sendResetLink')}</button>
       </form>
-      <a className="auth-return-link" href="/">Return to sign in</a>
+      <a className="auth-return-link" href="/">{translate('auth.returnToSignIn')}</a>
     </AuthFrame>
   )
 }
@@ -387,9 +387,9 @@ function PasswordResetRequestForm({ submit }: { submit: (email: string) => Promi
 function PasswordResetSentState() {
   return (
     <AuthFrame>
-      <h1>Check your email</h1>
-      <p className="auth-intro">If that address belongs to an active account, a password reset link has been sent. The same message is shown for every address.</p>
-      <a className="secondary-button auth-submit auth-link" href="/">Return to sign in</a>
+      <h1>{translate('auth.checkEmailHeading')}</h1>
+      <p className="auth-intro">{translate('auth.checkEmailHelp')}</p>
+      <a className="secondary-button auth-submit auth-link" href="/">{translate('auth.returnToSignIn')}</a>
     </AuthFrame>
   )
 }
@@ -397,9 +397,9 @@ function PasswordResetSentState() {
 function PasswordResetUnavailableState() {
   return (
     <AuthFrame>
-      <h1>Reset link unavailable</h1>
-      <p className="auth-intro">This password reset link is invalid, expired, or has already been used.</p>
-      <a className="primary-button auth-submit auth-link" href="/auth/reset-password">Request a new reset link</a>
+      <h1>{translate('auth.resetLinkUnavailable')}</h1>
+      <p className="auth-intro">{translate('auth.resetLinkUnavailableHelp')}</p>
+      <a className="primary-button auth-submit auth-link" href="/auth/reset-password">{translate('auth.requestNewResetLink')}</a>
     </AuthFrame>
   )
 }
@@ -417,7 +417,7 @@ function PasswordResetForm({ submit, unavailable }: {
     event.preventDefault()
     setError(null)
     if (password !== confirmation) {
-      setError('The password confirmation does not match.')
+      setError(translate('auth.passwordMismatch'))
       return
     }
     const submittedPassword = password
@@ -443,13 +443,13 @@ function PasswordResetForm({ submit, unavailable }: {
 
   return (
     <AuthFrame>
-      <h1>Choose a new password</h1>
-      <p className="auth-intro">Changing your password signs out any existing TekDocs sessions.</p>
+      <h1>{translate('auth.chooseNewPassword')}</h1>
+      <p className="auth-intro">{translate('auth.chooseNewPasswordHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>New password<input aria-label="New password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required autoFocus /><span>Use at least 12 characters and a unique password.</span></label>
-        <label>Confirm new password<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
+        <label>{translate('auth.newPassword')}<input aria-label={translate('auth.newPassword')} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required autoFocus /><span>{translate('auth.passwordHelp')}</span></label>
+        <label>{translate('auth.confirmNewPassword')}<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Changing password…' : 'Change password'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.changingPassword') : translate('auth.changePassword')}</button>
       </form>
     </AuthFrame>
   )
@@ -458,9 +458,9 @@ function PasswordResetForm({ submit, unavailable }: {
 function PasswordResetCompleteState() {
   return (
     <AuthFrame>
-      <h1>Password changed</h1>
-      <p className="auth-intro">Your password has been changed and existing sessions are no longer valid. Sign in with the new password.</p>
-      <a className="primary-button auth-submit auth-link" href="/">Continue to sign in</a>
+      <h1>{translate('auth.passwordChanged')}</h1>
+      <p className="auth-intro">{translate('auth.passwordChangedHelp')}</p>
+      <a className="primary-button auth-submit auth-link" href="/">{translate('auth.continueToSignIn')}</a>
     </AuthFrame>
   )
 }
@@ -468,9 +468,9 @@ function PasswordResetCompleteState() {
 function InvitationUnavailableState() {
   return (
     <AuthFrame>
-      <h1>Invitation unavailable</h1>
-      <p className="auth-intro">This invitation is missing, expired, revoked, or has already been used. Ask the TekDocs owner for a new invitation.</p>
-      <a className="secondary-button auth-submit auth-link" href="/">Return to sign in</a>
+      <h1>{translate('auth.invitationUnavailable')}</h1>
+      <p className="auth-intro">{translate('auth.invitationUnavailableHelp')}</p>
+      <a className="secondary-button auth-submit auth-link" href="/">{translate('auth.returnToSignIn')}</a>
     </AuthFrame>
   )
 }
@@ -490,7 +490,7 @@ function InvitationForm({ token, submit, unavailable }: {
     event.preventDefault()
     setError(null)
     if (password !== confirmation) {
-      setError('The password confirmation does not match.')
+      setError(translate('auth.passwordMismatch'))
       return
     }
     const submittedPassword = password
@@ -511,14 +511,14 @@ function InvitationForm({ token, submit, unavailable }: {
 
   return (
     <AuthFrame>
-      <h1>Accept invitation</h1>
-      <p className="auth-intro">Create your TekDocs account. Your email address is fixed by the invitation.</p>
+      <h1>{translate('auth.acceptInvitation')}</h1>
+      <p className="auth-intro">{translate('auth.acceptInvitationHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
-        <label>Your name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required autoFocus /></label>
-        <label>Password<input aria-label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required /><span>Use at least 12 characters and a unique password.</span></label>
-        <label>Confirm password<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
+        <label>{translate('auth.yourName')}<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required autoFocus /></label>
+        <label>{translate('auth.password')}<input aria-label={translate('auth.password')} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} required /><span>{translate('auth.passwordHelp')}</span></label>
+        <label>{translate('auth.confirmPassword')}<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" minLength={12} required /></label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? 'Activating account…' : 'Activate account'}</button>
+        <button className="primary-button auth-submit" type="submit" disabled={submitting}>{submitting ? translate('auth.activatingAccount') : translate('auth.activateAccount')}</button>
       </form>
     </AuthFrame>
   )
@@ -609,7 +609,7 @@ export function AuthGate({ client, initialContext, children }: {
   if (state.phase === 'mfa-challenge') return <MfaChallengeForm submit={async (code) => { setState({ phase: 'authenticated', context: await client.completeMfaLogin(code) }) }} cancel={() => setState({ phase: 'sign-in' })} />
   if (state.phase === 'password-reset-request') return <PasswordResetRequestForm submit={async (email) => { await client.requestPasswordReset(email); setState({ phase: 'password-reset-sent' }) }} />
   if (state.phase === 'password-reset-sent') return <PasswordResetSentState />
-  if (state.phase === 'password-reset-validating') return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />Checking reset link…</div></AuthFrame>
+  if (state.phase === 'password-reset-validating') return <AuthFrame><div className="auth-loading" role="status"><LoaderCircle size={20} className="spin" />{translate('auth.checkingResetLink')}</div></AuthFrame>
   if (state.phase === 'password-reset-unavailable') return <PasswordResetUnavailableState />
   if (state.phase === 'password-reset') return <PasswordResetForm submit={async (password) => { await client.completePasswordReset(state.key, password); setState({ phase: 'password-reset-complete' }) }} unavailable={() => setState({ phase: 'password-reset-unavailable' })} />
   if (state.phase === 'password-reset-complete') return <PasswordResetCompleteState />

@@ -100,9 +100,48 @@
       "workflow": "Staff administration, access control, email delivery administration, and system diagnostics",
       "routes": ["/staff", "/access-control", "/notification-delivery", "/system-status"],
       "states": ["loading", "empty", "invitation", "policy review", "denied", "delivery failure", "system failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review role and scope explanations, invitation administration, confirmation consequences, email-delivery recovery, and operator-only diagnostics without weakening exact security or failure details."
+      "decisions": [
+        {
+          "before": "Invite MSP staff, review account activation, and hand accepted members into access control.",
+          "after": "Invite staff, see who has joined, and manage invitations.",
+          "reason": "Describe the work available on the page instead of narrating the application workflow."
+        },
+        {
+          "before": "Tenant roles apply only where the organization access mode also allows the member.",
+          "after": "A role controls what a staff member can do. Client access controls where they can do it.",
+          "reason": "Separate role and client access concepts in language an MSP owner can act on."
+        },
+        {
+          "before": "Bootstrap identity",
+          "after": "Always has access",
+          "reason": "State the owner's access outcome without exposing installation terminology."
+        },
+        {
+          "before": "Organization access",
+          "after": "Client access",
+          "reason": "The product consistently presents managed organizations as clients in MSP workflows."
+        },
+        {
+          "before": "dead letter",
+          "after": "Failed",
+          "reason": "Operators need the actionable delivery state; the queue implementation term does not help them retry an email."
+        },
+        {
+          "before": "Diagram renderer",
+          "after": "Diagram service",
+          "reason": "Service describes what the operator is checking while exact failure codes and the package version remain available for diagnosis."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/staff/StaffAdministration.test.tsx",
+        "frontend/src/access-control/AccessControl.test.tsx",
+        "frontend/src/notifications/NotificationDeliveryAdmin.test.tsx",
+        "frontend/src/system-status/SystemStatus.test.tsx",
+        "frontend/e2e/live-workspace.spec.ts",
+        "frontend/e2e/shell.spec.ts",
+        "frontend/e2e/workspace-switcher.spec.ts"
+      ]
     },
     {
       "id": "organizations-people-sites",

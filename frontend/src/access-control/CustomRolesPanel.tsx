@@ -13,7 +13,7 @@ type Pending =
 const emptyRole: RoleDraft = { name: '', description: '', scope: 'tenant', permissions: [] }
 
 function messageFor(error: unknown) {
-  return error instanceof Error ? error.message : 'Custom role administration is unavailable.'
+  return error instanceof Error ? error.message : translate('accessControl.customRolesUnavailable')
 }
 
 export function CustomRolesPanel({ client, catalog, members, organizations }: {
@@ -84,12 +84,12 @@ export function CustomRolesPanel({ client, catalog, members, organizations }: {
         setRoles((current) => pending.role
           ? current?.map((role) => role.id === saved.id ? saved : role) ?? null
           : [...(current ?? []), saved])
-        setMessage(`${saved.name} was ${pending.role ? 'updated' : 'created'}.`)
+        setMessage(pending.role ? translate('accessControl.customRoleUpdated', { name: saved.name }) : translate('accessControl.customRoleCreated', { name: saved.name }))
         resetRole()
       } else if (pending.kind === 'archive-role') {
         const archived = await client.archiveCustomRole(pending.role.id)
         setRoles((current) => current?.map((role) => role.id === archived.id ? archived : role) ?? null)
-        setMessage(`${archived.name} was archived and no longer grants permissions.`)
+        setMessage(translate('accessControl.customRoleArchived', { name: archived.name }))
       } else if (pending.kind === 'assign') {
         const assignmentWasPresent = assignments?.some((item) =>
           item.member_id === pending.member.id
@@ -106,7 +106,7 @@ export function CustomRolesPanel({ client, catalog, members, organizations }: {
         if (!assignmentWasPresent) {
           setRoles((current) => current?.map((role) => role.id === assignment.role_id ? { ...role, assignment_count: role.assignment_count + 1 } : role) ?? null)
         }
-        setMessage(`${assignment.role_name} was assigned to ${assignment.member_name}.`)
+        setMessage(translate('accessControl.customRoleAssigned', { role: assignment.role_name, member: assignment.member_name }))
         setMemberId('')
         setRoleId('')
         setOrganizationId('')
@@ -115,7 +115,7 @@ export function CustomRolesPanel({ client, catalog, members, organizations }: {
         await client.removeScopedAssignment(pending.assignment.id)
         setAssignments((current) => current?.filter((item) => item.id !== pending.assignment.id) ?? null)
         setRoles((current) => current?.map((role) => role.id === pending.assignment.role_id ? { ...role, assignment_count: Math.max(0, role.assignment_count - 1) } : role) ?? null)
-        setMessage(`${pending.assignment.role_name} was removed from ${pending.assignment.member_name}.`)
+        setMessage(translate('accessControl.customRoleRemoved', { role: pending.assignment.role_name, member: pending.assignment.member_name }))
       }
       setPending(null)
     } catch (saveError) {
@@ -136,41 +136,41 @@ export function CustomRolesPanel({ client, catalog, members, organizations }: {
     && !duplicateAssignment
 
   return <section className="access-section" aria-labelledby="custom-roles-heading" aria-busy={roles === null || assignments === null || collections === null}>
-    <div className="section-heading"><div><h2 id="custom-roles-heading">Custom roles</h2><p>Add operational permissions at MSP or exact-organization scope. These grants never bypass client staff assignments.</p></div></div>
+    <div className="section-heading"><div><h2 id="custom-roles-heading">{translate('accessControl.customRoles')}</h2><p>{translate('accessControl.customRolesHelp')}</p></div></div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="form-success" role="status">{message}</div>}
-    {(roles === null || assignments === null || collections === null) && !error && <p role="status">Loading custom roles…</p>}
+    {(roles === null || assignments === null || collections === null) && !error && <p role="status">{translate('accessControl.loadingCustomRoles')}</p>}
     {roles !== null && assignments !== null && collections !== null && <>
       <AccessCollectionsPanel client={client} collections={collections} setCollections={setCollections} organizations={organizations} />
       <form className="custom-role-form" onSubmit={(event) => { event.preventDefault(); if (validRole) setPending({ kind: 'save-role', draft: roleDraft, role: editingRole }) }}>
-        <label><span>Role name</span><input value={roleDraft.name} maxLength={80} required onChange={(event) => setRoleDraft((current) => ({ ...current, name: event.target.value }))} /></label>
-        <label><span>Scope</span><select value={roleDraft.scope} disabled={editingRole !== null} onChange={(event) => setRoleDraft((current) => ({ ...current, scope: event.target.value as CustomRoleScope }))}><option value="tenant">MSP-wide</option><option value="organization">One organization</option><option value="collection">Organization collection</option></select></label>
-        <label className="custom-role-description"><span>Description</span><input value={roleDraft.description} maxLength={500} onChange={(event) => setRoleDraft((current) => ({ ...current, description: event.target.value }))} /></label>
-        <fieldset className="permission-picker"><legend>Permissions</legend>{permissionGroups.map(([category, permissions]) => <div key={category}><strong>{category}</strong>{permissions.map((permission) => <label key={permission.key}><input type="checkbox" checked={roleDraft.permissions.includes(permission.key)} onChange={(event) => setRoleDraft((current) => ({ ...current, permissions: event.target.checked ? [...current.permissions, permission.key] : current.permissions.filter((key) => key !== permission.key) }))} /><span>{permission.label}{permission.requires_mfa ? ' · MFA required' : ''}</span></label>)}</div>)}</fieldset>
-        <div className="form-actions"><button className="primary-button" type="submit" disabled={!validRole}>Review {editingRole ? 'update' : 'role'}</button>{editingRole && <button className="secondary-button" type="button" onClick={resetRole}>{translate('accessControl.cancelEdit')}</button>}</div>
+        <label><span>{translate('accessControl.roleName')}</span><input value={roleDraft.name} maxLength={80} required onChange={(event) => setRoleDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+        <label><span>{translate('accessControl.scope')}</span><select value={roleDraft.scope} disabled={editingRole !== null} onChange={(event) => setRoleDraft((current) => ({ ...current, scope: event.target.value as CustomRoleScope }))}><option value="tenant">{translate('accessControl.mspWide')}</option><option value="organization">{translate('accessControl.oneClient')}</option><option value="collection">{translate('accessControl.clientCollection')}</option></select></label>
+        <label className="custom-role-description"><span>{translate('accessControl.description')}</span><input value={roleDraft.description} maxLength={500} onChange={(event) => setRoleDraft((current) => ({ ...current, description: event.target.value }))} /></label>
+        <fieldset className="permission-picker"><legend>{translate('accessControl.permissions')}</legend>{permissionGroups.map(([category, permissions]) => <div key={category}><strong>{category}</strong>{permissions.map((permission) => <label key={permission.key}><input type="checkbox" checked={roleDraft.permissions.includes(permission.key)} onChange={(event) => setRoleDraft((current) => ({ ...current, permissions: event.target.checked ? [...current.permissions, permission.key] : current.permissions.filter((key) => key !== permission.key) }))} /><span>{permission.label}{permission.requires_mfa ? translate('accessControl.mfaRequiredSuffix') : ''}</span></label>)}</div>)}</fieldset>
+        <div className="form-actions"><button className="primary-button" type="submit" disabled={!validRole}>{editingRole ? translate('accessControl.reviewUpdate') : translate('accessControl.reviewRole')}</button>{editingRole && <button className="secondary-button" type="button" onClick={resetRole}>{translate('accessControl.cancelEdit')}</button>}</div>
       </form>
 
-      {roles.length === 0 ? <p className="settings-state">No custom roles have been defined.</p> : <div className="custom-role-list" role="table" aria-label="Custom roles">
-        <div className="custom-role-row header" role="row"><span role="columnheader">Role</span><span role="columnheader">Scope</span><span role="columnheader">Permissions</span><span role="columnheader">Assignments</span><span role="columnheader">Actions</span></div>
+      {roles.length === 0 ? <p className="settings-state">{translate('accessControl.noCustomRoles')}</p> : <div className="custom-role-list" role="table" aria-label={translate('accessControl.customRoles')}>
+        <div className="custom-role-row header" role="row"><span role="columnheader">{translate('accessControl.role')}</span><span role="columnheader">{translate('accessControl.scope')}</span><span role="columnheader">{translate('accessControl.permissions')}</span><span role="columnheader">{translate('accessControl.assignments')}</span><span role="columnheader">{translate('accessControl.actions')}</span></div>
         {roles.map((role) => <div className="custom-role-row" role="row" key={role.id}>
-          <span role="cell"><strong>{role.name}</strong><span>{role.description || 'No description'}{role.archived_at ? ' · Archived' : ''}</span></span>
-          <span role="cell">{role.scope === 'tenant' ? 'MSP-wide' : role.scope === 'organization' ? 'Organization' : 'Collection'}</span>
+          <span role="cell"><strong>{role.name}</strong><span>{role.description || translate('accessControl.noDescription')}{role.archived_at ? translate('accessControl.archivedSuffix') : ''}</span></span>
+          <span role="cell">{role.scope === 'tenant' ? translate('accessControl.mspWide') : role.scope === 'organization' ? translate('accessControl.client') : translate('accessControl.collection')}</span>
           <span role="cell">{role.permissions.length}</span><span role="cell">{role.assignment_count}</span>
-          <span role="cell">{role.archived_at ? 'Retained for history' : <><button className="secondary-button" type="button" onClick={() => { setEditingRole(role); setRoleDraft({ name: role.name, description: role.description, scope: role.scope, permissions: role.permissions }) }}>{translate('common.edit')}</button><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'archive-role', role })}>{translate('common.archive')}</button></>}</span>
+          <span role="cell">{role.archived_at ? translate('accessControl.retainedForHistory') : <><button className="secondary-button" type="button" onClick={() => { setEditingRole(role); setRoleDraft({ name: role.name, description: role.description, scope: role.scope, permissions: role.permissions }) }}>{translate('common.edit')}</button><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'archive-role', role })}>{translate('common.archive')}</button></>}</span>
         </div>)}
       </div>}
 
-      <div className="section-heading custom-assignment-heading"><div><h3>Scoped assignments</h3><p>Assign an active custom role to an MSP member. Organization and collection roles need an exact target.</p></div></div>
+      <div className="section-heading custom-assignment-heading"><div><h3>{translate('accessControl.customAssignments')}</h3><p>{translate('accessControl.customAssignmentsHelp')}</p></div></div>
       <form className="scoped-role-form" onSubmit={(event) => { event.preventDefault(); if (validAssignment && selectedMember && selectedRole) setPending({ kind: 'assign', member: selectedMember, role: selectedRole, organization: selectedOrganization, collection: selectedCollection }) }}>
-        <label><span>MSP member</span><select aria-label="Custom role member" value={memberId} onChange={(event) => setMemberId(event.target.value)}><option value="">Select a member</option>{members.filter((member) => !member.is_owner).map((member) => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label>
-        <label><span>Custom role</span><select aria-label="Custom role definition" value={roleId} onChange={(event) => { setRoleId(event.target.value); setOrganizationId(''); setCollectionId('') }}><option value="">Select a role</option>{activeRoles.map((role) => <option value={role.id} key={role.id}>{role.name} · {role.scope === 'tenant' ? 'MSP-wide' : role.scope}</option>)}</select></label>
-        {selectedRole?.scope === 'organization' && <label><span>Organization</span><select aria-label="Custom role organization" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}><option value="">Select an organization</option>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>}
-        {selectedRole?.scope === 'collection' && <label><span>Collection</span><select aria-label="Custom role collection" value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Select a collection</option>{collections.filter((collection) => collection.archived_at === null).map((collection) => <option value={collection.id} key={collection.id}>{collection.name}</option>)}</select></label>}
+        <label><span>{translate('accessControl.mspMember')}</span><select aria-label={translate('accessControl.customRoleMember')} value={memberId} onChange={(event) => setMemberId(event.target.value)}><option value="">{translate('accessControl.selectMember')}</option>{members.filter((member) => !member.is_owner).map((member) => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label>
+        <label><span>{translate('accessControl.customRole')}</span><select aria-label={translate('accessControl.customRoleDefinition')} value={roleId} onChange={(event) => { setRoleId(event.target.value); setOrganizationId(''); setCollectionId('') }}><option value="">{translate('accessControl.selectRole')}</option>{activeRoles.map((role) => <option value={role.id} key={role.id}>{role.name} · {role.scope === 'tenant' ? translate('accessControl.mspWide') : role.scope}</option>)}</select></label>
+        {selectedRole?.scope === 'organization' && <label><span>{translate('accessControl.client')}</span><select aria-label={translate('accessControl.customRoleClient')} value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}><option value="">{translate('accessControl.selectClient')}</option>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>}
+        {selectedRole?.scope === 'collection' && <label><span>{translate('accessControl.collection')}</span><select aria-label={translate('accessControl.customRoleCollection')} value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">{translate('accessControl.selectCollection')}</option>{collections.filter((collection) => collection.archived_at === null).map((collection) => <option value={collection.id} key={collection.id}>{collection.name}</option>)}</select></label>}
         <button className="secondary-button" type="submit" disabled={!validAssignment}>{translate('accessControl.reviewCustomAssignment')}</button>
-        {duplicateAssignment && <p className="form-error" role="status">This exact assignment already exists.</p>}
+        {duplicateAssignment && <p className="form-error" role="status">{translate('accessControl.duplicateAssignment')}</p>}
       </form>
-      {assignments.length === 0 ? <p className="settings-state">No custom roles are assigned.</p> : <ul className="scoped-assignment-list">{assignments.map((assignment) => <li key={assignment.id}><span><strong>{assignment.member_name}</strong><span>{assignment.member_email}</span></span><span><strong>{assignment.role_name}</strong><span>{assignment.organization_name ?? assignment.collection_name ?? 'MSP-wide'}</span></span><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'remove-assignment', assignment })}>{translate('common.remove')}</button></li>)}</ul>}
+      {assignments.length === 0 ? <p className="settings-state">{translate('accessControl.noCustomAssignments')}</p> : <ul className="scoped-assignment-list">{assignments.map((assignment) => <li key={assignment.id}><span><strong>{assignment.member_name}</strong><span>{assignment.member_email}</span></span><span><strong>{assignment.role_name}</strong><span>{assignment.organization_name ?? assignment.collection_name ?? translate('accessControl.mspWide')}</span></span><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'remove-assignment', assignment })}>{translate('common.remove')}</button></li>)}</ul>}
     </>}
-    {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="custom-role-confirmation-heading"><div><strong id="custom-role-confirmation-heading">Confirm custom role change</strong><p>{pending.kind === 'save-role' ? `${pending.role ? 'Update' : 'Create'} ${pending.draft.name}? ${pending.role ? `This immediately affects ${pending.role.assignment_count} assignment${pending.role.assignment_count === 1 ? '' : 's'}.` : 'It grants nothing until assigned.'}` : pending.kind === 'archive-role' ? `Archive ${pending.role.name}? Its ${pending.role.assignment_count} assignment${pending.role.assignment_count === 1 ? '' : 's'} will immediately stop granting permissions.` : pending.kind === 'assign' ? `Assign ${pending.role.name} to ${pending.member.display_name}${pending.organization ? ` only for ${pending.organization.name}` : pending.collection ? ` for organizations in ${pending.collection.name}` : ' across reachable workspaces'}?` : `Remove ${pending.assignment.role_name} from ${pending.assignment.member_name}?`}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? 'Saving…' : 'Confirm change'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div></div>}
+    {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="custom-role-confirmation-heading"><div><strong id="custom-role-confirmation-heading">{translate('accessControl.confirmCustomRoleChange')}</strong><p>{pending.kind === 'save-role' ? pending.role ? translate('accessControl.confirmCustomRoleUpdate', { name: pending.draft.name, count: pending.role.assignment_count }) : translate('accessControl.confirmCustomRoleCreate', { name: pending.draft.name }) : pending.kind === 'archive-role' ? translate('accessControl.confirmCustomRoleArchive', { name: pending.role.name, count: pending.role.assignment_count }) : pending.kind === 'assign' ? pending.organization ? translate('accessControl.confirmCustomRoleClientAssignment', { role: pending.role.name, member: pending.member.display_name, target: pending.organization.name }) : pending.collection ? translate('accessControl.confirmCustomRoleCollectionAssignment', { role: pending.role.name, member: pending.member.display_name, target: pending.collection.name }) : translate('accessControl.confirmCustomRoleMspAssignment', { role: pending.role.name, member: pending.member.display_name }) : translate('accessControl.confirmCustomRoleRemoval', { role: pending.assignment.role_name, member: pending.assignment.member_name })}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? translate('common.saving') : translate('accessControl.confirmChange')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div></div>}
   </section>
 }

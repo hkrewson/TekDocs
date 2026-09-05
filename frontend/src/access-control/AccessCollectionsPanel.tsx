@@ -10,7 +10,7 @@ type Pending =
 const emptyDraft: AccessCollectionInput = { name: '', description: '', organization_ids: [] }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Access collection administration is unavailable.'
+  return error instanceof Error ? error.message : translate('accessControl.collectionsUnavailable')
 }
 
 export function AccessCollectionsPanel({ client, collections, setCollections, organizations }: {
@@ -53,12 +53,12 @@ export function AccessCollectionsPanel({ client, collections, setCollections, or
         setCollections((current) => pending.collection
           ? current?.map((collection) => collection.id === saved.id ? saved : collection) ?? null
           : [...(current ?? []), saved])
-        setMessage(`${saved.name} was ${pending.collection ? 'updated' : 'created'}.`)
+        setMessage(pending.collection ? translate('accessControl.collectionUpdated', { name: saved.name }) : translate('accessControl.collectionCreated', { name: saved.name }))
         reset()
       } else {
         const archived = await client.archiveAccessCollection(pending.collection.id)
         setCollections((current) => current?.map((collection) => collection.id === archived.id ? archived : collection) ?? null)
-        setMessage(`${archived.name} was archived and no longer grants permissions.`)
+        setMessage(translate('accessControl.collectionArchived', { name: archived.name }))
       }
       setPending(null)
     } catch (saveError) {
@@ -69,24 +69,24 @@ export function AccessCollectionsPanel({ client, collections, setCollections, or
   }
 
   return <section className="access-subsection" aria-labelledby="access-collections-heading">
-    <div className="section-heading"><div><h3 id="access-collections-heading">Access collections</h3><p>Group organizations for reusable role scope. Collection membership never bypasses assigned-client access.</p></div></div>
+    <div className="section-heading"><div><h3 id="access-collections-heading">{translate('accessControl.clientCollections')}</h3><p>{translate('accessControl.clientCollectionsHelp')}</p></div></div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="form-success" role="status">{message}</div>}
     <form className="access-collection-form" onSubmit={(event) => { event.preventDefault(); if (draft.name.trim()) setPending({ kind: 'save', collection: editing, draft }) }}>
-      <label><span>Collection name</span><input value={draft.name} maxLength={80} required onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
-      <label><span>Description</span><input value={draft.description} maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>
-      <fieldset className="collection-organization-picker"><legend>Organizations</legend>{organizations.length === 0 ? <p>No organizations are available.</p> : organizations.map((organization) => <label key={organization.id}><input type="checkbox" checked={draft.organization_ids.includes(organization.id)} onChange={() => toggleOrganization(organization.id)} /><span>{organization.name}</span></label>)}</fieldset>
-      <div className="form-actions"><button className="primary-button" type="submit" disabled={!draft.name.trim()}>Review {editing ? 'update' : 'collection'}</button>{editing && <button className="secondary-button" type="button" onClick={reset}>{translate('accessControl.cancelEdit')}</button>}</div>
+      <label><span>{translate('accessControl.collectionName')}</span><input value={draft.name} maxLength={80} required onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+      <label><span>{translate('accessControl.description')}</span><input value={draft.description} maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>
+      <fieldset className="collection-organization-picker"><legend>{translate('accessControl.clients')}</legend>{organizations.length === 0 ? <p>{translate('accessControl.noClients')}</p> : organizations.map((organization) => <label key={organization.id}><input type="checkbox" checked={draft.organization_ids.includes(organization.id)} onChange={() => toggleOrganization(organization.id)} /><span>{organization.name}</span></label>)}</fieldset>
+      <div className="form-actions"><button className="primary-button" type="submit" disabled={!draft.name.trim()}>{editing ? translate('accessControl.reviewCollectionUpdate') : translate('accessControl.reviewCollection')}</button>{editing && <button className="secondary-button" type="button" onClick={reset}>{translate('accessControl.cancelEdit')}</button>}</div>
     </form>
-    {collections.length === 0 ? <p className="settings-state">No access collections have been defined.</p> : <div className="access-collection-list" role="table" aria-label="Access collections">
-      <div className="access-collection-row header" role="row"><span role="columnheader">Collection</span><span role="columnheader">Organizations</span><span role="columnheader">Assignments</span><span role="columnheader">Actions</span></div>
+    {collections.length === 0 ? <p className="settings-state">{translate('accessControl.noCollections')}</p> : <div className="access-collection-list" role="table" aria-label={translate('accessControl.clientCollections')}>
+      <div className="access-collection-row header" role="row"><span role="columnheader">{translate('accessControl.collection')}</span><span role="columnheader">{translate('accessControl.clients')}</span><span role="columnheader">{translate('accessControl.assignments')}</span><span role="columnheader">{translate('accessControl.actions')}</span></div>
       {collections.map((collection) => <div className="access-collection-row" role="row" key={collection.id}>
-        <span role="cell"><strong>{collection.name}</strong><span>{collection.description || 'No description'}{collection.archived_at ? ' · Archived' : ''}</span></span>
-        <span role="cell">{collection.organizations.length ? collection.organizations.map((organization) => organization.name).join(', ') : 'No organizations'}</span>
+        <span role="cell"><strong>{collection.name}</strong><span>{collection.description || translate('accessControl.noDescription')}{collection.archived_at ? translate('accessControl.archivedSuffix') : ''}</span></span>
+        <span role="cell">{collection.organizations.length ? collection.organizations.map((organization) => organization.name).join(', ') : translate('accessControl.noClients')}</span>
         <span role="cell">{collection.assignment_count}</span>
-        <span role="cell">{collection.archived_at ? 'Retained for history' : <><button className="secondary-button" type="button" onClick={() => { setEditing(collection); setDraft({ name: collection.name, description: collection.description, organization_ids: collection.organizations.map((organization) => organization.id) }) }}>{translate('common.edit')}</button><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'archive', collection })}>{translate('common.archive')}</button></>}</span>
+        <span role="cell">{collection.archived_at ? translate('accessControl.retainedForHistory') : <><button className="secondary-button" type="button" onClick={() => { setEditing(collection); setDraft({ name: collection.name, description: collection.description, organization_ids: collection.organizations.map((organization) => organization.id) }) }}>{translate('common.edit')}</button><button className="secondary-button" type="button" onClick={() => setPending({ kind: 'archive', collection })}>{translate('common.archive')}</button></>}</span>
       </div>)}
     </div>}
-    {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="collection-confirmation-heading"><div><strong id="collection-confirmation-heading">Confirm access collection change</strong><p>{pending.kind === 'save' ? `${pending.collection ? 'Update' : 'Create'} ${pending.draft.name}? ${pending.collection ? `Membership changes immediately affect ${pending.collection.assignment_count} scoped assignment${pending.collection.assignment_count === 1 ? '' : 's'}.` : 'It grants nothing until a collection-scoped role is assigned.'}` : `Archive ${pending.collection.name}? Its ${pending.collection.assignment_count} scoped assignment${pending.collection.assignment_count === 1 ? '' : 's'} will immediately stop granting permissions.`}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? 'Saving…' : 'Confirm change'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div></div>}
+    {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="collection-confirmation-heading"><div><strong id="collection-confirmation-heading">{translate('accessControl.confirmCollectionChange')}</strong><p>{pending.kind === 'save' ? pending.collection ? translate('accessControl.confirmCollectionUpdate', { name: pending.draft.name, count: pending.collection.assignment_count }) : translate('accessControl.confirmCollectionCreate', { name: pending.draft.name }) : translate('accessControl.confirmCollectionArchive', { name: pending.collection.name, count: pending.collection.assignment_count })}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void confirm() }}>{saving ? translate('common.saving') : translate('accessControl.confirmChange')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div></div>}
   </section>
 }

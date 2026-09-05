@@ -27,7 +27,7 @@ it('shows bounded renderer diagnostics and refreshes them', async () => {
   expect(await screen.findByText('@mermaid-js/mermaid-cli@11.16.0')).toBeInTheDocument()
   expect(screen.getByText('2 of 8 slots in use')).toBeInTheDocument()
   expect(screen.getByText('renderer_timeout')).toBeInTheDocument()
-  expect(screen.getByText(/excludes document content/)).toBeInTheDocument()
+  expect(screen.getByText(/does not include documents/)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Check again' }))
   expect(load).toHaveBeenCalledTimes(2)
 })

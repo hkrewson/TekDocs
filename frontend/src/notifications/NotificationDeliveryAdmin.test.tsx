@@ -22,10 +22,10 @@ describe('NotificationDeliveryAdmin', () => {
     expect(await screen.findByText('Client Reader')).toBeInTheDocument()
     expect(screen.queryByText(/document body/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
-    await user.type(screen.getByPlaceholderText('Reason for retry'), 'SMTP service recovered')
+    await user.type(screen.getByPlaceholderText('Why retry this delivery?'), 'SMTP service recovered')
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(retryDelivery).toHaveBeenCalledWith('delivery-1', 'SMTP service recovered')
-    expect(await screen.findByText('Delivery returned to the queue.')).toBeInTheDocument()
+    expect(await screen.findByText('The email was returned to the delivery queue.')).toBeInTheDocument()
   })
 
   it('appends an older delivery page without losing the visible history', async () => {

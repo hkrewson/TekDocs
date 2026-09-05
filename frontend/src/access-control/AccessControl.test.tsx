@@ -55,15 +55,15 @@ describe('access control', () => {
 
     expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
     expect(screen.getByText('Client Administrator')).toBeInTheDocument()
-    expect(screen.getAllByText('Organization-scoped role')).toHaveLength(2)
-    expect(screen.getByText('Bootstrap identity')).toBeInTheDocument()
+    expect(screen.getAllByText('Client role')).toHaveLength(2)
+    expect(screen.getByText('Always has access')).toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Role for Morgan Ellis' }), 'technician')
     await user.click(screen.getAllByRole('button', { name: 'Review change' })[0])
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Change Morgan Ellis from Read-only to Technician')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(assignRole).toHaveBeenCalledWith('member', 'technician'))
-    expect(await screen.findByRole('status')).toHaveTextContent("Morgan Ellis's role was updated")
+    expect(await screen.findByRole('status')).toHaveTextContent('Morgan Ellis’s role was updated')
   })
 
   it('explains the assignment boundary before changing the mode', async () => {
@@ -71,9 +71,9 @@ describe('access control', () => {
     const changeAccessMode = vi.fn().mockResolvedValue({ ...clientOrganization, access_mode: 'assigned_only' })
     render(<AccessControl client={client({ changeAccessMode })} />)
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Access mode for Acme Dental' }), 'assigned_only')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Access for Acme Dental' }), 'assigned_only')
     await user.click(screen.getAllByRole('button', { name: 'Review change' })[1])
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('explicitly assigned MSP staff')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('assigned staff')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(changeAccessMode).toHaveBeenCalledWith('organization', 'assigned_only'))
@@ -88,12 +88,12 @@ describe('access control', () => {
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Staff member for Acme Dental' }), technician.id)
     await user.click(screen.getByRole('button', { name: 'Review assignment' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Their MSP role still determines what they can do')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Their MSP role still controls what they can do')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(assignStaff).toHaveBeenCalledWith(clientOrganization.id, technician.id))
 
     await user.click(await screen.findByRole('button', { name: 'Remove' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('They will lose access if this organization is assigned-only')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('They will lose access if this client is limited to assigned staff')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(removeStaff).toHaveBeenCalledWith(clientOrganization.id, technician.id))
   })
@@ -114,15 +114,15 @@ describe('access control', () => {
     await user.type(await screen.findByRole('textbox', { name: 'Role name' }), 'Documentation lead')
     await user.click(screen.getByRole('checkbox', { name: /Edit documentation/ }))
     await user.click(screen.getByRole('button', { name: 'Review role' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('grants nothing until assigned')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('grants nothing until you assign it')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(createCustomRole).toHaveBeenCalledWith(expect.objectContaining({ name: 'Documentation lead' })))
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Custom role member' }), technician.id)
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Custom role definition' }), customRole.id)
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Custom role organization' }), clientOrganization.id)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Member receiving the custom role' }), technician.id)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Custom role to assign' }), customRole.id)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Client for the custom role' }), clientOrganization.id)
     await user.click(screen.getByRole('button', { name: 'Review custom assignment' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('only for Acme Dental')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('for Acme Dental only')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(createScopedAssignment).toHaveBeenCalledWith({ user_id: technician.id, role_id: customRole.id, organization_id: clientOrganization.id, collection_id: null }))
   })
@@ -132,13 +132,13 @@ describe('access control', () => {
     const createAccessCollection = vi.fn().mockResolvedValue(accessCollection)
     render(<AccessControl client={client({ createAccessCollection })} />)
 
-    const panel = (await screen.findByRole('heading', { name: 'Access collections' })).closest('section')
+    const panel = (await screen.findByRole('heading', { name: 'Client collections' })).closest('section')
     if (!panel) throw new Error('Access collection panel was not rendered')
     await user.type(within(panel).getByRole('textbox', { name: 'Collection name' }), 'Priority clients')
     await user.type(within(panel).getByRole('textbox', { name: 'Description' }), 'Primary support group.')
     await user.click(within(panel).getByRole('checkbox', { name: 'Acme Dental' }))
     await user.click(within(panel).getByRole('button', { name: 'Review collection' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('grants nothing until a collection-scoped role is assigned')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('grants nothing until you assign a collection role')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(createAccessCollection).toHaveBeenCalledWith({

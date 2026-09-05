@@ -507,7 +507,7 @@ test('authorized operators can inspect value-free renderer diagnostics', async (
   await expect(page.getByText('@mermaid-js/mermaid-cli@11.16.0')).toBeVisible()
   await expect(page.getByText('0 of 8 slots in use')).toBeVisible()
   await expect(page.getByText('renderer_timeout')).toBeVisible()
-  await expect(page.getByText(/excludes document content/)).toBeVisible()
+  await expect(page.getByText(/does not include documents/)).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 

@@ -184,7 +184,7 @@ describe('application shell', () => {
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     await user.click(screen.getByRole('menuitem', { name: 'Staff and invitations' }))
 
-    expect(await screen.findByRole('heading', { name: 'Staff & invitations' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Staff and invitations' })).toBeInTheDocument()
     expect(await screen.findByText('No invitations match this view.')).toBeInTheDocument()
   })
 

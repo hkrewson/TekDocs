@@ -36,7 +36,7 @@ describe('staff administration', () => {
   it('lists MSP members separately from invitation history and links to access control', async () => {
     render(<MemoryRouter><StaffAdministration client={client()} /></MemoryRouter>)
 
-    expect(await screen.findByRole('heading', { name: 'Staff & invitations' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Staff and invitations' })).toBeInTheDocument()
     expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
     expect(screen.getByText('technician@example.com')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Open access control/ })).toHaveAttribute('href', '/access-control')
@@ -52,7 +52,7 @@ describe('staff administration', () => {
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     await waitFor(() => expect(issue).toHaveBeenCalledWith('new@example.com'))
-    expect(screen.getByRole('status')).toHaveTextContent('begin with Read-only access')
+    expect(screen.getByRole('status')).toHaveTextContent('start with Read-only access')
     expect(screen.getByText('new@example.com')).toBeInTheDocument()
   })
 
@@ -62,9 +62,9 @@ describe('staff administration', () => {
     const user = userEvent.setup()
     render(<MemoryRouter><StaffAdministration client={client({ resend, revoke })} /></MemoryRouter>)
 
-    const history = await screen.findByRole('table', { name: 'MSP staff invitation history' })
+    const history = await screen.findByRole('table', { name: 'Staff invitation history' })
     await user.click(within(history).getByRole('button', { name: 'Resend' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('prior link will stop working')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('previous link will stop working')
     await user.click(screen.getByRole('button', { name: 'Send replacement' }))
     await waitFor(() => expect(resend).toHaveBeenCalledWith(invitation.id))
 
@@ -86,7 +86,7 @@ describe('staff administration', () => {
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('retained, but email delivery failed')
-    expect(within(await screen.findByRole('table', { name: 'MSP staff invitation history' })).getByText('Delivery failed')).toBeInTheDocument()
+    expect(within(await screen.findByRole('table', { name: 'Staff invitation history' })).getByText('Delivery failed')).toBeInTheDocument()
   })
 
   it('paginates the bounded invitation history and resets the page when filtering', async () => {

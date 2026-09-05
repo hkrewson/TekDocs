@@ -63,7 +63,7 @@ function sanitizeSvg(svg: string) {
   return sanitized
 }
 
-export function MermaidDiagram({ source, index }: { source: string; index: number }) {
+export function MermaidDiagram({ source, index, showSource = true }: { source: string; index: number; showSource?: boolean }) {
   const [state, setState] = useState<DiagramState>({ phase: 'loading' })
   const accessible = useMemo(() => accessibleText(source), [source])
 
@@ -89,7 +89,7 @@ export function MermaidDiagram({ source, index }: { source: string; index: numbe
     {accessible.description && <p>{accessible.description}</p>}
     {state.phase === 'loading' && <p role="status">Rendering diagram…</p>}
     {state.phase === 'ready' && <div className="mermaid-graphic" role="img" aria-label={accessible.title}><div aria-hidden="true" dangerouslySetInnerHTML={{ __html: state.svg }} /></div>}
-    {state.phase === 'error' && <p role="status">The diagram could not be rendered. Its source remains available below.</p>}
-    <details><summary>Accessible diagram source</summary><pre><code>{source}</code></pre></details>
+    {state.phase === 'error' && <p role="status">{showSource ? 'The diagram could not be rendered. Its source remains available below.' : 'The diagram could not be rendered. Open Mermaid source to inspect it.'}</p>}
+    {showSource && <details><summary>Accessible diagram source</summary><pre><code>{source}</code></pre></details>}
   </figure>
 }

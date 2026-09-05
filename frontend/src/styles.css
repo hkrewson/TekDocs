@@ -839,8 +839,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .diagram-list .icon-button { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; }
 .diagram-source { min-height: 420px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.55; }
 .diagram-preview { min-width: 0; padding-left: 20px; border-left: 1px solid var(--border); }
-.diagram-preview > h3 { margin: 0 0 10px; font-size: 13px; }
+.diagram-preview > .mode-tabs { margin-bottom: 12px; }
 .diagram-preview .mermaid-diagram { margin: 0; }
+.diagram-guide { padding: 4px 2px; }
+.diagram-guide h3 { margin: 0 0 6px; font-size: 14px; }
+.diagram-guide > p { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.diagram-guide dl { margin: 0 0 14px; border-top: 1px solid var(--border); }
+.diagram-guide dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.diagram-guide dt { color: var(--muted); font-size: 11px; font-weight: 650; }
+.diagram-guide dd { min-width: 0; margin: 0; font-size: 12px; }
+.diagram-guide code { word-break: break-word; }
 .markdown-preview-state { min-height: 220px; display: grid; place-items: center; padding: 30px; color: var(--muted); background: #fff; }
 .markdown-preview-state[role='alert'] { color: #6f2d22; }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4 { line-height: 1.3; }

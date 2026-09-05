@@ -22,4 +22,13 @@ describe('Markdown diagram blocks', () => {
   it('leaves unsupported Mermaid syntax available for source editing', () => {
     expect(parseDiagramSource('sequenceDiagram\nAlice->>Bob: Hello')).toBeNull()
   })
+
+  it('round-trips every shape exposed by the guided editor', () => {
+    const draft = defaultDiagramDraft('network')
+    draft.nodes = (['system', 'decision', 'terminal', 'database', 'document', 'person', 'cloud', 'network-device', 'input-output', 'boundary'] as const)
+      .map((shape, index) => ({ id: `N${index + 1}`, label: shape, shape }))
+    draft.connections = [{ from: 'N1', to: 'N2', label: 'uses' }]
+
+    expect(parseDiagramSource(diagramSource(draft))?.nodes).toEqual(draft.nodes)
+  })
 })

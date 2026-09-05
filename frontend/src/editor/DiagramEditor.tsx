@@ -26,6 +26,7 @@ export function DiagramEditor({ markdown, onSave, onCancel }: {
   const [draft, setDraft] = useState<DiagramDraft>(initialDraft ?? defaultDiagramDraft())
   const [rawSource, setRawSource] = useState(initialSource)
   const [sourceMode, setSourceMode] = useState(Boolean(initialSource && !initialDraft))
+  const [previewTab, setPreviewTab] = useState<'preview' | 'guide'>('preview')
 
   const loadTarget = (value: number | 'new') => {
     setTarget(value)
@@ -104,7 +105,7 @@ export function DiagramEditor({ markdown, onSave, onCancel }: {
             </div>
             <section className="diagram-list diagram-nodes" aria-labelledby="diagram-nodes-heading">
               <div className="section-heading"><h3 id="diagram-nodes-heading">{translate(draft.kind === 'network' ? 'diagrams.systems' : 'diagrams.steps')}</h3><button className="secondary-button" type="button" onClick={addNode}><Plus size={15} aria-hidden="true" />{translate('diagrams.addNode')}</button></div>
-              <ol>{draft.nodes.map((node, index) => <li key={node.id}><span className="diagram-item-id">{node.id}</span><input aria-label={`${translate('diagrams.nodeLabel')} ${index + 1}`} maxLength={120} value={node.label} onChange={(event) => updateNode(index, 'label', event.target.value)} /><select aria-label={`${translate('diagrams.nodeShape')} ${index + 1}`} value={node.shape} onChange={(event) => updateNode(index, 'shape', event.target.value)}><option value="system">{translate(draft.kind === 'network' ? 'diagrams.system' : 'diagrams.step')}</option><option value="decision">{translate('diagrams.decision')}</option><option value="terminal">{translate('diagrams.startEnd')}</option></select><button className="icon-button" type="button" aria-label={`${translate('diagrams.removeNode')} ${node.label}`} onClick={() => removeNode(node.id)}><Trash2 size={15} aria-hidden="true" /></button></li>)}</ol>
+              <ol>{draft.nodes.map((node, index) => <li key={node.id}><span className="diagram-item-id">{node.id}</span><input aria-label={`${translate('diagrams.nodeLabel')} ${index + 1}`} maxLength={120} value={node.label} onChange={(event) => updateNode(index, 'label', event.target.value)} /><select aria-label={`${translate('diagrams.nodeShape')} ${index + 1}`} value={node.shape} onChange={(event) => updateNode(index, 'shape', event.target.value)}><option value="system">{translate(draft.kind === 'network' ? 'diagrams.system' : 'diagrams.step')}</option><option value="decision">{translate('diagrams.decision')}</option><option value="terminal">{translate('diagrams.startEnd')}</option><option value="database">{translate('diagrams.database')}</option><option value="document">{translate('diagrams.document')}</option><option value="person">{translate('diagrams.person')}</option><option value="cloud">{translate('diagrams.cloud')}</option><option value="network-device">{translate('diagrams.networkDevice')}</option><option value="input-output">{translate('diagrams.inputOutput')}</option><option value="boundary">{translate('diagrams.boundary')}</option></select><button className="icon-button" type="button" aria-label={`${translate('diagrams.removeNode')} ${node.label}`} onClick={() => removeNode(node.id)}><Trash2 size={15} aria-hidden="true" /></button></li>)}</ol>
             </section>
             <section className="diagram-list diagram-connections" aria-labelledby="diagram-connections-heading">
               <div className="section-heading"><h3 id="diagram-connections-heading">{translate('diagrams.connections')}</h3><button className="secondary-button" type="button" disabled={draft.nodes.length < 2} onClick={addConnection}><Plus size={15} aria-hidden="true" />{translate('diagrams.addConnection')}</button></div>
@@ -114,7 +115,23 @@ export function DiagramEditor({ markdown, onSave, onCancel }: {
           {sourceMode && !guidedSourceSupported && <p className="form-message">{translate('diagrams.sourceOnly')}</p>}
           {!sourceHasAccessibility && <p className="form-message error" role="alert">{translate('diagrams.accessibilityRequired')}</p>}
         </div>
-        <section className="diagram-preview" aria-labelledby="diagram-preview-heading"><h3 id="diagram-preview-heading">{translate('diagrams.preview')}</h3><MermaidDiagram source={renderedSource} index={target === 'new' ? blocks.length : target} /></section>
+        <section className="diagram-preview" aria-label={translate('diagrams.previewPane')}>
+          <div className="mode-tabs" role="tablist" aria-label={translate('diagrams.previewTabs')}>
+            <button type="button" role="tab" aria-selected={previewTab === 'preview'} className={previewTab === 'preview' ? 'selected' : ''} onClick={() => setPreviewTab('preview')}>{translate('diagrams.preview')}</button>
+            <button type="button" role="tab" aria-selected={previewTab === 'guide'} className={previewTab === 'guide' ? 'selected' : ''} onClick={() => setPreviewTab('guide')}>{translate('diagrams.guide')}</button>
+          </div>
+          {previewTab === 'preview' ? <MermaidDiagram source={renderedSource} index={target === 'new' ? blocks.length : target} showSource={false} /> : <div className="diagram-guide">
+            <h3>{translate('diagrams.guideTitle')}</h3>
+            <p>{translate('diagrams.guideIntro')}</p>
+            <dl>
+              <div><dt>{translate('diagrams.guideDirection')}</dt><dd><code>flowchart LR</code> · <code>flowchart TD</code></dd></div>
+              <div><dt>{translate('diagrams.guideItems')}</dt><dd><code>{'A@{ shape: cyl, label: "Database" }'}</code></dd></div>
+              <div><dt>{translate('diagrams.guideConnections')}</dt><dd><code>A --&gt;|Uses| B</code></dd></div>
+              <div><dt>{translate('diagrams.guideAccess')}</dt><dd><code>accTitle:</code> · <code>accDescr:</code></dd></div>
+            </dl>
+            <p>{translate('diagrams.guideMore')}</p>
+          </div>}
+        </section>
       </div>
       <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>{translate('common.cancel')}</button><button className="primary-button" type="button" disabled={!canSave} onClick={save}>{translate(target === 'new' ? 'diagrams.insert' : 'diagrams.save')}</button></div>
     </div>

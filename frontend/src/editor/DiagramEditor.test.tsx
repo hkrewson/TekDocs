@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
@@ -21,7 +21,7 @@ describe('diagram editor', () => {
     const markdown = onSave.mock.calls[0][0] as string
     expect(markdown).toContain('```mermaid\nflowchart LR')
     expect(markdown).toContain('accTitle: Network diagram')
-    expect(markdown).toContain('N2["Edge firewall"]')
+    expect(markdown).toContain('N2@{ shape: rect, label: "Edge firewall" }')
     expect(markdown).not.toContain('tekdocs:')
   })
 
@@ -37,7 +37,7 @@ describe('diagram editor', () => {
 
     const saved = onSave.mock.calls[0][0] as string
     expect(saved.match(/```mermaid/g)).toHaveLength(1)
-    expect(saved).toContain('N2["Gateway"]')
+    expect(saved).toContain('N2@{ shape: rect, label: "Gateway" }')
   })
 
   it('keeps unsupported Mermaid diagrams in source mode and closes with Escape', async () => {
@@ -50,6 +50,19 @@ describe('diagram editor', () => {
     expect(screen.getByText(/outside the guided editor/)).toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(onCancel).toHaveBeenCalledOnce()
+  })
+
+  it('offers the expanded shapes and a concise Mermaid guide without repeating source in preview', async () => {
+    const user = userEvent.setup()
+    render(<DiagramEditor markdown="" onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    const shapes = screen.getByRole('combobox', { name: 'Item shape 1' })
+    expect(shapes).toContainElement(within(shapes).getByRole('option', { name: 'Database' }))
+    expect(shapes).toContainElement(within(shapes).getByRole('option', { name: 'Cloud or external service' }))
+    expect(screen.queryByText('Accessible diagram source')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Mermaid guide' }))
+    expect(screen.getByRole('heading', { name: 'Mermaid basics' })).toBeVisible()
+    expect(screen.getByText('A@{ shape: cyl, label: "Database" }')).toBeVisible()
   })
 
 })

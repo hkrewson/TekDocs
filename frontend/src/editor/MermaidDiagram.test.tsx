@@ -41,3 +41,10 @@ it('refuses obfuscated external CSS references in renderer output', async () => 
   expect(await screen.findByText('The diagram could not be rendered. Its source remains available below.')).toBeVisible()
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
+
+it('can omit the source disclosure in a guided editing context', async () => {
+  render(<MermaidDiagram source="flowchart LR\naccTitle: Path\naccDescr: A path\nA-->B" index={2} showSource={false} />)
+
+  expect(await screen.findByRole('img')).toBeVisible()
+  expect(screen.queryByText('Accessible diagram source')).not.toBeInTheDocument()
+})

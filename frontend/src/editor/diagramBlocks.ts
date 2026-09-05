@@ -1,6 +1,6 @@
 export type DiagramKind = 'network' | 'flow'
 export type DiagramDirection = 'LR' | 'TD'
-export type DiagramNodeShape = 'system' | 'decision' | 'terminal'
+export type DiagramNodeShape = 'system' | 'decision' | 'terminal' | 'database' | 'document' | 'person' | 'cloud' | 'network-device' | 'input-output' | 'boundary'
 
 export type DiagramNode = {
   id: string
@@ -87,9 +87,19 @@ export function defaultDiagramDraft(kind: DiagramKind = 'network'): DiagramDraft
 export function diagramSource(draft: DiagramDraft): string {
   const node = (item: DiagramNode) => {
     const label = safeText(item.label) || item.id
-    if (item.shape === 'decision') return `${item.id}{"${label}"}`
-    if (item.shape === 'terminal') return `${item.id}(["${label}"])`
-    return `${item.id}["${label}"]`
+    const mermaidShape: Record<DiagramNodeShape, string> = {
+      system: 'rect',
+      decision: 'diam',
+      terminal: 'stadium',
+      database: 'cyl',
+      document: 'doc',
+      person: 'circle',
+      cloud: 'cloud',
+      'network-device': 'hex',
+      'input-output': 'lean-r',
+      boundary: 'fr-rect',
+    }
+    return `${item.id}@{ shape: ${mermaidShape[item.shape]}, label: "${label}" }`
   }
   const lines = [
     `flowchart ${draft.direction}`,
@@ -120,6 +130,16 @@ export function parseDiagramSource(source: string): DiagramDraft | null {
       connections.push({ from: connection[1], to: connection[3], label: connection[2] ?? '' })
       continue
     }
+    const expanded = /^([A-Za-z][\w-]*)@\{\s*shape:\s*([\w-]+),\s*label:\s*"(.*)"\s*\}$/.exec(line)
+    const expandedShape: Record<string, DiagramNodeShape> = {
+      rect: 'system', diam: 'decision', stadium: 'terminal', cyl: 'database', doc: 'document', circle: 'person', cloud: 'cloud', hex: 'network-device', 'lean-r': 'input-output', 'fr-rect': 'boundary',
+    }
+    if (expanded) {
+      const shape = expandedShape[expanded[2]]
+      if (!shape) return null
+      nodes.push({ id: expanded[1], label: expanded[3].replaceAll('&quot;', '"'), shape })
+      continue
+    }
     const terminal = /^([A-Za-z][\w-]*)\(\["(.*)"\]\)$/.exec(line)
     const decision = /^([A-Za-z][\w-]*)\{"(.*)"\}$/.exec(line)
     const system = /^([A-Za-z][\w-]*)\["(.*)"\]$/.exec(line)
@@ -133,7 +153,7 @@ export function parseDiagramSource(source: string): DiagramDraft | null {
   }
   if (!nodes.length) return null
   return {
-    kind: nodes.some((item) => item.shape !== 'system') ? 'flow' : 'network',
+    kind: nodes.some((item) => item.shape === 'decision' || item.shape === 'terminal' || item.shape === 'input-output') ? 'flow' : 'network',
     direction: heading[1].toUpperCase() as DiagramDirection,
     title,
     description,

@@ -201,9 +201,54 @@
       "workflow": "Documents, templates, structured types, settings, review, publication, files, and exports",
       "routes": ["/documentation", "/files"],
       "states": ["loading", "empty", "editor", "conflict", "publication blocked", "published", "export failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review document settings discovery, starter-template language, publication findings, block reuse, audience choices, diagrams, and export recovery."
+      "decisions": [
+        {
+          "before": "Publish STATIC / immutable retained version",
+          "after": "Publish document / locked copy that cannot be edited",
+          "reason": "Publication is the stable product term; storage and immutability details are explained only where they affect the decision."
+        },
+        {
+          "before": "MSP client templates with live, pinned, or independent references",
+          "after": "Templates from your MSP with Copy once, Keep updated, or Keep this version",
+          "reason": "The choices now describe what happens to the client's content when the template changes."
+        },
+        {
+          "before": "Audience: MSP internal / Client visible",
+          "after": "Who can see it? MSP staff / Client portal",
+          "reason": "The options name the people and destination directly."
+        },
+        {
+          "before": "Export editable snapshot and portable bundle manifest",
+          "after": "Download editable copy and Download ZIP",
+          "reason": "The UI distinguishes editable downloads from a published version without exposing package internals."
+        },
+        {
+          "before": "Live and retained reuse impact",
+          "after": "Documents that will update or keep their current version",
+          "reason": "Impact is stated as an outcome for each affected document."
+        },
+        {
+          "before": "Managed files and file-backed documents",
+          "after": "Document files and Create document",
+          "reason": "Files remain attached to documents; implementation-specific storage terms do not help complete the task."
+        },
+        {
+          "before": "Remote source",
+          "after": "Web source",
+          "reason": "The workflow checks a public web page and lets the user review changes before applying them."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/documentation/Documentation.test.tsx",
+        "frontend/src/documentation/DocumentRelationshipRail.test.tsx",
+        "frontend/src/documentation/PdfViewer.test.tsx",
+        "frontend/src/files/Files.test.tsx",
+        "frontend/e2e/shell.spec.ts",
+        "frontend/e2e/live-workspace.spec.ts",
+        "TekDocs.wiki/Files-and-attachments.md",
+        "TekDocs.wiki/Diagrams-in-documents.md"
+      ]
     },
     {
       "id": "infrastructure",

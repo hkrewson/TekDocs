@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link2, Search, Trash2 } from 'lucide-react'
 import type { EntityReference, EntityRelationship, RelationshipScope, RelationshipsClient } from '../relationships/api'
+import { translate } from '../i18n/localization'
 
 function message(error: unknown) {
-  return error instanceof Error ? error.message : 'Document relationships are unavailable.'
+  return error instanceof Error ? error.message : translate('documentation.relationshipsUnavailable')
 }
 
 export function DocumentRelationshipRail({ scope, documentId, client }: {
@@ -55,12 +56,12 @@ export function DocumentRelationshipRail({ scope, documentId, client }: {
   }
 
   return <aside className="document-relationship-rail" aria-labelledby="document-relationships-heading">
-    <div><h2 id="document-relationships-heading">Related records</h2><p>Assets, people, sites, networks, services, vendors, and other addressable records.</p></div>
+    <div><h2 id="document-relationships-heading">{translate('documentation.relatedRecords')}</h2><p>{translate('documentation.relatedRecordsHelp')}</p></div>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <label><span>Find a record</span><span className="relationship-search-control"><Search size={15} /><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); if (!event.target.value.trim()) setCandidates([]) }} placeholder="Search this workspace" /></span></label>
+    <label><span>{translate('documentation.findRecord')}</span><span className="relationship-search-control"><Search size={15} /><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); if (!event.target.value.trim()) setCandidates([]) }} placeholder={translate('shell.search')} /></span></label>
     {candidates.length > 0 && <ul className="document-relationship-candidates">{candidates.map((candidate) => <li key={candidate.id}><button type="button" disabled={saving} onClick={() => { void add(candidate) }}><strong>{candidate.display_name}</strong><small>{candidate.entity_type.replaceAll('_', ' ')} · {candidate.workspace_label}</small></button></li>)}</ul>}
-    {relationships === null && !error && <p role="status">Loading related records…</p>}
-    {relationships?.length === 0 && <p>No related records.</p>}
-    {relationships && relationships.length > 0 && <ul className="document-relationship-list">{relationships.map((relationship) => <li key={relationship.id}><Link2 size={15} /><span><strong>{relationship.related_entity.display_name}</strong><small>{relationship.label} · {relationship.related_entity.entity_type.replaceAll('_', ' ')}</small></span><button className="icon-button" type="button" disabled={saving} aria-label={`Remove relationship with ${relationship.related_entity.display_name}`} onClick={() => { void archive(relationship) }}><Trash2 size={14} /></button></li>)}</ul>}
+    {relationships === null && !error && <p role="status">{translate('documentation.loadingRelatedRecords')}</p>}
+    {relationships?.length === 0 && <p>{translate('documentation.noRelatedRecords')}</p>}
+    {relationships && relationships.length > 0 && <ul className="document-relationship-list">{relationships.map((relationship) => <li key={relationship.id}><Link2 size={15} /><span><strong>{relationship.related_entity.display_name}</strong><small>{relationship.label} · {relationship.related_entity.entity_type.replaceAll('_', ' ')}</small></span><button className="icon-button" type="button" disabled={saving} aria-label={translate('documentation.removeRelationship', { name: relationship.related_entity.display_name })} onClick={() => { void archive(relationship) }}><Trash2 size={14} /></button></li>)}</ul>}
   </aside>
 }

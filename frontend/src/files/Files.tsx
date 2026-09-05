@@ -11,7 +11,7 @@ type ManagedFile = {
   documentId: string
   documentTitle: string
   file: DocumentAttachment | DocumentPrimaryFile
-  kind: 'Primary file' | 'Attachment'
+  kind: 'primary' | 'attachment'
   version: number | null
 }
 
@@ -22,7 +22,7 @@ function managedFiles(documents: DocumentRecord[]): ManagedFile[] {
       documentId: document.id,
       documentTitle: document.title,
       file,
-      kind: 'Primary file' as const,
+      kind: 'primary' as const,
       version: file.version_number,
     })),
     ...document.attachments.map((file) => ({
@@ -30,7 +30,7 @@ function managedFiles(documents: DocumentRecord[]): ManagedFile[] {
       documentId: document.id,
       documentTitle: document.title,
       file,
-      kind: 'Attachment' as const,
+      kind: 'attachment' as const,
       version: null,
     })),
   ]).sort((left, right) => right.file.created_at.localeCompare(left.file.created_at))
@@ -64,7 +64,7 @@ export function Files({ workspace, client }: { workspace: WorkspaceContext | nul
   const visible = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     if (!normalized) return files
-    return files.filter((item) => [item.file.filename, item.documentTitle, item.file.media_type, item.kind]
+    return files.filter((item) => [item.file.filename, item.documentTitle, item.file.media_type, translate(`files.kind.${item.kind}`)]
       .some((value) => value.toLowerCase().includes(normalized)))
   }, [files, query])
 
@@ -88,7 +88,7 @@ export function Files({ workspace, client }: { workspace: WorkspaceContext | nul
         : visible.length === 0 ? <p className="empty-state">{query ? translate('files.noMatches') : translate('files.empty')}</p>
           : <div className="network-table-wrap" role="group" aria-label={translate('files.table')} tabIndex={0}>
             <table className="network-table"><caption className="sr-only">{translate('files.table')}</caption><thead><tr><th>{translate('files.filename')}</th><th>{translate('files.document')}</th><th>{translate('files.kind')}</th><th>{translate('files.type')}</th><th>{translate('files.size')}</th><th>{translate('files.added')}</th><th><span className="sr-only">{translate('common.actions')}</span></th></tr></thead>
-              <tbody>{visible.map((item) => <tr key={`${item.documentId}:${item.id}`}><td><strong>{item.file.filename}</strong><small>{item.file.checksum.slice(0, 12)}</small></td><td><Link to={documentPath(workspace, item.documentId)}>{item.documentTitle} <ExternalLink size={12} aria-hidden="true" /></Link></td><td>{item.kind}{item.version ? ` · ${translate('files.version', { version: item.version })}` : ''}</td><td>{item.file.media_type}</td><td>{formatInteger(item.file.size)} B</td><td>{formatDateTime(item.file.created_at)}</td><td><a className="secondary-button compact-button" href={client.attachmentDownloadUrl(scope, item.documentId, item.id)}><Download size={14} aria-hidden="true" />{translate('files.download')}</a></td></tr>)}</tbody>
+              <tbody>{visible.map((item) => <tr key={`${item.documentId}:${item.id}`}><td><strong>{item.file.filename}</strong><small>{item.file.checksum.slice(0, 12)}</small></td><td><Link to={documentPath(workspace, item.documentId)}>{item.documentTitle} <ExternalLink size={12} aria-hidden="true" /></Link></td><td>{translate(`files.kind.${item.kind}`)}{item.version ? ` · ${translate('files.version', { version: item.version })}` : ''}</td><td>{item.file.media_type}</td><td>{formatInteger(item.file.size)} B</td><td>{formatDateTime(item.file.created_at)}</td><td><a className="secondary-button compact-button" href={client.attachmentDownloadUrl(scope, item.documentId, item.id)}><Download size={14} aria-hidden="true" />{translate('files.download')}</a></td></tr>)}</tbody>
             </table>
           </div>}
     </section>

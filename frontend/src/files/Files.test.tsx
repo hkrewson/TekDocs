@@ -27,12 +27,12 @@ describe('Files', () => {
     expect(await screen.findByText('firewall-runbook.pdf')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
     expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/files/file-1/download')
-    expect(screen.getByRole('table', { name: 'Managed files' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Document files' })).toBeInTheDocument()
   })
 
   it('shows a truthful empty state when documents have no files', async () => {
     const client = { list: vi.fn().mockResolvedValue({ results: [{ ...document, attachments: [], attachment_count: 0 }], count: 1 }) } as unknown as DocumentsClient
     render(<MemoryRouter><Files workspace={null} client={client} /></MemoryRouter>)
-    expect(await screen.findByText('No managed files are attached to documents in this workspace.')).toBeInTheDocument()
+    expect(await screen.findByText('No files have been added to documents in this workspace.')).toBeInTheDocument()
   })
 })

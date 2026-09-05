@@ -289,9 +289,9 @@ it('shows publication findings and keeps a blocked document from publishing', as
   expect(screen.getByText('Restore the renderer service, then run the check again.')).toBeVisible()
   expect(screen.getByRole('status')).toHaveTextContent('1 publication blocker')
 
-  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
-  await user.type(screen.getByLabelText('Publication reason'), 'Operational release')
-  const publishButton = screen.getByRole('button', { name: 'Publish immutable version' })
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Operational release')
+  const publishButton = screen.getByRole('button', { name: 'Publish' })
   await waitFor(() => expect(publishButton).toBeDisabled())
   expect(publish).not.toHaveBeenCalled()
 })
@@ -328,7 +328,7 @@ it('lists titles and persists an independently edited block', async () => {
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '# Updated')
   await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(updateSharedBlock).toHaveBeenCalledWith({}, 'doc-1', 'placement-1', '# Updated', 'revision-1'))
-  expect(screen.getByRole('status')).toHaveTextContent('Content saved.')
+  expect(screen.getByRole('status')).toHaveTextContent('Changes saved.')
 })
 
 it('opens an authorized document supplied by a workspace deep link', async () => {
@@ -367,14 +367,14 @@ it('exports an exact editable snapshot and includes only explicitly selected fil
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Export' }))
 
-  expect(await screen.findByRole('heading', { name: 'Export editable snapshot' })).toBeVisible()
-  expect(screen.getByText(/not a retained STATIC publication/)).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Download editable copy' })).toBeVisible()
+  expect(screen.getByText(/do not create a published version/)).toBeVisible()
   expect(screen.getByRole('link', { name: 'Markdown' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=md')
   expect(screen.getByRole('link', { name: 'DOCX' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=docx')
-  expect(screen.getByRole('link', { name: 'Download portable ZIP' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=bundle')
+  expect(screen.getByRole('link', { name: 'Download ZIP' })).toHaveAttribute('href', '/documents/doc-1/export?export_format=bundle')
 
   await user.click(screen.getByRole('checkbox', { name: /private-notes.txt/ }))
-  expect(screen.getByRole('link', { name: 'Download portable ZIP' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Download ZIP' })).toHaveAttribute(
     'href',
     '/documents/doc-1/export?export_format=bundle&attachment_ids=attachment-1',
   )
@@ -386,11 +386,11 @@ it('previews and explicitly restructures legacy content from document settings',
   const { documents, workspaces, previewRestructure, applyRestructure } = clients()
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  expect(screen.queryByText('Separate legacy content')).not.toBeInTheDocument()
+  expect(screen.queryByText('Split into editable sections')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
   await user.click(screen.getByRole('button', { name: 'Review section conversion' }))
-  expect(await screen.findByRole('heading', { name: 'Separate legacy content' })).toBeVisible()
-  expect(screen.getByText(/2 independently editable sections/)).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Split into editable sections' })).toBeVisible()
+  expect(screen.getByText(/content will become 2 editable sections/)).toBeVisible()
   expect(screen.getByText('Require MFA')).toBeVisible()
   expect(previewRestructure).toHaveBeenCalledWith({}, 'doc-1')
   await user.click(screen.getByRole('button', { name: 'Create 2 sections' }))
@@ -446,8 +446,8 @@ it('creates a document and adds an MSP-owned reference to a searched client', as
   await user.click(screen.getByRole('button', { name: 'Create document' }))
   await waitFor(() => expect(createDocument).toHaveBeenCalledWith({}, { title: 'New guide', markdown: 'Portable Markdown', category: 'general', topic_type: 'unstructured', is_template: false, library_visible: false }))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
-  await user.click(screen.getByRole('button', { name: 'Client listings' }))
-  await user.type(screen.getByRole('searchbox', { name: 'Find client organization' }), 'Acm')
+  await user.click(screen.getByRole('button', { name: 'Share with clients' }))
+  await user.type(screen.getByRole('searchbox', { name: 'Find a client' }), 'Acm')
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
   expect(addReference).toHaveBeenCalledWith('doc-2', 'org-1')
 })
@@ -482,7 +482,7 @@ it('creates a file-backed document with notes and exposes retained primary-file 
   const source = new File(['approved instructions'], 'runbook.txt', { type: 'text/plain' })
   await user.upload(screen.getByLabelText('Primary file'), source)
   await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), '## Local notes')
-  await user.click(screen.getByRole('button', { name: 'Create file-backed document' }))
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
   await waitFor(() => expect(createFileBacked).toHaveBeenCalledWith({}, { title: 'Vendor runbook', notes: '## Local notes', category: 'general', file: source }))
   expect(screen.getByText('Primary file · version 1 · 512 bytes')).toBeVisible()
   expect(screen.getByRole('link', { name: /Download/ })).toHaveAttribute('href', '/documents/doc-file/attachments/primary-1/download')
@@ -594,7 +594,7 @@ it('creates a client document from a published template with per-block behavior'
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: 'Use template' }))
   await user.selectOptions(screen.getByLabelText('Printer rationale'), 'live')
-  await user.click(screen.getByRole('button', { name: 'Create client document' }))
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
   await waitFor(() => expect(instantiateTemplate).toHaveBeenCalledWith(
     { organizationId: 'org-1' },
     'doc-source',
@@ -602,7 +602,7 @@ it('creates a client document from a published template with per-block behavior'
     'policy',
     { 'block-template-2': 'live' },
   ))
-  expect(screen.getByRole('status')).toHaveTextContent('Client document created from a retained template revision.')
+  expect(screen.getByRole('status')).toHaveTextContent('Document created from the selected template.')
 })
 
 it('previews and applies a conflict-free client template rollout', async () => {
@@ -620,8 +620,8 @@ it('previews and applies a conflict-free client template rollout', async () => {
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
   await user.click(screen.getByRole('button', { name: 'Check template updates' }))
-  expect(await screen.findByText('Applied revision 1; available revision 2.')).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Apply safe changes' }))
+  expect(await screen.findByText('Your version: 1 · Latest template: 2')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Apply update' }))
   await waitFor(() => expect(applyTemplateRollout).toHaveBeenCalledWith(
     { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', { 'block-new': 'copy' },
   ))
@@ -634,7 +634,7 @@ it('reviews a monitored public source before applying its Markdown', async () =>
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
-  await user.click(screen.getByRole('button', { name: 'Remote source' }))
+  await user.click(screen.getByRole('button', { name: 'Web source' }))
   await user.type(screen.getByLabelText('Public document URL'), 'https://docs.example.invalid/setup')
   await user.click(screen.getByRole('button', { name: 'Save source' }))
   await waitFor(() => expect(saveRemoteSource).toHaveBeenCalledWith({}, 'doc-1', expect.objectContaining({
@@ -677,7 +677,7 @@ it('imports Markdown and manages a private attachment link', async () => {
   await waitFor(() => expect(importMarkdown).toHaveBeenCalledWith({}, expect.any(File), 'imported', 'general', false))
   await user.click(screen.getByRole('button', { name: 'Add content here' }))
   await user.click(screen.getByRole('button', { name: 'File' }))
-  await user.upload(screen.getByLabelText('Attachment file'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
+  await user.upload(screen.getByLabelText('Attachment'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
   await waitFor(() => expect(uploadAttachment).toHaveBeenCalledWith({}, 'doc-imported', expect.any(File)))
   await user.click(await screen.findByRole('button', { name: 'Insert here' }))
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
@@ -700,15 +700,15 @@ it('offers inline viewing only for clean PDF files', async () => {
   expect(screen.getAllByRole('button', { name: 'Insert here' })).toHaveLength(2)
 })
 
-it('publishes and opens an immutable verified STATIC version', async () => {
+it('publishes and opens a verified locked version', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, publish } = clients()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
-  await user.type(screen.getByLabelText('Publication reason'), 'Approved for operations')
-  await user.click(screen.getByRole('button', { name: 'Publish immutable version' }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Approved for operations')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
   await waitFor(() => expect(publish).toHaveBeenCalledWith({}, 'doc-1', { reason: 'Approved for operations', audience: 'msp_internal', retention: 'permanent', retention_review_on: null, supersedes_id: null }))
   expect(await screen.findByText('Signature verified')).toBeVisible()
   expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/export?export_format=pdf')
@@ -743,18 +743,18 @@ it('shows pending client publication audiences and records an approval decision'
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Publish STATIC' }))
-  await user.type(screen.getByLabelText('Publication reason'), 'Client policy release')
-  await user.selectOptions(screen.getByLabelText('Audience'), 'client_visible')
-  await user.click(screen.getByRole('button', { name: 'Publish immutable version' }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Client policy release')
+  await user.selectOptions(screen.getByLabelText('Who can see it?'), 'client_visible')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
   expect((await screen.findAllByText('pending approval')).length).toBeGreaterThan(0)
-  expect(screen.getByText('Client portal').parentElement).toHaveTextContent('pending approval')
+  expect(screen.getAllByText('Client portal').find((element) => element.tagName === 'DT')?.parentElement).toHaveTextContent('pending approval')
   await user.click(screen.getByRole('button', { name: 'Approve publication' }))
   await user.type(screen.getByLabelText('Decision reason'), 'Independent approval')
-  await user.click(screen.getByRole('button', { name: 'Record approval' }))
+  await user.click(screen.getByRole('button', { name: 'Approve' }))
   await waitFor(() => expect(approvePublication).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', 'publication-1', 'Independent approval'))
-  expect(await screen.findByText('Publication approved for its intended audience.')).toBeVisible()
-  expect(screen.getByText('Client portal').parentElement).toHaveTextContent('Available')
+  expect(await screen.findByText('Published version approved for the selected audience.')).toBeVisible()
+  expect(screen.getAllByText('Client portal').find((element) => element.tagName === 'DT')?.parentElement).toHaveTextContent('Available')
 })
 
 it('declares a key binding, inserts a key, and reports what has not resolved', async () => {

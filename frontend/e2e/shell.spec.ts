@@ -306,7 +306,7 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await expect(source).not.toHaveValue(/tekdocs:/)
 
   await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByText('Content saved.')).toBeVisible()
+  await expect(page.getByText('Changes saved.')).toBeVisible()
   expect(pageErrors).toEqual([])
   await expect(page.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
   await expect(page.locator('.document-content-body pre > code.language-mermaid')).toHaveCount(0)

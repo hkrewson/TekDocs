@@ -32,7 +32,7 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
     let loadingTask: PDFDocumentLoadingTask | null = null
     fetch(url, { credentials: 'same-origin', signal: controller.signal })
       .then(async (response) => {
-        if (!response.ok) throw new Error('The PDF could not be loaded.')
+        if (!response.ok) throw new Error(translate('pdf.loadFailed'))
         return response.arrayBuffer()
       })
       .then(async (data) => {
@@ -41,7 +41,7 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
         if (!controller.signal.aborted) setDocument(loaded)
       })
       .catch((loadError: unknown) => {
-        if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'The PDF could not be loaded.')
+        if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : translate('pdf.loadFailed'))
       })
     return () => {
       controller.abort()
@@ -65,18 +65,18 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
       const content = await pdfPage.getTextContent()
       if (!cancelled) setText(content.items.map((item) => 'str' in item ? item.str : '').join(' '))
     }
-    void render().catch(() => { if (!cancelled) setError('This PDF page could not be rendered.') })
+    void render().catch(() => { if (!cancelled) setError(translate('pdf.renderFailed')) })
     return () => { cancelled = true }
   }, [document, page, scale])
 
   const search = async () => {
     const query = searchQuery.trim().toLocaleLowerCase()
     if (!document || !query) {
-      setSearchStatus(query ? 'The PDF is still loading.' : 'Enter text to search this PDF.')
+      setSearchStatus(query ? translate('pdf.stillLoading') : translate('pdf.enterSearch'))
       return
     }
     setSearching(true)
-    setSearchStatus('Searching…')
+    setSearchStatus(translate('pdf.searching'))
     try {
       for (let candidate = 1; candidate <= document.numPages; candidate += 1) {
         const pdfPage = await document.getPage(candidate)
@@ -84,21 +84,21 @@ export function PdfViewer({ filename, url, onClose }: { filename: string; url: s
         const pageText = content.items.map((item) => 'str' in item ? item.str : '').join(' ').toLocaleLowerCase()
         if (pageText.includes(query)) {
           setPage(candidate)
-          setSearchStatus(`Found on page ${candidate}.`)
+          setSearchStatus(translate('pdf.foundOnPage', { page: candidate }))
           return
         }
       }
-      setSearchStatus('No matches found.')
+      setSearchStatus(translate('pdf.noMatches'))
     } catch {
-      setSearchStatus('This PDF could not be searched.')
+      setSearchStatus(translate('pdf.searchFailed'))
     } finally {
       setSearching(false)
     }
   }
 
   return <section ref={viewerRef} className="pdf-viewer" aria-labelledby="pdf-viewer-heading" tabIndex={-1}>
-    <header><div><h3 id="pdf-viewer-heading">{filename}</h3><p>{document ? `Page ${page} of ${document.numPages}` : 'Loading PDF…'}</p></div><button className="icon-button" type="button" aria-label="Close PDF viewer" onClick={onClose}><X size={17} /></button></header>
-    {error && <div><p className="form-message error" role="alert">{error}</p><p>The original file remains available for download.</p><a className="secondary-button" href={url}><Download size={15} />Download</a></div>}
-    {!error && <><nav aria-label="PDF viewer controls"><button className="secondary-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />{translate('common.previous')}</button><button className="secondary-button" type="button" disabled={!document || page >= document.numPages} onClick={() => setPage((value) => value + 1)}>{translate('common.next')}<ChevronRight size={15} /></button><button className="icon-button" type="button" aria-label="Zoom out" disabled={scale <= .6} onClick={() => setScale((value) => Math.max(.6, value - .2))}><Minus size={16} /></button><span aria-live="polite">{Math.round(scale * 100)}%</span><button className="icon-button" type="button" aria-label="Zoom in" disabled={scale >= 2.4} onClick={() => setScale((value) => Math.min(2.4, value + .2))}><Plus size={16} /></button><form role="search" onSubmit={(event) => { event.preventDefault(); void search() }}><label className="sr-only" htmlFor="pdf-search">Search PDF</label><input id="pdf-search" type="search" value={searchQuery} maxLength={120} placeholder="Search PDF" onChange={(event) => setSearchQuery(event.target.value)} /><button className="secondary-button" type="submit" disabled={searching || !document}>{translate('documentation.search')}</button></form><a className="secondary-button" href={url}><Download size={15} />Download</a></nav><p role="status">{searchStatus}</p><div className="pdf-canvas"><canvas ref={canvasRef} role="img" aria-label={`${filename}, page ${page}`} /></div><details><summary>Accessible page text</summary><p>{text || 'No extractable text is available for this page.'}</p></details></>}
+    <header><div><h3 id="pdf-viewer-heading">{filename}</h3><p>{document ? translate('pdf.pageCount', { page, count: document.numPages }) : translate('pdf.loading')}</p></div><button className="icon-button" type="button" aria-label={translate('pdf.close')} onClick={onClose}><X size={17} /></button></header>
+    {error && <div><p className="form-message error" role="alert">{error}</p><p>{translate('pdf.downloadRecovery')}</p><a className="secondary-button" href={url}><Download size={15} />{translate('files.download')}</a></div>}
+    {!error && <><nav aria-label={translate('pdf.controls')}><button className="secondary-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />{translate('common.previous')}</button><button className="secondary-button" type="button" disabled={!document || page >= document.numPages} onClick={() => setPage((value) => value + 1)}>{translate('common.next')}<ChevronRight size={15} /></button><button className="icon-button" type="button" aria-label={translate('pdf.zoomOut')} disabled={scale <= .6} onClick={() => setScale((value) => Math.max(.6, value - .2))}><Minus size={16} /></button><span aria-live="polite">{Math.round(scale * 100)}%</span><button className="icon-button" type="button" aria-label={translate('pdf.zoomIn')} disabled={scale >= 2.4} onClick={() => setScale((value) => Math.min(2.4, value + .2))}><Plus size={16} /></button><form role="search" onSubmit={(event) => { event.preventDefault(); void search() }}><label className="sr-only" htmlFor="pdf-search">{translate('pdf.search')}</label><input id="pdf-search" type="search" value={searchQuery} maxLength={120} placeholder={translate('pdf.search')} onChange={(event) => setSearchQuery(event.target.value)} /><button className="secondary-button" type="submit" disabled={searching || !document}>{translate('documentation.search')}</button></form><a className="secondary-button" href={url}><Download size={15} />{translate('files.download')}</a></nav><p role="status">{searchStatus}</p><div className="pdf-canvas"><canvas ref={canvasRef} role="img" aria-label={translate('pdf.canvasLabel', { filename, page })} /></div><details><summary>{translate('pdf.accessibleText')}</summary><p>{text || translate('pdf.noText')}</p></details></>}
   </section>
 }

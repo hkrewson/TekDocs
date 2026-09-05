@@ -147,6 +147,22 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Write dependency, license, and secret evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category dependency_license_secret
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs locked dependency, license, Bandit, and Gitleaks gate"
+          --tool-version "repository lockfiles and pinned actions at $GITHUB_SHA"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:security"
+          --output artifacts/security-evidence/dependency-license-secret.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-dependency-license-secret-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/dependency-license-secret.json
+          retention-days: 90
+          if-no-files-found: error
 
   runtime-authorization:
     name: Focused PostgreSQL runtime and RLS boundary
@@ -178,7 +194,7 @@ jobs:
 
   postgres-coverage:
     name: Combined PostgreSQL coverage
-    needs: postgres-shards
+    needs: [prepare, postgres-shards, runtime-authorization]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -189,6 +205,22 @@ jobs:
           merge-multiple: true
       - name: Merge and enforce backend coverage
         run: ./scripts/combine-postgres-coverage.sh artifacts/postgres-coverage/combined
+      - name: Write authorization and RLS evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category authorization_and_rls
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs PostgreSQL authorization, IDOR, and forced-RLS suites"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:runtime+postgres-shards"
+          --output artifacts/security-evidence/authorization-and-rls.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-authorization-and-rls-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/authorization-and-rls.json
+          retention-days: 90
+          if-no-files-found: error
 
   browser:
     name: Chromium regression
@@ -305,6 +337,22 @@ jobs:
           --ignorefile /.trivyignore.yaml
           --severity HIGH,CRITICAL --exit-code 1
           "$MAILPIT_IMAGE"
+      - name: Write production image scan evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category image_scan
+          --scope-commit "$GITHUB_SHA"
+          --tool "Trivy production image vulnerability scan"
+          --tool-version "$TRIVY_IMAGE"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:backend+frontend+renderer+mailpit"
+          --output artifacts/security-evidence/image-scan.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-image-scan-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/image-scan.json
+          retention-days: 90
+          if-no-files-found: error
       - name: Preserve tested application images for publication
         if: github.event_name == 'push'
         run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${COMMIT_TAG}"
@@ -334,6 +382,7 @@ jobs:
       RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
       COMMIT_TAG: sha-${{ github.sha }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download tested application images
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -428,6 +477,22 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.renderer-digest }}
           sbom-path: renderer-sbom.cdx.json
           push-to-registry: true
+      - name: Write image, SBOM, and provenance evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category production_images_sbom_provenance
+          --scope-commit "$GITHUB_SHA"
+          --tool "GitHub artifact attestations and CycloneDX image SBOMs"
+          --tool-version "actions/attest@a1948c3f048ba23858d222213b7c278aabede763"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "${{ steps.publish.outputs.backend-digest }}:${{ steps.publish.outputs.frontend-digest }}:${{ steps.publish.outputs.renderer-digest }}"
+          --output artifacts/security-evidence/production-images-sbom-provenance.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-production-images-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/production-images-sbom-provenance.json
+          retention-days: 90
+          if-no-files-found: error
       - name: Summarize published images
         run: |
           {

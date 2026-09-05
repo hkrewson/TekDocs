@@ -31,6 +31,29 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  browser-evidence:
+    name: Browser security evidence
+    needs: browser-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Write commit-bound evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category browser_security
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs Playwright desktop and mobile browser matrix"
+          --tool-version "frontend lockfile at $GITHUB_SHA"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:chromium+firefox+webkit+mobile"
+          --output artifacts/security-evidence/browser-security.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/browser-security.json
+          retention-days: 90
+          if-no-files-found: error
+
   performance:
     name: Public-beta performance reference
     runs-on: ubuntu-latest
@@ -52,3 +75,69 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: make dast
+      - name: Write commit-bound evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category dast
+          --scope-commit "$GITHUB_SHA"
+          --tool "OWASP ZAP passive baseline against production-shaped TekDocs"
+          --tool-version "zaproxy/zap-stable@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:dast"
+          --output artifacts/security-evidence/dast.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-dast-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/dast.json
+          retention-days: 90
+          if-no-files-found: error
+
+  supported-upgrades:
+    name: Supported upgrade matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - run: make supported-upgrade-matrix
+      - name: Write commit-bound evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category upgrade
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs supported-minor production upgrade rehearsals"
+          --tool-version "upgrade matrix at $GITHUB_SHA"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:supported-upgrades"
+          --output artifacts/security-evidence/upgrade.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-upgrade-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/upgrade.json
+          retention-days: 90
+          if-no-files-found: error
+
+  supported-recovery:
+    name: Supported backup and restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: make supported-recovery-rehearsal
+      - name: Write commit-bound evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category backup_and_restore
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs encrypted backup, separate-key, and clean restore rehearsal"
+          --tool-version "recovery scripts at $GITHUB_SHA"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:supported-recovery"
+          --output artifacts/security-evidence/backup-and-restore.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-backup-and-restore-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/backup-and-restore.json
+          retention-days: 90
+          if-no-files-found: error

@@ -27,6 +27,17 @@ REQUIRED_EVIDENCE = {
     "source_review",
     "upgrade",
 }
+EVIDENCE_FIELDS = {
+    "schema_version",
+    "category",
+    "status",
+    "scope_commit",
+    "completed_at",
+    "tool",
+    "tool_version",
+    "reference",
+    "immutable_identifier",
+}
 FALSE_PUBLIC_CLAIMS = {
     "independent_human_security_assessment",
     "penetration_test",
@@ -95,6 +106,30 @@ def reject_secret_shaped_content(data: dict[str, Any]) -> None:
             require(pattern.search(value) is None, "record contains secret-shaped content")
 
 
+def validate_evidence_entry(
+    record: dict[str, Any],
+    candidate_commit: str,
+    *,
+    name: str,
+    now: datetime,
+) -> tuple[str, datetime]:
+    require(record.get("schema_version", 1) == 1, f"{name} has an unsupported schema_version")
+    unexpected_fields = sorted(record.keys() - EVIDENCE_FIELDS)
+    require(not unexpected_fields, f"{name} contains unsupported fields: {', '.join(unexpected_fields)}")
+    category = text_value(record.get("category"), f"{name}.category", maximum=80)
+    require(category in REQUIRED_EVIDENCE, f"unknown evidence category: {category}")
+    require(record.get("status") == "passed", f"evidence {category} has not passed")
+    require(record.get("scope_commit") == candidate_commit, f"evidence {category} does not match candidate commit")
+    completed_at = timestamp(record.get("completed_at"), f"evidence {category}.completed_at")
+    require(completed_at <= now, f"evidence {category} completion is in the future")
+    text_value(record.get("tool"), f"evidence {category}.tool", maximum=160)
+    text_value(record.get("tool_version"), f"evidence {category}.tool_version", maximum=160)
+    text_value(record.get("reference"), f"evidence {category}.reference", maximum=500)
+    text_value(record.get("immutable_identifier"), f"evidence {category}.immutable_identifier", maximum=500)
+    reject_secret_shaped_content(record)
+    return category, completed_at
+
+
 def validate_evidence(
     data: dict[str, Any],
     candidate_commit: str,
@@ -106,19 +141,15 @@ def validate_evidence(
     categories: set[str] = set()
     for index, raw_record in enumerate(records):
         record = object_value(raw_record, f"evidence[{index}]")
-        category = text_value(record.get("category"), f"evidence[{index}].category", maximum=80)
-        require(category in REQUIRED_EVIDENCE, f"unknown evidence category: {category}")
+        category, completed_at = validate_evidence_entry(
+            record,
+            candidate_commit,
+            name=f"evidence[{index}]",
+            now=now,
+        )
         require(category not in categories, f"duplicate evidence category: {category}")
         categories.add(category)
-        require(record.get("status") == "passed", f"evidence {category} has not passed")
-        require(record.get("scope_commit") == candidate_commit, f"evidence {category} does not match candidate commit")
-        completed_at = timestamp(record.get("completed_at"), f"evidence {category}.completed_at")
         require(completed_at <= review_completed_at, f"evidence {category} postdates review completion")
-        require(completed_at <= now, f"evidence {category} completion is in the future")
-        text_value(record.get("tool"), f"evidence {category}.tool", maximum=160)
-        text_value(record.get("tool_version"), f"evidence {category}.tool_version", maximum=160)
-        text_value(record.get("reference"), f"evidence {category}.reference", maximum=500)
-        text_value(record.get("immutable_identifier"), f"evidence {category}.immutable_identifier", maximum=500)
     missing = sorted(REQUIRED_EVIDENCE - categories)
     require(not missing, f"missing evidence categories: {', '.join(missing)}")
 

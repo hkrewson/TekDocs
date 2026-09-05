@@ -25,3 +25,26 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
       - uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+
+  evidence:
+    name: CodeQL evidence
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Write commit-bound evidence
+        run: >-
+          python3 scripts/write_security_evidence.py
+          --category codeql
+          --scope-commit "$GITHUB_SHA"
+          --tool "GitHub CodeQL security-extended and security-and-quality"
+          --tool-version "github/codeql-action@5595ccaf912efad79be6eef63a5619ff05969be3"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:python+javascript-typescript"
+          --output artifacts/security-evidence/codeql.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-security-evidence-codeql-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security-evidence/codeql.json
+          retention-days: 90
+          if-no-files-found: error

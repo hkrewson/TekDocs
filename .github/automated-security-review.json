@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "not_started",
+  "candidate_commit": null,
+  "completed_at": null,
+  "reviewer": {
+    "kind": "automated_or_ai_assisted",
+    "name": null,
+    "version": null,
+    "operator": null,
+    "method": null,
+    "limitations": []
+  },
+  "private_report_reference": null,
+  "evidence": [],
+  "findings": [],
+  "exceptions": [],
+  "public_claims": {
+    "independent_human_security_assessment": false,
+    "penetration_test": false,
+    "compliance_audit": false,
+    "certification": false,
+    "independent_assurance": false,
+    "statement": "TekDocs has not received an independent human security assessment, penetration test, compliance audit, certification, or independent assurance. Automated and AI-assisted checks provide evidence only for their tested scope."
+  }
+}

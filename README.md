@@ -8,7 +8,7 @@ TekDocs is an active homelab project published for people who want to run, inspe
 
 TekDocs is human-directed and built with AI assistance, primarily using OpenAI Sol. The maintainer defines the product, architecture, security boundaries, acceptance criteria, and release decisions. AI-produced implementation is treated as engineering work that must pass the same review, test, migration, isolation, and production-image gates as any other contribution.
 
-The security review currently recorded by the project used Claude Opus 5 (High) for three maintainer-directed automated review passes culminating in commit `32c72c0`. The reviewer and method are identified explicitly in the review record. TekDocs has not received an independent human security assessment, penetration test, or compliance audit, and 1.0 does not claim otherwise.
+The historical security review used Claude Opus 5 (High) for three maintainer-directed automated passes culminating in commit `32c72c0`. The 1.0 candidate will receive a new commit-matched [automated security review](https://github.com/hkrewson/TekDocs/wiki/Security-model). TekDocs has not received an independent human security assessment, penetration test, compliance audit, certification, or independent assurance, and 1.0 does not claim otherwise.
 
 ## Capabilities
 

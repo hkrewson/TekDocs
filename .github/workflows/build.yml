@@ -31,6 +31,7 @@ jobs:
       - name: Validate pinned supply chain
         run: |
           ./scripts/check-supply-chain-pins.sh
+          make test-automated-security-review-gate
           ./scripts/check-wiki.py
           ./scripts/check-compose-config.sh
       - name: Validate workflow syntax

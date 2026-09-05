@@ -17,6 +17,7 @@ export const capabilityRegistry = {
   vendors: { label: translate('capability.vendors'), path: '/vendors', group: 'Relationships', status: 'supported', scopes: ['msp', 'organization'] },
   products: { label: translate('capability.products'), path: '/products', group: 'Relationships', status: 'supported', scopes: ['msp', 'organization'] },
   invoices: { label: translate('capability.invoices'), path: '/invoices', group: 'Business', status: 'supported', scopes: ['msp', 'organization'] },
+  stock: { label: translate('capability.stock'), path: '/stock', group: 'Business', status: 'supported', scopes: ['msp'] },
   custom_fields: { label: translate('capability.customFields'), path: '/custom-fields', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },
   taxonomies: { label: translate('capability.taxonomies'), path: '/taxonomies', group: 'Governance', status: 'supported', scopes: ['msp'] },
   compliance: { label: translate('capability.compliance'), path: '/compliance', group: 'Governance', status: 'supported', scopes: ['msp', 'organization'] },

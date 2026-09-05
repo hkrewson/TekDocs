@@ -404,6 +404,7 @@ from apps.core.software_inventory_views import (
     SoftwareLicenseSeatDetailView,
     SoftwareLicenseSeatView,
 )
+from apps.core.stock_views import StockItemDetailView, StockItemListCreateView, StockMovementCreateView
 from apps.core.taxonomy_views import (
     MSPTaxonomyDetailView,
     MSPTaxonomyListCreateView,
@@ -1468,6 +1469,21 @@ urlpatterns = [
         "api/v1/workspaces/msp/invoice-settings",
         MSPInvoiceSettingsView.as_view(),
         name="msp-invoice-settings",
+    ),
+    path(
+        "api/v1/workspaces/msp/stock",
+        StockItemListCreateView.as_view(),
+        name="msp-stock-list-create",
+    ),
+    path(
+        "api/v1/workspaces/msp/stock/<uuid:item_id>",
+        StockItemDetailView.as_view(),
+        name="msp-stock-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/stock/<uuid:item_id>/movements",
+        StockMovementCreateView.as_view(),
+        name="msp-stock-movement-create",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>",

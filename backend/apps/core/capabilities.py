@@ -68,6 +68,7 @@ CAPABILITY_REGISTRY: dict[str, CapabilityDefinition] = {
         "Integrations", "/integrations", CapabilityStatus.SUPPORTED, PermissionKey.INTEGRATIONS_VIEW
     ),
     "invoices": CapabilityDefinition("Invoices", "/invoices", CapabilityStatus.SUPPORTED, PermissionKey.INVOICES_VIEW),
+    "stock": CapabilityDefinition("Stock", "/stock", CapabilityStatus.SUPPORTED, PermissionKey.INVOICES_VIEW),
 }
 
 CAPABILITY_PERMISSIONS = {key: definition.permission for key, definition in CAPABILITY_REGISTRY.items()}

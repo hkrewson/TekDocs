@@ -13,7 +13,7 @@ export type InvoiceLine = {
   net: string
   tax: string
   total: string
-  origin_type: '' | 'catalog_product' | 'service_rate' | 'contract_cost'
+  origin_type: '' | 'catalog_product' | 'service_rate' | 'contract_cost' | 'stock_item'
   origin_id: string | null
 }
 
@@ -62,7 +62,7 @@ export type InvoiceLifecycleEvent = {
 
 export type InvoiceOrigin = {
   id: string
-  origin_type: 'catalog_product' | 'service_rate' | 'contract_cost'
+  origin_type: 'catalog_product' | 'service_rate' | 'contract_cost' | 'stock_item'
   name: string
   description: string
   unit_amount: string

@@ -119,6 +119,8 @@ TENANT_SCOPED_TABLES = (
     "core_taxonomyterm",
     "core_webhookoutbounddelivery",
     "core_webhookinboundreceipt",
+    "core_stockitem",
+    "core_stockmovement",
 )
 
 RLS_TABLES = ORGANIZATION_SCOPED_TABLES + TENANT_SCOPED_TABLES

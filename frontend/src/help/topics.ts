@@ -36,6 +36,7 @@ const topics: Record<string, HelpTopic> = {
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
   'system-status': { title: 'System status', summary: 'Check TekDocs, its database, and the isolated diagram renderer without exposing document content.', slug: 'Diagrams-in-documents' },
   invoices: { title: 'Invoices', summary: 'Issue signed invoices, track their append-only lifecycle, reconcile accounting handoffs, and deliver matching client copies.', slug: 'Invoices' },
+  stock: { title: 'Stock', summary: 'Track MSP supplies, vendor and order details, quantities, client use, costs, and invoice prices.', slug: 'Stock' },
 }
 
 export function helpTopicForPath(pathname: string): HelpTopic {

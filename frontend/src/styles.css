@@ -1532,6 +1532,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .content-section > .table-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .content-section > .table-scroll th, .content-section > .table-scroll td { padding: 10px 12px; border-top: 1px solid var(--border); text-align: left; vertical-align: middle; }
 .content-section > .table-scroll th { color: var(--muted); font-weight: 650; }
+.stock-list .section-heading label { min-width: min(420px, 100%); display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 650; }
+.stock-list .section-heading input { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.stock-list tbody tr { cursor: pointer; }
+.stock-list tbody tr:hover, .stock-list tbody tr.selected-row { background: var(--surface-raised); }
+.stock-detail { margin-top: 16px; }
+.stock-detail a { display: inline-flex; align-items: center; gap: 4px; }
 .table-actions { display: flex; align-items: center; gap: 6px; }
 .integration-export-choices { display: grid; border-top: 1px solid var(--border); }
 .integration-export-choices label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--border); cursor: pointer; }

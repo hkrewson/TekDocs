@@ -4,7 +4,6 @@ from importlib import import_module
 
 from django.db import migrations
 
-
 REMOVE_DATABASE_GUARDS_SQL = r"""
 DROP TRIGGER IF EXISTS core_docmapbase_retained ON core_documentationmapbaseline;
 DROP TRIGGER IF EXISTS core_docmapentry_retained ON core_documentationmapentry;
@@ -31,6 +30,20 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(REMOVE_DATABASE_GUARDS_SQL, RESTORE_DATABASE_GUARDS_SQL),
+        migrations.RemoveIndex(model_name="documentationmaprevision", name="core_docmaprev_scope_idx"),
+        migrations.RemoveConstraint(model_name="documentationmaprevision", name="documentation_map_revision_unique"),
+        migrations.RemoveConstraint(model_name="documentationmaprevision", name="documentation_map_type_valid"),
+        migrations.RemoveConstraint(model_name="documentationmaprevision", name="documentation_map_audience_valid"),
+        migrations.RemoveConstraint(
+            model_name="documentationmaprevision", name="documentation_map_revision_digest_valid"
+        ),
+        migrations.RemoveIndex(model_name="documentationmapentry", name="core_docmapentry_scope_idx"),
+        migrations.RemoveConstraint(model_name="documentationmapentry", name="documentation_map_entry_position_unique"),
+        migrations.RemoveConstraint(model_name="documentationmapentry", name="documentation_map_entry_kind_valid"),
+        migrations.RemoveIndex(model_name="documentationmapbaseline", name="core_docmapbase_scope_idx"),
+        migrations.RemoveConstraint(
+            model_name="documentationmapbaseline", name="documentation_map_baseline_digest_valid"
+        ),
         migrations.RemoveField(model_name="documentationmapbaseline", name="documentation_map"),
         migrations.RemoveField(model_name="documentationmaprevision", name="documentation_map"),
         migrations.RemoveField(model_name="documentationmapentry", name="subordinate_map"),

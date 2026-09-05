@@ -89,6 +89,7 @@ def test_msp_and_organization_workspace_contexts_are_explicit_and_stable(owner_c
             "recycle_bin",
             "integrations",
             "invoices",
+            "stock",
         ],
         "organization": None,
     }

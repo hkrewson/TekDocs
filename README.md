@@ -22,6 +22,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 - People, sites, locations, custom fields, and typed entity relationships
 - Permission-aware workspace search across documentation content and operational identifiers
 - Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history
+- MSP-wide stock supplies with exact quantities, vendor provenance, client-use history, and invoice-line pricing
 - Simplified network records for locations, VLANs, CIDRs, ranges, gateways, DNS, and asset MAC addresses
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
 - Scoped built-in and custom roles at MSP, organization, and collection boundaries

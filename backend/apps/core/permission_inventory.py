@@ -26,6 +26,7 @@ def route(
 AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
+    route("system-diagnostics", ("GET",), PermissionKey.SYSTEM_DIAGNOSTICS_VIEW),
     route("api-token-list-create", ("GET", "POST")),
     route("api-token-rotate", ("POST",)),
     route("api-token-revoke", ("DELETE",)),
@@ -543,6 +544,22 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "PUT"),
         PermissionKey.INVOICES_ISSUE,
         (PermissionKey.INVOICES_ISSUE,),
+    ),
+    route(
+        "msp-stock-list-create",
+        ("GET", "POST"),
+        PermissionKey.INVOICES_VIEW,
+        (PermissionKey.INVOICES_EDIT,),
+    ),
+    route(
+        "msp-stock-detail",
+        ("PATCH", "DELETE"),
+        mutations=(PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
+    ),
+    route(
+        "msp-stock-movement-create",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
     ),
     route(
         "organization-invoice-detail",

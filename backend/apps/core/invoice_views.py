@@ -51,6 +51,7 @@ from .models import (
     InvoiceNumberSeries,
     InvoiceState,
     ServiceRate,
+    StockItem,
     TaxRate,
     TenantBillingProfile,
 )
@@ -89,7 +90,10 @@ class InvoiceUpdateSerializer(StrictSerializer):
 
 class InvoiceLineWriteSerializer(StrictSerializer):
     origin_type = serializers.ChoiceField(
-        choices=("catalog_product", "service_rate", "contract_cost"), allow_blank=True, required=False, default=""
+        choices=("catalog_product", "service_rate", "contract_cost", "stock_item"),
+        allow_blank=True,
+        required=False,
+        default="",
     )
     origin_id = serializers.UUIDField(required=False, allow_null=True)
     description = serializers.CharField(max_length=1000, required=False)
@@ -150,13 +154,15 @@ class InvoiceLineSerializer(serializers.Serializer):
             return "service_rate"
         if item.contract_cost_id:
             return "contract_cost"
+        if item.stock_item_id:
+            return "stock_item"
         return ""
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_origin_id(self, item):  # type: ignore[no-untyped-def]
         if item.catalog_product_id:
             return item.catalog_product.entity_id
-        return item.service_rate_id or item.contract_cost_id
+        return item.service_rate_id or item.contract_cost_id or item.stock_item_id
 
 
 class InvoiceLifecycleEventSerializer(serializers.Serializer):
@@ -821,6 +827,22 @@ class InvoiceOriginChoiceView(APIView):
                         "quantity": str(cost.quantity),
                     }
                 )
+        for item in StockItem.objects.filter(
+            tenant=workspace.member.tenant,
+            archived_at__isnull=True,
+            quantity_on_hand__gt=0,
+        )[:200]:
+            origins.append(
+                {
+                    "id": str(item.id),
+                    "origin_type": "stock_item",
+                    "name": item.name,
+                    "description": item.description,
+                    "unit_amount": render_amount(item.client_price_per_unit, item.currency),
+                    "currency": item.currency,
+                    "quantity": "1.000",
+                }
+            )
         today = timezone.localdate()
         rates = (
             TaxRate.scoped.for_tenant(workspace.member.tenant)

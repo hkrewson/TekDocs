@@ -3812,6 +3812,54 @@ export interface paths {
         readonly patch: operations["workspaces_msp_service_rates_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/stock": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_stock_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_stock_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/stock/{item_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["workspaces_msp_stock_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_msp_stock_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/stock/{item_id}/movements": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_stock_movements_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/vendors": {
         readonly parameters: {
             readonly query?: never;
@@ -10800,10 +10848,11 @@ export interface components {
              * @description * `catalog_product` - catalog_product
              *     * `service_rate` - service_rate
              *     * `contract_cost` - contract_cost
+             *     * `stock_item` - stock_item
              * @default
              * @enum {string}
              */
-            readonly origin_type: "catalog_product" | "service_rate" | "contract_cost" | "";
+            readonly origin_type: "catalog_product" | "service_rate" | "contract_cost" | "stock_item" | "";
             /** Format: uuid */
             readonly origin_id?: string | null;
             readonly description?: string;
@@ -12302,6 +12351,45 @@ export interface components {
             /** Format: uuid */
             readonly site_id?: string | null;
         };
+        readonly PatchedStockItemUpdate: {
+            readonly name?: string;
+            /** @default  */
+            readonly description: string;
+            /** Format: uuid */
+            readonly vendor_id?: string | null;
+            /** @default  */
+            readonly vendor_part_number: string;
+            readonly unit?: string;
+            /** Format: decimal */
+            readonly reorder_level?: string | null;
+            readonly currency?: string;
+            /** Format: decimal */
+            readonly cost_per_unit?: string;
+            /** Format: decimal */
+            readonly client_price_per_unit?: string;
+            /** Format: decimal */
+            readonly purchase_quantity?: string | null;
+            /** Format: decimal */
+            readonly purchase_price?: string | null;
+            /** Format: decimal */
+            readonly order_total?: string | null;
+            /** @default  */
+            readonly order_number: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly order_url: string;
+            /** Format: date */
+            readonly ordered_on?: string | null;
+            /** @default  */
+            readonly tracking_number: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly tracking_url: string;
+        };
         readonly PatchedSubnetWrite: {
             readonly name?: string;
             readonly cidr?: string;
@@ -13162,6 +13250,138 @@ export interface components {
             readonly created_by: string;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        readonly StockItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly description?: string;
+            /** Format: uuid */
+            readonly vendor_id: string | null;
+            readonly vendor_name: string | null;
+            readonly vendor_part_number?: string;
+            readonly unit?: string;
+            /** Format: decimal */
+            readonly quantity_on_hand?: string;
+            /** Format: decimal */
+            readonly reorder_level?: string | null;
+            readonly currency?: string;
+            readonly cost_per_unit: string;
+            readonly client_price_per_unit: string;
+            /** Format: decimal */
+            readonly purchase_quantity?: string | null;
+            readonly purchase_price: string | null;
+            readonly order_total: string | null;
+            readonly order_number?: string;
+            /** Format: uri */
+            readonly order_url?: string;
+            /** Format: date */
+            readonly ordered_on?: string | null;
+            readonly tracking_number?: string;
+            /** Format: uri */
+            readonly tracking_url?: string;
+            readonly movements: readonly components["schemas"]["StockMovement"][];
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly StockItemWrite: {
+            readonly name: string;
+            /** @default  */
+            readonly description: string;
+            /** Format: uuid */
+            readonly vendor_id?: string | null;
+            /** @default  */
+            readonly vendor_part_number: string;
+            readonly unit: string;
+            /**
+             * Format: decimal
+             * @default 0.000
+             */
+            readonly initial_quantity: string;
+            /** Format: decimal */
+            readonly reorder_level?: string | null;
+            readonly currency: string;
+            /** Format: decimal */
+            readonly cost_per_unit: string;
+            /** Format: decimal */
+            readonly client_price_per_unit: string;
+            /** Format: decimal */
+            readonly purchase_quantity?: string | null;
+            /** Format: decimal */
+            readonly purchase_price?: string | null;
+            /** Format: decimal */
+            readonly order_total?: string | null;
+            /** @default  */
+            readonly order_number: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly order_url: string;
+            /** Format: date */
+            readonly ordered_on?: string | null;
+            /** @default  */
+            readonly tracking_number: string;
+            /**
+             * Format: uri
+             * @default
+             */
+            readonly tracking_url: string;
+        };
+        readonly StockMovement: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `received` - Received
+             *     * `used` - Used at client
+             *     * `returned` - Returned to stock
+             *     * `correction` - Correction
+             * @enum {string}
+             */
+            readonly movement_type: "received" | "used" | "returned" | "correction";
+            /** Format: decimal */
+            readonly quantity_change: string;
+            /** Format: decimal */
+            readonly quantity_after: string;
+            /** Format: uuid */
+            readonly client_id: string | null;
+            readonly client_name: string | null;
+            readonly note?: string;
+            /** Format: date-time */
+            readonly occurred_at: string;
+            /** Format: date-time */
+            readonly recorded_at: string;
+            readonly actor: string;
+        };
+        readonly StockMovementWrite: {
+            /**
+             * @description * `received` - received
+             *     * `used` - used
+             *     * `returned` - returned
+             *     * `correction` - correction
+             * @enum {string}
+             */
+            readonly movement_type: "received" | "used" | "returned" | "correction";
+            /** Format: decimal */
+            readonly quantity_change: string;
+            /** Format: uuid */
+            readonly client_id?: string | null;
+            /** @default  */
+            readonly note: string;
+            /** Format: date-time */
+            readonly occurred_at?: string;
+        };
+        readonly StockResult: {
+            readonly results: readonly components["schemas"]["StockItem"][];
+            readonly can_manage: boolean;
+            readonly vendors: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly clients: readonly {
+                readonly [key: string]: unknown;
+            }[];
         };
         readonly Subnet: {
             /** Format: uuid */
@@ -23609,6 +23829,134 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ServiceRate"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_stock_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StockResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_stock_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["StockItemWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["StockItemWrite"];
+                readonly "multipart/form-data": components["schemas"]["StockItemWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StockItem"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_stock_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly item_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly workspaces_msp_stock_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly item_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedStockItemUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedStockItemUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedStockItemUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StockItem"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_stock_movements_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly item_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["StockMovementWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["StockMovementWrite"];
+                readonly "multipart/form-data": components["schemas"]["StockMovementWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StockItem"];
                 };
             };
         };

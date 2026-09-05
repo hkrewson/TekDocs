@@ -278,6 +278,35 @@
       "next_review": "Review irreversible issuance language, numbering choices, settings errors, delivery recovery, payment status, and accounting handoff without ledger terminology."
     },
     {
+      "id": "stock",
+      "workflow": "MSP supplies, purchasing references, quantity changes, client use, and invoice pricing",
+      "routes": ["/stock"],
+      "states": ["loading", "empty", "populated", "adjustment", "validation", "archive", "failure"],
+      "decisions": [
+        {
+          "before": "Inventory management",
+          "after": "Stock",
+          "reason": "Stock is the familiar name for supplies the MSP keeps on hand and distinguishes them from client assets."
+        },
+        {
+          "before": "Stock transaction",
+          "after": "Adjust stock",
+          "reason": "The action records what physically happened without introducing accounting terminology."
+        },
+        {
+          "before": "Consumption allocation",
+          "after": "Used at client",
+          "reason": "The option says where the material went and prompts for the client only when needed."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/stock/Stock.test.tsx",
+        "backend/apps/core/tests/test_stock_inventory.py",
+        "TekDocs.wiki/Stock.md"
+      ]
+    },
+    {
       "id": "governance",
       "workflow": "Taxonomies, compliance, reminders, activity, and recycle bin",
       "routes": ["/taxonomies", "/compliance", "/deadlines", "/activity", "/recycle-bin"],

@@ -23,6 +23,7 @@ import {
   MapPin,
   Network,
   Package,
+  PackageOpen,
   Plug,
   ReceiptText,
   Search,
@@ -59,6 +60,7 @@ import type { DomainsClient } from './domains/api'
 import { browserInventoryClient } from './inventory/api'
 import { browserCommercialClient } from './commercial/api'
 import { browserInvoiceClient } from './accounting/api'
+import { browserStockClient } from './stock/api'
 import type { InventoryClient } from './inventory/api'
 import { browserWebhooksClient } from './integrations/api'
 import type { WebhooksClient } from './integrations/api'
@@ -108,6 +110,7 @@ const Licenses = lazy(async () => ({ default: (await import('./inventory/License
 const Contracts = lazy(async () => ({ default: (await import('./commercial/Contracts')).Contracts }))
 const Invoices = lazy(async () => ({ default: (await import('./accounting/Invoices')).Invoices }))
 const InvoiceSettings = lazy(async () => ({ default: (await import('./accounting/InvoiceSettings')).InvoiceSettings }))
+const Stock = lazy(async () => ({ default: (await import('./stock/Stock')).Stock }))
 const Vendors = lazy(async () => ({ default: (await import('./inventory/Vendors')).Vendors }))
 const Networks = lazy(async () => ({ default: (await import('./networks/Networks')).Networks }))
 const Integrations = lazy(async () => ({ default: (await import('./integrations/Integrations')).Integrations }))
@@ -168,6 +171,7 @@ const navigationSections: NavigationSection[] = [
   ] },
   { label: translate('navigation.group.business'), items: [
     navigationItem('invoices', ReceiptText),
+    navigationItem('stock', PackageOpen),
   ] },
   { label: translate('navigation.group.governance'), items: [
     navigationItem('custom_fields', ListPlus),
@@ -557,6 +561,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/activity" element={<ActivityLog workspace={null} />} />
             <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">{translate('products.loading')}</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
             <Route path="/invoices" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">{translate('accounting.settingsLoading')}</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <UnavailablePage />} />
+            <Route path="/stock" element={shellContext.permissions?.includes('invoices.view') ? <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingStock')}</section>}><Stock client={browserStockClient} /></Suspense> : <UnavailablePage />} />
             <Route path="/accounting" element={<Navigate to="/invoices" replace />} />
             <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingSearch')}</section>}><SearchResults key={location.search} workspace={null} client={searchClient} /></Suspense>} />
             <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDomains')}</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />

@@ -553,6 +553,9 @@ class InvoiceLine(TimestampedModel):
     contract_cost = models.ForeignKey(
         "ContractCost", on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
     )
+    stock_item = models.ForeignKey(
+        "StockItem", on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
+    )
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -565,9 +568,10 @@ class InvoiceLine(TimestampedModel):
             models.CheckConstraint(condition=models.Q(tax_rate_value__gte=0), name="invoice_line_tax_nonnegative"),
             models.CheckConstraint(
                 condition=(
-                    models.Q(catalog_product__isnull=True, service_rate__isnull=True)
-                    | models.Q(catalog_product__isnull=True, contract_cost__isnull=True)
-                    | models.Q(service_rate__isnull=True, contract_cost__isnull=True)
+                    models.Q(catalog_product__isnull=True, service_rate__isnull=True, contract_cost__isnull=True)
+                    | models.Q(catalog_product__isnull=True, service_rate__isnull=True, stock_item__isnull=True)
+                    | models.Q(catalog_product__isnull=True, contract_cost__isnull=True, stock_item__isnull=True)
+                    | models.Q(service_rate__isnull=True, contract_cost__isnull=True, stock_item__isnull=True)
                 ),
                 name="invoice_line_one_origin",
             ),
@@ -586,7 +590,9 @@ class InvoiceLine(TimestampedModel):
         ):
             raise ValidationError("Invoice line must use its invoice scope")
         origins = tuple(
-            origin for origin in (self.catalog_product, self.service_rate, self.contract_cost) if origin is not None
+            origin
+            for origin in (self.catalog_product, self.service_rate, self.contract_cost, self.stock_item)
+            if origin is not None
         )
         if len(origins) > 1:
             raise ValidationError("Invoice line may retain only one origin")
@@ -609,6 +615,155 @@ class InvoiceLine(TimestampedModel):
             )
         except MoneyError as exc:
             raise ValidationError({"unit_amount": str(exc)}) from exc
+
+
+class StockItem(TimestampedModel):
+    """An MSP-owned supply item available for use across client sites."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="stock_items")
+    vendor = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="supplied_stock_items", null=True, blank=True
+    )
+    name = models.CharField(max_length=240)
+    description = models.TextField(blank=True)
+    vendor_part_number = models.CharField(max_length=120, blank=True)
+    unit = models.CharField(max_length=32, default="each")
+    quantity_on_hand = models.DecimalField(max_digits=15, decimal_places=3, default=0)
+    reorder_level = models.DecimalField(max_digits=15, decimal_places=3, null=True, blank=True)
+    currency = models.CharField(max_length=3, default="USD")
+    cost_per_unit = models.DecimalField(max_digits=18, decimal_places=6)
+    client_price_per_unit = models.DecimalField(max_digits=18, decimal_places=4)
+    purchase_quantity = models.DecimalField(max_digits=15, decimal_places=3, null=True, blank=True)
+    purchase_price = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    order_total = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    order_number = models.CharField(max_length=120, blank=True)
+    order_url = models.URLField(max_length=1000, blank=True)
+    ordered_on = models.DateField(null=True, blank=True)
+    tracking_number = models.CharField(max_length=160, blank=True)
+    tracking_url = models.URLField(max_length=1000, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("name", "id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(quantity_on_hand__gte=0), name="stock_quantity_nonnegative"),
+            models.CheckConstraint(
+                condition=models.Q(reorder_level__isnull=True) | models.Q(reorder_level__gte=0),
+                name="stock_reorder_level_nonnegative",
+            ),
+            models.CheckConstraint(condition=models.Q(cost_per_unit__gte=0), name="stock_cost_nonnegative"),
+            models.CheckConstraint(
+                condition=models.Q(client_price_per_unit__gte=0), name="stock_client_price_nonnegative"
+            ),
+            models.UniqueConstraint(
+                Lower("name"),
+                "tenant",
+                condition=models.Q(archived_at__isnull=True),
+                name="stock_item_name_active_unique",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "archived_at", "name"), name="core_stockitem_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        from .money import MoneyError, normalize_currency, validate_amount
+
+        self.name = self.name.strip()
+        self.unit = self.unit.strip().lower()
+        if not self.name:
+            raise ValidationError({"name": "Item name is required"})
+        if not re.fullmatch(r"[a-z0-9][a-z0-9 ._/-]{0,31}", self.unit):
+            raise ValidationError({"unit": "Unit must be a short plain label such as each, foot, or box"})
+        if self.vendor_id:
+            vendor = self.vendor
+            if vendor is None or vendor.tenant_id != self.tenant_id:
+                raise ValidationError({"vendor": "Vendor must belong to the stock item's tenant"})
+            if not vendor.classifications.filter(kind="vendor").exists():
+                raise ValidationError({"vendor": "Choose an organization classified as a vendor"})
+        if self.purchase_quantity is not None and self.purchase_quantity <= 0:
+            raise ValidationError({"purchase_quantity": "Purchase quantity must be greater than zero"})
+        for field in ("purchase_price", "order_total"):
+            value = getattr(self, field)
+            if value is not None and value < 0:
+                raise ValidationError({field: "Amount cannot be negative"})
+        try:
+            self.currency = normalize_currency(self.currency)
+            validate_amount(self.client_price_per_unit, self.currency)
+        except MoneyError as exc:
+            raise ValidationError({"client_price_per_unit": str(exc)}) from exc
+
+
+class StockMovementType(models.TextChoices):
+    RECEIVED = "received", "Received"
+    USED = "used", "Used at client"
+    RETURNED = "returned", "Returned to stock"
+    CORRECTION = "correction", "Correction"
+
+
+class StockMovement(models.Model):
+    """An append-only stock change recorded against the current on-hand balance."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="stock_movements")
+    stock_item = models.ForeignKey(StockItem, on_delete=models.PROTECT, related_name="movements")
+    client = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="stock_movements", null=True, blank=True
+    )
+    movement_type = models.CharField(max_length=16, choices=StockMovementType.choices)
+    quantity_change = models.DecimalField(max_digits=15, decimal_places=3)
+    quantity_after = models.DecimalField(max_digits=15, decimal_places=3)
+    note = models.CharField(max_length=500, blank=True)
+    occurred_at = models.DateTimeField()
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_stock_movements"
+    )
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "-recorded_at", "id")
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(quantity_change=0), name="stock_movement_change_nonzero"),
+            models.CheckConstraint(condition=models.Q(quantity_after__gte=0), name="stock_movement_after_nonnegative"),
+        ]
+        indexes = [
+            models.Index(fields=("tenant", "stock_item", "occurred_at"), name="core_stockmove_scope_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.stock_item_id} {self.quantity_change}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Stock movements are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Stock movements are retained")
+
+    def clean(self) -> None:
+        if self.stock_item_id and self.stock_item.tenant_id != self.tenant_id:
+            raise ValidationError("Stock movement must use its item's tenant")
+        if self.client_id:
+            client = self.client
+            if client is None or client.tenant_id != self.tenant_id:
+                raise ValidationError({"client": "Client must belong to the stock item's tenant"})
+            if not client.classifications.filter(kind="client").exists():
+                raise ValidationError({"client": "Choose an organization classified as a client"})
+        if self.movement_type == StockMovementType.USED and self.quantity_change >= 0:
+            raise ValidationError({"quantity_change": "Used stock must reduce the on-hand quantity"})
+        if self.movement_type in {StockMovementType.RECEIVED, StockMovementType.RETURNED} and self.quantity_change <= 0:
+            raise ValidationError({"quantity_change": "Received or returned stock must increase the on-hand quantity"})
+        if self.movement_type == StockMovementType.USED and not self.client_id:
+            raise ValidationError({"client": "Choose the client where the stock was used"})
 
 
 class InvoiceEventType(models.TextChoices):

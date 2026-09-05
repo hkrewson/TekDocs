@@ -12401,6 +12401,161 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/stock:
+    get:
+      operationId: workspaces_msp_stock_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_stock_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockItemWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StockItemWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StockItemWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/stock/{item_id}:
+    patch:
+      operationId: workspaces_msp_stock_partial_update
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStockItemUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStockItemUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStockItemUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_msp_stock_destroy
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/stock/{item_id}/movements:
+    post:
+      operationId: workspaces_msp_stock_movements_create
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockMovementWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StockMovementWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StockMovementWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/vendors:
     get:
       operationId: workspaces_msp_vendors_retrieve
@@ -33753,13 +33908,15 @@ components:
           - catalog_product
           - service_rate
           - contract_cost
+          - stock_item
           - ''
           type: string
           description: |-
             * `catalog_product` - catalog_product
             * `service_rate` - service_rate
             * `contract_cost` - contract_cost
-          x-spec-enum-id: b8ef6baac959073f
+            * `stock_item` - stock_item
+          x-spec-enum-id: 440c6c569e23f32c
           default: ''
         origin_id:
           type: string
@@ -37087,6 +37244,80 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedStockItemUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+        vendor_id:
+          type: string
+          format: uuid
+          nullable: true
+        vendor_part_number:
+          type: string
+          default: ''
+          maxLength: 120
+        unit:
+          type: string
+          maxLength: 32
+        reorder_level:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        currency:
+          type: string
+          maxLength: 3
+        cost_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        client_price_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        purchase_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        order_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        order_number:
+          type: string
+          default: ''
+          maxLength: 120
+        order_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 1000
+        ordered_on:
+          type: string
+          format: date
+          nullable: true
+        tracking_number:
+          type: string
+          default: ''
+          maxLength: 160
+        tracking_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 1000
     PatchedSubnetWrite:
       type: object
       properties:
@@ -39104,6 +39335,305 @@ components:
       - id
       - schema
       - version
+    StockItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+        vendor_id:
+          type: string
+          format: uuid
+          nullable: true
+        vendor_name:
+          type: string
+          nullable: true
+        vendor_part_number:
+          type: string
+          maxLength: 120
+        unit:
+          type: string
+          maxLength: 32
+        quantity_on_hand:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+        reorder_level:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        currency:
+          type: string
+          maxLength: 3
+        cost_per_unit:
+          type: string
+          readOnly: true
+        client_price_per_unit:
+          type: string
+          readOnly: true
+        purchase_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        purchase_price:
+          type: string
+          nullable: true
+          readOnly: true
+        order_total:
+          type: string
+          nullable: true
+          readOnly: true
+        order_number:
+          type: string
+          maxLength: 120
+        order_url:
+          type: string
+          format: uri
+          maxLength: 1000
+        ordered_on:
+          type: string
+          format: date
+          nullable: true
+        tracking_number:
+          type: string
+          maxLength: 160
+        tracking_url:
+          type: string
+          format: uri
+          maxLength: 1000
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovement'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - client_price_per_unit
+      - cost_per_unit
+      - created_at
+      - id
+      - movements
+      - name
+      - order_total
+      - purchase_price
+      - updated_at
+      - vendor_id
+      - vendor_name
+    StockItemWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+        vendor_id:
+          type: string
+          format: uuid
+          nullable: true
+        vendor_part_number:
+          type: string
+          default: ''
+          maxLength: 120
+        unit:
+          type: string
+          maxLength: 32
+        initial_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          default: '0.000'
+        reorder_level:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        currency:
+          type: string
+          maxLength: 3
+        cost_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        client_price_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        purchase_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        order_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        order_number:
+          type: string
+          default: ''
+          maxLength: 120
+        order_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 1000
+        ordered_on:
+          type: string
+          format: date
+          nullable: true
+        tracking_number:
+          type: string
+          default: ''
+          maxLength: 160
+        tracking_url:
+          type: string
+          format: uri
+          default: ''
+          maxLength: 1000
+      required:
+      - client_price_per_unit
+      - cost_per_unit
+      - currency
+      - name
+      - unit
+    StockMovement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        movement_type:
+          enum:
+          - received
+          - used
+          - returned
+          - correction
+          type: string
+          description: |-
+            * `received` - Received
+            * `used` - Used at client
+            * `returned` - Returned to stock
+            * `correction` - Correction
+          x-spec-enum-id: dd7af95bff0dfb55
+        quantity_change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+        quantity_after:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        client_name:
+          type: string
+          nullable: true
+        note:
+          type: string
+          maxLength: 500
+        occurred_at:
+          type: string
+          format: date-time
+        recorded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        actor:
+          type: string
+          readOnly: true
+      required:
+      - actor
+      - client_id
+      - client_name
+      - id
+      - movement_type
+      - occurred_at
+      - quantity_after
+      - quantity_change
+      - recorded_at
+    StockMovementWrite:
+      type: object
+      properties:
+        movement_type:
+          enum:
+          - received
+          - used
+          - returned
+          - correction
+          type: string
+          description: |-
+            * `received` - received
+            * `used` - used
+            * `returned` - returned
+            * `correction` - correction
+          x-spec-enum-id: bf6e9b5bdbc4d7e2
+        quantity_change:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        note:
+          type: string
+          default: ''
+          maxLength: 500
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - movement_type
+      - quantity_change
+    StockResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockItem'
+        can_manage:
+          type: boolean
+        vendors:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        clients:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - can_manage
+      - clients
+      - results
+      - vendors
     Subnet:
       type: object
       properties:

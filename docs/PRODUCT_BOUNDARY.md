@@ -13,6 +13,7 @@ The current column describes `0.8.46`. The 1.0 column is the release contract, n
 | Publication preflight and documentation lint | experimental | supported | TekDocs | [#31](https://github.com/hkrewson/TekDocs/issues/31) |
 | Controlled taxonomies and tag governance | supported | supported | TekDocs | — |
 | Inventory, licensing, commercial records, networks, domains, certificates, reminders, compliance | supported | supported | TekDocs records documented state; external systems may supply observations | — |
+| MSP stock supplies and append-only quantity history | supported | supported | TekDocs records physical stock; vendor orders are provenance only | [#63](https://github.com/hkrewson/TekDocs/issues/63) |
 | Entity-linked and authored diagrams | experimental | supported | TekDocs for authored diagrams and retained exports | [#41](https://github.com/hkrewson/TekDocs/issues/41), [#44](https://github.com/hkrewson/TekDocs/issues/44) |
 | Unified workspace search | experimental | supported | TekDocs | [#27](https://github.com/hkrewson/TekDocs/issues/27) |
 | Bulk import and dry-run reconciliation | experimental | supported | TekDocs | [#28](https://github.com/hkrewson/TekDocs/issues/28) |

@@ -39,6 +39,7 @@ from .models import (
     ReminderRecurrence,
     ReminderSchedule,
     ServiceRate,
+    StockItem,
     TaxRate,
     Tenant,
     TenantBillingProfile,
@@ -815,6 +816,21 @@ def _origin_snapshot(
                 "quantity": contract_cost.quantity,
                 "unit_amount": contract_cost.amount,
                 "currency": contract_cost.currency,
+            },
+        )
+    if origin_type == "stock_item":
+        stock_item = StockItem.objects.filter(
+            tenant=invoice.tenant, id=origin_id, archived_at__isnull=True
+        ).first()
+        if stock_item is None:
+            raise InvoiceError("The stock item is unavailable")
+        return (
+            {"stock_item": stock_item},
+            {
+                "description": stock_item.name,
+                "quantity": Decimal("1"),
+                "unit_amount": stock_item.client_price_per_unit,
+                "currency": stock_item.currency,
             },
         )
     raise InvoiceError("Choose a supported invoice-line origin")

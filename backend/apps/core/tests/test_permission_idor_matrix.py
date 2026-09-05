@@ -548,6 +548,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "client-portal-invoice-detail": ("invoice_entity_id",),
         "client-portal-invoice-pdf": ("invoice_entity_id",),
         "client-portal-invoice-csv": ("invoice_entity_id",),
+        "msp-stock-detail": ("item_id",),
+        "msp-stock-movement-create": ("item_id",),
     }
     if route_name in {"msp-recycle-bin-restore", "organization-recycle-bin-restore"}:
         kwargs = {"record_type": "site", "record_id": value}

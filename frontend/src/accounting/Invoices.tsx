@@ -72,6 +72,7 @@ function originLabel(origin: InvoiceOrigin) {
     catalog_product: translate('accounting.originProduct'),
     service_rate: translate('accounting.originService'),
     contract_cost: translate('accounting.originContract'),
+    stock_item: translate('accounting.originStock'),
   }
   return `${labels[origin.origin_type]} · ${origin.name} · ${origin.currency} ${origin.unit_amount}`
 }

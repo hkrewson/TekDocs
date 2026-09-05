@@ -44,6 +44,7 @@ MSP_CAPABILITIES = (
     "recycle_bin",
     "integrations",
     "invoices",
+    "stock",
 )
 
 CLASSIFICATION_CAPABILITIES: dict[str, tuple[str, ...]] = {

@@ -21,6 +21,7 @@
     {"slug": "Services-and-contracts", "audience": "end_user", "contextual": true},
     {"slug": "Vendors-and-products", "audience": "end_user", "contextual": true},
     {"slug": "Invoices", "audience": "end_user", "contextual": true},
+    {"slug": "Stock", "audience": "end_user", "contextual": true},
     {"slug": "Custom-fields", "audience": "end_user", "contextual": true},
     {"slug": "Compliance", "audience": "end_user", "contextual": true},
     {"slug": "Audit-and-activity", "audience": "end_user", "contextual": true},

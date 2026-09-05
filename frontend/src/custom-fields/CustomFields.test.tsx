@@ -29,8 +29,8 @@ describe('CustomFields', () => {
     render(<CustomFields workspace={workspace} client={client()} />)
     expect(await screen.findByText('Door code')).toBeInTheDocument()
     expect(screen.getByText('Support tier')).toBeInTheDocument()
-    expect(screen.getByText('Inherited from MSP')).toBeInTheDocument()
-    expect(screen.getByText('Managed by MSP')).toBeInTheDocument()
+    expect(screen.getByText('From MSP workspace')).toBeInTheDocument()
+    expect(screen.getByText('Edit from MSP workspace')).toBeInTheDocument()
   })
 
   it('creates a choice definition in the active organization', async () => {
@@ -40,7 +40,7 @@ describe('CustomFields', () => {
     await screen.findByText('Door code')
     await user.click(screen.getByRole('button', { name: /New field/ }))
     await user.type(screen.getByLabelText('Label'), 'Support tier')
-    await user.type(screen.getByLabelText('Stable key'), 'support tier')
+    await user.type(screen.getByLabelText(/Field key/), 'support tier')
     await user.selectOptions(screen.getByLabelText('Field type'), 'choice')
     await user.type(screen.getByLabelText(/Choices/), 'Standard\nPriority')
     await user.click(screen.getByRole('button', { name: 'Add field' }))
@@ -58,10 +58,10 @@ describe('CustomFields', () => {
     await user.clear(screen.getByLabelText('Label'))
     await user.type(screen.getByLabelText('Label'), 'Entry code')
     await user.click(screen.getByRole('button', { name: 'Create version' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('1 require review')
+    expect(await screen.findByRole('status')).toHaveTextContent('1 needs review')
     expect(createVersion).toHaveBeenCalledWith({ organizationId: workspace.id }, definition.id, expect.objectContaining({ label: 'Entry code' }))
 
-    await user.click(screen.getByRole('button', { name: 'Archive' }))
+    await user.click(screen.getByRole('button', { name: 'Archive Door code' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Archive Door code?' })
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
     expect(archiveDefinition).toHaveBeenCalledWith({ organizationId: workspace.id }, definition.id)

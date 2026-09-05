@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
-import { translate} from '../i18n/localization'
+import { translate } from '../i18n/localization'
 import { Link } from 'react-router'
 import { browserOrganizationClient } from './api'
 import type { Organization, OrganizationClassification, OrganizationClient, OrganizationInput } from './api'
 
 const classificationLabels: Record<OrganizationClassification, string> = {
-  client: 'Client',
-  vendor: 'Vendor',
-  manufacturer: 'Manufacturer',
-  partner: 'Partner',
+  client: translate('organizations.typeClient'),
+  vendor: translate('organizations.typeVendor'),
+  manufacturer: translate('organizations.typeManufacturer'),
+  partner: translate('organizations.typePartner'),
 }
 const classifications = Object.keys(classificationLabels) as OrganizationClassification[]
 const emptyInput: OrganizationInput = { name: '', legal_name: '', website: '', classifications: ['client'] }
@@ -49,14 +49,14 @@ function OrganizationForm({ organization, saving, onCancel, onSave }: {
   return (
     <section className="content-section organization-form-section" aria-labelledby="organization-form-heading">
       <div className="section-heading">
-        <div><h2 id="organization-form-heading">{organization ? `Edit ${organization.name}` : 'Add organization'}</h2><p>{organization ? 'Organizations may serve more than one business role.' : 'New organizations are restricted to explicitly assigned MSP staff. Owners retain access.'}</p></div>
+        <div><h2 id="organization-form-heading">{organization ? translate('organizations.edit', { name: organization.name }) : translate('organizations.add')}</h2>{!organization && <p>{translate('organizations.newAccessHelp')}</p>}</div>
       </div>
       <form className="organization-form" onSubmit={submit}>
-        <label>Display name<input autoFocus value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} maxLength={240} required /></label>
-        <label>Legal name <span>Optional</span><input value={input.legal_name} onChange={(event) => setInput({ ...input, legal_name: event.target.value })} maxLength={240} /></label>
-        <label>Website <span>Optional</span><input type="url" placeholder="https://" value={input.website} onChange={(event) => setInput({ ...input, website: event.target.value })} maxLength={500} /></label>
+        <label>{translate('organizations.displayName')}<input autoFocus value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} maxLength={240} required /></label>
+        <label>{translate('organizations.legalName')} <span>{translate('common.optional')}</span><input value={input.legal_name} onChange={(event) => setInput({ ...input, legal_name: event.target.value })} maxLength={240} /></label>
+        <label>{translate('organizations.website')} <span>{translate('common.optional')}</span><input type="url" placeholder="https://" value={input.website} onChange={(event) => setInput({ ...input, website: event.target.value })} maxLength={500} /></label>
         <fieldset>
-          <legend>Classifications</legend>
+          <legend>{translate('organizations.types')}</legend>
           <div className="classification-options">
             {classifications.map((classification) => (
               <label key={classification}>
@@ -67,9 +67,9 @@ function OrganizationForm({ organization, saving, onCancel, onSave }: {
           </div>
         </fieldset>
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving || input.classifications.length === 0}>{saving ? 'Saving…' : 'Save organization'}</button>
+          <button className="primary-button" type="submit" disabled={saving || input.classifications.length === 0}>{saving ? translate('common.saving') : translate('organizations.save')}</button>
           <button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button>
-          {input.classifications.length === 0 && <span className="field-guidance" role="alert">Select at least one classification.</span>}
+          {input.classifications.length === 0 && <span className="field-guidance" role="alert">{translate('organizations.typeRequired')}</span>}
         </div>
       </form>
     </section>
@@ -89,7 +89,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
     let active = true
     client.list()
       .then((loaded) => { if (active) setRecords(loaded) })
-      .catch((loadError: unknown) => { if (active) setError(errorMessage(loadError, 'Organizations could not be loaded.')) })
+      .catch((loadError: unknown) => { if (active) setError(errorMessage(loadError, translate('organizations.loadFailed'))) })
     return () => { active = false }
   }, [client])
 
@@ -107,9 +107,9 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
       setRecords((current) => [...(current ?? []).filter((record) => record.id !== saved.id), saved]
         .sort((left, right) => left.name.localeCompare(right.name)))
       setEditing(null)
-      setMessage(editing === 'new' ? 'Organization added.' : 'Organization updated.')
+      setMessage(editing === 'new' ? translate('organizations.added', { name: saved.name }) : translate('organizations.updated', { name: saved.name }))
     } catch (saveError) {
-      setError(errorMessage(saveError, 'The organization could not be saved.'))
+      setError(errorMessage(saveError, translate('organizations.saveFailed')))
     } finally {
       setSaving(false)
     }
@@ -123,10 +123,10 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
     try {
       await client.archive(archiving.id)
       setRecords((current) => current?.filter((record) => record.id !== archiving.id) ?? [])
-      setMessage('Organization archived.')
+      setMessage(translate('organizations.archived', { name: archiving.name }))
       setArchiving(null)
     } catch (archiveError) {
-      setError(errorMessage(archiveError, 'The organization could not be archived.'))
+      setError(errorMessage(archiveError, translate('organizations.archiveFailed')))
     } finally {
       setSaving(false)
     }
@@ -135,7 +135,7 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
   return (
     <>
       <header className="page-header">
-        <div><h1>Organizations</h1></div>
+        <div><h1>{translate('organizations.heading')}</h1></div>
         <button className="primary-button" type="button" aria-label={translate('organizations.new')} title={translate('organizations.new')} onClick={() => { setEditing('new'); setArchiving(null); setMessage(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('organizations.new')}</span></button>
       </header>
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -143,22 +143,22 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
       {editing && <OrganizationForm key={editing === 'new' ? 'new' : editing.id} organization={editing === 'new' ? null : editing} saving={saving} onCancel={() => setEditing(null)} onSave={save} />}
       <section className="content-section organization-list-section" aria-labelledby="organization-list-heading">
         <div className="section-heading organization-list-heading">
-          <h2 id="organization-list-heading">Organization records</h2>
-          <label>Show<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">All classifications</option>{classifications.map((classification) => <option key={classification} value={classification}>{classificationLabels[classification]}</option>)}</select></label>
+          <h2 id="organization-list-heading">{translate('organizations.list')}</h2>
+          <label>{translate('organizations.showType')}<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">{translate('organizations.allTypes')}</option>{classifications.map((classification) => <option key={classification} value={classification}>{classificationLabels[classification]}</option>)}</select></label>
         </div>
-        {records === null && !error && <p className="organization-state" role="status">Loading organizations…</p>}
-        {records !== null && visibleRecords.length === 0 && <p className="organization-state">{filter === 'all' ? 'No organizations have been added.' : `No ${classificationLabels[filter].toLowerCase()} organizations found.`}</p>}
+        {records === null && !error && <p className="organization-state" role="status">{translate('organizations.loading')}</p>}
+        {records !== null && visibleRecords.length === 0 && <p className="organization-state">{filter === 'all' ? translate('organizations.empty') : translate('organizations.noTypeMatch', { type: classificationLabels[filter].toLowerCase() })}</p>}
         {visibleRecords.length > 0 && (
-          <div className="organization-table" role="table" aria-label="Organizations">
-            <div className="organization-table-header" role="row"><span role="columnheader">Name</span><span role="columnheader">Classifications</span><span role="columnheader">Website</span><span role="columnheader">Actions</span></div>
+          <div className="organization-table" role="table" aria-label={translate('organizations.table')}>
+            <div className="organization-table-header" role="row"><span role="columnheader">{translate('organizations.name')}</span><span role="columnheader">{translate('organizations.types')}</span><span role="columnheader">{translate('organizations.website')}</span><span role="columnheader">{translate('common.actions')}</span></div>
             {visibleRecords.map((organization) => (
               <div className="organization-table-row" role="row" key={organization.id}>
                 <span role="cell"><Link className="organization-name-link" to={`/workspaces/organizations/${organization.id}/overview`}>{organization.name}</Link>{organization.legal_name && organization.legal_name !== organization.name && <span>{organization.legal_name}</span>}</span>
-                <span role="cell">{organization.classifications.map((classification) => classificationLabels[classification]).join(', ')}</span>
-                <span role="cell">{organization.website ? <a href={organization.website} target="_blank" rel="noreferrer">Visit site <ExternalLink size={13} aria-hidden="true" /></a> : '—'}</span>
+                <span role="cell" data-label={translate('organizations.types')}>{organization.classifications.map((classification) => classificationLabels[classification]).join(', ')}</span>
+                <span role="cell" data-label={translate('organizations.website')}>{organization.website ? <a href={organization.website} target="_blank" rel="noreferrer">{translate('organizations.visitWebsite')} <ExternalLink size={13} aria-hidden="true" /></a> : '—'}</span>
                 <span role="cell" className="organization-row-actions">
-                  <button type="button" className="row-action" onClick={() => { setEditing(organization); setArchiving(null); setMessage(null) }}><Pencil size={15} aria-hidden="true" />Edit <span className="sr-only">{organization.name}</span></button>
-                  <button type="button" className="row-action danger" onClick={() => { setArchiving(organization); setEditing(null); setMessage(null) }}><Trash2 size={15} aria-hidden="true" />Archive <span className="sr-only">{organization.name}</span></button>
+                  <button type="button" className="row-action" aria-label={translate('organizations.edit', { name: organization.name })} onClick={() => { setEditing(organization); setArchiving(null); setMessage(null) }}><Pencil size={15} aria-hidden="true" />{translate('common.edit')}</button>
+                  <button type="button" className="row-action danger" aria-label={translate('organizations.archive', { name: organization.name })} onClick={() => { setArchiving(organization); setEditing(null); setMessage(null) }}><Trash2 size={15} aria-hidden="true" />{translate('common.archive')}</button>
                 </span>
               </div>
             ))}
@@ -166,8 +166,8 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
         )}
         {archiving && (
           <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-confirmation-heading">
-            <div><strong id="archive-confirmation-heading">Archive {archiving.name}?</strong><p>It will leave active organization lists. Recovery arrives with the recycle-bin workflow.</p></div>
-            <div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? 'Archiving…' : 'Archive organization'}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div>
+            <div><strong id="archive-confirmation-heading">{translate('organizations.archiveQuestion', { name: archiving.name })}</strong><p>{translate('organizations.archiveHelp')}</p></div>
+            <div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? translate('common.archiving') : translate('organizations.archiveButton')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div>
           </div>
         )}
       </section>

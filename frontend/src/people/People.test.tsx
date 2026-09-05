@@ -121,12 +121,12 @@ describe('People', () => {
     await user.type(screen.getByLabelText('Full name'), 'Morgan Ellis')
     await user.selectOptions(screen.getByLabelText('Relationship'), 'contact')
     await user.type(screen.getByLabelText(/Role/), 'Office Manager')
-    await user.type(screen.getByLabelText(/Location/), 'Main Office')
-    await user.type(screen.getByLabelText(/Office/), 'Room 4')
+    await user.type(screen.getByLabelText(/Site name/), 'Main Office')
+    await user.type(screen.getByLabelText(/Location name/), 'Room 4')
     await user.type(screen.getByLabelText(/Email/), 'morgan@example.com')
     await user.click(screen.getByRole('button', { name: 'Save person' }))
     expect(create).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({ full_name: 'Morgan Ellis', role: 'Office Manager' }))
-    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent('Person added.')
+    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent('Morgan Ellis was added.')
 
     await user.click(screen.getByRole('button', { name: 'Edit Jordan Avery' }))
     const preferredName = screen.getByLabelText(/Preferred name/)
@@ -137,7 +137,7 @@ describe('People', () => {
 
     await user.click(screen.getByRole('button', { name: 'Archive Jordan Avery' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Archive Jordan Avery?' })
-    expect(within(dialog).getByText(/Other future associations/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/may still appear in other workspaces/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Archive person' }))
     expect(archive).toHaveBeenCalledWith({ organizationId: workspace.id }, person.id)
   })
@@ -160,10 +160,10 @@ describe('People', () => {
     await user.click(screen.getByRole('button', { name: 'New person' }))
     await user.type(screen.getByLabelText('Full name'), 'Placed Person')
     await screen.findByRole('option', { name: 'Main Campus' })
-    await user.selectOptions(screen.getByLabelText(/Structured site/), '00000000-0000-4000-8000-000000000040')
-    await user.selectOptions(screen.getByLabelText(/Structured location/), '00000000-0000-4000-8000-000000000041')
-    expect(screen.getByLabelText(/Location label/)).toHaveValue('Main Campus')
-    expect(screen.getByLabelText(/Office label/)).toHaveValue('Desk 214')
+    await user.selectOptions(screen.getByLabelText(/Saved site/), '00000000-0000-4000-8000-000000000040')
+    await user.selectOptions(screen.getByLabelText(/Saved location/), '00000000-0000-4000-8000-000000000041')
+    expect(screen.getByLabelText(/Site name/)).toHaveValue('Main Campus')
+    expect(screen.getByLabelText(/Location name/)).toHaveValue('Desk 214')
     await user.click(screen.getByRole('button', { name: 'Save person' }))
 
     expect(create).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({
@@ -186,5 +186,17 @@ describe('People', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('not authorized')
     expect(screen.getByLabelText('Full name')).toHaveValue('Denied Person')
+  })
+
+  it('allows location text when saved sites cannot be loaded', async () => {
+    const user = userEvent.setup()
+    const unavailableSites = { ...sitesClient, list: vi.fn().mockRejectedValue(new Error('Unavailable')) }
+    render(<People workspace={workspace} client={peopleClient()} sitesClient={unavailableSites} />)
+    await screen.findByRole('cell', { name: 'Jordan Avery' })
+
+    await user.click(screen.getByRole('button', { name: 'New person' }))
+    expect(await screen.findByText(/Saved sites could not be loaded/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Site name/)).toBeEnabled()
+    expect(screen.getByLabelText(/Location name/)).toBeEnabled()
   })
 })

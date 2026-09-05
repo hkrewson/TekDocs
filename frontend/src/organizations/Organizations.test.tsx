@@ -37,10 +37,10 @@ describe('Organizations', () => {
     expect(await screen.findByRole('button', { name: 'Edit Acme Dental' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Acme Dental' })).toHaveAttribute('href', `/workspaces/organizations/${acme.id}/overview`)
     expect(screen.getByText('Client, Partner')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Visit site' })).toHaveAttribute('href', 'https://acme.example.com')
+    expect(screen.getByRole('link', { name: 'Visit website' })).toHaveAttribute('href', 'https://acme.example.com')
 
-    await user.selectOptions(screen.getByLabelText('Show'), 'vendor')
-    expect(screen.getByText('No vendor organizations found.')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Show type'), 'vendor')
+    expect(screen.getByText('No vendor organizations were found.')).toBeInTheDocument()
   })
 
   it('creates a multi-classification organization', async () => {
@@ -63,7 +63,7 @@ describe('Organizations', () => {
       website: 'https://acme.example.com',
       classifications: ['client', 'partner'],
     })
-    expect(await screen.findByRole('status')).toHaveTextContent('Organization added.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Acme Dental was added.')
   })
 
   it('updates and archives with an explicit confirmation', async () => {
@@ -80,13 +80,13 @@ describe('Organizations', () => {
     await user.type(name, 'Acme Health')
     await user.click(screen.getByRole('button', { name: 'Save organization' }))
     expect(update).toHaveBeenCalledWith(acme.id, expect.objectContaining({ name: 'Acme Health' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Organization updated.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Acme Health was updated.')
 
     await user.click(screen.getByRole('button', { name: 'Archive Acme Health' }))
     expect(screen.getByRole('alertdialog', { name: 'Archive Acme Health?' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Archive organization' }))
     expect(archive).toHaveBeenCalledWith(acme.id)
-    expect(await screen.findByRole('status')).toHaveTextContent('Organization archived.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Acme Health was moved to the recycle bin.')
   })
 
   it('keeps the form open and reports server denial', async () => {
@@ -104,5 +104,14 @@ describe('Organizations', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('not authorized')
     expect(screen.getByLabelText('Display name')).toHaveValue('Denied Client')
+  })
+
+  it('keeps long organization names available to links and row actions', async () => {
+    const longName = 'North Central Regional Healthcare and Community Services Cooperative'.repeat(3)
+    renderOrganizations(client({ list: vi.fn().mockResolvedValue([{ ...acme, name: longName }]) }))
+
+    expect(await screen.findByRole('link', { name: longName })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Edit ${longName}` })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Archive ${longName}` })).toBeInTheDocument()
   })
 })

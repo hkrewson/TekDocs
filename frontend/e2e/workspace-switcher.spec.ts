@@ -349,16 +349,17 @@ test('client custom-field definitions and Site values remain workspace scoped an
 
   await expect(page.getByRole('heading', { name: 'Custom fields' })).toBeVisible()
   await expect(page.getByText('Door code', { exact: true })).toBeVisible()
-  await expect(page.getByText('This organization')).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'This workspace' })).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Sites' }).click()
   await page.getByRole('button', { name: 'Custom fields for site North Campus' }).click()
   await expect(page.getByRole('heading', { name: 'Custom fields for North Campus' })).toBeVisible()
-  await expect(page.getByLabel('Door code')).toHaveValue('4231')
-  await page.getByLabel('Door code').fill('9912')
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByLabel('Door code')).toHaveValue('9912')
+  const doorCode = page.getByRole('textbox', { name: 'Door code' })
+  await expect(doorCode).toHaveValue('4231')
+  await doorCode.fill('9912')
+  await page.getByRole('button', { name: 'Save Door code' }).click()
+  await expect(doorCode).toHaveValue('9912')
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

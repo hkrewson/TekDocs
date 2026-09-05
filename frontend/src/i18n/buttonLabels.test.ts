@@ -29,8 +29,6 @@ const PENDING_PARAMETERISED_LABELS: Record<string, number> = {
   'src/inventory/Licenses.tsx': 1,
   'src/networks/NetworkAddressing.tsx': 1,
   'src/networks/NetworkEndpoints.tsx': 1,
-  'src/organizations/Organizations.tsx': 2,
-  'src/people/People.tsx': 2,
   'src/portal/ClientPortal.tsx': 1,
   'src/workspaces/WorkspaceSwitcher.tsx': 1,
 }

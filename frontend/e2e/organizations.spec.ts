@@ -44,7 +44,7 @@ test('organization administration supports create, edit, filter, and archive', a
   await page.getByLabel('Display name').fill('Acme Dental')
   await page.getByRole('checkbox', { name: 'Partner' }).check()
   await page.getByRole('button', { name: 'Save organization' }).click()
-  await expect(page.getByRole('status')).toHaveText('Organization added.')
+  await expect(page.getByRole('status')).toHaveText('Acme Dental was added.')
   await expect(page.getByText('Client, Partner')).toBeVisible()
 
   await page.getByRole('button', { name: 'Edit Acme Dental' }).click()
@@ -55,6 +55,6 @@ test('organization administration supports create, edit, filter, and archive', a
 
   await page.getByRole('button', { name: 'Archive Acme Health' }).click()
   await page.getByRole('button', { name: 'Archive organization' }).click()
-  await expect(page.getByRole('status')).toHaveText('Organization archived.')
+  await expect(page.getByRole('status')).toHaveText('Acme Health was moved to the recycle bin.')
   await expect(page.getByText('No organizations have been added.')).toBeVisible()
 })

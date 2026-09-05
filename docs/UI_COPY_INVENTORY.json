@@ -148,9 +148,53 @@
       "workflow": "Organizations, people, sites, and custom fields",
       "routes": ["/organizations", "/people", "/sites", "/custom-fields"],
       "states": ["loading", "empty", "populated", "validation", "archive", "denied", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review create/edit/archive labels, record ownership wording, inherited-field explanations, and long organization and person names."
+      "decisions": [
+        {
+          "before": "Classifications",
+          "after": "Organization types",
+          "reason": "Type is the familiar term for choosing whether an organization is a client, vendor, manufacturer, or partner."
+        },
+        {
+          "before": "This relationship belongs to {workspace}.",
+          "after": "This person is listed in {workspace}.",
+          "reason": "Describe the visible result without exposing the association model."
+        },
+        {
+          "before": "Structured site / Structured location",
+          "after": "Saved site / Saved location",
+          "reason": "Saved distinguishes reusable site records from retained text without implementation language."
+        },
+        {
+          "before": "Location label / Office label · Retained fallback text",
+          "after": "Site name / Location name · Kept if the saved record is later archived",
+          "reason": "Explain why the text is stored and when it remains useful."
+        },
+        {
+          "before": "Stable key",
+          "after": "Field key · Used by imports and integrations; cannot be changed later",
+          "reason": "Name the value plainly and explain the consequence at the decision point."
+        },
+        {
+          "before": "Inherited from MSP / Managed by MSP",
+          "after": "From MSP workspace / Edit from MSP workspace",
+          "reason": "Tell staff where the field comes from and where it can be changed."
+        },
+        {
+          "before": "Version created. N existing values remain compatible; N require review.",
+          "after": "New version created. N existing values are still valid; N need review. No values were changed. (Singular counts use singular grammar.)",
+          "reason": "Replace migration terminology while preserving the exact impact and safety guarantee."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/organizations/Organizations.test.tsx",
+        "frontend/src/people/People.test.tsx",
+        "frontend/src/sites/Sites.test.tsx",
+        "frontend/src/custom-fields/CustomFields.test.tsx",
+        "frontend/src/custom-fields/EntityCustomFields.test.tsx",
+        "frontend/e2e/organizations.spec.ts",
+        "frontend/e2e/live-workspace.spec.ts"
+      ]
     },
     {
       "id": "documents-files",

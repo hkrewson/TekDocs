@@ -322,6 +322,58 @@ def diagram_renderer_health() -> str:
     return "ready"
 
 
+def diagram_renderer_diagnostics() -> dict[str, object]:
+    """Return bounded, value-free renderer telemetry for authorized operators."""
+
+    status = diagram_renderer_health()
+    result: dict[str, object] = {
+        "status": status,
+        "version": None,
+        "capacity": MAX_ACTIVE_JOBS,
+        "queue": {"waiting": 0, "processing": 0, "total": 0},
+        "recent_failures": [],
+        "last_checked_at": None,
+    }
+    configured = str(getattr(settings, "TEKDOCS_DIAGRAM_JOB_DIRECTORY", "")).strip()
+    if not configured:
+        return result
+    root = Path(configured)
+    try:
+        if not root.is_absolute() or not root.is_dir() or root.is_symlink():
+            return result
+        jobs = [item for item in root.iterdir() if item.is_dir() and _JOB_ID.fullmatch(item.name)]
+        waiting = sum(1 for item in jobs if (item / "ready").is_file())
+        processing = sum(1 for item in jobs if (item / "processing").is_file())
+        result["queue"] = {"waiting": waiting, "processing": processing, "total": len(jobs)}
+        telemetry_path = root / ".renderer-diagnostics.json"
+        if not telemetry_path.is_file() or telemetry_path.is_symlink() or telemetry_path.stat().st_size > 16_384:
+            return result
+        telemetry = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return result
+    if not isinstance(telemetry, dict):
+        return result
+    version = telemetry.get("renderer")
+    if isinstance(version, str) and RENDERER_REPORT.fullmatch(version):
+        result["version"] = version
+    now_ms = int(time.time() * 1000)
+    checked_at = telemetry.get("checked_at")
+    if isinstance(checked_at, int) and 0 < checked_at <= now_ms + 60_000:
+        result["last_checked_at"] = checked_at
+    failures: list[dict[str, object]] = []
+    reported_failures = telemetry.get("recent_failures")
+    if isinstance(reported_failures, list):
+        for item in reported_failures[-10:]:
+            if not isinstance(item, dict) or item.get("code") not in RENDERER_FAILURE_CODES:
+                continue
+            occurred_at = item.get("occurred_at")
+            if not isinstance(occurred_at, int) or not 0 < occurred_at <= now_ms + 60_000:
+                continue
+            failures.append({"code": item["code"], "occurred_at": occurred_at})
+    result["recent_failures"] = failures
+    return result
+
+
 def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[DiagramExportArtifact, ...]:
     sources = diagram_sources(markdown)
     if not sources:

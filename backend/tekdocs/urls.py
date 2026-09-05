@@ -411,7 +411,7 @@ from apps.core.taxonomy_views import (
     OrganizationTaxonomyListView,
     OrganizationTaxonomyLocalTermCreateView,
 )
-from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView
+from apps.core.views import ApiRootView, LiveHealthView, ReadyHealthView, SystemDiagnosticsView
 from apps.core.webhook_views import (
     InboundWebhookView,
     OrganizationWebhookDeliveryListView,
@@ -2475,6 +2475,7 @@ urlpatterns = [
     ),
     path("api/v1/health/live", LiveHealthView.as_view(), name="health-live"),
     path("api/v1/health/ready", ReadyHealthView.as_view(), name="health-ready"),
+    path("api/v1/system/diagnostics", SystemDiagnosticsView.as_view(), name="system-diagnostics"),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="api-docs"),
 ]

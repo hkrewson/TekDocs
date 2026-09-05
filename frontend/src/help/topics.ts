@@ -34,6 +34,7 @@ const topics: Record<string, HelpTopic> = {
   staff: { title: 'Staff and invitations', summary: 'Invite MSP staff, review invitation delivery and expiry, and continue into role and client assignment.', slug: 'People-and-access' },
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
+  'system-status': { title: 'System status', summary: 'Check TekDocs, its database, and the isolated diagram renderer without exposing document content.', slug: 'Diagrams-in-documents' },
   invoices: { title: 'Invoices', summary: 'Issue signed invoices, track their append-only lifecycle, reconcile accounting handoffs, and deliver matching client copies.', slug: 'Invoices' },
 }
 

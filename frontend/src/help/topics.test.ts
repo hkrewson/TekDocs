@@ -4,6 +4,7 @@ describe('contextual help topics', () => {
   it('normalizes MSP and organization workspace routes to the same stable topic', () => {
     expect(helpTopicForPath('/documentation').slug).toBe('Documentation')
     expect(helpTopicForPath('/staff').slug).toBe('People-and-access')
+    expect(helpTopicForPath('/system-status').slug).toBe('Diagrams-in-documents')
     expect(helpTopicForPath('/workspaces/organizations/123/documentation').slug).toBe('Documentation')
     expect(helpTopicForPath('/workspaces/organizations/123/recycle_bin').slug).toBe('Recycle-bin')
     expect(helpTopicForPath('/invoices').slug).toBe('Invoices')

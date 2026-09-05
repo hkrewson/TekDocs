@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { constants, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { constants, existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { promisify } from 'node:util'
 import path from 'node:path'
 
@@ -18,6 +18,7 @@ const maximumOutputBytes = 2 * 1024 * 1024
 const maximumPngBytes = 5 * 1024 * 1024
 const maximumJobs = 8
 const staleMilliseconds = 5 * 60 * 1000
+const recentFailures = []
 
 // A job can fail six operationally different ways. Reporting one flat code for all of
 // them means an operator reading container logs cannot tell a Chromium launch failure
@@ -49,6 +50,33 @@ function atomicJson(jobDirectory, payload) {
   const temporary = path.join(jobDirectory, '.result.json')
   writeFileSync(temporary, `${JSON.stringify(payload)}\n`, { encoding: 'utf8', mode: 0o600 })
   renameSync(temporary, path.join(jobDirectory, 'result.json'))
+}
+
+function recordFailure(code) {
+  recentFailures.push({ code, occurred_at: Date.now() })
+  if (recentFailures.length > 10) recentFailures.shift()
+}
+
+function refreshDiagnostics() {
+  const jobs = readdirSync(jobRoot).filter((name) => jobPattern.test(name))
+  let waiting = 0
+  let processing = 0
+  for (const name of jobs) {
+    const jobDirectory = path.join(jobRoot, name)
+    if (existsSync(path.join(jobDirectory, 'processing'))) processing += 1
+    else if (existsSync(path.join(jobDirectory, 'ready'))) waiting += 1
+  }
+  const payload = {
+    checked_at: Date.now(),
+    renderer: rendererVersion,
+    capacity: maximumJobs,
+    queue: { waiting, processing, total: jobs.length },
+    recent_failures: recentFailures,
+  }
+  const temporary = path.join(jobRoot, '.renderer-diagnostics.json.tmp')
+  writeFileSync(temporary, `${JSON.stringify(payload)}\n`, { encoding: 'utf8', mode: 0o600 })
+  renameSync(temporary, path.join(jobRoot, '.renderer-diagnostics.json'))
+  writeFileSync(path.join(jobRoot, '.renderer-ready'), `${Date.now()}\n`, { encoding: 'utf8', mode: 0o600 })
 }
 
 function safeFiles(jobDirectory, suffix) {
@@ -99,6 +127,7 @@ async function processJob(jobName) {
     atomicJson(jobDirectory, { status: 'ok', count: request.count, renderer: rendererVersion })
   } catch (error) {
     const code = failureCode(error)
+    recordFailure(code)
     const status = error && Number.isInteger(error.code) ? ` exit=${error.code}` : ''
     process.stderr.write(`diagram render failed: ${code}${status}\n`)
     atomicJson(jobDirectory, { status: 'error', code })
@@ -122,7 +151,6 @@ async function cycle() {
   removeStaleJobs()
   const jobs = readdirSync(jobRoot).filter((name) => jobPattern.test(name)).slice(0, maximumJobs)
   for (const job of jobs) await processJob(job)
-  writeFileSync(path.join(jobRoot, '.renderer-ready'), `${Date.now()}\n`, { encoding: 'utf8', mode: 0o600 })
 }
 
 let running = false
@@ -136,5 +164,7 @@ async function scheduledCycle() {
   }
 }
 
+refreshDiagnostics()
 await scheduledCycle()
 setInterval(() => { void scheduledCycle() }, 100)
+setInterval(refreshDiagnostics, 1000)

@@ -6468,6 +6468,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/system/diagnostics:
+    get:
+      operationId: system_diagnostics_retrieve
+      tags:
+      - system
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemDiagnostics'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/taxonomies:
     get:
       operationId: taxonomies_msp_list
@@ -29107,6 +29141,72 @@ components:
       required:
       - count
       - results
+    DiagramFailure:
+      type: object
+      properties:
+        code:
+          type: string
+        occurred_at:
+          type: integer
+          minimum: 1
+      required:
+      - code
+      - occurred_at
+    DiagramQueue:
+      type: object
+      properties:
+        waiting:
+          type: integer
+          minimum: 0
+        processing:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+      required:
+      - processing
+      - total
+      - waiting
+    DiagramRendererDiagnostics:
+      type: object
+      properties:
+        status:
+          enum:
+          - ready
+          - stale
+          - unavailable
+          - not_configured
+          type: string
+          description: |-
+            * `ready` - ready
+            * `stale` - stale
+            * `unavailable` - unavailable
+            * `not_configured` - not_configured
+          x-spec-enum-id: c73704220b706784
+        version:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+        queue:
+          $ref: '#/components/schemas/DiagramQueue'
+        recent_failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagramFailure'
+        last_checked_at:
+          type: integer
+          minimum: 1
+          nullable: true
+      required:
+      - capacity
+      - last_checked_at
+      - queue
+      - recent_failures
+      - status
+      - version
     Document:
       type: object
       properties:
@@ -39099,6 +39199,37 @@ components:
       required:
       - cidr
       - name
+    SystemDiagnostics:
+      type: object
+      properties:
+        status:
+          enum:
+          - ready
+          - degraded
+          type: string
+          description: |-
+            * `ready` - ready
+            * `degraded` - degraded
+          x-spec-enum-id: eb2ef62e5ff62762
+        checked_at:
+          type: string
+          format: date-time
+        application_version:
+          type: string
+        database:
+          enum:
+          - ready
+          type: string
+          description: '* `ready` - ready'
+          x-spec-enum-id: d28c4d24a671a61e
+        diagram_renderer:
+          $ref: '#/components/schemas/DiagramRendererDiagnostics'
+      required:
+      - application_version
+      - checked_at
+      - database
+      - diagram_renderer
+      - status
     Taxonomy:
       type: object
       properties:

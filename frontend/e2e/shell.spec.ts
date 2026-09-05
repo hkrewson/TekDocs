@@ -7,6 +7,11 @@ const wcag22Tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+  role: 'owner',
+  permissions: ['system_diagnostics.view'],
+  surface: 'msp',
+  organization: null,
+  mfa_enrollment_required: false,
 }
 const documentBlockId = crypto.randomUUID()
 const documentRevisionId = crypto.randomUUID()
@@ -475,6 +480,35 @@ test('account menu closes with Escape and restores trigger focus', async ({ page
   await page.keyboard.press('Escape')
   await expect(page.getByRole('menu')).not.toBeVisible()
   await expect(trigger).toBeFocused()
+})
+
+test('authorized operators can inspect value-free renderer diagnostics', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.route('**/api/v1/system/diagnostics', (route) => route.fulfill({ json: {
+    status: 'ready',
+    checked_at: '2026-09-05T12:00:00Z',
+    application_version: '0.8.46',
+    database: 'ready',
+    diagram_renderer: {
+      status: 'ready',
+      version: '@mermaid-js/mermaid-cli@11.16.0',
+      capacity: 8,
+      queue: { waiting: 0, processing: 0, total: 0 },
+      recent_failures: [{ code: 'renderer_timeout', occurred_at: Date.parse('2026-09-05T11:30:00Z') }],
+      last_checked_at: Date.parse('2026-09-05T11:59:59Z'),
+    },
+  } }))
+
+  await page.goto('/overview')
+  await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
+  await page.getByRole('menuitem', { name: 'System status' }).click()
+
+  await expect(page.getByRole('heading', { name: 'System status' })).toBeVisible()
+  await expect(page.getByText('@mermaid-js/mermaid-cli@11.16.0')).toBeVisible()
+  await expect(page.getByText('0 of 8 slots in use')).toBeVisible()
+  await expect(page.getByText('renderer_timeout')).toBeVisible()
+  await expect(page.getByText(/excludes document content/)).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
 test('contextual help follows the page without embedding unpublished Wiki content', async ({ page }) => {

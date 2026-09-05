@@ -103,6 +103,7 @@ class PermissionKey(StrEnum):
     INTEGRATIONS_VIEW = "integrations.view"
     INTEGRATIONS_MANAGE = "integrations.manage"
     NOTIFICATIONS_MANAGE = "notifications.manage"
+    SYSTEM_DIAGNOSTICS_VIEW = "system_diagnostics.view"
     ACTIVITY_VIEW = "activity.view"
 
 
@@ -171,6 +172,7 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.CUSTOM_ROLES_ASSIGN, "Assign custom roles", "Administration", mfa=True),
     _permission(PermissionKey.ACCESS_COLLECTIONS_VIEW, "View access collections", "Administration"),
     _permission(PermissionKey.ACCESS_COLLECTIONS_MANAGE, "Manage access collections", "Administration", mfa=True),
+    _permission(PermissionKey.SYSTEM_DIAGNOSTICS_VIEW, "View system status", "Administration"),
     _permission(PermissionKey.RECYCLE_BIN_VIEW, "View archived records", "Recovery"),
     _permission(PermissionKey.RECYCLE_BIN_RESTORE, "Restore archived records", "Recovery", mfa=True),
     _permission(PermissionKey.DOCUMENTS_VIEW, "View documentation", "Documentation"),

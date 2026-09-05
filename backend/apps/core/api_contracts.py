@@ -43,6 +43,34 @@ class ApiRootSerializer(serializers.Serializer):
     conventions = serializers.DictField()
 
 
+class DiagramQueueSerializer(serializers.Serializer):
+    waiting = serializers.IntegerField(min_value=0)
+    processing = serializers.IntegerField(min_value=0)
+    total = serializers.IntegerField(min_value=0)
+
+
+class DiagramFailureSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    occurred_at = serializers.IntegerField(min_value=1)
+
+
+class DiagramRendererDiagnosticsSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("ready", "stale", "unavailable", "not_configured"))
+    version = serializers.CharField(allow_null=True)
+    capacity = serializers.IntegerField(min_value=1)
+    queue = DiagramQueueSerializer()
+    recent_failures = DiagramFailureSerializer(many=True)
+    last_checked_at = serializers.IntegerField(min_value=1, allow_null=True)
+
+
+class SystemDiagnosticsSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("ready", "degraded"))
+    checked_at = serializers.DateTimeField()
+    application_version = serializers.CharField()
+    database = serializers.ChoiceField(choices=("ready",))
+    diagram_renderer = DiagramRendererDiagnosticsSerializer()
+
+
 IDEMPOTENCY_KEY_PARAMETER = OpenApiParameter(
     name="Idempotency-Key",
     type=OpenApiTypes.STR,

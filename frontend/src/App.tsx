@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   UserPlus,
   ScrollText,
+  ServerCog,
   Trash2,
   Tags,
   UsersRound,
@@ -116,6 +117,7 @@ const Certificates = lazy(async () => ({ default: (await import('./domains/Certi
 const Files = lazy(async () => ({ default: (await import('./files/Files')).Files }))
 const ProductCatalogs = lazy(async () => ({ default: (await import('./catalog/ProductCatalogs')).ProductCatalogs }))
 const SearchResults = lazy(async () => ({ default: (await import('./search/SearchResults')).SearchResults }))
+const SystemStatus = lazy(async () => ({ default: (await import('./system-status/SystemStatus')).SystemStatus }))
 
 type NavigationItem = {
   label: string
@@ -257,11 +259,12 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   )
 }
 
-function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotifications, onSignOut, signingOut }: {
+function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotifications, canViewSystemStatus, onSignOut, signingOut }: {
   user: AuthenticatedContext['user']
   canManageAccess: boolean
   canManageStaff: boolean
   canManageNotifications: boolean
+  canViewSystemStatus: boolean
   onSignOut: () => Promise<void>
   signingOut: boolean
 }) {
@@ -301,6 +304,7 @@ function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotificat
           {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={() => setOpen(false)}><UserPlus size={17} />Staff &amp; invitations</AppLink>}
           {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />Access control</AppLink>}
           {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />Email delivery</AppLink>}
+          {canViewSystemStatus && <AppLink to="/system-status" role="menuitem" onClick={() => setOpen(false)}><ServerCog size={17} />System status</AppLink>}
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       )}
@@ -493,9 +497,9 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   }
 
   useEffect(() => {
-    const areaLabel = activeArea.charAt(0).toUpperCase() + activeArea.slice(1)
+    const areaLabel = location.pathname === '/system-status' ? 'System status' : activeArea.charAt(0).toUpperCase() + activeArea.slice(1)
     document.title = `${selectedWorkspace?.name ?? shellContext.tenant.name} · ${areaLabel} · TekDocs`
-  }, [activeArea, selectedWorkspace?.name, shellContext.tenant.name])
+  }, [activeArea, location.pathname, selectedWorkspace?.name, shellContext.tenant.name])
 
   useEffect(() => {
     if (previousPathname.current !== location.pathname) {
@@ -514,7 +518,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
-          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} canViewSystemStatus={shellContext.permissions?.includes('system_diagnostics.view') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
@@ -535,6 +539,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/staff" element={shellContext.permissions?.includes('staff_invitations.view') ? <Suspense fallback={<section className="content-section" role="status">Loading staff administration…</section>}><StaffAdministration client={staffAdministrationClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <Suspense fallback={<section className="content-section" role="status">Loading access control…</section>}><AccessControl client={accessControlClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/notification-delivery" element={shellContext.permissions?.includes('notifications.manage') ? <NotificationDeliveryAdmin client={browserNotificationDeliveryAdminClient} /> : <Navigate to="/overview" replace />} />
+            <Route path="/system-status" element={shellContext.permissions?.includes('system_diagnostics.view') ? <SystemStatus /> : <Navigate to="/overview" replace />} />
             <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />

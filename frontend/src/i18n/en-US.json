@@ -19,6 +19,7 @@
   "files.search": "Search files",
   "files.loading": "Loading files…",
   "files.empty": "No managed files are attached to documents in this workspace.",
+  "systemStatus.rendererErrorsTable": "Recent renderer errors",
   "files.noMatches": "No files match this search.",
   "files.loadFailed": "Files could not be loaded.",
   "files.table": "Managed files",

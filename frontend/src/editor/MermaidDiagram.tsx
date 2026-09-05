@@ -1,6 +1,9 @@
 import DOMPurify from 'dompurify'
+import { Download, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import mermaid from 'mermaid'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
+
+import { translate } from '../i18n/localization'
 
 type DiagramState =
   | { phase: 'loading' }
@@ -35,8 +38,14 @@ function stableId(source: string, index: number) {
 }
 
 function accessibleText(source: string) {
-  const title = /^\s*accTitle:\s*(.+)$/im.exec(source)?.[1]?.trim() || 'Technical diagram'
-  const description = /^\s*accDescr:\s*(.+)$/im.exec(source)?.[1]?.trim()
+  let title = ''
+  let description = ''
+  for (const line of source.split(/\r?\n/)) {
+    const titleMatch = /^\s*accTitle:\s*(.+?)\s*$/i.exec(line)
+    const descriptionMatch = /^\s*accDescr:\s*(.+?)\s*$/i.exec(line)
+    if (titleMatch) title = titleMatch[1]
+    if (descriptionMatch) description = descriptionMatch[1]
+  }
   return { title, description }
 }
 
@@ -63,9 +72,27 @@ function sanitizeSvg(svg: string) {
   return sanitized
 }
 
-export function MermaidDiagram({ source, index, showSource = false }: { source: string; index: number; showSource?: boolean }) {
+function downloadName(title: string) {
+  const safe = title.normalize('NFKD').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+  return `${safe || 'diagram'}.svg`
+}
+
+export function MermaidDiagram({
+  source,
+  index,
+  showSource = false,
+  showErrorSource = true,
+}: {
+  source: string
+  index: number
+  showSource?: boolean
+  showErrorSource?: boolean
+}) {
   const [state, setState] = useState<DiagramState>({ phase: 'loading' })
+  const [zoom, setZoom] = useState(1)
   const accessible = useMemo(() => accessibleText(source), [source])
+  const accessibleTitle = accessible.title || 'Technical diagram'
+  const descriptionId = useId()
 
   useEffect(() => {
     let active = true
@@ -73,7 +100,10 @@ export function MermaidDiagram({ source, index, showSource = false }: { source: 
     const render = async () => {
       try {
         const result = await mermaid.render(stableId(source, index), source)
-        if (active) setState({ phase: 'ready', svg: sanitizeSvg(result.svg) })
+        if (active) {
+          setState({ phase: 'ready', svg: sanitizeSvg(result.svg) })
+          setZoom(1)
+        }
       } catch {
         if (active) setState({ phase: 'error' })
       }
@@ -84,12 +114,34 @@ export function MermaidDiagram({ source, index, showSource = false }: { source: 
     }
   }, [index, source])
 
+  const downloadSvg = () => {
+    if (state.phase !== 'ready') return
+    const href = URL.createObjectURL(new Blob([state.svg], { type: 'image/svg+xml;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = href
+    link.download = downloadName(accessibleTitle)
+    link.click()
+    URL.revokeObjectURL(href)
+  }
+
+  const sourceVisible = showSource || (showErrorSource && state.phase === 'error')
+
   return <figure className="mermaid-diagram">
-    <figcaption>{accessible.title}</figcaption>
-    {accessible.description && <p>{accessible.description}</p>}
+    <figcaption>{accessibleTitle}</figcaption>
+    {accessible.description && <p id={descriptionId}>{accessible.description}</p>}
     {state.phase === 'loading' && <p role="status">Rendering diagram…</p>}
-    {state.phase === 'ready' && <div className="mermaid-graphic" role="img" aria-label={accessible.title}><div aria-hidden="true" dangerouslySetInnerHTML={{ __html: state.svg }} /></div>}
-    {state.phase === 'error' && <p role="status">{showSource ? 'The diagram could not be rendered. Its source remains available below.' : 'The diagram could not be rendered. Open Mermaid source to inspect it.'}</p>}
-    {showSource && <details><summary>Accessible diagram source</summary><pre><code>{source}</code></pre></details>}
+    {state.phase === 'ready' && <>
+      <div className="diagram-view-toolbar" role="group" aria-label="Diagram view controls">
+        <button className="icon-button" type="button" aria-label="Zoom out" title="Zoom out" disabled={zoom <= .5} onClick={() => setZoom((value) => Math.max(.5, value - .25))}><ZoomOut size={16} aria-hidden="true" /></button>
+        <button className="diagram-zoom-reset" type="button" aria-label={`Reset zoom, currently ${Math.round(zoom * 100)}%`} title="Reset zoom" disabled={zoom === 1} onClick={() => setZoom(1)}><RotateCcw size={14} aria-hidden="true" /><span aria-hidden="true">{Math.round(zoom * 100)}%</span></button>
+        <button className="icon-button" type="button" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 2} onClick={() => setZoom((value) => Math.min(2, value + .25))}><ZoomIn size={16} aria-hidden="true" /></button>
+        <button className="secondary-button diagram-download" type="button" onClick={downloadSvg}><Download size={15} aria-hidden="true" />{translate('diagrams.downloadSvg')}</button>
+      </div>
+      <div className="mermaid-graphic" role="region" tabIndex={0} aria-label={`Scrollable diagram: ${accessibleTitle}`}>
+        <div className="mermaid-graphic-size" style={{ width: `${zoom * 100}%` }} role="img" aria-label={accessibleTitle} aria-describedby={accessible.description ? descriptionId : undefined}><div aria-hidden="true" dangerouslySetInnerHTML={{ __html: state.svg }} /></div>
+      </div>
+    </>}
+    {state.phase === 'error' && <p role="status">The diagram could not be rendered. Its Mermaid source remains available below.</p>}
+    {sourceVisible && <details><summary>Mermaid source</summary><pre><code>{source}</code></pre></details>}
   </figure>
 }

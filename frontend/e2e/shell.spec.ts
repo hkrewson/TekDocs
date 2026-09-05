@@ -276,6 +276,13 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await dialog.getByRole('combobox', { name: 'Connection style 1' }).selectOption('wireless')
   await expect(dialog.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
   await expect(dialog.getByText('Accessible diagram source')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Zoom in' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(dialog.getByRole('button', { name: 'Reset zoom, currently 125%' })).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Reset zoom, currently 125%' }).click()
+  const diagramDownload = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: 'Download SVG' }).click()
+  expect((await diagramDownload).suggestedFilename()).toBe('network-diagram.svg')
   await dialog.getByRole('tab', { name: 'Mermaid guide' }).click()
   await expect(dialog.getByRole('heading', { name: 'Mermaid basics' })).toBeVisible()
   await dialog.getByRole('tab', { name: 'Preview' }).click()
@@ -298,6 +305,17 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   expect(pageErrors).toEqual([])
   await expect(page.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
   await expect(page.locator('.document-content-body pre > code.language-mermaid')).toHaveCount(0)
+  const savedGraphic = page.getByRole('img', { name: 'Network diagram' })
+  const describedBy = await savedGraphic.getAttribute('aria-describedby')
+  expect(describedBy).toBeTruthy()
+  await expect(page.locator(`#${describedBy}`)).toContainText('The systems and connections in this network.')
+  await page.emulateMedia({ forcedColors: 'active' })
+  expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true)
+  expect((await new AxeBuilder({ page }).include('.mermaid-diagram').withTags(wcag22Tags).analyze()).violations).toEqual([])
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.getByRole('group', { name: 'Diagram view controls' })).toBeHidden()
+  await expect(page.getByRole('img', { name: 'Network diagram' })).toBeVisible()
+  await page.emulateMedia({ media: 'screen', forcedColors: 'none' })
 })
 
 test('Mermaid preview renders locally with an accessible description', async ({ page, baseURL }) => {
@@ -319,6 +337,25 @@ test('Mermaid preview renders locally with an accessible description', async ({ 
   await expect(diagram.getByRole('img', { name: 'Client path' })).toBeVisible()
   await expect(diagram.locator(':scope > p').first()).toHaveText('User traffic crosses the firewall')
   await expect(page.getByText('Accessible diagram source')).toHaveCount(0)
+})
+
+test('a failed Mermaid preview keeps source available without exposing it before failure', async ({ page, baseURL }) => {
+  await mockAuthenticated(page)
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
+    json: {
+      html: '<pre><code class="language-mermaid">not-a-diagram\naccTitle: Broken path\naccDescr: Source remains available</code></pre>',
+    },
+  }))
+
+  await page.goto('/documentation')
+  await openPrimaryBlockEditor(page)
+  await page.getByRole('tab', { name: 'Preview' }).click()
+
+  await expect(page.getByText('The diagram could not be rendered. Its Mermaid source remains available below.')).toBeVisible()
+  await expect(page.getByText('Mermaid source', { exact: true })).toBeVisible()
+  await page.getByText('Mermaid source', { exact: true }).click()
+  await expect(page.locator('.mermaid-diagram details code')).toContainText('not-a-diagram')
 })
 
 test('revision history pagination and diffs remain keyboard-accessible', async ({ page }) => {

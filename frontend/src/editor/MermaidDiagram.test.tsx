@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
 const { initialize, renderDiagram } = vi.hoisted(() => ({
@@ -18,7 +19,7 @@ it('uses strict deterministic rendering and retains an accessible source fallbac
 
   expect(await screen.findByRole('img', { name: 'Client data flow' })).toBeVisible()
   expect(screen.getByText('Firewall traffic path')).toBeVisible()
-  expect(screen.getByText('Accessible diagram source')).toBeVisible()
+  expect(screen.getByText('Mermaid source')).toBeVisible()
   expect(document.querySelector('details code')?.textContent).toBe(source)
   expect(document.querySelector('script')).not.toBeInTheDocument()
   expect(document.querySelector('foreignObject')).not.toBeInTheDocument()
@@ -38,7 +39,8 @@ it('refuses obfuscated external CSS references in renderer output', async () => 
 
   render(<MermaidDiagram source="flowchart LR\nA-->B" index={1} showSource />)
 
-  expect(await screen.findByText('The diagram could not be rendered. Its source remains available below.')).toBeVisible()
+  expect(await screen.findByText('The diagram could not be rendered. Its Mermaid source remains available below.')).toBeVisible()
+  expect(screen.getByText('Mermaid source')).toBeVisible()
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
 
@@ -46,5 +48,31 @@ it('can omit the source disclosure in a guided editing context', async () => {
   render(<MermaidDiagram source="flowchart LR\naccTitle: Path\naccDescr: A path\nA-->B" index={2} showSource={false} />)
 
   expect(await screen.findByRole('img')).toBeVisible()
-  expect(screen.queryByText('Accessible diagram source')).not.toBeInTheDocument()
+  expect(screen.queryByText('Mermaid source')).not.toBeInTheDocument()
+})
+
+it('zooms with keyboard-operable controls and downloads sanitized SVG', async () => {
+  const user = userEvent.setup()
+  const source = `flowchart LR
+accTitle: Client path
+accDescr: A path
+A-->B`
+  render(<MermaidDiagram source={source} index={3} />)
+
+  const graphic = await screen.findByRole('img', { name: 'Client path' })
+  expect(graphic).toHaveAttribute('aria-describedby')
+  expect(screen.getByRole('region', { name: 'Scrollable diagram: Client path' })).toHaveAttribute('tabindex', '0')
+  await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+  expect(graphic).toHaveStyle({ width: '125%' })
+  await user.click(screen.getByRole('button', { name: 'Reset zoom, currently 125%' }))
+  expect(graphic).toHaveStyle({ width: '100%' })
+  const createObjectUrl = vi.fn().mockReturnValue('blob:diagram')
+  const revokeObjectUrl = vi.fn()
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+  await user.click(screen.getByRole('button', { name: 'Download SVG' }))
+  expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+  expect(click).toHaveBeenCalledOnce()
+  expect(revokeObjectUrl).toHaveBeenCalledWith('blob:diagram')
 })

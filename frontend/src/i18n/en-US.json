@@ -844,6 +844,7 @@
   "diagrams.guideConnections": "Connections",
   "diagrams.guideAccess": "Accessibility",
   "diagrams.guideMore": "The preview updates as you edit the source.",
+  "diagrams.downloadSvg": "Download SVG",
   "diagrams.insert": "Insert diagram",
   "diagrams.save": "Save diagram",
   "workspace.haloTickets": "Recent HaloPSA tickets",

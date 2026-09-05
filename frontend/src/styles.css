@@ -819,8 +819,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .mermaid-diagram { margin: 18px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
 .mermaid-diagram figcaption { margin-bottom: 10px; font-weight: 650; }
 .mermaid-diagram > p { color: var(--muted); }
-.mermaid-graphic { overflow: auto; padding: 12px; background: var(--surface); border-radius: 6px; }
-.mermaid-graphic svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.diagram-view-toolbar { display: flex; align-items: center; gap: 5px; margin: 10px 0 6px; }
+.diagram-view-toolbar .icon-button { width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; }
+.diagram-zoom-reset { min-width: 68px; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 11px; font-weight: 600; }
+.diagram-zoom-reset:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); }
+.diagram-zoom-reset:disabled { cursor: default; opacity: .65; }
+.diagram-view-toolbar .diagram-download { min-height: 30px; margin-left: auto; padding: 5px 9px; font-size: 12px; }
+.mermaid-graphic { overflow: auto; padding: 12px; background: var(--surface); border: 1px solid transparent; border-radius: 6px; }
+.mermaid-graphic:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); outline-offset: 1px; }
+.mermaid-graphic-size { min-width: 100%; margin: auto; }
+.mermaid-graphic svg { display: block; width: 100%; max-width: none; height: auto; margin: auto; }
 .mermaid-diagram details { margin-top: 10px; }
 .mermaid-diagram summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .mermaid-diagram pre { max-height: 280px; overflow: auto; white-space: pre-wrap; }
@@ -1290,6 +1298,15 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (forced-colors: active) {
   button, a, input, select, textarea { forced-color-adjust: auto; }
   .nav-link.active, .mode-tabs button.selected { outline: 2px solid currentColor; outline-offset: -2px; }
+  .mermaid-diagram, .mermaid-graphic { border-color: CanvasText; forced-color-adjust: auto; }
+}
+
+@media print {
+  .diagram-view-toolbar { display: none !important; }
+  .mermaid-diagram { break-inside: avoid; padding: 0; background: transparent; border: 0; }
+  .mermaid-graphic { overflow: visible; padding: 0; border: 0; }
+  .mermaid-graphic-size { width: 100% !important; }
+  .mermaid-diagram details { display: none; }
 }
 
 @media (max-width: 800px) {

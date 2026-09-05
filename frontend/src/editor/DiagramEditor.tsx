@@ -120,7 +120,7 @@ export function DiagramEditor({ markdown, onSave, onCancel }: {
             <button type="button" role="tab" aria-selected={previewTab === 'preview'} className={previewTab === 'preview' ? 'selected' : ''} onClick={() => setPreviewTab('preview')}>{translate('diagrams.preview')}</button>
             <button type="button" role="tab" aria-selected={previewTab === 'guide'} className={previewTab === 'guide' ? 'selected' : ''} onClick={() => setPreviewTab('guide')}>{translate('diagrams.guide')}</button>
           </div>
-          {previewTab === 'preview' ? <MermaidDiagram source={renderedSource} index={target === 'new' ? blocks.length : target} showSource={false} /> : <div className="diagram-guide">
+          {previewTab === 'preview' ? <MermaidDiagram source={renderedSource} index={target === 'new' ? blocks.length : target} showSource={false} showErrorSource={false} /> : <div className="diagram-guide">
             <h3>{translate('diagrams.guideTitle')}</h3>
             <p>{translate('diagrams.guideIntro')}</p>
             <dl>

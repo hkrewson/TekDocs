@@ -170,6 +170,7 @@ TekDocs uses session and CSRF authentication for the browser application. Person
 The repository uses three primary workflows:
 
 - **Build, test, and secure** validates backend, frontend, and diagram-renderer code, PostgreSQL behavior, permissions, isolation, dependencies, licenses, repository secrets, browser journeys, and production containers. Successful trusted pushes publish the exact tested backend, frontend, and isolated diagram-renderer images to GHCR with commit-addressed tags, SBOM attestations, and build-provenance attestations.
+- **Diagram renderer maintenance** is governed by a checked preview/export version contract and a [repeatable update procedure](.github/DIAGRAM_RENDERER_MAINTENANCE.md). CI retains the effective versions and hashes of the files that control diagram output.
 - **Extended validation** runs the full browser matrix, reference performance dataset, backup and upgrade rehearsals, and DAST.
 - **CodeQL** publishes Python and JavaScript/TypeScript findings through GitHub code scanning.
 

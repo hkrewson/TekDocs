@@ -4,6 +4,10 @@ set -eu
 root_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root_dir"
 
+python3 scripts/check_renderer_dependency_contract.py
+grep -q 'python3 scripts/check_renderer_dependency_contract.py' .github/workflows/build.yml
+grep -q 'path: artifacts/renderer-dependency-contract.json' .github/workflows/build.yml
+
 for lock_file in backend/build-requirements.lock backend/requirements.lock backend/requirements-dev.lock; do
   test -s "$lock_file"
   grep -q -- '--hash=sha256:' "$lock_file"

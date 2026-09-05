@@ -30,3 +30,14 @@ it('uses strict deterministic rendering and retains an accessible source fallbac
   }))
   expect(renderDiagram).toHaveBeenCalledWith(expect.stringMatching(/^tekdocs-mermaid-/), source)
 })
+
+it('refuses obfuscated external CSS references in renderer output', async () => {
+  renderDiagram.mockResolvedValueOnce({
+    svg: '<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\\72l(\\68ttps\\3a//example.invalid/x)"/></svg>',
+  })
+
+  render(<MermaidDiagram source="flowchart LR\nA-->B" index={1} />)
+
+  expect(await screen.findByText('The diagram could not be rendered. Its source remains available below.')).toBeVisible()
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+})

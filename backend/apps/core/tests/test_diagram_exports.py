@@ -77,6 +77,25 @@ def test_svg_sanitizer_rejects_active_and_external_content():
         sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg"><style>.x{fill:url(https://bad)}</style></svg>')
 
 
+@pytest.mark.parametrize(
+    "svg",
+    (
+        '<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\\72l(\\68ttps\\3a//example.invalid/x)"/></svg>',
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<rect style="fill:&#x75;rl(&#x68;ttps&#x3a;//example.invalid/x)"/></svg>'
+        ),
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<style>.x{fill:&#x75;rl(&#x68;ttps&#x3a;//example.invalid/x)}</style></svg>'
+        ),
+    ),
+)
+def test_svg_sanitizer_rejects_obfuscated_external_css_references(svg):
+    with pytest.raises(DiagramRenderError, match="unsafe"):
+        sanitize_svg(svg.encode())
+
+
 def test_exported_html_has_graphic_alt_text_and_source_fallback():
     source = DiagramSource(1, "flowchart LR\nA-->B", "a" * 64, "Service flow", "A reaches B.")
     artifact = DiagramExportArtifact(

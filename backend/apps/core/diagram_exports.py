@@ -182,6 +182,28 @@ def sanitize_svg(content: bytes) -> bytes:
         text = content.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise DiagramRenderError("The diagram renderer returned invalid SVG.") from exc
+    _validate_svg_content(text)
+    cleaned = nh3.clean(
+        text,
+        tags=_SVG_TAGS,
+        attributes=_SVG_ATTRIBUTES,
+        clean_content_tags=set(),
+        url_schemes=set(),
+    ).strip()
+    # nh3 decodes character references while normalizing the SVG. Recheck the
+    # normalized result so an encoded CSS URL cannot become active after the first
+    # inspection. CSS escapes are refused in style contexts because they can hide
+    # url(), a scheme, or @import from a textual allowlist.
+    _validate_svg_content(cleaned)
+    if not cleaned.startswith("<svg") or "</svg>" not in cleaned:
+        raise DiagramRenderError("The diagram renderer returned invalid SVG.")
+    encoded = cleaned.encode("utf-8")
+    if len(encoded) > MAX_SVG_BYTES:
+        raise DiagramRenderError("A sanitized diagram exceeds the SVG size limit.")
+    return encoded
+
+
+def _validate_svg_content(text: str) -> None:
     lowered = text.casefold()
     scanned = lowered.replace('xmlns="http://www.w3.org/2000/svg"', "").replace(
         'xmlns:xlink="http://www.w3.org/1999/xlink"', ""
@@ -193,22 +215,13 @@ def sanitize_svg(content: bytes) -> bytes:
         reference = match.group(1).strip().strip("'\"")
         if not reference.startswith("#"):
             raise DiagramRenderError("The diagram renderer returned an unsafe SVG reference.")
-    for style in re.findall(r"<style(?:\s[^>]*)?>(.*?)</style>", text, re.IGNORECASE | re.DOTALL):
-        if "\\" in style:
-            raise DiagramRenderError("The diagram renderer returned unsafe SVG styling.")
-    cleaned = nh3.clean(
-        text,
-        tags=_SVG_TAGS,
-        attributes=_SVG_ATTRIBUTES,
-        clean_content_tags=set(),
-        url_schemes=set(),
-    ).strip()
-    if not cleaned.startswith("<svg") or "</svg>" not in cleaned:
-        raise DiagramRenderError("The diagram renderer returned invalid SVG.")
-    encoded = cleaned.encode("utf-8")
-    if len(encoded) > MAX_SVG_BYTES:
-        raise DiagramRenderError("A sanitized diagram exceeds the SVG size limit.")
-    return encoded
+    styles = re.findall(r"<style(?:\s[^>]*)?>(.*?)</style>", text, re.IGNORECASE | re.DOTALL)
+    styles.extend(
+        match.group(2)
+        for match in re.finditer(r"\sstyle\s*=\s*([\"'])(.*?)\1", text, re.IGNORECASE | re.DOTALL)
+    )
+    if any("\\" in style for style in styles):
+        raise DiagramRenderError("The diagram renderer returned unsafe SVG styling.")
 
 
 def _rejected_detail(result: object, *, expected_count: int) -> str | None:

@@ -284,11 +284,13 @@ security:
 	./scripts/frontend-gate.sh audit
 	docker compose run --rm --no-deps --entrypoint node diagram-renderer check-licenses.mjs
 	docker run --rm -v "$(CURDIR):/src:ro" -v /dev/null:/src/.env:ro zricethezav/gitleaks:latest@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/src --no-git --no-banner --redact
-	docker build --target production -t tekdocs-backend-security ./backend
+	docker build --pull --no-cache --target production -t tekdocs-backend-security ./backend
+	docker build --pull --no-cache --target production -t tekdocs-frontend-security ./frontend
+	docker build --pull --no-cache -t tekdocs-diagram-renderer-security ./renderer
 	docker run --rm -v "$(CURDIR)/scripts/check-python-licenses.py:/check-python-licenses.py:ro" tekdocs-backend-security python /check-python-licenses.py
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-backend-security
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-diagram-renderer
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend-security
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-diagram-renderer-security
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(CURDIR)/.trivyignore.yaml:/.trivyignore.yaml:ro" aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --ignorefile /.trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:8ff5eae4b0873bbfe047f408e681a4e59885f819dcb891e5f424b46135191e1b
 
 dast:

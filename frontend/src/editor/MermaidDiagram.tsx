@@ -41,10 +41,26 @@ function accessibleText(source: string) {
 }
 
 function sanitizeSvg(svg: string) {
-  return DOMPurify.sanitize(svg, {
+  const sanitized = DOMPurify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true },
     FORBID_TAGS: ['foreignObject', 'script'],
   })
+  const scanned = sanitized.toLowerCase()
+    .replace('xmlns="http://www.w3.org/2000/svg"', '')
+    .replace('xmlns:xlink="http://www.w3.org/1999/xlink"', '')
+  if (['javascript:', 'data:', 'http:', 'https:', '@import'].some((value) => scanned.includes(value))) {
+    throw new Error('Unsafe diagram output')
+  }
+  for (const match of sanitized.matchAll(/url\(([^)]*)\)/gi)) {
+    const reference = match[1].trim().replace(/^['"]|['"]$/g, '')
+    if (!reference.startsWith('#')) throw new Error('Unsafe diagram output')
+  }
+  const styles = [
+    ...Array.from(sanitized.matchAll(/<style(?:\s[^>]*)?>(.*?)<\/style>/gis), (match) => match[1]),
+    ...Array.from(sanitized.matchAll(/\sstyle\s*=\s*(["'])(.*?)\1/gis), (match) => match[2]),
+  ]
+  if (styles.some((style) => style.includes('\\'))) throw new Error('Unsafe diagram output')
+  return sanitized
 }
 
 export function MermaidDiagram({ source, index }: { source: string; index: number }) {

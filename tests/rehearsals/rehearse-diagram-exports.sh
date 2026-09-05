@@ -10,6 +10,7 @@ test -n "$container_id"
 test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$container_id")" = "none"
 test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = "10001:10001"
 test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = "true"
+test "$(docker inspect --format '{{.HostConfig.Init}}' "$container_id")" = "true"
 
 docker compose run --rm --no-deps \
   -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false \

@@ -19,6 +19,7 @@ const maximumPngBytes = 5 * 1024 * 1024
 const maximumJobs = 8
 const staleMilliseconds = 5 * 60 * 1000
 const recentFailures = []
+const renderTimeoutMilliseconds = 30_000
 
 // A job can fail six operationally different ways. Reporting one flat code for all of
 // them means an operator reading container logs cannot tell a Chromium launch failure
@@ -97,19 +98,27 @@ async function processJob(jobName) {
   try {
     const request = JSON.parse(readFileSync(path.join(jobDirectory, 'request.json'), 'utf8'))
     if (!Number.isInteger(request.count) || request.count < 1 || request.count > 20) throw new Error('invalid request')
-    await execFileAsync(
-      '/renderer/node_modules/.bin/mmdc',
-      [
-        '--input', path.join(jobDirectory, 'input.md'),
-        '--output', path.join(jobDirectory, 'output.md'),
-        '--configFile', '/renderer/mermaid-config.json',
-        '--puppeteerConfigFile', '/renderer/puppeteer-config.json',
-        '--backgroundColor', 'white',
-        '--width', '1200',
-        '--height', '800',
-      ],
-      { timeout: 15000, maxBuffer: 64 * 1024, env: { ...process.env, NO_PROXY: '*', no_proxy: '*' } },
-    )
+    // Mermaid CLI renders every chart in a Markdown input concurrently. Process
+    // sources in order so a mixed document stays within the fixed memory boundary.
+    for (let index = 1; index <= request.count; index += 1) {
+      await execFileAsync(
+        '/renderer/node_modules/.bin/mmdc',
+        [
+          '--input', path.join(jobDirectory, `input-${index}.mmd`),
+          '--output', path.join(jobDirectory, `output-${index}.svg`),
+          '--configFile', '/renderer/mermaid-config.json',
+          '--puppeteerConfigFile', '/renderer/puppeteer-config.json',
+          '--backgroundColor', 'white',
+          '--width', '1200',
+          '--height', '800',
+        ],
+        {
+          timeout: renderTimeoutMilliseconds,
+          maxBuffer: 64 * 1024,
+          env: { ...process.env, NO_PROXY: '*', no_proxy: '*' },
+        },
+      )
+    }
     const svgFiles = safeFiles(jobDirectory, '.svg')
     if (svgFiles.length !== request.count) throw new Error('incomplete render')
     for (const svgName of svgFiles) {

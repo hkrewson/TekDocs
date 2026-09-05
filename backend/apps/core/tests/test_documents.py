@@ -273,6 +273,40 @@ def test_diagram_preflight_returns_specific_safe_failure_and_remediation(owner_c
 
 
 @pytest.mark.django_db
+def test_diagram_preflight_warns_for_a_family_outside_the_1x_contract(
+    owner_client, installation, monkeypatch
+):
+    markdown = (
+        "```mermaid\n"
+        "gantt\n"
+        "accTitle: Maintenance schedule\n"
+        "accDescr: Planned maintenance work over time.\n"
+        "dateFormat YYYY-MM-DD\n"
+        "section Network\n"
+        "Upgrade :2026-09-05, 1d\n"
+        "```\n"
+    )
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Maintenance schedule", "markdown": markdown},
+        content_type="application/json",
+    ).json()
+    monkeypatch.setattr("apps.core.preflight.render_diagram_exports", lambda *_args, **_kwargs: ())
+
+    response = owner_client.get(
+        reverse("msp-document-preflight", kwargs={"document_entity_id": created["id"]}),
+        {"audience": "msp_internal"},
+    )
+
+    assert response.status_code == 200
+    report = response.json()
+    finding = next(item for item in report["findings"] if item["code"] == "diagram.family.unsupported")
+    assert finding["severity"] == "warning"
+    assert finding["target"] == "editor"
+    assert report["valid"] is True
+
+
+@pytest.mark.django_db
 def test_policy_starter_markdown_is_accepted_without_duplicate_structure(owner_client, installation):
     from apps.core.topic_schemas import seed_markdown
 

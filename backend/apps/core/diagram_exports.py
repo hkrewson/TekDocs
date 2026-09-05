@@ -21,6 +21,28 @@ MAX_SVG_BYTES = 2 * 1024 * 1024
 MAX_PNG_BYTES = 5 * 1024 * 1024
 MAX_ACTIVE_JOBS = 8
 RENDERER_HEALTH_MAX_AGE_SECONDS = 5
+RENDERER_PROCESS_TIMEOUT_BASE_SECONDS = 30
+RENDERER_PROCESS_TIMEOUT_PER_DIAGRAM_SECONDS = 6
+RENDERER_PROCESS_TIMEOUT_MAX_SECONDS = 55
+#: Diagram families TekDocs renders and regression-tests as part of the 1.x
+#: compatibility contract. Other Mermaid families remain editable and may render,
+#: but publication preflight warns that their output is best-effort.
+SUPPORTED_DIAGRAM_FAMILIES = (
+    "flowchart",
+    "sequence",
+    "class",
+    "state",
+    "entity_relationship",
+)
+_DIAGRAM_FAMILY_ALIASES = {
+    "flowchart": "flowchart",
+    "graph": "flowchart",
+    "sequencediagram": "sequence",
+    "classdiagram": "class",
+    "statediagram": "state",
+    "statediagram-v2": "state",
+    "erdiagram": "entity_relationship",
+}
 #: The renderer identifies its own version; this module does not keep a second copy to
 #: compare against. A duplicated constant cannot be updated by a dependency bump, so it
 #: would silently attest the wrong renderer in a signed manifest while every check still
@@ -152,6 +174,7 @@ class DiagramSource:
     source_checksum: str
     title: str
     description: str
+    family: str = "unsupported"
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +192,32 @@ class DiagramExportArtifact:
     @property
     def png_checksum(self) -> str | None:
         return hashlib.sha256(self.png).hexdigest() if self.png is not None else None
+
+
+def diagram_family(source: str) -> str:
+    """Return a stable contract name without exposing untrusted source tokens."""
+
+    for line in source.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("%%"):
+            continue
+        folded = stripped.casefold()
+        if folded.startswith(("acctitle:", "accdescr:")):
+            continue
+        token = folded.split(maxsplit=1)[0]
+        return _DIAGRAM_FAMILY_ALIASES.get(token, "unsupported")
+    return "unsupported"
+
+
+def diagram_render_wait_seconds(count: int) -> int:
+    """Return a bounded wait that covers the renderer's batch-aware deadline."""
+
+    worker_timeout = min(
+        RENDERER_PROCESS_TIMEOUT_MAX_SECONDS,
+        RENDERER_PROCESS_TIMEOUT_BASE_SECONDS + count * RENDERER_PROCESS_TIMEOUT_PER_DIAGRAM_SECONDS,
+    )
+    configured_maximum = int(getattr(settings, "TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS", 60))
+    return min(configured_maximum, worker_timeout + 5)
 
 
 def diagram_sources(markdown: str) -> tuple[DiagramSource, ...]:
@@ -201,6 +250,7 @@ def diagram_sources(markdown: str) -> tuple[DiagramSource, ...]:
                 source_checksum=hashlib.sha256(source.encode("utf-8")).hexdigest(),
                 title=(title_match.group(1).strip() if title_match else "Technical diagram")[:240],
                 description=(description_match.group(1).strip() if description_match else "")[:1000],
+                family=diagram_family(source),
             )
         )
     return tuple(values)
@@ -414,19 +464,21 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
     job = root / uuid4().hex
     try:
         job.mkdir(mode=0o700)
-        markdown_batch = "\n\n".join(f"```mermaid\n{source.source}\n```" for source in sources) + "\n"
-        input_path = job / "input.md"
         request_path = job / "request.json"
         ready_path = job / "ready"
-        input_path.write_text(markdown_batch, encoding="utf-8")
+        input_paths: list[Path] = []
+        for source in sources:
+            input_path = job / f"input-{source.index}.mmd"
+            input_path.write_text(f"{source.source}\n", encoding="utf-8")
+            input_paths.append(input_path)
         request_path.write_text(
             json.dumps({"count": len(sources)}, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
         ready_path.write_bytes(b"")
-        for path in (input_path, request_path, ready_path):
+        for path in (*input_paths, request_path, ready_path):
             path.chmod(0o600)
-        deadline = time.monotonic() + int(getattr(settings, "TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS", 20))
+        deadline = time.monotonic() + diagram_render_wait_seconds(len(sources))
         result_path = job / "result.json"
         while time.monotonic() < deadline and not result_path.is_file():
             time.sleep(0.05)
@@ -487,6 +539,7 @@ def diagram_manifest(artifacts: tuple[DiagramExportArtifact, ...]) -> list[dict[
             "index": item.source.index,
             "title": item.source.title,
             "description": item.source.description,
+            "family": item.source.family,
             "source_checksum": item.source.source_checksum,
             "renderer_version": item.renderer_version,
             "state": item.state,

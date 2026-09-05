@@ -20,6 +20,8 @@ from apps.core.diagram_exports import (
     DiagramSource,
     _rejected_detail,
     diagram_manifest,
+    diagram_family,
+    diagram_render_wait_seconds,
     diagram_sources,
     embed_diagrams_in_html,
     render_diagram_exports,
@@ -48,6 +50,7 @@ def test_mermaid_source_metadata_and_manifest_are_stable():
     assert source.index == 1
     assert source.title == "Request path"
     assert source.description == "A request moves from browser to API."
+    assert source.family == "flowchart"
     assert source.source_checksum == hashlib.sha256(source.source.encode()).hexdigest()
 
     artifact = DiagramExportArtifact(
@@ -61,6 +64,7 @@ def test_mermaid_source_metadata_and_manifest_are_stable():
     assert record["source_checksum"] == source.source_checksum
     assert record["svg_checksum"] == hashlib.sha256(artifact.svg or b"").hexdigest()
     assert record["png_checksum"] == hashlib.sha256(artifact.png or b"").hexdigest()
+    assert record["family"] == "flowchart"
     assert "path" not in record
 
 
@@ -100,6 +104,30 @@ def test_source_policy_failures_have_stable_codes(markdown, expected_code):
         diagram_sources(markdown)
 
     assert caught.value.code == expected_code
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    (
+        ("flowchart LR\nA-->B", "flowchart"),
+        ("graph TD\nA-->B", "flowchart"),
+        ("sequenceDiagram\nA->>B: Request", "sequence"),
+        ("classDiagram\nclass Router", "class"),
+        ("stateDiagram-v2\n[*] --> Ready", "state"),
+        ("stateDiagram\n[*] --> Ready", "state"),
+        ("erDiagram\nCUSTOMER ||--o{ ORDER : places", "entity_relationship"),
+        ("%% a comment\naccTitle: Timeline\ngantt\ntitle Work", "unsupported"),
+        ("", "unsupported"),
+    ),
+)
+def test_diagram_family_contract_is_stable(source, expected):
+    assert diagram_family(source) == expected
+
+
+@override_settings(TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS=60)
+@pytest.mark.parametrize(("count", "expected"), ((1, 41), (5, 60), (20, 60)))
+def test_diagram_batch_wait_is_bounded_and_scales_with_document_size(count, expected):
+    assert diagram_render_wait_seconds(count) == expected
 
 
 def test_svg_sanitizer_rejects_active_and_external_content():
@@ -192,13 +220,65 @@ def test_pre_0824_static_manifest_keeps_text_fallback_compatibility():
     assert diagrams[0].renderer_version == "legacy-static-text-fallback"
 
 
+SUPPORTED_FAMILY_MARKDOWN = MARKDOWN + """
+```mermaid
+sequenceDiagram
+  accTitle: Request exchange
+  accDescr: A browser sends a request to an API.
+  participant Browser
+  participant API
+  Browser->>API: Request
+```
+
+```mermaid
+classDiagram
+  accTitle: Service classes
+  accDescr: A router depends on a switch.
+  class Router
+  class Switch
+  Router --> Switch
+```
+
+```mermaid
+stateDiagram-v2
+  accTitle: Device state
+  accDescr: A device moves from offline to ready.
+  [*] --> Offline
+  Offline --> Ready
+```
+
+```mermaid
+erDiagram
+  accTitle: Customer orders
+  accDescr: A customer may place several orders.
+  CUSTOMER ||--o{ ORDER : places
+```
+"""
+
+
+@pytest.mark.renderer_runtime
+def test_supported_diagram_families_render_when_runtime_is_requested(settings):
+    if os.environ.get("TEKDOCS_RUN_DIAGRAM_RUNTIME") != "true":
+        pytest.skip("isolated renderer runtime not configured")
+    artifacts = render_diagram_exports(SUPPORTED_FAMILY_MARKDOWN, required=True)
+    assert tuple(item.source.family for item in artifacts) == (
+        "flowchart",
+        "sequence",
+        "class",
+        "state",
+        "entity_relationship",
+    )
+    assert all(item.state == "rendered" for item in artifacts)
+    assert all(item.svg and item.svg.startswith(b"<svg") for item in artifacts)
+    assert all(item.png and item.png.startswith(b"\x89PNG\r\n\x1a\n") for item in artifacts)
+
+
 @pytest.mark.renderer_runtime
 def test_isolated_renderer_is_deterministic_when_runtime_is_requested(settings):
     if os.environ.get("TEKDOCS_RUN_DIAGRAM_RUNTIME") != "true":
         pytest.skip("isolated renderer runtime not configured")
     first = render_diagram_exports(MARKDOWN, required=True)[0]
     second = render_diagram_exports(MARKDOWN, required=True)[0]
-    assert first.state == second.state == "rendered"
     assert first.svg_checksum == second.svg_checksum
     assert first.png_checksum == second.png_checksum
     assert first.svg == second.svg

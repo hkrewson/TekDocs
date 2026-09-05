@@ -91,6 +91,11 @@ FINDING_CATALOG = {
         "A diagram lacks a useful accessible title or description.",
         "Add accTitle and accDescr lines to the Mermaid source.",
     ),
+    "diagram.family.unsupported": (
+        "warning",
+        "A diagram type is outside the TekDocs 1.0 support contract.",
+        "Use a flowchart, sequence, class, state, or entity-relationship diagram for guaranteed 1.x compatibility.",
+    ),
     "diagram.render_failed": (
         "blocker",
         "A diagram cannot be rendered into retained publication artifacts.",
@@ -265,6 +270,8 @@ def run_document_preflight(*, workspace, document: Document, resolved, audience:
         folded_source = diagram.source.casefold()
         if "acctitle:" not in folded_source or "accdescr:" not in folded_source:
             findings.append(_finding("diagram.accessibility", target="editor"))
+    if any(diagram.family == "unsupported" for diagram in diagrams):
+        findings.append(_finding("diagram.family.unsupported", target="editor"))
     if diagrams:
         try:
             render_diagram_exports(resolved.markdown, required=True)

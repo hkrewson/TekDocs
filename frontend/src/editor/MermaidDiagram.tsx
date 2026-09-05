@@ -63,7 +63,7 @@ function sanitizeSvg(svg: string) {
   return sanitized
 }
 
-export function MermaidDiagram({ source, index, showSource = true }: { source: string; index: number; showSource?: boolean }) {
+export function MermaidDiagram({ source, index, showSource = false }: { source: string; index: number; showSource?: boolean }) {
   const [state, setState] = useState<DiagramState>({ phase: 'loading' })
   const accessible = useMemo(() => accessibleText(source), [source])
 

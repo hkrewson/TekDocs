@@ -14,7 +14,7 @@ import { MermaidDiagram } from './MermaidDiagram'
 
 it('uses strict deterministic rendering and retains an accessible source fallback', async () => {
   const source = 'flowchart LR\naccTitle: Client data flow\naccDescr: Firewall traffic path\nA-->B'
-  render(<MermaidDiagram source={source} index={0} />)
+  render(<MermaidDiagram source={source} index={0} showSource />)
 
   expect(await screen.findByRole('img', { name: 'Client data flow' })).toBeVisible()
   expect(screen.getByText('Firewall traffic path')).toBeVisible()
@@ -36,7 +36,7 @@ it('refuses obfuscated external CSS references in renderer output', async () => 
     svg: '<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\\72l(\\68ttps\\3a//example.invalid/x)"/></svg>',
   })
 
-  render(<MermaidDiagram source="flowchart LR\nA-->B" index={1} />)
+  render(<MermaidDiagram source="flowchart LR\nA-->B" index={1} showSource />)
 
   expect(await screen.findByText('The diagram could not be rendered. Its source remains available below.')).toBeVisible()
   expect(screen.queryByRole('img')).not.toBeInTheDocument()

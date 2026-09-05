@@ -251,7 +251,7 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await expect(source).not.toHaveValue(/tekdocs:/)
 })
 
-test('Mermaid preview renders locally with an accessible source fallback', async ({ page, baseURL }) => {
+test('Mermaid preview renders locally with an accessible description', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
@@ -269,7 +269,7 @@ test('Mermaid preview renders locally with an accessible source fallback', async
   const diagram = page.getByRole('figure', { name: 'Client path' })
   await expect(diagram.getByRole('img', { name: 'Client path' })).toBeVisible()
   await expect(diagram.locator(':scope > p').first()).toHaveText('User traffic crosses the firewall')
-  await expect(page.getByText('Accessible diagram source')).toBeVisible()
+  await expect(page.getByText('Accessible diagram source')).toHaveCount(0)
 })
 
 test('revision history pagination and diffs remain keyboard-accessible', async ({ page }) => {

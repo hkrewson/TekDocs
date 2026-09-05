@@ -156,10 +156,6 @@ DOCUMENT_RLS_TABLES = {
     "core_importbatch",
     "core_importrow",
     "core_importexternalkey",
-    "core_documentationmap",
-    "core_documentationmaprevision",
-    "core_documentationmapentry",
-    "core_documentationmapbaseline",
 }
 
 

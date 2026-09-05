@@ -181,7 +181,7 @@ Production updates pull the three images for the checked-out Git commit, verify 
 
 The [TekDocs Wiki](https://github.com/hkrewson/TekDocs/wiki) is the public product and operator manual. This repository does not maintain a second public documentation tree.
 
-Documentation can also be assembled into versioned maps for operating manuals, recovery plans, onboarding, compliance, and client handoff. Map baselines retain a deterministic portable manifest, source content, checksums, and optional PDF or DOCX output.
+Markdown documents support Mermaid diagrams for network maps, flows, and other relationships kept directly beside the documentation they explain.
 
 Before contributing, read `AGENTS.md`, the applicable backend or frontend instructions, the [interface-language contract](docs/UI_LANGUAGE.md), and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization.
 

@@ -11,7 +11,6 @@
     {"slug": "Sites-and-locations", "audience": "end_user", "contextual": true},
     {"slug": "Documentation", "audience": "end_user", "contextual": true},
     {"slug": "Structured-topics-and-publication-checks", "audience": "end_user"},
-    {"slug": "Documentation-maps", "audience": "end_user"},
     {"slug": "Files-and-attachments", "audience": "end_user", "contextual": true},
     {"slug": "Assets", "audience": "end_user", "contextual": true},
     {"slug": "Software-and-licenses", "audience": "end_user", "contextual": true},

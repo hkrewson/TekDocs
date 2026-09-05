@@ -232,22 +232,3 @@ def catalog() -> list[dict[str, str]]:
         {"code": code, "severity": values[0], "summary": values[1], "remediation": values[2]}
         for code, values in sorted(FINDING_CATALOG.items())
     ]
-
-
-def run_map_preflight(*, documentation_map, findings) -> dict[str, Any]:  # type: ignore[no-untyped-def]
-    """Normalize the map inspector through the same release-check service boundary."""
-    ordered = sorted(findings, key=lambda item: (item.severity != "blocker", item.code, str(item.entry_id or "")))
-    digest = documentation_map.current_revision.content_digest if documentation_map.current_revision else ""
-    result = {
-        "version": "tekdocs-preflight/v1",
-        "scope": "documentation_map",
-        "scope_id": str(documentation_map.entity_id),
-        "composition_digest": digest,
-        "valid": not any(item.severity == "blocker" for item in ordered),
-        "counts": {
-            level: sum(item.severity == level for item in ordered) for level in ("blocker", "warning", "information")
-        },
-        "findings": ordered,
-    }
-    logger.info("documentation_preflight scope=map codes=%s", ",".join(item.code for item in ordered))
-    return result

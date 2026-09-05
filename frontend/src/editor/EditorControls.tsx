@@ -26,21 +26,25 @@ import {
   Redo2,
   Table2,
   Undo2,
+  Workflow,
 } from 'lucide-react'
-import type { ChangeEvent, PointerEvent } from 'react'
+import type { ChangeEvent, PointerEvent, RefObject } from 'react'
 
+import { translate } from '../i18n/localization'
 import { calloutTypes, type CalloutType } from './markdownExtensions'
 
 type Props = {
   editor: Crepe | null
   ready: boolean
+  onDiagram: () => void
+  diagramButtonRef?: RefObject<HTMLButtonElement | null>
 }
 
 function preserveSelection(event: PointerEvent<HTMLButtonElement>): void {
   event.preventDefault()
 }
 
-export function EditorControls({ editor, ready }: Props) {
+export function EditorControls({ editor, ready, onDiagram, diagramButtonRef }: Props) {
   const act = (action: (instance: Crepe) => void) => {
     if (editor && ready) action(editor)
   }
@@ -152,6 +156,7 @@ export function EditorControls({ editor, ready }: Props) {
         {button('Insert divider', <Minus size={17} />, (instance) => instance.editor.action((ctx) => {
           ctx.get(commandsCtx).call(addBlockTypeCommand.key, { nodeType: hrSchema.type(ctx) })
         }))}
+        <button ref={diagramButtonRef} type="button" aria-label={translate('diagrams.manage')} title={translate('diagrams.manage')} disabled={!ready} onPointerDown={preserveSelection} onClick={onDiagram}><Workflow size={17} aria-hidden="true" /></button>
       </span>
       <select aria-label="Insert callout" defaultValue="" disabled={!ready} onChange={addCallout}>
         <option value="" disabled>Callout</option>

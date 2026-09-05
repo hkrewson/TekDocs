@@ -34,6 +34,10 @@ vi.mock('@milkdown/crepe', () => ({
   },
 }))
 
+vi.mock('./MermaidDiagram', () => ({
+  MermaidDiagram: ({ source }: { source: string }) => <pre>{source}</pre>,
+}))
+
 import { EditorSpike } from './EditorSpike'
 
 describe('editor feasibility spike', () => {
@@ -94,5 +98,19 @@ describe('editor feasibility spike', () => {
     const previewTab = screen.getByRole('tab', { name: 'Preview' })
     expect(previewTab).toHaveAttribute('aria-selected', 'true')
     expect(previewTab).toHaveFocus()
+  })
+
+  it('opens the diagram editor and returns focus after inserting a diagram', async () => {
+    const user = userEvent.setup()
+    const onMarkdownChange = vi.fn()
+    render(<EditorSpike onMarkdownChange={onMarkdownChange} />)
+
+    const diagrams = await screen.findByRole('button', { name: 'Diagrams' })
+    await user.click(diagrams)
+    expect(screen.getByRole('dialog', { name: 'Insert diagram' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Insert diagram' }))
+
+    expect(onMarkdownChange).toHaveBeenLastCalledWith(expect.stringContaining('```mermaid'))
+    await waitFor(() => expect(diagrams).toHaveFocus())
   })
 })

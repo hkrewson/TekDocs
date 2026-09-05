@@ -223,6 +223,29 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
 })
 
+test('guided diagrams remain portable Markdown inside the document', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/documentation')
+  await openPrimaryBlockEditor(page)
+
+  const trigger = page.getByRole('button', { name: 'Diagrams' })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: 'Insert diagram' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Item name 2' }).fill('Edge firewall')
+  await expect(dialog.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('.diagram-editor').withTags(wcag22Tags).analyze()).violations).toEqual([])
+  await dialog.getByRole('button', { name: 'Insert diagram' }).click()
+  await expect(trigger).toBeFocused()
+
+  await page.getByRole('tab', { name: 'Markdown' }).click()
+  const source = page.getByLabel('Markdown source')
+  await expect(source).toHaveValue(/```mermaid\nflowchart LR/)
+  await expect(source).toHaveValue(/accTitle: Network diagram/)
+  await expect(source).toHaveValue(/N2\["Edge firewall"\]/)
+  await expect(source).not.toHaveValue(/tekdocs:/)
+})
+
 test('Mermaid preview renders locally with an accessible source fallback', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])

@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 
 import { EditorControls } from './EditorControls'
+import { DiagramEditor } from './DiagramEditor'
 import { MarkdownHelp } from './MarkdownHelp'
 import { SanitizedMarkdown } from './SanitizedMarkdown'
 import { renderMarkdownPreview } from './api'
@@ -17,11 +18,13 @@ const editorModes: EditorMode[] = ['wysiwyg', 'markdown', 'preview', 'help']
 
 export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewall replacement', description = 'Canonical Markdown editor', organizationId, documentId, onMarkdownChange }: { initialMarkdown?: string; title?: string; description?: string; organizationId?: string; documentId?: string; onMarkdownChange?: (markdown: string) => void }) {
   const editorRoot = useRef<HTMLDivElement>(null)
+  const diagramButton = useRef<HTMLButtonElement>(null)
   const [editor, setEditor] = useState<Crepe | null>(null)
   const [mode, setMode] = useState<EditorMode>('wysiwyg')
   const [markdown, setMarkdown] = useState(initialMarkdown)
   const [editorSeed, setEditorSeed] = useState(initialMarkdown)
   const [preview, setPreview] = useState<PreviewState>({ phase: 'idle' })
+  const [diagramOpen, setDiagramOpen] = useState(false)
   const markdownChange = useRef(onMarkdownChange)
   const tabsId = useId()
   const tabRefs = useRef<Record<EditorMode, HTMLButtonElement | null>>({ wysiwyg: null, markdown: null, preview: null, help: null })
@@ -101,6 +104,26 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
     else leaveEditor(nextMode)
   }
 
+  const openDiagrams = () => {
+    const current = editor ? normalizeTekDocsMarkdown(editor.getMarkdown()) : markdown
+    setMarkdown(current)
+    markdownChange.current?.(current)
+    setDiagramOpen(true)
+  }
+
+  const saveDiagram = (value: string) => {
+    setMarkdown(value)
+    setEditorSeed(value)
+    markdownChange.current?.(value)
+    setDiagramOpen(false)
+    requestAnimationFrame(() => diagramButton.current?.focus())
+  }
+
+  const closeDiagram = () => {
+    setDiagramOpen(false)
+    requestAnimationFrame(() => diagramButton.current?.focus())
+  }
+
   const moveTab = (event: KeyboardEvent<HTMLButtonElement>, currentMode: EditorMode) => {
     const currentIndex = editorModes.indexOf(currentMode)
     let nextIndex: number | null = null
@@ -144,7 +167,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
         </div>
       </div>
       {mode === 'wysiwyg' && <div id={`${tabsId}-wysiwyg-panel`} role="tabpanel" aria-labelledby={`${tabsId}-wysiwyg-tab`}>
-        <EditorControls editor={editor} ready={editor !== null} />
+        <EditorControls editor={editor} ready={editor !== null} onDiagram={openDiagrams} diagramButtonRef={diagramButton} />
         <div className="milkdown-host" ref={editorRoot} />
       </div>}
       {mode === 'markdown' && <div id={`${tabsId}-markdown-panel`} role="tabpanel" aria-labelledby={`${tabsId}-markdown-tab`}><textarea className="markdown-source" value={markdown} onChange={(event) => { setMarkdown(event.target.value); markdownChange.current?.(event.target.value) }} aria-label="Markdown source" spellCheck="false" /></div>}
@@ -154,6 +177,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
         {preview.phase === 'ready' && <SanitizedMarkdown html={preview.html} />}
       </div>}
       {mode === 'help' && <div id={`${tabsId}-help-panel`} role="tabpanel" aria-labelledby={`${tabsId}-help-tab`}><MarkdownHelp /></div>}
+      {diagramOpen && <DiagramEditor markdown={markdown} onSave={saveDiagram} onCancel={closeDiagram} />}
     </section>
   )
 }

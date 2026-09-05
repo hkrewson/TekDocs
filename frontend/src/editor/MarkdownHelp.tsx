@@ -1,3 +1,5 @@
+import { translate } from '../i18n/localization'
+
 const inlineSyntax = [
   ['Bold', '**important**'],
   ['Italic', '*emphasis*'],
@@ -38,6 +40,7 @@ export function MarkdownHelp() {
       </section>
       <section aria-labelledby="block-formatting-heading">
         <h3 id="block-formatting-heading">Blocks and technical content</h3>
+        <p>{translate('diagrams.help')}</p>
         <div className="markdown-help-table" role="table" aria-label="Block Markdown syntax">
           {blockSyntax.map(([name, syntax]) => (
             <div role="row" key={name}><strong role="cell">{name}</strong><code role="cell">{syntax}</code></div>

@@ -16,12 +16,15 @@ describe('diagram editor', () => {
 
     await user.clear(screen.getByRole('textbox', { name: 'Item name 2' }))
     await user.type(screen.getByRole('textbox', { name: 'Item name 2' }), 'Edge firewall')
+    await user.type(screen.getByRole('textbox', { name: 'Item details 2' }), 'Primary gateway')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Connection style 1' }), 'wireless')
     await user.click(screen.getByRole('button', { name: 'Insert diagram' }))
 
     const markdown = onSave.mock.calls[0][0] as string
     expect(markdown).toContain('```mermaid\nflowchart LR')
     expect(markdown).toContain('accTitle: Network diagram')
-    expect(markdown).toContain('N2@{ shape: rect, label: "Edge firewall" }')
+    expect(markdown).toContain('N2@{ shape: rect, label: "Edge firewall<br/>Primary gateway" }')
+    expect(markdown).toContain('N1 -.-> N2')
     expect(markdown).not.toContain('tekdocs:')
   })
 

@@ -115,8 +115,10 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
     setMarkdown(value)
     setEditorSeed(value)
     markdownChange.current?.(value)
+    setPreview({ phase: 'loading' })
+    requestedTabFocus.current = 'preview'
+    setMode('preview')
     setDiagramOpen(false)
-    requestAnimationFrame(() => diagramButton.current?.focus())
   }
 
   const closeDiagram = () => {

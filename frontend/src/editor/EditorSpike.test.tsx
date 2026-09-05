@@ -100,7 +100,7 @@ describe('editor feasibility spike', () => {
     expect(previewTab).toHaveFocus()
   })
 
-  it('opens the diagram editor and returns focus after inserting a diagram', async () => {
+  it('opens the diagram editor and shows the rendered preview after insertion', async () => {
     const user = userEvent.setup()
     const onMarkdownChange = vi.fn()
     render(<EditorSpike onMarkdownChange={onMarkdownChange} />)
@@ -111,6 +111,8 @@ describe('editor feasibility spike', () => {
     await user.click(screen.getByRole('button', { name: 'Insert diagram' }))
 
     expect(onMarkdownChange).toHaveBeenLastCalledWith(expect.stringContaining('```mermaid'))
-    await waitFor(() => expect(diagrams).toHaveFocus())
+    const preview = screen.getByRole('tab', { name: 'Preview' })
+    await waitFor(() => expect(preview).toHaveAttribute('aria-selected', 'true'))
+    expect(preview).toHaveFocus()
   })
 })

@@ -5,13 +5,17 @@ export type DiagramNodeShape = 'system' | 'decision' | 'terminal' | 'database' |
 export type DiagramNode = {
   id: string
   label: string
+  details: string
   shape: DiagramNodeShape
 }
+
+export type DiagramConnectionStyle = 'wired' | 'wireless'
 
 export type DiagramConnection = {
   from: string
   to: string
   label: string
+  style: DiagramConnectionStyle
 }
 
 export type DiagramDraft = {
@@ -40,7 +44,22 @@ export function findMermaidBlocks(markdown: string): MermaidBlock[] {
 }
 
 function safeText(value: string): string {
-  return value.trim().replaceAll('"', '&quot;').replaceAll('\n', ' ')
+  return value.trim().replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('\n', ' ')
+}
+
+function decodedText(value: string): string {
+  return value.replaceAll('&quot;', '"').replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&')
+}
+
+function wrappedDetails(value: string, width = 32): string {
+  const words = value.trim().replaceAll(/\s+/g, ' ').split(' ').filter(Boolean)
+  const lines: string[] = []
+  for (const word of words) {
+    const current = lines.at(-1)
+    if (!current || current.length + word.length + 1 > width) lines.push(word)
+    else lines[lines.length - 1] = `${current} ${word}`
+  }
+  return lines.map(safeText).join('<br/>')
 }
 
 function safeEdgeText(value: string): string {
@@ -55,15 +74,15 @@ export function defaultDiagramDraft(kind: DiagramKind = 'network'): DiagramDraft
       title: 'Process flow',
       description: 'The steps and decisions in this process.',
       nodes: [
-        { id: 'N1', label: 'Start', shape: 'terminal' },
-        { id: 'N2', label: 'Complete the task', shape: 'system' },
-        { id: 'N3', label: 'Successful?', shape: 'decision' },
-        { id: 'N4', label: 'Finish', shape: 'terminal' },
+        { id: 'N1', label: 'Start', details: '', shape: 'terminal' },
+        { id: 'N2', label: 'Complete the task', details: '', shape: 'system' },
+        { id: 'N3', label: 'Successful?', details: '', shape: 'decision' },
+        { id: 'N4', label: 'Finish', details: '', shape: 'terminal' },
       ],
       connections: [
-        { from: 'N1', to: 'N2', label: '' },
-        { from: 'N2', to: 'N3', label: '' },
-        { from: 'N3', to: 'N4', label: 'Yes' },
+        { from: 'N1', to: 'N2', label: '', style: 'wired' },
+        { from: 'N2', to: 'N3', label: '', style: 'wired' },
+        { from: 'N3', to: 'N4', label: 'Yes', style: 'wired' },
       ],
     }
   }
@@ -73,20 +92,22 @@ export function defaultDiagramDraft(kind: DiagramKind = 'network'): DiagramDraft
     title: 'Network diagram',
     description: 'The systems and connections in this network.',
     nodes: [
-      { id: 'N1', label: 'Internet', shape: 'system' },
-      { id: 'N2', label: 'Firewall', shape: 'system' },
-      { id: 'N3', label: 'Core switch', shape: 'system' },
+      { id: 'N1', label: 'Internet', details: '', shape: 'system' },
+      { id: 'N2', label: 'Firewall', details: '', shape: 'system' },
+      { id: 'N3', label: 'Core switch', details: '', shape: 'system' },
     ],
     connections: [
-      { from: 'N1', to: 'N2', label: '' },
-      { from: 'N2', to: 'N3', label: '' },
+      { from: 'N1', to: 'N2', label: '', style: 'wired' },
+      { from: 'N2', to: 'N3', label: '', style: 'wired' },
     ],
   }
 }
 
 export function diagramSource(draft: DiagramDraft): string {
   const node = (item: DiagramNode) => {
-    const label = safeText(item.label) || item.id
+    const name = safeText(item.label) || item.id
+    const details = wrappedDetails(item.details)
+    const label = `${name}${details ? `<br/>${details}` : ''}`
     const mermaidShape: Record<DiagramNodeShape, string> = {
       system: 'rect',
       decision: 'diam',
@@ -109,7 +130,9 @@ export function diagramSource(draft: DiagramDraft): string {
     ...draft.connections
       .filter((item) => draft.nodes.some((nodeItem) => nodeItem.id === item.from)
         && draft.nodes.some((nodeItem) => nodeItem.id === item.to))
-      .map((item) => `  ${item.from} -->${item.label.trim() ? `|${safeEdgeText(item.label)}|` : ''} ${item.to}`),
+      .map((item) => item.style === 'wireless'
+        ? `  ${item.from} ${item.label.trim() ? `-. ${safeEdgeText(item.label)} .->` : '-.->'} ${item.to}`
+        : `  ${item.from} -->${item.label.trim() ? `|${safeEdgeText(item.label)}|` : ''} ${item.to}`),
   ]
   return lines.join('\n')
 }
@@ -127,7 +150,12 @@ export function parseDiagramSource(source: string): DiagramDraft | null {
     if (line.startsWith('accTitle:') || line.startsWith('accDescr:')) continue
     const connection = /^([A-Za-z][\w-]*)\s+-->\s*(?:\|([^|]*)\|\s*)?([A-Za-z][\w-]*)$/.exec(line)
     if (connection) {
-      connections.push({ from: connection[1], to: connection[3], label: connection[2] ?? '' })
+      connections.push({ from: connection[1], to: connection[3], label: connection[2] ?? '', style: 'wired' })
+      continue
+    }
+    const wireless = /^([A-Za-z][\w-]*)\s+-\.\s*(.*?)\s*\.->\s+([A-Za-z][\w-]*)$/.exec(line)
+    if (wireless) {
+      connections.push({ from: wireless[1], to: wireless[3], label: wireless[2], style: 'wireless' })
       continue
     }
     const expanded = /^([A-Za-z][\w-]*)@\{\s*shape:\s*([\w-]+),\s*label:\s*"(.*)"\s*\}$/.exec(line)
@@ -137,7 +165,8 @@ export function parseDiagramSource(source: string): DiagramDraft | null {
     if (expanded) {
       const shape = expandedShape[expanded[2]]
       if (!shape) return null
-      nodes.push({ id: expanded[1], label: expanded[3].replaceAll('&quot;', '"'), shape })
+      const [label, ...details] = expanded[3].split(/<br\s*\/>/i)
+      nodes.push({ id: expanded[1], label: decodedText(label), details: decodedText(details.join(' ')), shape })
       continue
     }
     const terminal = /^([A-Za-z][\w-]*)\(\["(.*)"\]\)$/.exec(line)
@@ -147,7 +176,8 @@ export function parseDiagramSource(source: string): DiagramDraft | null {
     if (!match) return null
     nodes.push({
       id: match[1],
-      label: match[2].replaceAll('&quot;', '"'),
+      label: decodedText(match[2]),
+      details: '',
       shape: terminal ? 'terminal' : decision ? 'decision' : 'system',
     })
   }

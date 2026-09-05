@@ -26,9 +26,32 @@ describe('Markdown diagram blocks', () => {
   it('round-trips every shape exposed by the guided editor', () => {
     const draft = defaultDiagramDraft('network')
     draft.nodes = (['system', 'decision', 'terminal', 'database', 'document', 'person', 'cloud', 'network-device', 'input-output', 'boundary'] as const)
-      .map((shape, index) => ({ id: `N${index + 1}`, label: shape, shape }))
-    draft.connections = [{ from: 'N1', to: 'N2', label: 'uses' }]
+      .map((shape, index) => ({ id: `N${index + 1}`, label: shape, details: '', shape }))
+    draft.connections = [{ from: 'N1', to: 'N2', label: 'uses', style: 'wired' }]
 
     expect(parseDiagramSource(diagramSource(draft))?.nodes).toEqual(draft.nodes)
+  })
+
+  it('round-trips wrapped details and wireless connections', () => {
+    const draft = defaultDiagramDraft('network')
+    draft.nodes[1].details = 'Gateway · 192.0.2.1\nPrimary site'
+    draft.connections[0] = { ...draft.connections[0], label: 'Wi-Fi 6', style: 'wireless' }
+
+    const source = diagramSource(draft)
+    expect(source).toContain('Firewall<br/>Gateway · 192.0.2.1 Primary site')
+    expect(source).toContain('N1 -. Wi-Fi 6 .-> N2')
+    expect(parseDiagramSource(source)).toEqual({
+      ...draft,
+      nodes: draft.nodes.map((node) => ({ ...node, details: node.details.replace('\n', ' ') })),
+    })
+  })
+
+  it('wraps long item details without losing their text', () => {
+    const draft = defaultDiagramDraft('network')
+    draft.nodes[1].details = 'Primary gateway for the main office and guest wireless networks'
+
+    const source = diagramSource(draft)
+    expect(source).toContain('Primary gateway for the main<br/>office and guest wireless<br/>networks')
+    expect(parseDiagramSource(source)?.nodes[1].details).toBe(draft.nodes[1].details)
   })
 })

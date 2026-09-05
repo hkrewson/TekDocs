@@ -223,8 +223,15 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
 })
 
-test('guided diagrams remain portable Markdown inside the document', async ({ page }) => {
+test('guided diagrams remain portable Markdown inside the document', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/markdown/render', async (route) => {
+    const body = await route.request().postDataJSON() as { markdown: string }
+    const source = /```mermaid\n([\s\S]*?)\n```/.exec(body.markdown)?.[1] ?? ''
+    const escaped = source.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    await route.fulfill({ json: { html: `<pre><code class="language-mermaid">${escaped}</code></pre>` } })
+  })
   await page.goto('/documentation')
   await openPrimaryBlockEditor(page)
 
@@ -233,7 +240,9 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   const dialog = page.getByRole('dialog', { name: 'Insert diagram' })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('textbox', { name: 'Item name 2' }).fill('Edge firewall')
+  await dialog.getByRole('textbox', { name: 'Item details 2' }).fill('Primary gateway · 192.0.2.1')
   await dialog.getByRole('combobox', { name: 'Item shape 2' }).selectOption('network-device')
+  await dialog.getByRole('combobox', { name: 'Connection style 1' }).selectOption('wireless')
   await expect(dialog.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
   await expect(dialog.getByText('Accessible diagram source')).toHaveCount(0)
   await dialog.getByRole('tab', { name: 'Mermaid guide' }).click()
@@ -241,13 +250,16 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await dialog.getByRole('tab', { name: 'Preview' }).click()
   expect((await new AxeBuilder({ page }).include('.diagram-editor').withTags(wcag22Tags).analyze()).violations).toEqual([])
   await dialog.getByRole('button', { name: 'Insert diagram' }).click()
-  await expect(trigger).toBeFocused()
+  await expect(page.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('figure', { name: 'Network diagram' })).toBeVisible()
 
+  await page.waitForTimeout(500)
   await page.getByRole('tab', { name: 'Markdown' }).click()
   const source = page.getByLabel('Markdown source')
   await expect(source).toHaveValue(/```mermaid\nflowchart LR/)
   await expect(source).toHaveValue(/accTitle: Network diagram/)
-  await expect(source).toHaveValue(/N2@\{ shape: hex, label: "Edge firewall" \}/)
+  await expect(source).toHaveValue(/N2@\{ shape: hex, label: "Edge firewall<br\/>Primary gateway · 192.0.2.1" \}/)
+  await expect(source).toHaveValue(/N1 -.-> N2/)
   await expect(source).not.toHaveValue(/tekdocs:/)
 })
 

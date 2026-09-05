@@ -833,8 +833,9 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .diagram-list .section-heading { align-items: center; }
 .diagram-list ol { margin: 0; padding: 0; list-style: none; }
 .diagram-list li { align-items: center; gap: 8px; min-height: 48px; padding: 5px 0; border-bottom: 1px solid var(--border); }
-.diagram-nodes li { display: grid; grid-template-columns: 36px minmax(140px, 1fr) minmax(110px, .5fr) 34px; }
-.diagram-connections li { display: grid; grid-template-columns: minmax(105px, .8fr) 16px minmax(105px, .8fr) minmax(120px, 1fr) 34px; }
+.diagram-nodes li { display: grid; grid-template-columns: 36px minmax(120px, .8fr) minmax(150px, 1fr) minmax(115px, .55fr) 34px; }
+.diagram-nodes textarea { min-height: 38px; resize: vertical; }
+.diagram-connections li { display: grid; grid-template-columns: minmax(95px, .7fr) 16px minmax(95px, .7fr) minmax(110px, .8fr) minmax(105px, .6fr) 34px; }
 .diagram-item-id { color: var(--muted); font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; font-weight: 600; }
 .diagram-list .icon-button { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; }
 .diagram-source { min-height: 420px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.55; }
@@ -1388,11 +1389,11 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .diagram-target-row { align-items: stretch; flex-direction: column; }
   .diagram-target-row .mode-tabs { width: 100%; }
   .diagram-nodes li, .diagram-connections li { grid-template-columns: 36px minmax(0, 1fr) 34px; }
-  .diagram-nodes li select { grid-column: 2; }
-  .diagram-nodes li .icon-button { grid-column: 3; grid-row: 1 / span 2; }
+  .diagram-nodes li input, .diagram-nodes li textarea, .diagram-nodes li select { grid-column: 2; }
+  .diagram-nodes li .icon-button { grid-column: 3; grid-row: 1 / span 3; }
   .diagram-connections li > span { grid-column: 1; text-align: center; }
   .diagram-connections li select, .diagram-connections li input { grid-column: 2; }
-  .diagram-connections li .icon-button { grid-column: 3; grid-row: 1 / span 4; }
+  .diagram-connections li .icon-button { grid-column: 3; grid-row: 1 / span 5; }
   .asset-bulk-toolbar { align-items: stretch; flex-direction: column; }
   .asset-relationship-form { grid-template-columns: 1fr; align-items: stretch; }
   .inventory-provenance { grid-template-columns: 1fr; }

@@ -401,7 +401,7 @@ test('workspace search supports keyboard submission, filtering, pagination, and 
   await mockWorkspaceApplication(page)
   await page.goto(`/workspaces/organizations/${clientWorkspace.id}/overview`)
 
-  const globalSearch = page.getByRole('searchbox', { name: 'Search TekDocs' })
+  const globalSearch = page.getByRole('searchbox', { name: 'Search this workspace' })
   await globalSearch.fill('firewall')
   await globalSearch.press('Enter')
 

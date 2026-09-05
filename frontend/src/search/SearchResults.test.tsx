@@ -24,7 +24,7 @@ describe('SearchResults', () => {
     const client = { search } as WorkspaceSearchClient
     render(<MemoryRouter initialEntries={['/search?q=firewall']}><SearchResults workspace={null} client={client} /></MemoryRouter>)
 
-    expect(await screen.findByText('17 authorized records found.')).toBeInTheDocument()
+    expect(await screen.findByText('17 records found.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
     expect(screen.getByRole('link', { name: /mail.example.com/ })).toHaveAttribute('href', '/certificates?q=mail.example.com')
     expect(screen.getByText('Allow the management subnet.')).toBeInTheDocument()
@@ -39,7 +39,7 @@ describe('SearchResults', () => {
     const client = { search } as WorkspaceSearchClient
     render(<MemoryRouter initialEntries={['/search?q=firewall']}><SearchResults workspace={null} client={client} /></MemoryRouter>)
 
-    await screen.findByText('17 authorized records found.')
+    await screen.findByText('17 records found.')
     fireEvent.click(screen.getByRole('button', { name: /^Filters$/ }))
     fireEvent.click(screen.getByText('Result type', { exact: true }))
     fireEvent.click(screen.getByRole('radio', { name: 'Documents (1)' }))

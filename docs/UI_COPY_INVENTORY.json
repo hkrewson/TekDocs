@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "issue": 59,
+  "entries": [
+    {
+      "id": "shell-navigation-search",
+      "workflow": "Application shell, navigation, search, and unavailable routes",
+      "routes": [
+        "/overview",
+        "/search",
+        "/workspaces/organizations/:organizationId/overview",
+        "/workspaces/organizations/:organizationId/search",
+        "*"
+      ],
+      "states": ["loading", "ready", "no results", "unavailable", "narrow navigation"],
+      "decisions": [
+        {
+          "before": "Search TekDocs",
+          "after": "Search this workspace",
+          "reason": "Search is limited to the active workspace, not the whole installation."
+        },
+        {
+          "before": "Available capabilities",
+          "after": "Available areas",
+          "reason": "Area is a familiar navigation term; capability is product-contract language."
+        },
+        {
+          "before": "Staff & invitations",
+          "after": "Staff and invitations",
+          "reason": "Use ordinary prose instead of a compact navigation abbreviation."
+        },
+        {
+          "before": "Find records you are authorized to view in the active workspace.",
+          "after": "Find documents and records in this workspace.",
+          "reason": "Authorization is enforced automatically and does not need to be narrated."
+        },
+        {
+          "before": "No authorized records match this search.",
+          "after": "No records match this search.",
+          "reason": "The shorter empty state describes the result without implementation language."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/App.test.tsx",
+        "frontend/src/search/SearchResults.test.tsx",
+        "frontend/e2e/shell.spec.ts",
+        "frontend/e2e/workspace-switcher.spec.ts"
+      ]
+    },
+    {
+      "id": "authentication-account-security",
+      "workflow": "First-owner setup, sign-in, MFA, invitations, account, and security settings",
+      "routes": ["/auth/*", "/settings", "/staff", "/access-control", "/notification-delivery", "/system-status"],
+      "states": ["setup", "loading", "validation", "denied", "recovery", "success", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review security consequences, recovery instructions, provider sign-in labels, and whether entered values survive each failure."
+    },
+    {
+      "id": "organizations-people-sites",
+      "workflow": "Organizations, people, sites, and custom fields",
+      "routes": ["/organizations", "/people", "/sites", "/custom-fields"],
+      "states": ["loading", "empty", "populated", "validation", "archive", "denied", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review create/edit/archive labels, record ownership wording, inherited-field explanations, and long organization and person names."
+    },
+    {
+      "id": "documents-files",
+      "workflow": "Documents, templates, structured types, settings, review, publication, files, and exports",
+      "routes": ["/documentation", "/files"],
+      "states": ["loading", "empty", "editor", "conflict", "publication blocked", "published", "export failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review document settings discovery, starter-template language, publication findings, block reuse, audience choices, diagrams, and export recovery."
+    },
+    {
+      "id": "infrastructure",
+      "workflow": "Assets, licenses, networks, domains, certificates, credentials, and services",
+      "routes": ["/assets", "/licenses", "/networks", "/domains", "/certificates", "/credentials", "/services"],
+      "states": ["loading", "empty", "populated", "stale", "validation", "denied", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review technical field labels without removing necessary precision; simplify provenance, monitoring, assignment, and externally stored credential explanations."
+    },
+    {
+      "id": "suppliers-products",
+      "workflow": "Vendors and product catalogs",
+      "routes": ["/vendors", "/products"],
+      "states": ["loading", "empty", "populated", "revision", "archive", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review vendor/manufacturer distinctions, model and specification actions, revision language, and archive consequences."
+    },
+    {
+      "id": "invoices",
+      "workflow": "Invoice settings, drafts, issuance, delivery, lifecycle, and accounting handoff",
+      "routes": ["/invoices"],
+      "states": ["loading", "settings incomplete", "draft", "issuance confirmation", "issued", "delivery failure", "reconciliation"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review irreversible issuance language, numbering choices, settings errors, delivery recovery, payment status, and accounting handoff without ledger terminology."
+    },
+    {
+      "id": "governance",
+      "workflow": "Taxonomies, compliance, reminders, activity, and recycle bin",
+      "routes": ["/taxonomies", "/compliance", "/deadlines", "/activity", "/recycle-bin"],
+      "states": ["loading", "empty", "populated", "retired", "restore", "denied", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Explain taxonomy once at its decision point; review compliance evidence, reminder schedules, audit-only terms, and archive/restore consequences."
+    },
+    {
+      "id": "integrations-imports",
+      "workflow": "Integrations, imports, webhooks, synchronization, observations, conflicts, and recovery",
+      "routes": ["/integrations"],
+      "states": ["loading", "not connected", "syncing", "stale", "needs review", "conflict", "disabled", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Replace provider and synchronization implementation terms in ordinary setup while preserving precise audit codes in technical logs."
+    },
+    {
+      "id": "client-portal",
+      "workflow": "Client portal documents, publications, files, and invoices",
+      "routes": ["/portal"],
+      "states": ["loading", "empty", "published", "withdrawn", "download", "denied", "failure"],
+      "decisions": [],
+      "status": "pending",
+      "next_review": "Review client-facing publication and invoice language without exposing internal storage, authorization, or provider terms."
+    }
+  ]
+}

@@ -1876,6 +1876,22 @@ export interface paths {
         readonly patch: operations["locations_msp_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/system/diagnostics": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["system_diagnostics_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/taxonomies": {
         readonly parameters: {
             readonly query?: never;
@@ -8817,6 +8833,30 @@ export interface components {
             readonly results: readonly components["schemas"]["DerivedVendor"][];
             readonly count: number;
         };
+        readonly DiagramFailure: {
+            readonly code: string;
+            readonly occurred_at: number;
+        };
+        readonly DiagramQueue: {
+            readonly waiting: number;
+            readonly processing: number;
+            readonly total: number;
+        };
+        readonly DiagramRendererDiagnostics: {
+            /**
+             * @description * `ready` - ready
+             *     * `stale` - stale
+             *     * `unavailable` - unavailable
+             *     * `not_configured` - not_configured
+             * @enum {string}
+             */
+            readonly status: "ready" | "stale" | "unavailable" | "not_configured";
+            readonly version: string | null;
+            readonly capacity: number;
+            readonly queue: components["schemas"]["DiagramQueue"];
+            readonly recent_failures: readonly components["schemas"]["DiagramFailure"][];
+            readonly last_checked_at: number | null;
+        };
         readonly Document: {
             /** Format: uuid */
             readonly id: string;
@@ -13156,6 +13196,23 @@ export interface components {
             readonly vlan_id?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly SystemDiagnostics: {
+            /**
+             * @description * `ready` - ready
+             *     * `degraded` - degraded
+             * @enum {string}
+             */
+            readonly status: "ready" | "degraded";
+            /** Format: date-time */
+            readonly checked_at: string;
+            readonly application_version: string;
+            /**
+             * @description * `ready` - ready
+             * @enum {string}
+             */
+            readonly database: "ready";
+            readonly diagram_renderer: components["schemas"]["DiagramRendererDiagnostics"];
         };
         readonly Taxonomy: {
             /** Format: uuid */
@@ -18828,6 +18885,39 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Location"];
+                };
+            };
+        };
+    };
+    readonly system_diagnostics_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SystemDiagnostics"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly [key: string]: unknown;
+                    };
                 };
             };
         };

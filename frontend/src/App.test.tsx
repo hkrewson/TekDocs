@@ -111,7 +111,7 @@ describe('application shell', () => {
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
     expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
-    expect(screen.getByRole('table', { name: 'Available capabilities' })).toHaveTextContent('Documentation')
+    expect(screen.getByRole('table', { name: 'Available areas' })).toHaveTextContent('Documentation')
     expect(screen.getByText('TekDocs 0.8.46')).toBeInTheDocument()
   })
 
@@ -170,7 +170,7 @@ describe('application shell', () => {
 
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('menuitem', { name: 'Staff & invitations' })).toHaveAttribute('href', '/staff')
+    expect(screen.getByRole('menuitem', { name: 'Staff and invitations' })).toHaveAttribute('href', '/staff')
     expect(screen.getByRole('menuitem', { name: 'System status' })).toHaveAttribute('href', '/system-status')
     expect(screen.queryByRole('menuitem', { name: 'Integrations' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
@@ -182,7 +182,7 @@ describe('application shell', () => {
     render(app('/overview'))
 
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
-    await user.click(screen.getByRole('menuitem', { name: 'Staff & invitations' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Staff and invitations' }))
 
     expect(await screen.findByRole('heading', { name: 'Staff & invitations' })).toBeInTheDocument()
     expect(await screen.findByText('No invitations match this view.')).toBeInTheDocument()

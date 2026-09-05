@@ -122,7 +122,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   const staffEmail = `live-technician-${suffix}@example.invalid`
   await page.getByRole('button', { name: /Account menu for Live Workspace Owner/ }).click()
-  await page.getByRole('menuitem', { name: 'Staff & invitations' }).click()
+  await page.getByRole('menuitem', { name: 'Staff and invitations' }).click()
   await expect(page.getByRole('heading', { name: 'Staff & invitations' })).toBeVisible()
   await page.getByLabel('Email address').fill(staffEmail)
   await page.getByRole('button', { name: 'Send invitation' }).click()

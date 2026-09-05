@@ -145,7 +145,7 @@ function AppLink({ to, className, children, ...props }: {
 }
 
 const navigationSections: NavigationSection[] = [
-  { label: 'Workspace', items: [
+  { label: translate('navigation.group.workspace'), items: [
     navigationItem('overview', Activity),
     navigationItem('organizations', Building2),
     navigationItem('people', UsersRound),
@@ -153,7 +153,7 @@ const navigationSections: NavigationSection[] = [
     navigationItem('documentation', BookOpenText),
     navigationItem('files', File),
   ] },
-  { label: 'Infrastructure', items: [
+  { label: translate('navigation.group.infrastructure'), items: [
     navigationItem('assets', Boxes),
     navigationItem('licenses', ScrollText),
     navigationItem('networks', Network),
@@ -162,14 +162,14 @@ const navigationSections: NavigationSection[] = [
     navigationItem('credentials', KeyRound),
     navigationItem('services', BriefcaseBusiness),
   ] },
-  { label: 'Relationships', items: [
+  { label: translate('navigation.group.relationships'), items: [
     navigationItem('vendors', Handshake),
     navigationItem('products', Package),
   ] },
-  { label: 'Business', items: [
+  { label: translate('navigation.group.business'), items: [
     navigationItem('invoices', ReceiptText),
   ] },
-  { label: 'Governance', items: [
+  { label: translate('navigation.group.governance'), items: [
     navigationItem('custom_fields', ListPlus),
     navigationItem('taxonomies', Tags),
     navigationItem('compliance', ShieldCheck),
@@ -235,17 +235,17 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-topline">
           <Brand collapsed={collapsed} />
-          <button className="icon-button desktop-collapse" onClick={onCollapse} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}>
+          <button className="icon-button desktop-collapse" onClick={onCollapse} aria-label={collapsed ? translate('navigation.expand') : translate('navigation.collapse')}>
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
-          <button className="icon-button mobile-close" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button>
+          <button className="icon-button mobile-close" onClick={onMobileClose} aria-label={translate('navigation.close')}><X size={19} /></button>
         </div>
 
         <WorkspaceSwitcher tenant={tenant} activeWorkspace={workspace} activeArea={activeArea} client={workspaceClient} collapsed={collapsed} workspaceLoading={workspaceLoading} onNavigate={onMobileClose} />
 
         <div className="sidebar-scroll">
           {organizationRoute && !workspace
-            ? <p className="workspace-navigation-state">{workspaceLoading ? 'Loading navigation…' : 'Workspace unavailable'}</p>
+            ? <p className="workspace-navigation-state">{workspaceLoading ? translate('navigation.loading') : translate('navigation.workspaceUnavailable')}</p>
             : availableSections.map((section, index) => (
               <div key={section.label}>
                 {index > 0 && <div className="nav-divider" />}
@@ -254,7 +254,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
             ))}
         </div>
       </aside>
-      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label="Close navigation" />}
+      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label={translate('navigation.close')} />}
     </>
   )
 }
@@ -293,19 +293,19 @@ function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotificat
 
   return (
     <div className="profile-menu" ref={ref}>
-      <button ref={triggerRef} className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={`Account menu for ${user.display_name}`}>
+      <button ref={triggerRef} className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={translate('shell.accountMenu', { name: user.display_name })}>
         <CircleUserRound size={22} />
         <span className="profile-copy"><strong>{user.display_name}</strong><span>{user.email}</span></span>
         <ChevronDown size={15} />
       </button>
       {open && (
         <div className="profile-popover" role="menu">
-          <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />Settings</AppLink>
-          {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={() => setOpen(false)}><UserPlus size={17} />Staff &amp; invitations</AppLink>}
-          {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />Access control</AppLink>}
-          {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />Email delivery</AppLink>}
-          {canViewSystemStatus && <AppLink to="/system-status" role="menuitem" onClick={() => setOpen(false)}><ServerCog size={17} />System status</AppLink>}
-          <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
+          <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />{translate('shell.settings')}</AppLink>
+          {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={() => setOpen(false)}><UserPlus size={17} />{translate('shell.staff')}</AppLink>}
+          {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />{translate('shell.accessControl')}</AppLink>}
+          {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />{translate('shell.emailDelivery')}</AppLink>}
+          {canViewSystemStatus && <AppLink to="/system-status" role="menuitem" onClick={() => setOpen(false)}><ServerCog size={17} />{translate('shell.systemStatus')}</AppLink>}
+          <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? translate('shell.signingOut') : translate('shell.signOut')}</button>
         </div>
       )}
     </div>
@@ -334,11 +334,11 @@ function UnavailablePage({ organizationOverview }: { organizationOverview?: stri
 function Overview() {
   return (
     <>
-      <PageHeader title="Overview" description={`TekDocs ${packageMetadata.version}`} />
+      <PageHeader title={translate('overview.heading')} description={`TekDocs ${packageMetadata.version}`} />
       <section className="content-section">
-        <div className="section-heading"><h2>Available capabilities</h2><span>{packageMetadata.version}</span></div>
-        <div className="status-table" role="table" aria-label="Available capabilities">
-          {workspaceCapabilities.map((capability) => <div className="status-row" role="row" key={capability}><span role="cell">{capabilityRegistry[capability].label}</span><span role="cell">Available</span></div>)}
+        <div className="section-heading"><h2>{translate('overview.areas')}</h2><span>{packageMetadata.version}</span></div>
+        <div className="status-table" role="table" aria-label={translate('overview.areas')}>
+          {workspaceCapabilities.map((capability) => <div className="status-row" role="row" key={capability}><span role="cell">{capabilityRegistry[capability].label}</span><span role="cell">{translate('overview.available')}</span></div>)}
         </div>
       </section>
     </>
@@ -355,9 +355,9 @@ function workspaceErrorMessage(error: unknown) {
 }
 
 function OrganizationWorkspaceRoute({ state, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient }) {
-  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingOrganizationWorkspace')}</section>
   if (state.phase === 'error') {
-    return <section className="content-section workspace-error" role="alert"><h1>Workspace unavailable</h1><p>{state.message}</p><Link className="secondary-button" to="/organizations">Return to organizations</Link></section>
+    return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.workspaceUnavailable')}</h1><p>{state.message}</p><Link className="secondary-button" to="/organizations">{translate('navigation.returnToOrganizations')}</Link></section>
   }
   return <WorkspaceOverview workspace={state.workspace} relationshipsClient={relationshipsClient} />
 }
@@ -387,36 +387,36 @@ const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: stri
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
-  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading organization workspace…</section>
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingOrganizationWorkspace')}</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
-    return <section className="content-section workspace-error" role="alert"><h1>Area unavailable</h1><p>This area is not available for the selected organization.</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>Return to overview</Link></section>
+    return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.areaUnavailable')}</h1><p>{translate('navigation.areaUnavailableHelp')}</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>{translate('navigation.returnToOverview')}</Link></section>
   }
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
-  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={initialDocumentId} /></Suspense>
-  if (area === 'files') return <Suspense fallback={<section className="content-section" role="status">Loading files…</section>}><Files workspace={state.workspace} client={documentsClient} /></Suspense>
+  if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={initialDocumentId} /></Suspense>
+  if (area === 'files') return <Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={state.workspace} client={documentsClient} /></Suspense>
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
-  if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
-  if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
-  if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
-  if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
-  if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
-  if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
-  if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
+  if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAssets')}</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingLicenses')}</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
+  if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingVendors')}</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
+  if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingNetworks')}</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
+  if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingIntegrations')}</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
+  if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCompliance')}</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'deadlines') return <Reminders workspace={state.workspace} relationshipsClient={relationshipsClient} />
   if (area === 'activity') return <ActivityLog workspace={state.workspace} />
-  if (area === 'invoices') return <Suspense fallback={<section className="content-section" role="status">Loading invoices…</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
-  if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
-  if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
+  if (area === 'invoices') return <Suspense fallback={<section className="content-section" role="status">{translate('accounting.loading')}</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
+  if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDomains')}</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
+  if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCertificates')}</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />
   return <UnavailablePage organizationOverview={organizationWorkspacePath(state.workspace, 'overview')} />
 }
 
 function OrganizationSearchRoute({ state, relationshipsClient, searchClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient; searchClient: WorkspaceSearchClient }) {
-  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">Loading workspace search…</section>
+  if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingWorkspaceSearch')}</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   return <SearchResults workspace={state.workspace} client={searchClient} />
 }
@@ -497,7 +497,13 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   }
 
   useEffect(() => {
-    const areaLabel = location.pathname === '/system-status' ? 'System status' : activeArea.charAt(0).toUpperCase() + activeArea.slice(1)
+    const areaLabel = location.pathname === '/system-status'
+      ? translate('shell.systemStatus')
+      : activeArea === 'search'
+        ? translate('search.heading')
+        : activeArea === 'settings'
+          ? translate('shell.settings')
+          : capabilityRegistry[activeArea].label
     document.title = `${selectedWorkspace?.name ?? shellContext.tenant.name} · ${areaLabel} · TekDocs`
   }, [activeArea, location.pathname, selectedWorkspace?.name, shellContext.tenant.name])
 
@@ -514,7 +520,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
-          <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
+          <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={translate('navigation.open')}><Menu size={20} /></button>
           <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
@@ -522,12 +528,12 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
-          <Suspense fallback={<section className="content-section" role="status"><h1>Loading workspace</h1><p>Please wait…</p></section>}><Routes>
+          <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Overview />} />
-            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">Loading documentation…</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
-            <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">Loading files…</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
+            <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
+            <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />
@@ -536,25 +542,25 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/recycle-bin" element={<RecycleBin workspace={null} client={recycleBinClient} />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/settings" element={<SecuritySettings client={authClient} context={shellContext} onProfileUpdated={setShellContext} />} />
-            <Route path="/staff" element={shellContext.permissions?.includes('staff_invitations.view') ? <Suspense fallback={<section className="content-section" role="status">Loading staff administration…</section>}><StaffAdministration client={staffAdministrationClient} /></Suspense> : <Navigate to="/overview" replace />} />
-            <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <Suspense fallback={<section className="content-section" role="status">Loading access control…</section>}><AccessControl client={accessControlClient} /></Suspense> : <Navigate to="/overview" replace />} />
+            <Route path="/staff" element={shellContext.permissions?.includes('staff_invitations.view') ? <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingStaff')}</section>}><StaffAdministration client={staffAdministrationClient} /></Suspense> : <Navigate to="/overview" replace />} />
+            <Route path="/access-control" element={shellContext.permissions?.includes('memberships.assign_role') ? <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAccessControl')}</section>}><AccessControl client={accessControlClient} /></Suspense> : <Navigate to="/overview" replace />} />
             <Route path="/notification-delivery" element={shellContext.permissions?.includes('notifications.manage') ? <NotificationDeliveryAdmin client={browserNotificationDeliveryAdminClient} /> : <Navigate to="/overview" replace />} />
             <Route path="/system-status" element={shellContext.permissions?.includes('system_diagnostics.view') ? <SystemStatus /> : <Navigate to="/overview" replace />} />
-            <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">Loading assets…</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
-            <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">Loading licenses…</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
-            <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">Loading contracts…</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
-            <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">Loading vendors…</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
-            <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">Loading networks…</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
-            <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">Loading integrations…</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />
-            <Route path="/compliance" element={<Suspense fallback={<section className="content-section" role="status">Loading compliance…</section>}><Compliance workspace={null} client={complianceClient} /></Suspense>} />
+            <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAssets')}</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingLicenses')}</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
+            <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingVendors')}</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
+            <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingNetworks')}</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
+            <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingIntegrations')}</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />
+            <Route path="/compliance" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCompliance')}</section>}><Compliance workspace={null} client={complianceClient} /></Suspense>} />
             <Route path="/deadlines" element={<Reminders workspace={null} relationshipsClient={relationshipsClient} />} />
             <Route path="/activity" element={<ActivityLog workspace={null} />} />
-            <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">Loading supplier catalogs…</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
-            <Route path="/invoices" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">Loading invoice settings…</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <UnavailablePage />} />
+            <Route path="/products" element={<Suspense fallback={<section className="content-section" role="status">{translate('products.loading')}</section>}><ProductCatalogs client={workspaceClient} /></Suspense>} />
+            <Route path="/invoices" element={shellContext.permissions?.includes('invoices.issue') ? <Suspense fallback={<section className="content-section" role="status">{translate('accounting.settingsLoading')}</section>}><InvoiceSettings client={browserInvoiceClient} authClient={authClient} /></Suspense> : <UnavailablePage />} />
             <Route path="/accounting" element={<Navigate to="/invoices" replace />} />
-            <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">Loading search…</section>}><SearchResults key={location.search} workspace={null} client={searchClient} /></Suspense>} />
-            <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">Loading domains…</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
-            <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">Loading certificates…</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
+            <Route path="/search" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingSearch')}</section>}><SearchResults key={location.search} workspace={null} client={searchClient} /></Suspense>} />
+            <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDomains')}</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
+            <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCertificates')}</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} searchClient={searchClient} />} />
@@ -595,7 +601,7 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
   const application = (
     <AuthGate client={authClient} initialContext={initialAuthContext}>
       {({ context, signOut, signingOut, signOutError }) => (
-        context.surface === 'client_portal' ? <Suspense fallback={<section className="content-section" role="status">Loading client portal…</section>}><ClientPortal
+        context.surface === 'client_portal' ? <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingClientPortal')}</section>}><ClientPortal
           context={context}
           onSignOut={signOut}
           signingOut={signingOut}

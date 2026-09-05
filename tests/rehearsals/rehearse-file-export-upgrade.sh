@@ -45,8 +45,8 @@ if [ "$baseline_version" != "0.8.21" ]; then
   echo "File/export upgrade expected baseline 0.8.21, found $baseline_version" >&2
   exit 1
 fi
-if [ "$current_version" != "0.8.32" ]; then
-  echo "File/export upgrade expected current version 0.8.32, found $current_version" >&2
+if [ "$current_version" = "$baseline_version" ]; then
+  echo "File/export upgrade requires a current version newer than $baseline_version" >&2
   exit 1
 fi
 
@@ -68,6 +68,13 @@ result = bootstrap_owner(tenant_name="File Export Upgrade MSP", owner_email="upg
 scope = rls_scope(DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
 scope.__enter__()
 document = create_document(tenant=result.tenant, organization=None, actor_id=result.owner.id, title="Retained source package", markdown="# Retained source\n\nRevision one.")
+diagram_document = create_document(
+    tenant=result.tenant,
+    organization=None,
+    actor_id=result.owner.id,
+    title="Versioned diagram source",
+    markdown="# Versioned diagram\n\n```mermaid\ngraph LR\naccTitle: Upgrade path\naccDescr: Source survives upgrade and becomes a rendered diagram.\n  Baseline --> Current\n```\n",
+)
 revision = update_document(document=document, actor_id=result.owner.id, title="Retained source package", markdown="# Retained source\n\nRevision two.", base_revision_id=document.placements.get().block.current_revision_id)
 primary_v1 = create_document_attachment(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v1.pdf", b"%PDF-1.4\nsource v1\n%%EOF"), purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1)
 primary_v2 = replace_primary_document_file(document=document, actor_id=result.owner.id, upload=SimpleUploadedFile("source-v2.pdf", b"%PDF-1.4\nsource v2\n%%EOF"))
@@ -77,6 +84,7 @@ assert revision.revision_number == 2
 assert primary_v2.replaces_id == primary_v1.id
 assert attachment.checksum
 assert publication.content_digest
+assert "```mermaid" in diagram_document.placements.get().block.current_revision.markdown
 scope.__exit__(None, None, None)
 print("File/export upgrade fixture created")
 '
@@ -91,6 +99,7 @@ from pathlib import Path
 from zipfile import ZipFile
 from io import BytesIO
 from django.conf import settings
+from apps.core.diagram_exports import render_diagram_exports
 from apps.core.document_exports import export_bundle, resolve_export_snapshot
 from apps.core.documents import resolve_document
 from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentAttachmentPurpose, DocumentPublication, DocumentPublicationArtifact, InstallationState
@@ -105,6 +114,13 @@ scope = rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMod
 scope.__enter__()
 document = Document.objects.select_related("entity").get(entity__display_name="Retained source package")
 assert resolve_document(document).markdown == "# Retained source\n\nRevision two.\n"
+diagram_document = Document.objects.select_related("entity").get(entity__display_name="Versioned diagram source")
+diagram_markdown = resolve_document(diagram_document).markdown
+assert "Baseline --> Current" in diagram_markdown
+diagram = render_diagram_exports(diagram_markdown, required=True)[0]
+assert diagram.svg.startswith(b"<svg")
+assert diagram.png.startswith(b"\x89PNG\r\n\x1a\n")
+assert diagram.source.title == "Upgrade path"
 revisions = BlockRevision.objects.filter(tenant=tenant)
 assert revisions.filter(revision_number=2).exists(), list(revisions.values_list("revision_number", "markdown"))
 for revision in revisions:

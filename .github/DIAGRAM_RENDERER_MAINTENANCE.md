@@ -55,3 +55,39 @@ Patch, minor, and major updates use the same gates. A small version number does 
 - Roll back by reverting the complete dependency update, including manifests, lockfiles, image digest or Chromium-series changes, configuration, and fixtures. Re-run the fast contract check after the revert.
 
 Compatibility is established by the retained test and release evidence, not by dependency versions alone.
+
+## Building the 1.0 diagram release record
+
+Diagram evidence is split into seven value-safe JSON fragments. Each fragment names the exact candidate commit, the successful gate, an immutable run or digest identifier, and the fixed checks that gate owns. Raw browser output, document content, secrets, and scanner reports do not belong in these fragments.
+
+The required categories are:
+
+- `dependency_contract`: exact dependency pins, preview/renderer alignment, Chromium assertion, and controlling-file checksums.
+- `authoring_and_failures`: guided/source round trips, accessibility metadata, unsupported-source preservation, and every safe failure code.
+- `renderer_and_exports`: supported families, deterministic bytes, isolation, capacity, cleanup, retained integrity, STATIC atomicity, and HTML/PDF/DOCX/ZIP output.
+- `browser_accessibility`: saved rendering, source editing and fallback, download, keyboard and screen-reader behavior, zoom/reflow, forced colors, print, and axe.
+- `production_image`: actual export, health, runtime identity, Chromium attribution, and non-root/read-only controls.
+- `upgrade_and_restore`: versioned Mermaid source upgrade plus signed publication and SVG/PNG recovery from separate database/media backup.
+- `supply_chain`: dependency/license audit, renderer digest, vulnerability scan, SBOM, and provenance attestations.
+
+Use this exact sequence for a frozen candidate:
+
+1. Record the 40-character candidate commit. It must already be pushed; the supply-chain fragment is created only after the tested renderer image is published and attested.
+2. Let **Build, test, and secure** complete for that push. Do not use fragments from a rerun of another commit.
+3. Dispatch **Extended validation** against the same commit and let its supported-upgrade, versioned-diagram-source upgrade, and supported-recovery jobs complete.
+4. Create an empty collection directory and download only artifacts whose names begin `tekdocs-diagram-evidence-` from those two runs. GitHub CLI example:
+
+   ```sh
+   candidate=0123456789abcdef0123456789abcdef01234567
+   build_run=123456789
+   extended_run=123456790
+   mkdir -p artifacts/diagram-release-evidence
+   gh run download "$build_run" --pattern 'tekdocs-diagram-evidence-*' --dir artifacts/diagram-release-evidence
+   gh run download "$extended_run" --pattern 'tekdocs-diagram-evidence-*' --dir artifacts/diagram-release-evidence
+   make assemble-diagram-release-evidence CANDIDATE_COMMIT="$candidate"
+   ```
+
+5. The assembler must report seven evidence records and the full required-check count. Missing categories, altered check inventories, duplicate categories, failed gates, future timestamps, secret-shaped content, non-digest renderer identities, or mixed candidate commits block assembly.
+6. Retain `artifacts/diagram-release-evidence.json` with the 1.0 release record. Do not commit a candidate record back into the candidate it describes, and do not substitute job names or screenshots for the JSON fragments.
+
+The assembled matrix proves the scoped automated gates ran for one candidate. It does not claim an independent security, accessibility, or compliance assessment.

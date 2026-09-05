@@ -7,6 +7,9 @@ cd "$root_dir"
 python3 scripts/check_renderer_dependency_contract.py
 grep -q 'python3 scripts/check_renderer_dependency_contract.py' .github/workflows/build.yml
 grep -q 'path: artifacts/renderer-dependency-contract.json' .github/workflows/build.yml
+grep -q 'category supply_chain' .github/workflows/build.yml
+grep -q 'category upgrade_and_restore' .github/workflows/extended-validation.yml
+grep -q 'assemble-diagram-release-evidence:' Makefile
 
 for lock_file in backend/build-requirements.lock backend/requirements.lock backend/requirements-dev.lock; do
   test -s "$lock_file"

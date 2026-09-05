@@ -101,6 +101,8 @@ jobs:
         with:
           fetch-depth: 0
       - run: make supported-upgrade-matrix
+      - name: Rehearse versioned diagram source upgrade
+        run: make file-export-upgrade-rehearsal
       - name: Write commit-bound evidence
         run: >-
           python3 scripts/write_security_evidence.py
@@ -139,5 +141,28 @@ jobs:
         with:
           name: tekdocs-security-evidence-backup-and-restore-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/backup-and-restore.json
+          retention-days: 90
+          if-no-files-found: error
+
+  diagram-upgrade-and-restore-evidence:
+    name: Diagram upgrade and restore evidence
+    needs: [supported-upgrades, supported-recovery]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Record commit-bound diagram upgrade and restore evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category upgrade_and_restore
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs supported upgrade and encrypted recovery rehearsals"
+          --tool-version "rehearsal scripts at $GITHUB_SHA"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:diagram-upgrade+restore"
+          --output artifacts/diagram-release-evidence/upgrade-and-restore.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-upgrade-and-restore-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/upgrade-and-restore.json
           retention-days: 90
           if-no-files-found: error

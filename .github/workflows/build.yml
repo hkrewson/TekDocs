@@ -144,9 +144,18 @@ jobs:
           npm audit --omit=dev --audit-level=high
           node check-licenses.mjs
       - name: Record diagram renderer dependency contract
-        run: >-
-          python3 scripts/check_renderer_dependency_contract.py
-          --output artifacts/renderer-dependency-contract.json
+        run: |
+          python3 scripts/check_renderer_dependency_contract.py \
+            --output artifacts/renderer-dependency-contract.json
+          contract_digest="sha256:$(sha256sum artifacts/renderer-dependency-contract.json | cut -d ' ' -f 1)"
+          python3 scripts/diagram_release_evidence.py write \
+            --category dependency_contract \
+            --scope-commit "$GITHUB_SHA" \
+            --tool "TekDocs renderer dependency contract" \
+            --tool-version "schema v1" \
+            --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --immutable-identifier "$contract_digest" \
+            --output artifacts/diagram-release-evidence/dependency-contract.json
       - name: Scan repository history for secrets
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
@@ -171,6 +180,12 @@ jobs:
         with:
           name: tekdocs-renderer-dependency-contract-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/renderer-dependency-contract.json
+          retention-days: 90
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-dependency-contract-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/dependency-contract.json
           retention-days: 90
           if-no-files-found: error
 
@@ -240,6 +255,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run Chromium regression
         run: ./tests/rehearsals/rehearse-browser-e2e.sh chromium
+      - name: Record diagram browser and accessibility evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category browser_accessibility
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs Chromium diagram authoring and accessibility regression"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:chromium-diagrams"
+          --output artifacts/diagram-release-evidence/browser-accessibility.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
@@ -247,6 +272,12 @@ jobs:
           path: artifacts/playwright-safe/chromium.json
           retention-days: 7
           if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/browser-accessibility.json
+          retention-days: 90
+          if-no-files-found: error
 
   live-workspace:
     name: Live browser-to-PostgreSQL journey
@@ -257,9 +288,44 @@ jobs:
       - name: Exercise the real application boundary
         run: ./tests/rehearsals/rehearse-live-workspace-e2e.sh
 
+  diagram-exports:
+    name: Diagram authoring, failures, and exports
+    needs: [prepare, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Run the complete diagram export gate
+        run: make test-diagram-exports
+      - name: Record diagram authoring and failure evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category authoring_and_failures
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs diagram authoring and failure regression"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:diagram-authoring"
+          --output artifacts/diagram-release-evidence/authoring-and-failures.json
+      - name: Record isolated renderer and export evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category renderer_and_exports
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs isolated renderer and export regression"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:renderer-exports"
+          --output artifacts/diagram-release-evidence/renderer-and-exports.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-exports-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/*.json
+          retention-days: 90
+          if-no-files-found: error
+
   production-containers:
     name: Production containers, SBOMs, and vulnerability scan
-    needs: [prepare, backend, frontend, security, runtime-authorization, postgres-coverage, browser, live-workspace]
+    needs: [prepare, backend, frontend, security, runtime-authorization, postgres-coverage, browser, live-workspace, diagram-exports]
     runs-on: ubuntu-latest
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
@@ -290,6 +356,8 @@ jobs:
             --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
             --tag "${RENDERER_IMAGE}:${COMMIT_TAG}" ./renderer
           docker pull "$MAILPIT_IMAGE"
+      - name: Rehearse the production diagram path
+        run: sh ./tests/rehearsals/rehearse-production-image.sh
       - name: Validate Python production licenses
         run: docker run --rm -v "$PWD/scripts/check-python-licenses.py:/check-python-licenses.py:ro" "${BACKEND_IMAGE}:${COMMIT_TAG}" python /check-python-licenses.py
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
@@ -357,10 +425,26 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:backend+frontend+renderer+mailpit"
           --output artifacts/security-evidence/image-scan.json
+      - name: Record production diagram image evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category production_image
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs production-target image rehearsal"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:production-diagram-image"
+          --output artifacts/diagram-release-evidence/production-image.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: tekdocs-security-evidence-image-scan-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/image-scan.json
+          retention-days: 90
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-production-image-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/production-image.json
           retention-days: 90
           if-no-files-found: error
       - name: Preserve tested application images for publication
@@ -497,10 +581,26 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "${{ steps.publish.outputs.backend-digest }}:${{ steps.publish.outputs.frontend-digest }}:${{ steps.publish.outputs.renderer-digest }}"
           --output artifacts/security-evidence/production-images-sbom-provenance.json
+      - name: Record diagram renderer supply-chain evidence
+        run: >-
+          python3 scripts/diagram_release_evidence.py write
+          --category supply_chain
+          --scope-commit "$GITHUB_SHA"
+          --tool "TekDocs renderer audit, scan, SBOM, and provenance gate"
+          --tool-version "TekDocs ${{ needs.prepare.outputs.version }}"
+          --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --immutable-identifier "${{ steps.publish.outputs.renderer-digest }}"
+          --output artifacts/diagram-release-evidence/supply-chain.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: tekdocs-security-evidence-production-images-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/production-images-sbom-provenance.json
+          retention-days: 90
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tekdocs-diagram-evidence-supply-chain-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/diagram-release-evidence/supply-chain.json
           retention-days: 90
           if-no-files-found: error
       - name: Summarize published images

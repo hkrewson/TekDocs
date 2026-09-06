@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -47,6 +47,10 @@ describe('Imports', () => {
     expect(await screen.findByText('site-1')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Apply import' }))
+    const confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('You cannot undo the import as a group.')
+    expect(client.apply).not.toHaveBeenCalled()
+    await user.click(within(confirmation).getByRole('button', { name: 'Apply import' }))
     await waitFor(() => expect(client.apply).toHaveBeenCalledWith(workspace, batch, {}))
   })
 
@@ -66,6 +70,7 @@ describe('Imports', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Use existing record' }))
     expect(apply).toBeEnabled()
     await user.click(apply)
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apply import' }))
     await waitFor(() => expect(client.apply).toHaveBeenCalledWith(workspace, batch, { 'row-2': 'entity-2' }))
   })
 })

@@ -29,7 +29,7 @@ const topics: Record<string, HelpTopic> = {
   compliance: { title: 'Compliance', summary: 'Track controls, evidence, risks, locked review bundles, and due dates.', slug: 'Compliance' },
   activity: { title: 'Activity', summary: 'See security and business changes made in this workspace.', slug: 'Audit-and-activity' },
   recycle_bin: { title: 'Recycle bin', summary: 'Restore archived records to this workspace.', slug: 'Recycle-bin' },
-  integrations: { title: 'Integrations', summary: 'Preview safe imports, configure scoped webhooks and read-only synchronization, reconcile changes, and create sanitized exports.', slug: 'Integrations-and-API' },
+  integrations: { title: 'Integrations', summary: 'Connect read-only systems, preview imports, review differences, manage webhooks, and export documents.', slug: 'Integrations-and-API' },
   settings: { title: 'Account security', summary: 'Manage profile details, sessions, MFA, recovery codes, and API tokens.', slug: 'Account-security' },
   staff: { title: 'Staff and invitations', summary: 'Invite MSP staff, review invitation delivery and expiry, and continue into role and client assignment.', slug: 'People-and-access' },
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },

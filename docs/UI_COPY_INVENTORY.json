@@ -477,9 +477,46 @@
       "workflow": "Integrations, imports, webhooks, synchronization, observations, conflicts, and recovery",
       "routes": ["/integrations"],
       "states": ["loading", "not connected", "syncing", "stale", "needs review", "conflict", "disabled", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Replace provider and synchronization implementation terms in ordinary setup while preserving precise audit codes in technical logs."
+      "decisions": [
+        {
+          "before": "Safe imports, read-only provider sync, reviewed reconciliation, signed webhooks, and sanitized exports.",
+          "after": "Connect other systems, import records, review differences, send webhooks, and export documents.",
+          "reason": "Names the available work without describing internal safeguards as product features."
+        },
+        {
+          "before": "Recent sync jobs and recent observations",
+          "after": "Recent updates and records from connected systems",
+          "reason": "Uses terms that describe what staff are looking at instead of the background implementation."
+        },
+        {
+          "before": "Reconciliation queue and Accept fingerprint",
+          "after": "Review differences and Acknowledge change",
+          "reason": "Makes the decision understandable while retaining the API's existing review behavior."
+        },
+        {
+          "before": "Create sanitized Git bundle and Retained bundles",
+          "after": "Create document export and Saved exports",
+          "reason": "Keeps Git and ZIP where they identify the format, but removes storage and serialization terminology from headings."
+        },
+        {
+          "before": "Raw server errors replaced the page's recovery guidance.",
+          "after": "Errors identify the failed action, say what was preserved, and offer a next step.",
+          "reason": "Keeps configuration and selections available and gives staff a useful recovery path."
+        },
+        {
+          "before": "Browser prompts handled import application, credential replacement, webhook secret replacement, and delivery retry.",
+          "after": "In-page confirmations state consequences before sensitive changes and collect required values without hiding the page.",
+          "reason": "Preserves context, improves accessibility, and makes irreversible consequences visible."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/integrations/Integrations.test.tsx",
+        "frontend/src/integrations/Imports.test.tsx",
+        "frontend/src/integrations/Webhooks.test.tsx",
+        "frontend/e2e/shell.spec.ts",
+        "scripts/tests/test_check_ui_language.py"
+      ]
     },
     {
       "id": "client-portal",

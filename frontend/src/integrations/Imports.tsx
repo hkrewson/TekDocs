@@ -68,6 +68,7 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmingApply, setConfirmingApply] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -100,15 +101,15 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
       const next = await client.preview(workspace, file, sourceFormat, recordType)
       replaceBatch(next); setFile(null); setMatches({})
       if (fileInput.current) fileInput.current.value = ''
-    } catch (caught) { setError(caught instanceof Error ? caught.message : translate('imports.previewFailed')) }
+    } catch { setError(translate('imports.previewFailed')) }
     finally { setSaving(false) }
   }
 
   async function applyImport() {
     if (!selected) return
     setSaving(true); setError(null)
-    try { replaceBatch(await client.apply(workspace, selected, matches)) }
-    catch (caught) { setError(caught instanceof Error ? caught.message : translate('imports.applyFailed')) }
+    try { replaceBatch(await client.apply(workspace, selected, matches)); setConfirmingApply(false) }
+    catch { setError(translate('imports.applyFailed')) }
     finally { setSaving(false) }
   }
 
@@ -116,7 +117,7 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
     if (!selected) return
     setSaving(true); setError(null)
     try { replaceBatch(await client.cancel(workspace, selected)) }
-    catch (caught) { setError(caught instanceof Error ? caught.message : translate('imports.cancelFailed')) }
+    catch { setError(translate('imports.cancelFailed')) }
     finally { setSaving(false) }
   }
 
@@ -141,10 +142,11 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
       {phase === 'loading' && <p className="empty-state" role="status">{translate('imports.loading')}</p>}
       {phase === 'error' && <p className="empty-state" role="alert">{translate('imports.loadFailed')}</p>}
       {phase === 'ready' && batches.length === 0 && <p className="empty-state">{translate('imports.empty')}</p>}
-      {phase === 'ready' && batches.length > 0 && <div className="table-scroll" role="group" aria-label={translate('imports.historyTable')} tabIndex={0}><table><thead><tr><th>{translate('imports.file')}</th><th>{translate('imports.source')}</th><th>{translate('imports.created')}</th><th>{translate('imports.state')}</th><th>{translate('imports.summary')}</th><th>{translate('imports.action')}</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.id} className={selected?.id === batch.id ? 'selected-row' : undefined}><td>{batch.source_filename}</td><td>{SOURCE_LABELS[batch.source_format]}</td><td>{formatDateTime(batch.created_at)}</td><td>{STATE_LABELS[batch.state]}</td><td>{resultSummary(batch)}</td><td><button className="secondary-button" type="button" onClick={() => { setSelected(batch); setMatches({}) }}>{translate('imports.review')}</button></td></tr>)}</tbody></table></div>}
+      {phase === 'ready' && batches.length > 0 && <div className="table-scroll" role="group" aria-label={translate('imports.historyTable')} tabIndex={0}><table><thead><tr><th>{translate('imports.file')}</th><th>{translate('imports.source')}</th><th>{translate('imports.created')}</th><th>{translate('imports.state')}</th><th>{translate('imports.summary')}</th><th>{translate('imports.action')}</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.id} className={selected?.id === batch.id ? 'selected-row' : undefined}><td>{batch.source_filename}</td><td>{SOURCE_LABELS[batch.source_format]}</td><td>{formatDateTime(batch.created_at)}</td><td>{STATE_LABELS[batch.state]}</td><td>{resultSummary(batch)}</td><td><button className="secondary-button" type="button" onClick={() => { setSelected(batch); setMatches({}); setConfirmingApply(false) }}>{translate('imports.review')}</button></td></tr>)}</tbody></table></div>}
     </section>
     {selected && <section className="content-section" aria-labelledby="import-preview-title">
-      <div className="section-heading"><div><h2 id="import-preview-title">{translate('imports.previewTitle')}</h2><p>{selected.source_filename} · {translate('imports.expires', { date: formatDateTime(selected.expires_at) })}</p></div><div className="table-actions"><a className="secondary-button" href={client.reportUrl(workspace, selected)}><Download size={14} />{translate('imports.report')}</a>{pending && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void cancelImport() }}>{translate('common.cancel')}</button>}<button className="primary-button" type="button" disabled={!pending || saving || blockingRows.length > 0} onClick={() => { void applyImport() }}>{saving ? translate('imports.processing') : translate('imports.apply')}</button></div></div>
+      <div className="section-heading"><div><h2 id="import-preview-title">{translate('imports.previewTitle')}</h2><p>{selected.source_filename} · {translate('imports.expires', { date: formatDateTime(selected.expires_at) })}</p></div><div className="table-actions"><a className="secondary-button" href={client.reportUrl(workspace, selected)}><Download size={14} />{translate('imports.report')}</a>{pending && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void cancelImport() }}>{translate('common.cancel')}</button>}<button className="primary-button" type="button" disabled={!pending || saving || blockingRows.length > 0} onClick={() => setConfirmingApply(true)}>{translate('imports.apply')}</button></div></div>
+      {confirmingApply && pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="apply-import-heading" aria-describedby="apply-import-help"><div><strong id="apply-import-heading">{translate('imports.applyHeading', { file: selected.source_filename })}</strong><p id="apply-import-help">{translate('imports.applyHelp')}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void applyImport() }}>{saving ? translate('imports.processing') : translate('imports.apply')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setConfirmingApply(false)}>{translate('common.cancel')}</button></div></div>}
       {blockingRows.length > 0 && <div className="form-message warning" role="status">{translate('imports.blocked', { count: blockingRows.length })}</div>}
       <div className="table-scroll" role="group" aria-label={translate('imports.previewTable')} tabIndex={0}><table><thead><tr><th>{translate('imports.row')}</th><th>{translate('imports.recordType')}</th><th>{translate('imports.externalKey')}</th><th>{translate('imports.action')}</th><th>{translate('imports.reason')}</th><th>{translate('imports.decision')}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.row_number}</td><td>{RECORD_LABELS[row.record_type]}</td><td><code>{row.external_key}</code></td><td>{ACTION_LABELS[row.action]}</td><td><code>{row.reason_code || '—'}</code></td><td>{pending && row.action === 'conflict' && row.local_entity_id ? <label className="inline-choice"><input type="checkbox" checked={Boolean(matches[row.id])} onChange={(event) => setMatches((current) => { const next = { ...current }; if (event.target.checked && row.local_entity_id) next[row.id] = row.local_entity_id; else delete next[row.id]; return next })} /><span>{translate('imports.useExisting')}</span></label> : '—'}</td></tr>)}</tbody></table></div>
     </section>}

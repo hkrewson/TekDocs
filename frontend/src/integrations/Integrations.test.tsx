@@ -61,7 +61,7 @@ describe('Integrations', () => {
 
     render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} />)
 
-    expect(await screen.findByText(/No external provider connections/i)).toBeInTheDocument()
+    expect(await screen.findByText(/No systems are connected/i)).toBeInTheDocument()
     expect(provider.listConnections).toHaveBeenCalledWith(workspace, expect.any(AbortSignal))
     expect(documents.list).toHaveBeenCalledWith({ organizationId: 'client-1' }, expect.any(AbortSignal))
 
@@ -112,7 +112,6 @@ describe('Integrations', () => {
     vi.mocked(provider.updateConnection).mockResolvedValue({ ...connection, active: false })
     vi.mocked(provider.rotateConnection).mockResolvedValue({ ...connection, secret_generation: 2 })
     vi.mocked(provider.resolveConflict).mockResolvedValue({ ...conflict, status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    vi.spyOn(window, 'prompt').mockReturnValue('replacement-token')
     const user = userEvent.setup()
 
     render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
@@ -123,15 +122,19 @@ describe('Integrations', () => {
     await waitFor(() => expect(provider.cancelJob).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'job-2' })))
     await user.click(screen.getByRole('button', { name: 'Pause' }))
     await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, false))
-    await user.click(screen.getByRole('button', { name: /Rotate Primary NetBox provider credential/i }))
+    await user.click(screen.getByRole('button', { name: /Replace the credential for Primary NetBox/i }))
+    const credential = screen.getByRole('alertdialog')
+    expect(credential).toHaveTextContent('The current credential will stop working after this change.')
+    await user.type(screen.getByLabelText('API token'), 'replacement-token')
+    await user.click(screen.getByRole('button', { name: 'Replace credential' }))
     await waitFor(() => expect(provider.rotateConnection).toHaveBeenCalledWith(
       workspace, expect.objectContaining({ id: connection.id }), { api_token: 'replacement-token' },
     ))
 
     await user.click(screen.getByRole('button', { name: 'Reconciliation' }))
-    await user.click(screen.getByRole('button', { name: 'Accept fingerprint' }))
+    await user.click(screen.getByRole('button', { name: 'Acknowledge change' }))
     await waitFor(() => expect(provider.resolveConflict).toHaveBeenCalledWith(workspace, conflict, 'accept_remote'))
-    expect(screen.getByText(/No unresolved provider differences/i)).toBeInTheDocument()
+    expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
   })
 
   it('creates a read-only provider connection and clears the one-time token field', async () => {

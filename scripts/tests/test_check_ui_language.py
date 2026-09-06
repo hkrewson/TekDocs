@@ -29,6 +29,7 @@ class UiLanguageContractTests(unittest.TestCase):
         MODULE.validate_supplier_migration()
         MODULE.validate_invoice_migration()
         MODULE.validate_governance_migration()
+        MODULE.validate_integration_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -98,6 +99,16 @@ class UiLanguageContractTests(unittest.TestCase):
                 ValueError, "reviewed governance copy or confirmation returned"
             ):
                 MODULE.validate_governance_migration()
+
+    def test_rejects_reintroduced_integration_jargon_raw_errors_or_browser_prompts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "Webhooks.tsx"
+            source.write_text("window.prompt('Why retry?')\n", encoding="utf-8")
+            reviewed_files = {source: {"window.prompt"}}
+            with patch.object(MODULE, "REVIEWED_INTEGRATION_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed integration copy, raw error, or browser prompt returned"
+            ):
+                MODULE.validate_integration_migration()
 
 
 if __name__ == "__main__":

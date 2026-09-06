@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -54,8 +54,21 @@ describe('Webhooks', () => {
     await waitFor(() => expect(setActive).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'endpoint-1' }), false))
     expect(await screen.findByText('Inactive')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^Filters$/ }))
-    await user.click(screen.getByText('State', { exact: true }))
-    await user.click(screen.getByRole('radio', { name: 'Dead letter' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Delivery filters' })).getByText('Status', { exact: true }))
+    await user.click(screen.getByRole('radio', { name: 'Failed' }))
     await waitFor(() => expect(listDeliveries).toHaveBeenLastCalledWith(workspace, 1, 'dead_letter', expect.any(AbortSignal)))
+  })
+
+  it('explains the impact before replacing a signing secret', async () => {
+    const rotate = vi.fn().mockResolvedValue({ id: 'endpoint-1', direction: 'outbound', name: 'PSA', url: 'https://hooks.example.com/tekdocs', inbound_path: null, topics: ['document_publication.available'], secret_prefix: 'tdwhsec_new', secret_generation: 2, active: true, created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T01:00:00Z', signing_secret: 'tdwhsec_replacement' })
+    const user = userEvent.setup()
+    render(<Webhooks workspace={workspace} client={{ ...mockClient(), rotate }} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Replace the signing secret for PSA' }))
+    const confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('The current secret will stop working immediately.')
+    expect(rotate).not.toHaveBeenCalled()
+    await user.click(within(confirmation).getByRole('button', { name: 'Replace secret' }))
+    await waitFor(() => expect(rotate).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'endpoint-1' })))
   })
 })

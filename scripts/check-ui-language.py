@@ -139,6 +139,35 @@ REVIEWED_GOVERNANCE_FILES = {
         "same cascade",
     },
 }
+REVIEWED_INTEGRATION_FILES = {
+    ROOT / "frontend" / "src" / "integrations" / "Integrations.tsx": {
+        "window.prompt",
+        "Provider connections",
+        "Recent sync jobs",
+        "Recent observations",
+        "Reconciliation queue",
+        "Accept fingerprint",
+        "Create sanitized Git bundle",
+        "Retained bundles",
+        "caught.message",
+    },
+    ROOT / "frontend" / "src" / "integrations" / "Imports.tsx": {
+        "caught.message",
+    },
+    ROOT / "frontend" / "src" / "integrations" / "Webhooks.tsx": {
+        "window.confirm",
+        "window.prompt",
+        "metadata-only inspection",
+        "bounded retries",
+        "caught.message",
+    },
+    ROOT / "frontend" / "src" / "help" / "topics.ts": {
+        "configure scoped webhooks",
+        "read-only synchronization",
+        "reconcile changes",
+        "sanitized exports",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -281,6 +310,16 @@ def validate_governance_migration() -> None:
         )
 
 
+def validate_integration_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_INTEGRATION_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed integration copy, raw error, or browser prompt returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
@@ -289,6 +328,7 @@ def main() -> int:
     validate_supplier_migration()
     validate_invoice_migration()
     validate_governance_migration()
+    validate_integration_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

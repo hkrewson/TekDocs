@@ -158,6 +158,8 @@ test('NinjaOne setup and reconciliation states are explicit and accessible', asy
 
   await page.goto('/integrations')
   await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
+  await expect(page.getByText(/TekDocs does not change them/)).toBeVisible()
   await expect(page.getByText('Needs review')).toBeVisible()
   await expect(page.getByText('Reception laptop in TekDocs')).toBeVisible()
   await expect(page.getByText(/Stale · source observed/)).toBeVisible()
@@ -167,6 +169,9 @@ test('NinjaOne setup and reconciliation states are explicit and accessible', asy
   await expect(providerSelect).toHaveValue('ninjaone')
   await expect(page.getByRole('link', { name: 'NinjaOne setup guidance' })).toHaveAttribute('href', /ninjaone\.com/)
   await expect(page.getByText(/read-only API application/)).toBeVisible()
+  await page.getByRole('button', { name: 'Reconciliation' }).click()
+  await expect(page.getByRole('heading', { name: 'Review differences' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Acknowledge change' })).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 

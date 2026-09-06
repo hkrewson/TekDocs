@@ -309,9 +309,45 @@
       "workflow": "Vendors and product catalogs",
       "routes": ["/vendors", "/products"],
       "states": ["loading", "empty", "populated", "revision", "archive", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review vendor/manufacturer distinctions, model and specification actions, revision language, and archive consequences."
+      "decisions": [
+        {
+          "before": "Vendor / Manufacturer",
+          "after": "A vendor sells a product; a manufacturer makes it; an organization can be both",
+          "reason": "Explain the classification distinction once where staff choose or review a supplier catalog."
+        },
+        {
+          "before": "Suppliers derived from retained asset provenance",
+          "after": "Vendors and manufacturers connected to this workspace’s assets",
+          "reason": "Describe why an organization appears in the list without exposing storage or lineage terminology."
+        },
+        {
+          "before": "Specification sets / reusable validation contracts / checksum",
+          "after": "Specification templates / details recorded for a model",
+          "reason": "A template describes the task directly; the unlabeled checksum is hidden because it does not help an ordinary catalog decision."
+        },
+        {
+          "before": "Revise / revision notes / Create revision",
+          "after": "Update model / change notes / Save new version",
+          "reason": "Use familiar actions while still stating that a saved update creates a new version and does not rewrite existing assets."
+        },
+        {
+          "before": "STATIC publication / Associate / retained publications",
+          "after": "Published document / Add document / documents included with assets",
+          "reason": "Name the document and the result of linking it instead of exposing publication-mode and relationship terminology."
+        },
+        {
+          "before": "Archive product and its models?",
+          "after": "Product and models leave new-asset choices; existing assets keep saved details; no restore action is available",
+          "reason": "The confirmation names the full consequence before an archive that the current interface cannot reverse."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/catalog/ProductCatalogs.test.tsx",
+        "frontend/src/catalog/Products.test.tsx",
+        "frontend/src/inventory/Vendors.test.tsx",
+        "frontend/e2e/suppliers-products-language.spec.ts"
+      ]
     },
     {
       "id": "invoices",

@@ -31,8 +31,8 @@ export function ProductCatalogs({ client }: { client: WorkspaceClient }) {
       if (controller.signal.aborted) return
       const unique = new Map([...vendors, ...manufacturers].map((workspace) => [workspace.id, workspace]))
       setSuppliers([...unique.values()].sort((left, right) => left.name.localeCompare(right.name)))
-    }).catch((caught: unknown) => {
-      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('products.loadFailed'))
+    }).catch(() => {
+      if (!controller.signal.aborted) setError(translate('products.loadFailed'))
     })
     return () => controller.abort()
   }, [client])

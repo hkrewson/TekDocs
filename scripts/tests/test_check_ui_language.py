@@ -26,6 +26,7 @@ class UiLanguageContractTests(unittest.TestCase):
         self.assertGreater(MODULE.validate_catalog(), 0)
         MODULE.validate_shell_migration()
         MODULE.validate_infrastructure_migration()
+        MODULE.validate_supplier_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -65,6 +66,16 @@ class UiLanguageContractTests(unittest.TestCase):
                 ValueError, "reviewed infrastructure copy returned"
             ):
                 MODULE.validate_infrastructure_migration()
+
+    def test_rejects_reintroduced_supplier_jargon(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "Products.tsx"
+            source.write_text("const label = 'Reusable validation contracts'\n", encoding="utf-8")
+            reviewed_files = {source: {"Reusable validation contracts"}}
+            with patch.object(MODULE, "REVIEWED_SUPPLIER_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed supplier copy returned"
+            ):
+                MODULE.validate_supplier_migration()
 
 
 if __name__ == "__main__":

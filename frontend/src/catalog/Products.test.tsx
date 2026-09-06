@@ -63,15 +63,15 @@ function catalogClient(overrides: Partial<CatalogClient> = {}): CatalogClient {
 }
 
 describe('Products', () => {
-  it('shows supplier products, current specifications, and immutable history', async () => {
+  it('shows supplier products, current specifications, and saved version history', async () => {
     const user = userEvent.setup()
     render(<Products workspace={workspace} client={catalogClient()} />)
     expect(await screen.findByRole('heading', { name: 'EdgeSwitch' })).toBeInTheDocument()
-    expect(screen.getByText('ES-24 · active · revision 1')).toBeInTheDocument()
+    expect(screen.getByText('ES-24 · Active · version 1')).toBeInTheDocument()
     expect(screen.getByText('24')).toBeInTheDocument()
     expect(screen.getByText('Yes')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show history for EdgeSwitch 24' }))
-    expect(screen.getByText(/Revision 1 · Managed switch v1/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show versions for EdgeSwitch 24' }))
+    expect(screen.getByText(/Version 1 · Managed switch, template version 1/)).toBeInTheDocument()
     expect(screen.getByText(/Initial/)).toBeInTheDocument()
   })
 
@@ -82,7 +82,7 @@ describe('Products', () => {
     render(<Products workspace={workspace} client={api} />)
     await user.click(await screen.findByRole('button', { name: 'New product' }))
     const editor = screen.getByRole('heading', { name: 'New product' }).closest('section')!
-    await user.type(within(editor).getByLabelText('Name'), 'Cloud Gateway')
+    await user.type(within(editor).getByLabelText('Product name'), 'Cloud Gateway')
     await user.selectOptions(within(editor).getByLabelText('Type'), 'software')
     await user.type(within(editor).getByLabelText('Description'), 'Cloud-managed gateway')
     await user.click(within(editor).getByRole('button', { name: 'Create product' }))
@@ -91,29 +91,29 @@ describe('Products', () => {
     }))
   })
 
-  it('builds a closed structured specification schema and versions an existing set', async () => {
+  it('builds a controlled specification template and saves a new version', async () => {
     const createDefinition = vi.fn<CatalogClient['createDefinition']>().mockResolvedValue(definition)
     const versionDefinition = vi.fn().mockResolvedValue(definition.versions[0])
     const api = catalogClient({ createDefinition, versionDefinition })
     const user = userEvent.setup()
     render(<Products workspace={workspace} client={api} />)
-    await user.click(await screen.findByRole('tab', { name: 'Specification sets' }))
-    await user.click(screen.getByRole('button', { name: 'New specification set' }))
-    let editor = screen.getByRole('heading', { name: 'New specification set' }).closest('section')!
-    await user.type(within(editor).getByLabelText('Name'), 'Wireless access point')
-    await user.type(within(editor).getByLabelText('Key'), 'radio_count')
-    await user.type(within(editor).getByLabelText('Label'), 'Radio count')
-    await user.selectOptions(within(editor).getByLabelText('Type'), 'integer')
+    await user.click(await screen.findByRole('tab', { name: 'Specification templates' }))
+    await user.click(screen.getByRole('button', { name: 'New specification template' }))
+    let editor = screen.getByRole('heading', { name: 'New specification template' }).closest('section')!
+    await user.type(within(editor).getByLabelText('Template name'), 'Wireless access point')
+    await user.type(within(editor).getByLabelText('Import name'), 'radio_count')
+    await user.type(within(editor).getByLabelText('Display label'), 'Radio count')
+    await user.selectOptions(within(editor).getByLabelText('Value type'), 'integer')
     await user.click(within(editor).getByLabelText('Required'))
-    await user.click(within(editor).getByRole('button', { name: 'Create specification set' }))
+    await user.click(within(editor).getByRole('button', { name: 'Create template' }))
     await waitFor(() => expect(createDefinition).toHaveBeenCalledOnce())
     const submittedDefinition = createDefinition.mock.calls[0][1]
     expect(submittedDefinition.name).toBe('Wireless access point')
     expect(submittedDefinition.schema.additionalProperties).toBe(false)
     expect(submittedDefinition.schema.required).toEqual(['radio_count'])
-    await user.click(screen.getByRole('button', { name: 'New version' }))
-    editor = screen.getByRole('heading', { name: 'New Managed switch version' }).closest('section')!
-    await user.click(within(editor).getByRole('button', { name: 'Publish version' }))
+    await user.click(screen.getByRole('button', { name: 'Update template' }))
+    editor = screen.getByRole('heading', { name: 'Update Managed switch' }).closest('section')!
+    await user.click(within(editor).getByRole('button', { name: 'Save new version' }))
     await waitFor(() => expect(versionDefinition).toHaveBeenCalledWith(workspace, 'definition-1', expect.objectContaining({ additionalProperties: false })))
   })
 
@@ -131,15 +131,15 @@ describe('Products', () => {
     await user.click(within(editor).getByLabelText('Managed'))
     await user.click(within(editor).getByRole('button', { name: 'Add model' }))
     await waitFor(() => expect(createModel).toHaveBeenCalledWith(workspace, 'product-1', expect.objectContaining({ specifications: { ports: 48, managed: true } })))
-    await user.click(screen.getByRole('button', { name: 'Revise' }))
-    editor = screen.getByRole('heading', { name: 'Revise EdgeSwitch 24' }).closest('section')!
-    await user.clear(within(editor).getByLabelText('Revision notes'))
-    await user.type(within(editor).getByLabelText('Revision notes'), 'Reviewed specification')
-    await user.click(within(editor).getByRole('button', { name: 'Create revision' }))
+    await user.click(screen.getByRole('button', { name: 'Update model' }))
+    editor = screen.getByRole('heading', { name: 'Update EdgeSwitch 24' }).closest('section')!
+    await user.clear(within(editor).getByLabelText('Change notes'))
+    await user.type(within(editor).getByLabelText('Change notes'), 'Reviewed specification')
+    await user.click(within(editor).getByRole('button', { name: 'Save new version' }))
     await waitFor(() => expect(reviseModel).toHaveBeenCalledWith(workspace, 'product-1', 'model-1', expect.objectContaining({ base_revision_id: 'revision-1', notes: 'Reviewed specification' })))
   })
 
-  it('associates a client-visible STATIC publication with an exact model', async () => {
+  it('adds a published document to an exact model', async () => {
     const associateDocument = vi.fn().mockResolvedValue({})
     const api = catalogClient({
       associateDocument,
@@ -150,10 +150,11 @@ describe('Products', () => {
     })
     const user = userEvent.setup()
     render(<Products workspace={workspace} client={api} />)
-    await user.click(await screen.findByRole('button', { name: 'Add publication' }))
-    await user.selectOptions(screen.getByLabelText('STATIC publication'), 'publication-1')
+    await user.click(await screen.findByRole('button', { name: 'Add document' }))
+    await user.selectOptions(screen.getByLabelText('Published document'), 'publication-1')
     await user.selectOptions(screen.getByLabelText('Applies to'), 'model-1')
-    await user.click(screen.getByRole('button', { name: 'Associate' }))
+    const form = screen.getByLabelText('Published document').closest('.catalog-document-form') as HTMLElement
+    await user.click(within(form).getByRole('button', { name: 'Add document' }))
     await waitFor(() => expect(associateDocument).toHaveBeenCalledWith(workspace, 'product-1', 'publication-1', 'model-1'))
   })
 
@@ -163,10 +164,29 @@ describe('Products', () => {
       listDefinitions: vi.fn().mockResolvedValue({ results: [], can_manage: false }),
     })
     const { unmount } = render(<Products workspace={workspace} client={denied} />)
-    expect(await screen.findByText('No supplier products match this view.')).toBeInTheDocument()
+    expect(await screen.findByText('No products match this view.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New product' })).not.toBeInTheDocument()
     unmount()
     render(<Products workspace={workspace} client={catalogClient({ listProducts: vi.fn().mockRejectedValue(new Error('Denied')) })} />)
-    expect(await screen.findByRole('heading', { name: 'Catalog unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Products unavailable' })).toBeInTheDocument()
+  })
+
+  it('explains product and model archive consequences before making the change', async () => {
+    const archiveProduct = vi.fn().mockResolvedValue(undefined)
+    const archiveModel = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<Products workspace={workspace} client={catalogClient({ archiveProduct, archiveModel })} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Archive EdgeSwitch' }))
+    let confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('Existing assets keep their saved product and model details.')
+    await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }))
+
+    await user.click(screen.getByRole('button', { name: 'Archive model EdgeSwitch 24' }))
+    confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('Existing assets keep their saved model details.')
+    await user.click(within(confirmation).getByRole('button', { name: 'Archive model' }))
+    await waitFor(() => expect(archiveModel).toHaveBeenCalledWith(workspace, 'product-1', 'model-1'))
+    expect(archiveProduct).not.toHaveBeenCalled()
   })
 })

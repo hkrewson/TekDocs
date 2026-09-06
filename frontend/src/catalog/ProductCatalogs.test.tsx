@@ -14,7 +14,8 @@ describe('ProductCatalogs', () => {
 
     expect(await screen.findByText('Acme Supply')).toBeInTheDocument()
     expect(screen.getAllByText('Acme Supply')).toHaveLength(1)
-    expect(screen.getByRole('link', { name: 'Open catalog' })).toHaveAttribute('href', '/workspaces/organizations/supplier-1/products')
+    expect(screen.getByText('A vendor sells a product; a manufacturer makes it. An organization can be both.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open products' })).toHaveAttribute('href', '/workspaces/organizations/supplier-1/products')
     expect(searchOrganizations).toHaveBeenCalledTimes(2)
   })
 })

@@ -9,7 +9,9 @@ describe('Vendors', () => {
       listVendors: vi.fn().mockResolvedValue({ results: [{ id: 'supplier-1', name: 'Northwind', legal_name: 'Northwind, Inc.', website: 'https://example.invalid', classifications: ['manufacturer'], asset_count: 2 }], count: 1 }),
     } as unknown as InventoryClient
     render(<Vendors workspace={{ id: 'client-1' } as never} client={client} />)
-    expect(await screen.findByText('Northwind')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Vendors and manufacturers' })).toBeInTheDocument()
+    expect(screen.getByText('Northwind')).toBeInTheDocument()
+    expect(screen.getByText('Manufacturer')).toBeInTheDocument()
     expect(screen.getByText('2 assets')).toBeInTheDocument()
   })
 })

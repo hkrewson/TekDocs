@@ -84,6 +84,26 @@ REVIEWED_INFRASTRUCTURE_FILES = {
         "operational fields",
     },
 }
+REVIEWED_SUPPLIER_FILES = {
+    ROOT / "frontend" / "src" / "inventory" / "Vendors.tsx": {
+        "retained asset provenance",
+        "derived supplier list",
+    },
+    ROOT / "frontend" / "src" / "catalog" / "ProductCatalogs.tsx": {
+        "Reusable product and model definitions retained",
+        "No vendor or manufacturer catalogs are available",
+    },
+    ROOT / "frontend" / "src" / "catalog" / "Products.tsx": {
+        "stable supplier-owned family",
+        "Reusable validation contracts",
+        "Specifications are validated and retained",
+        "STATIC publication",
+        "No retained publications",
+        "Create revision",
+        "Revision notes",
+        "Sell price",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -196,11 +216,22 @@ def validate_infrastructure_migration() -> None:
         )
 
 
+def validate_supplier_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_SUPPLIER_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed supplier copy returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
     validate_shell_migration()
     validate_infrastructure_migration()
+    validate_supplier_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

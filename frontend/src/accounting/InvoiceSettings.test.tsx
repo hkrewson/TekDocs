@@ -60,4 +60,16 @@ describe('InvoiceSettings', () => {
     expect(await screen.findByText('Invoice settings saved.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Current password')).not.toBeInTheDocument()
   })
+
+  it('keeps edited settings visible when saving fails', async () => {
+    const saveIssueSettings = vi.fn().mockRejectedValue(new Error('Internal server error'))
+    render(<InvoiceSettings client={{ issueSettings: vi.fn().mockResolvedValue(settings), saveIssueSettings }} authClient={authClient} />)
+
+    await screen.findByRole('heading', { name: 'Invoice settings' })
+    fireEvent.change(screen.getByLabelText('Invoice prefix'), { target: { value: 'MSP' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save invoice settings' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save invoice settings. Your changes are still here. Try again.")
+    expect(screen.getByLabelText('Invoice prefix')).toHaveValue('MSP')
+  })
 })

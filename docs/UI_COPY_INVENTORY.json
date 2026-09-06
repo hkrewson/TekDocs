@@ -354,9 +354,44 @@
       "workflow": "Invoice settings, drafts, issuance, delivery, lifecycle, and accounting handoff",
       "routes": ["/invoices"],
       "states": ["loading", "settings incomplete", "draft", "issuance confirmation", "issued", "delivery failure", "reconciliation"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review irreversible issuance language, numbering choices, settings errors, delivery recovery, payment status, and accounting handoff without ledger terminology."
+      "decisions": [
+        {
+          "before": "Lines / unit amount / manual line",
+          "after": "Items / price per unit / enter an item manually",
+          "reason": "Use the terms an MSP expects while building an invoice instead of accounting record terminology."
+        },
+        {
+          "before": "Browser confirmation for issue or delete",
+          "after": "In-page confirmation naming the draft date and permanent consequence",
+          "reason": "Keep the decision visible, accessible, and specific before assigning a permanent number or deleting a draft."
+        },
+        {
+          "before": "Lifecycle / reconciliation / synchronized",
+          "after": "Status / accounting / sent to accounting",
+          "reason": "Describe what happened to the invoice without requiring bookkeeping-system vocabulary."
+        },
+        {
+          "before": "Provider event ID / external record ID",
+          "after": "Unique update ID / invoice ID in accounting system",
+          "reason": "Name the values by the job they do and explain that the update ID prevents duplicates."
+        },
+        {
+          "before": "Invoice settings could not be saved",
+          "after": "Couldn't save invoice settings; changes remain; try again",
+          "reason": "Failure messages state what happened, whether work was preserved, and the next action."
+        },
+        {
+          "before": "Ed25519 signing key",
+          "after": "Issued and locked with a verification ID",
+          "reason": "Keep useful proof visible without making ordinary invoice readers interpret a cryptographic algorithm."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/accounting/Invoices.test.tsx",
+        "frontend/src/accounting/InvoiceSettings.test.tsx",
+        "frontend/e2e/invoices.spec.ts"
+      ]
     },
     {
       "id": "stock",

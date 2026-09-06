@@ -32,7 +32,7 @@ const issuedInvoice = {
   lifecycle_events: [{ id: crypto.randomUUID(), event_type: 'issued', occurred_at: '2026-08-29T12:00:00Z', recorded_at: '2026-08-29T12:00:00Z', actor: 'Primary Owner', provider: '', external_id: '', amount: null, currency: '', related_invoice_id: null, note: '' }],
 }
 
-test('invoice lifecycle and accounting handoff remain compact and accessible', async ({ page, baseURL }) => {
+test('invoice status and accounting updates remain compact and accessible', async ({ page, baseURL }) => {
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
@@ -55,15 +55,16 @@ test('invoice lifecycle and accounting handoff remain compact and accessible', a
 
   await page.goto(`/workspaces/organizations/${clientId}/invoices`)
   await expect(page.getByRole('heading', { name: 'INV-2026-000042' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Accounting export' })).toHaveAttribute('href', new RegExp(`${invoiceId}/accounting-export$`))
-  await expect(page.getByText('Not synchronized').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Record update' }).click()
-  await page.getByLabel('Update type').selectOption('accounting_synchronized')
-  await page.getByLabel('Accounting provider').fill('ledger')
-  await page.getByLabel('External record ID').fill('invoice-44')
-  await page.getByLabel('Provider event ID').fill('ledger:invoice-44')
-  await page.getByRole('dialog').getByRole('button', { name: 'Record update' }).click()
-  await expect(page.getByText('Synchronized to accounting')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download for accounting' })).toHaveAttribute('href', new RegExp(`${invoiceId}/accounting-export$`))
+  await expect(page.getByText('Not sent to accounting').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Update status' }).click()
+  await page.getByLabel('What changed').selectOption('accounting_synchronized')
+  await page.getByLabel('Accounting system', { exact: true }).fill('ledger')
+  await page.getByLabel('Invoice ID in accounting system', { exact: true }).fill('invoice-44')
+  await page.getByLabel('Unique update ID', { exact: true }).fill('ledger:invoice-44')
+  await expect(page.getByText(/prevent the same update from being recorded twice/)).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Update status' }).click()
+  await expect(page.getByText('Sent to accounting').last()).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
@@ -105,11 +106,11 @@ test('a stock line records its quantity for the client in one save', async ({ pa
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [draft], can_manage: true, can_issue: false } }))
 
   await page.goto(`/workspaces/organizations/${clientId}/invoices`)
-  await page.getByRole('button', { name: 'Add line' }).click()
+  await page.getByRole('button', { name: 'Add item' }).click()
   await page.getByLabel('Source').selectOption(`stock_item:${stockId}`)
-  await expect(page.getByText('Saving this line uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
+  await expect(page.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
   await page.getByLabel('Quantity').fill('125.500')
-  await page.getByRole('dialog').getByRole('button', { name: 'Save line' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Save item' }).click()
   await expect(page.getByText('125.500 × USD 0.30')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })

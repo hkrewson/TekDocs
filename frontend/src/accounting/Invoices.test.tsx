@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { Invoices } from './Invoices'
@@ -80,12 +80,12 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
 describe('Invoices', () => {
   it('keeps MSP settings out of the client workspace and links there when setup is incomplete', async () => {
     const client = invoiceClient({ issue: vi.fn().mockRejectedValue(new Error('Configure invoice issue settings first.')) })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<MemoryRouter><Invoices workspace={workspace} client={client} /></MemoryRouter>)
 
     expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Invoice settings' })).not.toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
     expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/invoices')
   })
 
@@ -96,9 +96,9 @@ describe('Invoices', () => {
 
     expect(await screen.findByRole('heading', { name: 'Draft · Aug 29, 2026' })).toBeInTheDocument()
     expect(screen.getAllByText('USD 137.50')).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: 'Add line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }))
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'service_rate:rate-1' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
@@ -121,13 +121,13 @@ describe('Invoices', () => {
     })
     render(<Invoices workspace={workspace} client={client} />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Add line' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add item' }))
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'stock_item:stock-1' } })
     expect(screen.getByRole('option', { name: 'In-stock item · Cat6 bulk cable · 1000.000 foot available · USD 0.30' })).toBeInTheDocument()
-    expect(screen.getByText('Saving this line uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeInTheDocument()
+    expect(screen.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeInTheDocument()
     expect(screen.getByLabelText('Quantity')).toHaveAttribute('max', '1000.000')
     fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '125.500' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
@@ -145,23 +145,39 @@ describe('Invoices', () => {
     render(<Invoices workspace={workspace} client={client} />)
 
     expect(await screen.findByText('Managed firewall')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add line' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New draft' })).not.toBeInTheDocument()
     expect(choices).not.toHaveBeenCalled()
   })
 
   it('issues a configured draft and replaces editing controls with signed proof', async () => {
     const issue = vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Invoices workspace={workspace} client={invoiceClient({ issue })} />)
 
     await screen.findByRole('button', { name: 'Issue invoice' })
     fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Issue the draft dated Aug 29, 2026?')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('You cannot undo this.')
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
 
     expect(await screen.findByRole('heading', { name: 'INV-000001' })).toBeInTheDocument()
     expect(issue).toHaveBeenCalledWith(workspace, 'invoice-1')
     expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument()
-    expect(screen.getByText(/Ed25519 signing key/)).toBeInTheDocument()
+    expect(screen.getByText(/verification ID/)).toBeInTheDocument()
+  })
+
+  it('names the draft and consequence before deleting it', async () => {
+    const remove = vi.fn().mockResolvedValue(undefined)
+    render(<Invoices workspace={workspace} client={invoiceClient({ remove })} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete draft' }))
+    const confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('Delete the draft dated Aug 29, 2026?')
+    expect(confirmation).toHaveTextContent('permanently deleted')
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete draft' }))
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(workspace, 'invoice-1'))
+    expect(await screen.findByText('No invoices have been created for this client.')).toBeInTheDocument()
   })
 
   it('retains the snapshotted tax when an existing line is edited', async () => {
@@ -169,8 +185,8 @@ describe('Invoices', () => {
     render(<Invoices workspace={workspace} client={invoiceClient({ updateLine })} />)
 
     await screen.findByRole('heading', { name: 'Draft · Aug 29, 2026' })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit line Managed firewall' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit item Managed firewall' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => expect(updateLine).toHaveBeenCalledWith(
       workspace,
@@ -200,7 +216,7 @@ describe('Invoices', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send invoice' }))
 
     await waitFor(() => expect(deliver).toHaveBeenCalledWith(workspace, 'invoice-1', 'accounts@example.invalid'))
-    expect(await screen.findByText(/Delivery count 1/)).toBeInTheDocument()
+    expect(await screen.findByText('Emailed once · sent Aug 29, 2026')).toBeInTheDocument()
   })
 
   it('records an idempotent accounting handoff and payment projection', async () => {
@@ -212,20 +228,20 @@ describe('Invoices', () => {
       recordEvent,
     })} />)
 
-    expect(await screen.findByRole('link', { name: 'Accounting export' })).toHaveAttribute('href', '/invoice-accounting.json')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Record update' }).at(-1)!)
-    fireEvent.change(screen.getByLabelText('Update type'), { target: { value: 'accounting_synchronized' } })
-    fireEvent.change(screen.getByLabelText('Accounting provider'), { target: { value: 'ledger' } })
-    fireEvent.change(screen.getByLabelText('External record ID'), { target: { value: 'evt-1' } })
-    fireEvent.change(screen.getByLabelText('Provider event ID'), { target: { value: 'ledger:evt-1' } })
+    expect(await screen.findByRole('link', { name: 'Download for accounting' })).toHaveAttribute('href', '/invoice-accounting.json')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Update status' }).at(-1)!)
+    fireEvent.change(screen.getByLabelText('What changed'), { target: { value: 'accounting_synchronized' } })
+    fireEvent.change(screen.getByLabelText('Accounting system'), { target: { value: 'ledger' } })
+    fireEvent.change(screen.getByLabelText('Invoice ID in accounting system'), { target: { value: 'evt-1' } })
+    fireEvent.change(screen.getByLabelText('Unique update ID'), { target: { value: 'ledger:evt-1' } })
+    expect(screen.getByText(/prevent the same update from being recorded twice/)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Reference or note'), { target: { value: 'Invoice 44' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Record update' }).at(-1)!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Update status' }).at(-1)!)
 
     await waitFor(() => expect(recordEvent).toHaveBeenCalledWith(workspace, 'invoice-1', expect.objectContaining({
       event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'evt-1', idempotency_key: 'ledger:evt-1',
     })))
-    expect(await screen.findAllByText('Synchronized')).not.toHaveLength(0)
-    expect(screen.getByText('Synchronized to accounting')).toBeInTheDocument()
+    expect(await screen.findAllByText('Sent to accounting')).not.toHaveLength(0)
   })
 
   it('shows a bounded error state when the workspace request fails', async () => {

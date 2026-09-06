@@ -104,6 +104,19 @@ REVIEWED_SUPPLIER_FILES = {
         "Sell price",
     },
 }
+REVIEWED_INVOICE_FILES = {
+    ROOT / "frontend" / "src" / "accounting" / "Invoices.tsx": {
+        "window.confirm",
+        "Provider event ID",
+        "Accounting handoff",
+        "Ed25519 signing key",
+        " · inclusive",
+    },
+    ROOT / "frontend" / "src" / "accounting" / "InvoiceSettings.tsx": {
+        "['none', 'No date']",
+        "['never', 'Never']",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -226,12 +239,23 @@ def validate_supplier_migration() -> None:
         )
 
 
+def validate_invoice_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_INVOICE_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed invoice copy or confirmation returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
     validate_shell_migration()
     validate_infrastructure_migration()
     validate_supplier_migration()
+    validate_invoice_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

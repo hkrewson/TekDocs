@@ -27,6 +27,7 @@ class UiLanguageContractTests(unittest.TestCase):
         MODULE.validate_shell_migration()
         MODULE.validate_infrastructure_migration()
         MODULE.validate_supplier_migration()
+        MODULE.validate_invoice_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -76,6 +77,16 @@ class UiLanguageContractTests(unittest.TestCase):
                 ValueError, "reviewed supplier copy returned"
             ):
                 MODULE.validate_supplier_migration()
+
+    def test_rejects_reintroduced_invoice_jargon_or_browser_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "Invoices.tsx"
+            source.write_text("window.confirm('Issue invoice?')\n", encoding="utf-8")
+            reviewed_files = {source: {"window.confirm"}}
+            with patch.object(MODULE, "REVIEWED_INVOICE_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed invoice copy or confirmation returned"
+            ):
+                MODULE.validate_invoice_migration()
 
 
 if __name__ == "__main__":

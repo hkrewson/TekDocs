@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AuthClient } from '../auth/api'
 import { translate } from '../i18n/localization'
+import type { MessageId } from '../i18n/localization'
 import { InvoiceRequestError } from './api'
 import type { InvoiceClient, InvoiceDateComponent, InvoiceIssueSettings } from './api'
 
@@ -49,7 +50,7 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
       if (saveError instanceof InvoiceRequestError && saveError.code === 'recent_authentication_required') {
         setReauthenticationRequired(true)
       } else {
-        setErrorMessage(saveError instanceof Error ? saveError.message : translate('accounting.settingsFailed'))
+        setErrorMessage(translate('accounting.settingsFailed'))
       }
       setMessage('error')
     } finally {
@@ -73,10 +74,10 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
       await authClient.reauthenticate(submittedPassword)
       setReauthenticationRequired(false)
       await saveSettings()
-    } catch (confirmationError) {
+    } catch {
       setMessage('error')
       setErrorMessage(
-        confirmationError instanceof Error ? confirmationError.message : translate('accounting.reauthenticationFailed'),
+        translate('accounting.reauthenticationFailed'),
       )
       setBusy(false)
     }
@@ -142,19 +143,19 @@ function Field({ label, value, onChange, type = 'text', required = true, autoFoc
   return <label><span>{label}</span><input autoFocus={autoFocus} required={required} type={type} min={type === 'number' ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></label>
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: ReadonlyArray<readonly [string, string]>; onChange: (value: string) => void }) {
-  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, text]) => <option key={optionValue || 'none'} value={optionValue}>{text}</option>)}</select></label>
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: ReadonlyArray<readonly [string, MessageId]>; onChange: (value: string) => void }) {
+  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, messageId]) => <option key={optionValue || 'none'} value={optionValue}>{translate(messageId)}</option>)}</select></label>
 }
 
 const DATE_OPTIONS = [
-  ['none', 'No date'], ['year', 'Year · 2026'], ['short_year', 'Short year · 26'],
-  ['year_month', 'Year + month · 202608'], ['short_year_month', 'Short year + month · 2608'],
-  ['month_year', 'Month + year · 082026'], ['month_short_year', 'Month + short year · 0826'],
-  ['year_month_code', 'Year + month letter · 2026H'], ['short_year_month_code', 'Short year + month letter · 26H'],
+  ['none', 'accounting.dateNone'], ['year', 'accounting.dateYear'], ['short_year', 'accounting.dateShortYear'],
+  ['year_month', 'accounting.dateYearMonth'], ['short_year_month', 'accounting.dateShortYearMonth'],
+  ['month_year', 'accounting.dateMonthYear'], ['month_short_year', 'accounting.dateMonthShortYear'],
+  ['year_month_code', 'accounting.dateYearMonthCode'], ['short_year_month_code', 'accounting.dateShortYearMonthCode'],
 ] as const
-const SEPARATOR_OPTIONS = [['-', 'Hyphen · -'], ['/', 'Slash · /'], ['.', 'Period · .'], ['', 'None']] as const
-const DIGIT_OPTIONS = Array.from({ length: 12 }, (_, index) => [String(index + 1), String(index + 1)] as const)
-const RESET_OPTIONS = [['never', 'Never'], ['yearly', 'Each year'], ['monthly', 'Each month']] as const
+const SEPARATOR_OPTIONS = [['-', 'accounting.separatorHyphen'], ['/', 'accounting.separatorSlash'], ['.', 'accounting.separatorPeriod'], ['', 'accounting.separatorNone']] as const
+const DIGIT_OPTIONS = Array.from({ length: 12 }, (_, index) => [String(index + 1), `accounting.sequenceDigits.${index + 1}` as MessageId] as const)
+const RESET_OPTIONS = [['never', 'accounting.resetNever'], ['yearly', 'accounting.resetYearly'], ['monthly', 'accounting.resetMonthly']] as const
 const MONTH_COMPONENTS = new Set<InvoiceDateComponent>(['year_month', 'short_year_month', 'month_year', 'month_short_year', 'year_month_code', 'short_year_month_code'])
 
 function invoiceNumberPreview(settings: InvoiceIssueSettings): string {

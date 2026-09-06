@@ -25,6 +25,7 @@ class UiLanguageContractTests(unittest.TestCase):
         self.assertGreater(routes, 0)
         self.assertGreater(MODULE.validate_catalog(), 0)
         MODULE.validate_shell_migration()
+        MODULE.validate_infrastructure_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -54,6 +55,16 @@ class UiLanguageContractTests(unittest.TestCase):
             inventory.write_text(json.dumps(current), encoding="utf-8")
             with patch.object(MODULE, "INVENTORY", inventory), self.assertRaisesRegex(ValueError, "must record copy decisions"):
                 MODULE.validate_inventory()
+
+    def test_rejects_reintroduced_infrastructure_jargon(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "Assets.tsx"
+            source.write_text("const label = 'Provenance checksum'\n", encoding="utf-8")
+            reviewed_files = {source: {"Provenance checksum"}}
+            with patch.object(MODULE, "REVIEWED_INFRASTRUCTURE_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed infrastructure copy returned"
+            ):
+                MODULE.validate_infrastructure_migration()
 
 
 if __name__ == "__main__":

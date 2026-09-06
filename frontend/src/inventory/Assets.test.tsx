@@ -70,7 +70,7 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
 }
 
 describe('Assets', () => {
-  it('shows retained catalog and STATIC publication provenance', async () => {
+  it('shows saved supplier details and published product documents', async () => {
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient()} />)
     expect(await screen.findByRole('heading', { name: 'Core switch' })).toBeInTheDocument()
@@ -125,7 +125,7 @@ describe('Assets', () => {
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient({ createAsset })} />)
     await user.click(await screen.findByRole('button', { name: 'New asset' }))
-    const form = screen.getByRole('heading', { name: 'New asset from supplier model' }).closest('section')!
+    const form = screen.getByRole('heading', { name: 'New asset' }).closest('section')!
     await waitFor(() => expect(within(form).getByRole('option', { name: /Northwind/ })).toBeInTheDocument())
     await user.selectOptions(within(form).getByLabelText('Supplier model'), 'model-1')
     await user.type(within(form).getByLabelText('Asset name (optional)'), 'Reception switch')

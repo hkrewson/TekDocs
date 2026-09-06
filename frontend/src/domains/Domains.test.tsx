@@ -41,7 +41,7 @@ describe('Domains', () => {
     expect(await screen.findByText('example.com')).toBeInTheDocument()
   })
 
-  it('shows retained monitoring evidence and queues a new check', async () => {
+  it('shows previous domain and certificate checks and queues a new check', async () => {
     const domain = {
       id: 'domain-1', name: 'example.com', registrar_id: null, registrar: null,
       registration_date: null, expiration_date: '2027-08-12', renewal_mode: 'auto' as const,
@@ -109,12 +109,12 @@ describe('Domains', () => {
     expect(detailsButton).toHaveAttribute('aria-expanded', 'true')
     expect(await screen.findByText('dns changed')).toBeInTheDocument()
     expect(screen.getByText('4 records via doh.example')).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: 'Recent RDAP and DNS monitoring evidence' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Previous RDAP and DNS checks' })).toBeInTheDocument()
     expect(screen.getByText('TLS certificate endpoints')).toBeInTheDocument()
     expect(screen.getByText('Untrusted')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'History' }))
     expect(await screen.findByText('Example CA')).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: 'Immutable TLS certificate monitoring evidence' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Previous TLS certificate checks' })).toBeInTheDocument()
     expect(screen.getByText('expiration due')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Check certificate' }))
     await waitFor(() => expect(scanCertificate).toHaveBeenCalledWith(null, domain.id, certificate.id))

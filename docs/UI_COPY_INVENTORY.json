@@ -255,9 +255,54 @@
       "workflow": "Assets, licenses, networks, domains, certificates, credentials, and services",
       "routes": ["/assets", "/licenses", "/networks", "/domains", "/certificates", "/credentials", "/services"],
       "states": ["loading", "empty", "populated", "stale", "validation", "denied", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review technical field labels without removing necessary precision; simplify provenance, monitoring, assignment, and externally stored credential explanations."
+      "decisions": [
+        {
+          "before": "Provenance checksum / Retained specifications / STATIC product documentation",
+          "after": "Source check / Saved specifications / Published product documents",
+          "reason": "Keep the supplier record verifiable while naming the information and documents the technician can actually use."
+        },
+        {
+          "before": "New asset from supplier model / applicable STATIC publications will be retained",
+          "after": "New asset / current specifications and published product documents will be copied into the asset record",
+          "reason": "Explain what the supplier-model choice does without exposing publication modes or storage language."
+        },
+        {
+          "before": "Choose a license to inspect its entitlement / Revoke seat",
+          "after": "Choose a license to view its details / Unassign seat",
+          "reason": "Details and unassign describe the ordinary task; entitlement and revoke are unnecessary licensing jargon here."
+        },
+        {
+          "before": "Credential references / 1Password remains the security boundary / handoff",
+          "after": "Credential links / Credentials stay in 1Password / Open in 1Password",
+          "reason": "Tell staff what TekDocs stores, where the credential remains, and what the action does without narrating the security architecture."
+        },
+        {
+          "before": "Monitoring details / Collection history / retained monitoring evidence",
+          "after": "Domain checks / Check history / Previous checks",
+          "reason": "Checks are the visible operation; source-specific RDAP, DNS, DNSSEC, CAA, and TLS terms remain because technicians need their exact meaning."
+        },
+        {
+          "before": "Evidence",
+          "after": "Result ID",
+          "reason": "The displayed digest identifies a saved check result; Evidence overstated what the shortened value alone represented."
+        },
+        {
+          "before": "Commercial records / operational fields with a separate access policy",
+          "after": "Services and contracts / Staff need permission to view Costs",
+          "reason": "Name the records and the actual visibility consequence at the form where pricing is separated."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/inventory/Assets.test.tsx",
+        "frontend/src/inventory/Licenses.test.tsx",
+        "frontend/src/networks/Networks.test.tsx",
+        "frontend/src/domains/Domains.test.tsx",
+        "frontend/src/domains/Certificates.test.tsx",
+        "frontend/src/credential-references/CredentialReferences.test.tsx",
+        "frontend/src/commercial/Contracts.test.tsx",
+        "frontend/e2e/live-workspace.spec.ts"
+      ]
     },
     {
       "id": "suppliers-products",

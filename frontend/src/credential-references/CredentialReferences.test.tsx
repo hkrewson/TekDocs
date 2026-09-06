@@ -27,11 +27,11 @@ function client(overrides: Partial<CredentialReferencesClient> = {}): Credential
 }
 
 describe('CredentialReferences', () => {
-  it('explains external custody and opens only through the audited TekDocs handoff', async () => {
+  it('explains that credentials stay in 1Password and uses the TekDocs open link', async () => {
     const api = client()
     render(<CredentialReferences workspace={null} client={api} />)
     expect(await screen.findByText('Firewall administrator')).toBeInTheDocument()
-    expect(screen.getByText(/1Password remains the security boundary/)).toBeInTheDocument()
+    expect(screen.getByText('Credentials stay in 1Password')).toBeInTheDocument()
     const link = screen.getByRole('link', { name: /Open in 1Password/ })
     expect(link).toHaveAttribute('href', '/api/v1/credential-references/reference-1/open')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
@@ -43,12 +43,12 @@ describe('CredentialReferences', () => {
     const api = client({ create })
     const user = userEvent.setup()
     render(<CredentialReferences workspace={null} client={api} />)
-    await user.click(await screen.findByRole('button', { name: 'New reference' }))
-    const form = screen.getByRole('heading', { name: 'New credential reference' }).closest('section')!
+    await user.click(await screen.findByRole('button', { name: 'New link' }))
+    const form = screen.getByRole('heading', { name: 'New credential link' }).closest('section')!
     await user.type(within(form).getByLabelText('Title'), 'Firewall administrator')
     await user.type(within(form).getByPlaceholderText('https://start.1password.com/open/i?…'), 'https://start.1password.com/open/i?private')
     expect(within(form).getAllByRole('textbox')).toHaveLength(2)
-    await user.click(within(form).getByRole('button', { name: 'Save reference' }))
+    await user.click(within(form).getByRole('button', { name: 'Save link' }))
     await waitFor(() => expect(create).toHaveBeenCalledWith(null, {
       title: 'Firewall administrator',
       provider: 'onepassword',
@@ -61,17 +61,17 @@ describe('CredentialReferences', () => {
     const user = userEvent.setup()
     render(<CredentialReferences workspace={null} client={api} />)
     await user.click(await screen.findByRole('button', { name: 'Archive Firewall administrator' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('The 1Password item and its access remain unchanged')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('The item and its access in 1Password will not change')
   })
 
-  it('explains stale provider links and changes pages through the bounded API', async () => {
+  it('explains broken links and changes pages through the bounded API', async () => {
     const list = vi.fn()
       .mockResolvedValueOnce({ results: [reference], page: 1, page_size: 50, count: 51, has_more: true, can_manage: true })
       .mockResolvedValueOnce({ results: [{ ...reference, id: 'reference-51', title: 'Last reference' }], page: 2, page_size: 50, count: 51, has_more: false, can_manage: true })
     const user = userEvent.setup()
     render(<CredentialReferences workspace={null} client={client({ list })} />)
 
-    expect(await screen.findByText(/TekDocs cannot check whether an item still exists/)).toBeInTheDocument()
+    expect(await screen.findByText(/If a link stops working/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     expect(await screen.findByText('Last reference')).toBeInTheDocument()
     expect(list).toHaveBeenLastCalledWith(null, '', 2, expect.any(AbortSignal))

@@ -78,11 +78,11 @@ export function Contracts({ workspace, client }: { workspace: WorkspaceContext; 
   }
 
   return <>
-    <header className="page-header"><div><h1>Services & contracts</h1></div>{canManage && <button type="button" className="primary-button" aria-label={translate('contracts.new')} title={translate('contracts.new')} onClick={() => { setContract(blankContract); setModal('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('contracts.new')}</span></button>}</header>
+    <header className="page-header"><div><h1>{translate('contracts.heading')}</h1></div>{canManage && <button type="button" className="primary-button" aria-label={translate('contracts.new')} title={translate('contracts.new')} onClick={() => { setContract(blankContract); setModal('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('contracts.new')}</span></button>}</header>
     <label className="search-field"><span className="sr-only">Search contracts</span><input type="search" value={query} placeholder="Search contracts, providers, or references" onChange={(event) => { setPhase('loading'); setQuery(event.target.value); setPage(1) }} /></label>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && <section className="content-section" role="status">Loading contracts…</section>}
-    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Contracts unavailable</h2><p>The workspace commercial records could not be loaded.</p></section>}
+    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('contracts.unavailable')}</h2><p>{translate('contracts.loadFailed')}</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
       <section className="content-section inventory-index">{records.length === 0 ? <p className="empty-state">No matching contracts have been recorded.</p> : <><ul className="inventory-list">{records.map((item) => <li key={item.id}><button type="button" className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.provider_name} · {item.status}</span></button></li>)}</ul><CollectionPagination label="Contracts" page={page} pageSize={pageState.pageSize} count={pageState.count} hasMore={pageState.hasMore} onPageChange={(next) => { setPhase('loading'); setSelectedId(null); setPage(next) }} /></>}</section>
       <section className="content-section inventory-detail">{selected ? <>
@@ -101,7 +101,7 @@ export function Contracts({ workspace, client }: { workspace: WorkspaceContext; 
 
 function ContractEditor({ title, value, setValue, providers, busy, cancel, submit }: { title: string; value: ContractForm; setValue: (value: ContractForm) => void; providers: Array<{ id: string; name: string }>; busy: boolean; cancel: () => void; submit: () => void }) {
   function save(event: FormEvent) { event.preventDefault(); submit() }
-  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="contract-editor-title"><form className="record-form" onSubmit={save}><div className="section-heading"><h2 id="contract-editor-title">{title}</h2></div><p className="workspace-area-note">Contract details are operational fields. Keep pricing, rates, and other financial terms in Costs so their separate access policy applies.</p><div className="form-grid">
+  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="contract-editor-title"><form className="record-form" onSubmit={save}><div className="section-heading"><h2 id="contract-editor-title">{title}</h2></div><p className="workspace-area-note">{translate('contracts.costHelp')}</p><div className="form-grid">
     <Field label="Contract name" value={value.name} onChange={(name) => setValue({ ...value, name })} />
     <label><span>Provider</span><select required value={value.provider_id} onChange={(event) => setValue({ ...value, provider_id: event.target.value })}><option value="">Choose provider</option>{providers.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
     <Choice label="Kind" value={value.kind} items={['service', 'support', 'lease', 'subscription', 'other']} onChange={(kind) => setValue({ ...value, kind: kind as CommercialContract['kind'] })} />

@@ -53,6 +53,37 @@ REPLACED_SHELL_LITERALS = {
     "Search TekDocs",
     "Staff &amp; invitations",
 }
+REVIEWED_INFRASTRUCTURE_FILES = {
+    ROOT / "frontend" / "src" / "inventory" / "Assets.tsx": {
+        "Provenance checksum",
+        "Retained specifications",
+        "STATIC product documentation",
+        "inspect retained provenance",
+        "New asset from supplier model",
+    },
+    ROOT / "frontend" / "src" / "inventory" / "Licenses.tsx": {
+        "inspect its entitlement",
+        "Revoke seat",
+    },
+    ROOT / "frontend" / "src" / "credential-references" / "CredentialReferences.tsx": {
+        "Credential references",
+        "security boundary",
+        "hands off",
+    },
+    ROOT / "frontend" / "src" / "domains" / "Domains.tsx": {
+        "Monitoring details",
+        "Collection history",
+        "monitoring evidence",
+    },
+    ROOT / "frontend" / "src" / "domains" / "Certificates.tsx": {
+        "certificate evidence",
+        "monitoring evidence",
+    },
+    ROOT / "frontend" / "src" / "commercial" / "Contracts.tsx": {
+        "commercial records",
+        "operational fields",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -155,10 +186,21 @@ def validate_shell_migration() -> None:
         require(f"translate('{message_id}'" in source, f"App shell must use catalog message {message_id}")
 
 
+def validate_infrastructure_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_INFRASTRUCTURE_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed infrastructure copy returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
     validate_shell_migration()
+    validate_infrastructure_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

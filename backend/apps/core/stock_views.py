@@ -221,7 +221,10 @@ class StockItemDetailView(APIView):
     def delete(self, request, item_id):  # type: ignore[no-untyped-def]
         workspace = resolve_msp_workspace(request.user)
         require_permission(request.user, PermissionKey.INVOICES_EDIT)
-        archive_stock_item(item=self._record(workspace, item_id), actor_id=request.user.pk)
+        try:
+            archive_stock_item(item=self._record(workspace, item_id), actor_id=request.user.pk)
+        except StockError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(status=204)
 
 

@@ -120,7 +120,7 @@ def test_stock_item_records_exact_cost_and_append_only_client_usage(owner_client
 
 
 @pytest.mark.django_db
-def test_stock_item_is_an_invoice_snapshot_origin_without_consuming_stock(owner_client, installation):
+def test_stock_item_invoice_line_tracks_quantity_through_draft_changes(owner_client, installation):
     vendor = organization(installation, "Parts Supplier", "vendor")
     client = organization(installation, "Invoice Client", "client")
     created = owner_client.post(reverse("msp-stock-list-create"), item_payload(vendor), content_type="application/json")
@@ -135,16 +135,74 @@ def test_stock_item_is_an_invoice_snapshot_origin_without_consuming_stock(owner_
             "organization-invoice-line-list-create",
             kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
         ),
-        {"origin_type": "stock_item", "origin_id": item_id},
+        {"origin_type": "stock_item", "origin_id": item_id, "quantity": "125.500"},
         content_type="application/json",
     )
     assert line.status_code == 201, line.content
     assert line.json()["lines"][0]["origin_type"] == "stock_item"
     assert line.json()["lines"][0]["unit_amount"] == "0.30"
-    assert (
-        InvoiceLine.objects.get(id=line.json()["lines"][0]["id"]).stock_item_id
-        == StockItem.objects.get(id=item_id).id
+    line_id = line.json()["lines"][0]["id"]
+    invoice_line = InvoiceLine.objects.get(id=line_id)
+    assert invoice_line.stock_item_id == StockItem.objects.get(id=item_id).id
+    assert invoice_line.stock_quantity_consumed == Decimal("125.500")
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("874.500")
+    movement = StockMovement.objects.filter(stock_item_id=item_id, movement_type="used").get()
+    assert movement.quantity_change == Decimal("-125.500")
+    assert movement.client_id == client.id
+    choices = owner_client.get(
+        reverse("organization-invoice-origin-choices", kwargs={"organization_entity_id": client.entity_id})
     )
+    stock_choice = next(origin for origin in choices.json()["origins"] if origin["id"] == item_id)
+    assert stock_choice["available_quantity"] == "874.500"
+    assert stock_choice["unit"] == "foot"
+
+    blocked_archive = owner_client.delete(reverse("msp-stock-detail", kwargs={"item_id": item_id}))
+    assert blocked_archive.status_code == 400
+
+    line_detail = reverse(
+        "organization-invoice-line-detail",
+        kwargs={
+            "organization_entity_id": client.entity_id,
+            "invoice_entity_id": invoice.json()["id"],
+            "line_id": line_id,
+        },
+    )
+    increased = owner_client.patch(line_detail, {"quantity": "150.000"}, content_type="application/json")
+    assert increased.status_code == 200, increased.content
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("850.000")
+
+    reduced = owner_client.patch(line_detail, {"quantity": "100.000"}, content_type="application/json")
+    assert reduced.status_code == 200, reduced.content
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("900.000")
+
+    removed = owner_client.delete(line_detail)
+    assert removed.status_code == 200, removed.content
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("1000.000")
+    assert [entry.quantity_change for entry in StockMovement.objects.filter(stock_item_id=item_id)] == [
+        Decimal("100.000"),
+        Decimal("50.000"),
+        Decimal("-24.500"),
+        Decimal("-125.500"),
+        Decimal("1000.000"),
+    ]
+
+    replacement = owner_client.post(
+        reverse(
+            "organization-invoice-line-list-create",
+            kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
+        ),
+        {"origin_type": "stock_item", "origin_id": item_id, "quantity": "10.000"},
+        content_type="application/json",
+    )
+    assert replacement.status_code == 201, replacement.content
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("990.000")
+    deleted_draft = owner_client.delete(
+        reverse(
+            "organization-invoice-detail",
+            kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
+        )
+    )
+    assert deleted_draft.status_code == 204, deleted_draft.content
     assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("1000.000")
 
     archived = owner_client.delete(reverse("msp-stock-detail", kwargs={"item_id": item_id}))
@@ -153,6 +211,34 @@ def test_stock_item_is_an_invoice_snapshot_origin_without_consuming_stock(owner_
         reverse("organization-invoice-origin-choices", kwargs={"organization_entity_id": client.entity_id})
     )
     assert all(origin["id"] != item_id for origin in choices.json()["origins"])
+
+
+@pytest.mark.django_db
+def test_stock_invoice_line_rejects_insufficient_quantity_atomically(owner_client, installation):
+    vendor = organization(installation, "Limited Supplier", "vendor")
+    client = organization(installation, "Limited Client", "client")
+    created = owner_client.post(reverse("msp-stock-list-create"), item_payload(vendor), content_type="application/json")
+    item_id = created.json()["id"]
+    invoice = owner_client.post(
+        reverse("organization-invoice-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"currency": "USD", "invoice_date": "2026-08-05", "due_date": "2026-09-04"},
+        content_type="application/json",
+    )
+
+    response = owner_client.post(
+        reverse(
+            "organization-invoice-line-list-create",
+            kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
+        ),
+        {"origin_type": "stock_item", "origin_id": item_id, "quantity": "1000.001"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert "Only 1000.000 foot are on hand" in str(response.json())
+    assert InvoiceLine.objects.filter(invoice_id=invoice.json()["id"]).count() == 0
+    assert StockItem.objects.get(id=item_id).quantity_on_hand == Decimal("1000.000")
+    assert StockMovement.objects.filter(stock_item_id=item_id).count() == 1
 
 
 @pytest.mark.django_db

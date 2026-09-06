@@ -556,6 +556,7 @@ class InvoiceLine(TimestampedModel):
     stock_item = models.ForeignKey(
         "StockItem", on_delete=models.PROTECT, related_name="invoice_lines", null=True, blank=True
     )
+    stock_quantity_consumed = models.DecimalField(max_digits=15, decimal_places=3, default=0)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -566,6 +567,13 @@ class InvoiceLine(TimestampedModel):
             models.CheckConstraint(condition=models.Q(position__gte=1), name="invoice_line_position_positive"),
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name="invoice_line_quantity_positive"),
             models.CheckConstraint(condition=models.Q(tax_rate_value__gte=0), name="invoice_line_tax_nonnegative"),
+            models.CheckConstraint(
+                condition=models.Q(stock_quantity_consumed__gte=0), name="invoice_line_stock_consumed_nonnegative"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(stock_item__isnull=False) | models.Q(stock_quantity_consumed=0),
+                name="invoice_line_stock_consumed_origin",
+            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(catalog_product__isnull=True, service_rate__isnull=True, contract_cost__isnull=True)

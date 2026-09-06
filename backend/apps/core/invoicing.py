@@ -40,6 +40,7 @@ from .models import (
     ReminderSchedule,
     ServiceRate,
     StockItem,
+    StockMovementType,
     TaxRate,
     Tenant,
     TenantBillingProfile,
@@ -48,6 +49,7 @@ from .models import (
 from .money import InvoiceAmounts, LineAmounts, calculate_invoice, calculate_line, render_amount
 from .publications import _encoded_public_key, publication_signing_key
 from .scoping import DataScope
+from .stock import StockError, change_stock
 
 
 class InvoiceError(ValueError):
@@ -756,6 +758,11 @@ def delete_invoice(*, invoice: Invoice, actor_id: UUID) -> None:
     locked = Invoice.objects.select_for_update().select_related("entity").get(pk=invoice.pk)
     if locked.state != "draft":
         raise InvoiceError("Only draft invoices can be deleted")
+    stock_lines = InvoiceLine.objects.select_for_update().filter(
+        invoice=locked, stock_item__isnull=False, stock_quantity_consumed__gt=0
+    )
+    for line in stock_lines:
+        _sync_stock_consumption(line=line, actor_id=actor_id, desired_quantity=Decimal("0"))
     tenant = locked.tenant
     entity = locked.entity
     entity_id = entity.id
@@ -836,6 +843,30 @@ def _origin_snapshot(
     raise InvoiceError("Choose a supported invoice-line origin")
 
 
+def _sync_stock_consumption(*, line: InvoiceLine, actor_id: UUID, desired_quantity: Decimal) -> None:
+    if line.stock_item_id is None:
+        return
+    stock_item = line.stock_item
+    if stock_item is None:  # pragma: no cover - guarded by stock_item_id
+        return
+    change = desired_quantity - line.stock_quantity_consumed
+    if not change:
+        return
+    try:
+        change_stock(
+            item=stock_item,
+            actor_id=actor_id,
+            movement_type=StockMovementType.USED if change > 0 else StockMovementType.RETURNED,
+            quantity_change=-change,
+            client=line.organization,
+            note=("Added to invoice draft" if change > 0 else "Removed from invoice draft"),
+        )
+    except StockError as exc:
+        raise InvoiceError(str(exc)) from exc
+    line.stock_quantity_consumed = desired_quantity
+    line.save(update_fields=("stock_quantity_consumed", "updated_at"))
+
+
 @transaction.atomic
 def create_line(
     *,
@@ -877,6 +908,7 @@ def create_line(
     )
     _validate(line)
     line.save()
+    _sync_stock_consumption(line=line, actor_id=actor_id, desired_quantity=line.quantity)
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,
@@ -897,6 +929,7 @@ def update_line(*, line: InvoiceLine, actor_id: UUID, values: dict[str, object])
             setattr(locked, field, values[field])
     _validate(locked)
     locked.save(update_fields=(*values.keys(), "updated_at"))
+    _sync_stock_consumption(line=locked, actor_id=actor_id, desired_quantity=locked.quantity)
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,
@@ -909,11 +942,12 @@ def update_line(*, line: InvoiceLine, actor_id: UUID, values: dict[str, object])
 
 @transaction.atomic
 def delete_line(*, line: InvoiceLine, actor_id: UUID) -> None:
-    locked = InvoiceLine.objects.select_for_update().select_related("invoice").get(pk=line.pk)
+    locked = InvoiceLine.objects.select_for_update().select_related("invoice", "organization").get(pk=line.pk)
     if locked.invoice.state != "draft":
         raise InvoiceError("Only draft invoice lines can be deleted")
     tenant = locked.tenant
     entity_id = locked.invoice.entity_id
+    _sync_stock_consumption(line=locked, actor_id=actor_id, desired_quantity=Decimal("0"))
     locked.delete()
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="invoice.draft_line_deleted", entity_id=entity_id, metadata={}

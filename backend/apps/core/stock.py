@@ -67,6 +67,8 @@ def archive_stock_item(*, item: StockItem, actor_id: UUID) -> None:
     locked = StockItem.objects.select_for_update().get(pk=item.pk)
     if locked.archived_at is not None:
         return
+    if locked.invoice_lines.filter(invoice__state="draft", stock_quantity_consumed__gt=0).exists():
+        raise StockError("Remove this item from its invoice drafts before archiving it")
     from django.utils import timezone
 
     locked.archived_at = timezone.now()

@@ -388,6 +388,8 @@ class OriginChoiceSerializer(serializers.Serializer):
     unit_amount = serializers.CharField()
     currency = serializers.CharField()
     quantity = serializers.CharField()
+    available_quantity = serializers.CharField(required=False)
+    unit = serializers.CharField(required=False)
 
 
 class OriginChoiceResultSerializer(serializers.Serializer):
@@ -841,6 +843,8 @@ class InvoiceOriginChoiceView(APIView):
                     "unit_amount": render_amount(item.client_price_per_unit, item.currency),
                     "currency": item.currency,
                     "quantity": "1.000",
+                    "available_quantity": str(item.quantity_on_hand),
+                    "unit": item.unit,
                 }
             )
         today = timezone.localdate()

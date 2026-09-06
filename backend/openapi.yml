@@ -35861,6 +35861,10 @@ components:
           type: string
         quantity:
           type: string
+        available_quantity:
+          type: string
+        unit:
+          type: string
       required:
       - currency
       - description

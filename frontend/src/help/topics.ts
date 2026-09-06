@@ -35,8 +35,8 @@ const topics: Record<string, HelpTopic> = {
   access_control: { title: 'Access control', summary: 'Assign built-in or custom roles at tenant, organization, and collection scope.', slug: 'Roles-and-permissions' },
   notification_delivery: { title: 'Notification delivery', summary: 'Inspect delivery state, retries, batching, digests, and mail-outage behavior.', slug: 'Notifications' },
   'system-status': { title: 'System status', summary: 'Check TekDocs, its database, and the isolated diagram renderer without exposing document content.', slug: 'Diagrams-in-documents' },
-  invoices: { title: 'Invoices', summary: 'Issue signed invoices, track their append-only lifecycle, reconcile accounting handoffs, and deliver matching client copies.', slug: 'Invoices' },
-  stock: { title: 'Stock', summary: 'Track MSP supplies, vendor and order details, quantities, client use, costs, and invoice prices.', slug: 'Stock' },
+  invoices: { title: 'Invoices', summary: 'Build drafts from products, services, costs, or stock; issue signed invoices; and track delivery and accounting handoff.', slug: 'Invoices' },
+  stock: { title: 'Stock', summary: 'Track MSP supplies, purchases, quantities, client use, costs, and stock used by invoice drafts.', slug: 'Stock' },
 }
 
 export function helpTopicForPath(pathname: string): HelpTopic {

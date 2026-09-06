@@ -66,3 +66,50 @@ test('invoice lifecycle and accounting handoff remain compact and accessible', a
   await expect(page.getByText('Synchronized to accounting')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
+
+test('a stock line records its quantity for the client in one save', async ({ page, baseURL }) => {
+  const draftId = crypto.randomUUID()
+  const stockId = crypto.randomUUID()
+  const draft = {
+    ...issuedInvoice,
+    id: draftId,
+    state: 'draft',
+    number: undefined,
+    lines: [],
+    subtotal: '0.00',
+    total: '0.00',
+    issued_at: undefined,
+    lifecycle_events: [],
+  }
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['invoices.view', 'invoices.edit'],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: clientId, name: 'Example Client', classifications: ['client'], capabilities: ['overview', 'invoices'],
+    organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: {
+    origins: [{ id: stockId, origin_type: 'stock_item', name: 'Cat6 bulk cable', description: '', unit_amount: '0.30', currency: 'USD', quantity: '1.000', available_quantity: '1000.000', unit: 'foot' }],
+    tax_rates: [],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}/lines`, async (route) => {
+    expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, quantity: '125.500', tax_rate_id: null })
+    await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable', quantity: '125.500', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
+  })
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [draft], can_manage: true, can_issue: false } }))
+
+  await page.goto(`/workspaces/organizations/${clientId}/invoices`)
+  await page.getByRole('button', { name: 'Add line' }).click()
+  await page.getByLabel('Source').selectOption(`stock_item:${stockId}`)
+  await expect(page.getByText('Saving this line uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
+  await page.getByLabel('Quantity').fill('125.500')
+  await page.getByRole('dialog').getByRole('button', { name: 'Save line' }).click()
+  await expect(page.getByText('125.500 × USD 0.30')).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})

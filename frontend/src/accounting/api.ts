@@ -68,6 +68,8 @@ export type InvoiceOrigin = {
   unit_amount: string
   currency: string
   quantity: string
+  available_quantity?: string
+  unit?: string
 }
 
 export type TaxRateChoice = { id: string; name: string; rate: string; inclusive: boolean }

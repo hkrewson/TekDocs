@@ -11650,6 +11650,8 @@ export interface components {
             readonly unit_amount: string;
             readonly currency: string;
             readonly quantity: string;
+            readonly available_quantity?: string;
+            readonly unit?: string;
         };
         readonly OriginChoiceResult: {
             readonly origins: readonly components["schemas"]["OriginChoice"][];

@@ -107,6 +107,35 @@ describe('Invoices', () => {
     ))
   })
 
+  it('uses the selected stock quantity for the client in one save', async () => {
+    const addLine = vi.fn().mockResolvedValue(draft)
+    const client = invoiceClient({
+      addLine,
+      choices: vi.fn().mockResolvedValue({
+        origins: [{
+          id: 'stock-1', origin_type: 'stock_item', name: 'Cat6 bulk cable', description: '',
+          unit_amount: '0.30', currency: 'USD', quantity: '1.000', available_quantity: '1000.000', unit: 'foot',
+        }],
+        tax_rates: [],
+      }),
+    })
+    render(<Invoices workspace={workspace} client={client} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add line' }))
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'stock_item:stock-1' } })
+    expect(screen.getByRole('option', { name: 'In-stock item · Cat6 bulk cable · 1000.000 foot available · USD 0.30' })).toBeInTheDocument()
+    expect(screen.getByText('Saving this line uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Quantity')).toHaveAttribute('max', '1000.000')
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '125.500' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save line' }))
+
+    await waitFor(() => expect(addLine).toHaveBeenCalledWith(
+      workspace,
+      'invoice-1',
+      { origin_type: 'stock_item', origin_id: 'stock-1', quantity: '125.500', tax_rate_id: null },
+    ))
+  })
+
   it('keeps a read-only draft useful without requesting edit-only choices', async () => {
     const choices = vi.fn()
     const client = invoiceClient({

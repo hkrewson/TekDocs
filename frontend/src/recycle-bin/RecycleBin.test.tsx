@@ -17,7 +17,7 @@ const item = {
 }
 
 describe('RecycleBin', () => {
-  it('lists archived records, confirms cascade scope, and refreshes after restore', async () => {
+  it('lists archived records, explains related restores, and refreshes after restore', async () => {
     const user = userEvent.setup()
     const list = vi.fn()
       .mockResolvedValueOnce({ results: [item], page: 1, page_size: 50, count: 1, has_more: false })
@@ -29,10 +29,10 @@ describe('RecycleBin', () => {
 
     expect(await screen.findByText('Downtown office')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Restore' }))
-    expect(screen.getByText('This also restores 2 records archived in the same cascade.')).toBeInTheDocument()
+    expect(screen.getByText('This also restores 2 related records that were archived with it.')).toBeInTheDocument()
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Restore' }))
     await screen.findByText('Downtown office restored.')
-    await screen.findByText('This workspace has no recoverable archived records.')
+    await screen.findByText('There are no archived records in this workspace.')
     expect(restore).toHaveBeenCalledWith({}, expect.objectContaining({ id: item.id, record_type: 'site' }))
     await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2))
   })
@@ -43,6 +43,6 @@ describe('RecycleBin', () => {
 
     const button = await screen.findByRole('button', { name: 'Restore' })
     expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('title', 'You do not have permission to restore this record')
+    expect(button).toHaveAttribute('title', 'You don’t have permission to restore this record')
   })
 })

@@ -2,17 +2,18 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { translate } from '../i18n/localization'
+import type { MessageId } from '../i18n/localization'
 import type { TaxonomiesClient, Taxonomy, TaxonomyBinding, TaxonomyInput, TaxonomyTerm } from './api'
 
-const bindingOptions: { value: TaxonomyBinding; label: string }[] = [
-  { value: 'document_tags', label: 'Document tags' },
-  { value: 'technology', label: 'Technology' },
-  { value: 'service_family', label: 'Service family' },
-  { value: 'platform', label: 'Platform' },
-  { value: 'risk_level', label: 'Risk level' },
-  { value: 'support_tier', label: 'Support tier' },
-  { value: 'compliance_domain', label: 'Compliance domain' },
-  { value: 'document_subject', label: 'Document subject' },
+const bindingOptions: { value: TaxonomyBinding; labelKey: MessageId }[] = [
+  { value: 'document_tags', labelKey: 'taxonomies.binding.documentTags' },
+  { value: 'technology', labelKey: 'taxonomies.binding.technology' },
+  { value: 'service_family', labelKey: 'taxonomies.binding.serviceFamily' },
+  { value: 'platform', labelKey: 'taxonomies.binding.platform' },
+  { value: 'risk_level', labelKey: 'taxonomies.binding.riskLevel' },
+  { value: 'support_tier', labelKey: 'taxonomies.binding.supportTier' },
+  { value: 'compliance_domain', labelKey: 'taxonomies.binding.complianceDomain' },
+  { value: 'document_subject', labelKey: 'taxonomies.binding.documentSubject' },
 ]
 
 type TermDraft = Omit<TaxonomyTerm, 'id' | 'impact'>
@@ -27,11 +28,12 @@ export function Taxonomies({ client }: { client: TaxonomiesClient }) {
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingArchive, setPendingArchive] = useState<Taxonomy | null>(null)
   const [migration, setMigration] = useState<Awaited<ReturnType<TaxonomiesClient['migration']>> | null>(null)
 
   const load = useCallback(() => {
     const controller = new AbortController()
-    client.list(undefined, controller.signal).then((result) => { setItems(result.results); setPhase('ready') }).catch((cause: unknown) => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : translate('taxonomies.loadFailed')); setPhase('error') } })
+    client.list(undefined, controller.signal).then((result) => { setItems(result.results); setPhase('ready') }).catch(() => { if (!controller.signal.aborted) { setError(translate('taxonomies.loadFailed')); setPhase('error') } })
     return () => controller.abort()
   }, [client])
   useEffect(() => load(), [load])
@@ -74,11 +76,18 @@ export function Taxonomies({ client }: { client: TaxonomiesClient }) {
       if (editing === 'new') await client.create(input)
       else await client.revise(editing.id, { label: input.label, description: input.description, allow_local_terms: input.allow_local_terms, terms: input.terms })
       setEditing(null); setMigration(null); load()
-    } catch (cause) { setError(cause instanceof Error ? cause.message : translate('taxonomies.saveFailed')) } finally { setSaving(false) }
+    } catch { setError(translate('taxonomies.saveFailed')) } finally { setSaving(false) }
   }
   const previewMigration = async (apply: boolean) => {
     setSaving(true); setError(null)
-    try { setMigration(await client.migration(apply)) } catch (cause) { setError(cause instanceof Error ? cause.message : translate('taxonomies.migrationFailed')) } finally { setSaving(false) }
+    try { setMigration(await client.migration(apply)) } catch { setError(translate('taxonomies.migrationFailed')) } finally { setSaving(false) }
+  }
+  const archive = async () => {
+    if (!pendingArchive) return
+    setSaving(true); setError(null)
+    try { await client.archive(pendingArchive.id); setPendingArchive(null); load() }
+    catch { setError(translate('taxonomies.archiveFailed')) }
+    finally { setSaving(false) }
   }
 
   return <>
@@ -88,7 +97,7 @@ export function Taxonomies({ client }: { client: TaxonomiesClient }) {
       <div className="section-heading"><h2 id="taxonomy-editor-heading">{editing === 'new' ? translate('taxonomies.new') : translate('taxonomies.newVersion')}</h2><button className="secondary-button" type="button" onClick={() => setEditing(null)}>{translate('common.cancel')}</button></div>
       <div className="document-detail-fields">
         <label>{translate('taxonomies.key')}<input value={draft.key} disabled={editing !== 'new'} maxLength={80} onChange={(event) => setDraft({ ...draft, key: event.target.value })} /></label>
-        <label>{translate('taxonomies.binding')}<select value={draft.binding} disabled={editing !== 'new'} onChange={(event) => setDraft({ ...draft, binding: event.target.value as TaxonomyBinding })}>{bindingOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label>{translate('taxonomies.binding')}<select value={draft.binding} disabled={editing !== 'new'} onChange={(event) => setDraft({ ...draft, binding: event.target.value as TaxonomyBinding })}>{bindingOptions.map((option) => <option key={option.value} value={option.value}>{translate(option.labelKey)}</option>)}</select></label>
         <label>{translate('taxonomies.label')}<input value={draft.label} maxLength={120} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label>
         <label>{translate('taxonomies.description')}<input value={draft.description} maxLength={500} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
       </div>
@@ -111,7 +120,8 @@ export function Taxonomies({ client }: { client: TaxonomiesClient }) {
       {phase === 'loading' && <p className="empty-state">{translate('taxonomies.loading')}</p>}
       {phase === 'error' && <p className="empty-state">{translate('taxonomies.loadFailed')}</p>}
       {phase === 'ready' && items.length === 0 && <p className="empty-state">{translate('taxonomies.empty')}</p>}
-      {items.length > 0 && <div className="taxonomy-table" role="table" aria-label={translate('taxonomies.definitions')}><div className="taxonomy-table-row header" role="row"><span role="columnheader">{translate('taxonomies.name')}</span><span role="columnheader">{translate('taxonomies.binding')}</span><span role="columnheader">{translate('taxonomies.version')}</span><span role="columnheader">{translate('taxonomies.usage')}</span><span role="columnheader">{translate('common.actions')}</span></div>{items.map((taxonomy) => <div className="taxonomy-table-row" role="row" key={taxonomy.id}><span role="cell"><strong>{taxonomy.current_version.label}</strong><code>{taxonomy.key}</code><small>{taxonomy.current_version.description}</small></span><span role="cell">{bindingOptions.find((option) => option.value === taxonomy.binding)?.label}</span><span role="cell">v{taxonomy.current_version.version} · {taxonomy.current_version.terms.length} {translate('taxonomies.terms').toLowerCase()}</span><span role="cell">{translate('taxonomies.usageCount', taxonomy.impact)}</span><span role="cell" className="row-actions"><button className="row-action" type="button" onClick={() => start(taxonomy)}>{translate('taxonomies.newVersion')}</button><button className="row-action danger" type="button" onClick={() => { if (window.confirm(translate('taxonomies.archiveConfirm', { name: taxonomy.current_version.label }))) void client.archive(taxonomy.id).then(load).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : translate('taxonomies.saveFailed'))) }}>{translate('common.archive')}</button></span></div>)}</div>}
+      {items.length > 0 && <div className="taxonomy-table" role="table" aria-label={translate('taxonomies.definitions')}><div className="taxonomy-table-row header" role="row"><span role="columnheader">{translate('taxonomies.name')}</span><span role="columnheader">{translate('taxonomies.binding')}</span><span role="columnheader">{translate('taxonomies.version')}</span><span role="columnheader">{translate('taxonomies.usage')}</span><span role="columnheader">{translate('common.actions')}</span></div>{items.map((taxonomy) => <div className="taxonomy-table-row" role="row" key={taxonomy.id}><span role="cell"><strong>{taxonomy.current_version.label}</strong><code>{taxonomy.key}</code><small>{taxonomy.current_version.description}</small></span><span role="cell">{translate(bindingOptions.find((option) => option.value === taxonomy.binding)?.labelKey ?? 'taxonomies.binding.documentTags')}</span><span role="cell">v{taxonomy.current_version.version} · {taxonomy.current_version.terms.length} {translate('taxonomies.terms').toLowerCase()}</span><span role="cell">{translate('taxonomies.usageCount', taxonomy.impact)}</span><span role="cell" className="row-actions"><button className="row-action" type="button" onClick={() => start(taxonomy)}>{translate('taxonomies.newVersion')}</button><button className="row-action danger" type="button" onClick={() => setPendingArchive(taxonomy)}>{translate('common.archive')}</button></span></div>)}</div>}
+      {pendingArchive && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-taxonomy-heading"><div><strong id="archive-taxonomy-heading">{translate('taxonomies.archiveHeading', { name: pendingArchive.current_version.label })}</strong><p>{translate('taxonomies.archiveConfirm')}</p></div><div className="form-actions"><button className="primary-button danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? translate('common.saving') : translate('common.archive')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPendingArchive(null)}>{translate('common.cancel')}</button></div></div>}
     </section>
     <section className="content-section"><div className="section-heading"><div><h2>{translate('taxonomies.migration')}</h2><p>{translate('taxonomies.migrationIntro')}</p></div><button className="secondary-button" type="button" disabled={saving} onClick={() => { void previewMigration(false) }}>{translate('taxonomies.preview')}</button></div>{migration && <><p role="status">{translate('taxonomies.migrationSummary', migration.counts)}</p>{migration.rows.length > 0 && <div className="taxonomy-migration-list" role="table" aria-label={translate('taxonomies.migration')}><div className="taxonomy-migration-row header" role="row"><span role="columnheader">{translate('taxonomies.document')}</span><span role="columnheader">{translate('taxonomies.legacyTag')}</span><span role="columnheader">{translate('taxonomies.match')}</span></div>{migration.rows.map((row, index) => <div className="taxonomy-migration-row" role="row" key={`${row.document_id}-${row.tag}-${index}`}><span role="cell">{row.document_title}</span><span role="cell">{row.tag}</span><span role="cell">{row.term_label ?? row.status}</span></div>)}</div>}{migration.counts.matched > 0 && <button className="primary-button" type="button" disabled={saving} onClick={() => { void previewMigration(true) }}>{translate('taxonomies.applyMigration')}</button>}</>}
     </section>

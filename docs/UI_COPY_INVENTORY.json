@@ -427,9 +427,50 @@
       "workflow": "Taxonomies, compliance, reminders, activity, and recycle bin",
       "routes": ["/taxonomies", "/compliance", "/deadlines", "/activity", "/recycle-bin"],
       "states": ["loading", "empty", "populated", "retired", "restore", "denied", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Explain taxonomy once at its decision point; review compliance evidence, reminder schedules, audit-only terms, and archive/restore consequences."
+      "decisions": [
+        {
+          "before": "Managed vocabularies used for consistent document metadata across every client.",
+          "after": "A taxonomy is a shared list of terms used to organize documents consistently.",
+          "reason": "Defines the unfamiliar term once, where a user decides whether to create one."
+        },
+        {
+          "before": "Existing tag migration / Preview migration",
+          "after": "Match existing tags / Preview matches",
+          "reason": "Describes the user’s task instead of the underlying data operation."
+        },
+        {
+          "before": "Versioned control catalogs, applicability decisions, accountable owners, and retained review history for this workspace.",
+          "after": "Track compliance controls, evidence, and risks for this workspace.",
+          "reason": "Keeps necessary compliance terms while removing implementation language."
+        },
+        {
+          "before": "Create signed bundle / Immutable signed snapshots of the current controls, evidence, and risks.",
+          "after": "Create locked bundle / Locked copies of the current controls, evidence, and risks.",
+          "reason": "Explains the result without requiring knowledge of signing or storage details."
+        },
+        {
+          "before": "Permission-aware, append-only changes in the active workspace.",
+          "after": "See changes made in this workspace.",
+          "reason": "Leaves audit implementation details out of the ordinary page introduction."
+        },
+        {
+          "before": "This also restores records archived in the same cascade.",
+          "after": "This also restores related records that were archived with it.",
+          "reason": "States the consequence in language a user can act on."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/taxonomies/Taxonomies.test.tsx",
+        "frontend/src/compliance/Compliance.test.tsx",
+        "frontend/src/operations/Reminders.test.tsx",
+        "frontend/src/operations/ActivityLog.test.tsx",
+        "frontend/src/recycle-bin/RecycleBin.test.tsx",
+        "frontend/e2e/taxonomies.spec.ts",
+        "frontend/e2e/recycle-bin.spec.ts",
+        "frontend/e2e/live-workspace.spec.ts",
+        "scripts/tests/test_check_ui_language.py"
+      ]
     },
     {
       "id": "integrations-imports",

@@ -248,7 +248,7 @@ it('searches governed terms by alias and permits explicitly allowed client-local
   expect(screen.queryByText('Intune')).not.toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Add client term' }))
-  await user.type(screen.getByLabelText('Stable key'), 'client-app')
+  await user.type(screen.getByLabelText('Term key'), 'client-app')
   await user.type(screen.getByLabelText('Label'), 'Client App')
   await user.click(screen.getByRole('button', { name: 'Create client term' }))
   await waitFor(() => expect(createLocalTerm).toHaveBeenCalledWith(

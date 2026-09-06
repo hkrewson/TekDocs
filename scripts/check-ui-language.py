@@ -117,6 +117,28 @@ REVIEWED_INVOICE_FILES = {
         "['never', 'Never']",
     },
 }
+REVIEWED_GOVERNANCE_FILES = {
+    ROOT / "frontend" / "src" / "taxonomies" / "Taxonomies.tsx": {
+        "window.confirm",
+        "Existing tag migration",
+        "Preview migration",
+        "Managed vocabularies",
+    },
+    ROOT / "frontend" / "src" / "compliance" / "Compliance.tsx": {
+        "Versioned control catalogs",
+        "Saving creates immutable revisions",
+        "Create signed bundle",
+        "Immutable signed snapshots",
+        "<dt>Digest</dt>",
+    },
+    ROOT / "frontend" / "src" / "operations" / "ActivityLog.tsx": {
+        "Permission-aware, append-only",
+    },
+    ROOT / "frontend" / "src" / "recycle-bin" / "RecycleBin.tsx": {
+        "permission-checked and audited",
+        "same cascade",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -249,6 +271,16 @@ def validate_invoice_migration() -> None:
         )
 
 
+def validate_governance_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_GOVERNANCE_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed governance copy or confirmation returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
@@ -256,6 +288,7 @@ def main() -> int:
     validate_infrastructure_migration()
     validate_supplier_migration()
     validate_invoice_migration()
+    validate_governance_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

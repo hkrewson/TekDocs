@@ -335,7 +335,7 @@ export function Compliance({
       .then(setRevisions)
       .catch(() => {
         if (!controller.signal.aborted)
-          setError("Version history could not be loaded.");
+          setError(translate('compliance.historyLoadFailed'));
       });
     return () => controller.abort();
   }, [client, selectedId, workspace]);
@@ -346,14 +346,14 @@ export function Compliance({
       .evidence(workspace, controller.signal)
       .then((result) => setEvidence(result.results))
       .catch(() => {
-        if (!controller.signal.aborted) setError("Compliance evidence could not be loaded.");
+        if (!controller.signal.aborted) setError(translate('compliance.evidenceLoadFailed'));
       });
     return () => controller.abort();
   }, [client, workspace]);
   useEffect(() => {
     const controller = new AbortController();
     client.bundles(workspace, controller.signal).then(setBundles).catch(() => {
-      if (!controller.signal.aborted) setError("Evidence bundles could not be loaded.");
+      if (!controller.signal.aborted) setError(translate('compliance.bundleLoadFailed'));
     });
     return () => controller.abort();
   }, [client, workspace]);
@@ -365,7 +365,7 @@ export function Compliance({
       setRiskSummary(result.summary);
       if (result.owner_choices.length) setOwnerChoices(result.owner_choices);
     }).catch(() => {
-      if (!controller.signal.aborted) setError("Compliance risks could not be loaded.");
+      if (!controller.signal.aborted) setError(translate('compliance.riskLoadFailed'));
     });
     return () => controller.abort();
   }, [client, workspace]);
@@ -381,7 +381,7 @@ export function Compliance({
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setError("Control assignments could not be loaded.");
+          setError(translate('compliance.reviewLoadFailed'));
       });
     return () => controller.abort();
   }, [client, selectedId, workspace]);
@@ -440,12 +440,8 @@ export function Compliance({
         setViewingRevision(null);
       }
       setForm(null);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "The catalog version could not be saved.",
-      );
+    } catch {
+      setError(translate('compliance.frameworkSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -468,12 +464,8 @@ export function Compliance({
       ]);
       setReviewingControl(null);
       setAssignmentDraft(EMPTY_ASSIGNMENT);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "The control review could not be saved.",
-      );
+    } catch {
+      setError(translate('compliance.reviewSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -503,8 +495,8 @@ export function Compliance({
       setExistingEvidenceId("");
       setEvidenceAssignmentId("");
       setEvidenceDecision("");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The evidence could not be saved.");
+    } catch {
+      setError(translate('compliance.evidenceSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -533,8 +525,8 @@ export function Compliance({
       setRiskFormOpen(false);
       setEditingRiskId(null);
       setRiskDraft(EMPTY_RISK);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The risk decision could not be saved.");
+    } catch {
+      setError(translate('compliance.riskSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -544,11 +536,8 @@ export function Compliance({
     <>
       <header className="page-header">
         <div>
-          <h1>Compliance</h1>
-          <p>
-            Versioned control catalogs, applicability decisions, accountable
-            owners, and retained review history for this workspace.
-          </p>
+          <h1>{translate('compliance.heading')}</h1>
+          <p>{translate('compliance.intro')}</p>
         </div>
         {canManage && (
           <button type="button" className="primary-button" aria-label={translate('compliance.newFramework')} title={translate('compliance.newFramework')} onClick={startNew}>
@@ -574,10 +563,7 @@ export function Compliance({
                   ? "New framework"
                   : `New ${selected?.name} version`}
               </h2>
-              <p>
-                Saving creates immutable revisions; an earlier version cannot be
-                overwritten.
-              </p>
+              <p>{translate('compliance.versionHelp')}</p>
             </div>
           </div>
           {form === "new" && (
@@ -727,7 +713,7 @@ export function Compliance({
                   <dd>{displayed.created_by}</dd>
                 </div>
                 <div>
-                  <dt>Digest</dt>
+                  <dt>{translate('compliance.verificationId')}</dt>
                   <dd>
                     <code>{displayed.content_digest.slice(0, 16)}</code>
                   </dd>
@@ -940,7 +926,7 @@ export function Compliance({
         <div className="section-heading">
           <div>
             <h2 id="compliance-evidence-heading">Evidence</h2>
-            <p>Reusable workspace evidence with collection windows, exact control links, and retained reviews.</p>
+            <p>{translate('compliance.evidenceIntro')}</p>
           </div>
           {canManage && (
             <button type="button" className="secondary-button" onClick={() => setEvidenceFormOpen(true)}>
@@ -987,7 +973,7 @@ export function Compliance({
         <div className="section-heading">
           <div>
             <h2 id="compliance-risks-heading">Risk register</h2>
-            <p>Workspace risks with consistent scoring, accountable treatment, deadlines, and retained decisions.</p>
+            <p>{translate('compliance.riskIntro')}</p>
           </div>
           {canManage && <button type="button" className="secondary-button" onClick={() => { setEditingRiskId(null); setRiskDraft(EMPTY_RISK); setRiskFormOpen(true); }}><Plus size={15} /> {translate('compliance.addRisk')}</button>}
         </div>
@@ -1010,14 +996,14 @@ export function Compliance({
           <label className="wide-field"><span>Treatment plan (Markdown)</span><textarea rows={3} value={riskDraft.treatment_plan} onChange={(event) => setRiskDraft({ ...riskDraft, treatment_plan: event.target.value })} /></label>
           <label className="wide-field"><span>Decision</span><input maxLength={120} value={riskDraft.decision} onChange={(event) => setRiskDraft({ ...riskDraft, decision: event.target.value })} /></label>
           <label className="wide-field"><span>Review note</span><textarea rows={2} value={riskDraft.note} onChange={(event) => setRiskDraft({ ...riskDraft, note: event.target.value })} /></label>
-          {riskDraft.status === "accepted" && <p className="form-note wide-field">Saving records you as the accepting actor. Acceptance is a retained decision, not deletion or remediation.</p>}
+          {riskDraft.status === "accepted" && <p className="form-note wide-field">{translate('compliance.acceptanceHelp')}</p>}
           <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>{translate('common.cancel')}</button></div>
         </div>}
         {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.riskTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>{translate('common.review')}</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
       </section>
       <section className="content-section compliance-risks" aria-labelledby="compliance-bundles-heading">
-        <div className="section-heading"><div><h2 id="compliance-bundles-heading">Evidence bundles</h2><p>Immutable signed snapshots of the current controls, evidence, and risks.</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : "The evidence bundle could not be created."); } finally { setSaving(false); } })(); }}>{translate('compliance.createSignedBundle')}</button>}</div>
-        {bundles.length === 0 ? <p className="empty-state">No signed evidence bundles have been created.</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.bundleTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Integrity</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>SHA-256 {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
+        <div className="section-heading"><div><h2 id="compliance-bundles-heading">{translate('compliance.bundlesHeading')}</h2><p>{translate('compliance.bundlesIntro')}</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch { setError(translate('compliance.bundleCreateFailed')); } finally { setSaving(false); } })(); }}>{translate('compliance.createBundle')}</button>}</div>
+        {bundles.length === 0 ? <p className="empty-state">{translate('compliance.bundlesEmpty')}</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.bundleTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Verification</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>{translate('compliance.verificationId')} {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
       </section>
       <DataFlows workspace={workspace} client={dataFlowClient} />
     </>

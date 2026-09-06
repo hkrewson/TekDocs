@@ -111,8 +111,8 @@ export function DataFlows({ workspace, client = browserDataFlowClient }: { works
       await action()
       await reload()
       setMode('read')
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The data flow could not be changed.')
+    } catch {
+      setError(translate('dataFlows.saveFailed'))
     } finally {
       setBusy(false)
     }
@@ -130,7 +130,7 @@ export function DataFlows({ workspace, client = browserDataFlowClient }: { works
     try {
       setHistory((await client.revisions(workspace, record.id)).results)
     } catch {
-      setError('The revision history could not be loaded.')
+      setError(translate('dataFlows.historyLoadFailed'))
     }
   }
 

@@ -187,7 +187,7 @@ describe('Compliance', () => {
     await user.click(screen.getByRole('button', { name: 'Review' }))
     await user.selectOptions(screen.getByLabelText('Status'), 'accepted')
     expect(screen.getByLabelText('Treatment')).toHaveValue('accept')
-    expect(screen.getByText(/records you as the accepting actor/i)).toBeInTheDocument()
+    expect(screen.getByText(/marks you as the person who accepted this risk/i)).toBeInTheDocument()
     await user.type(screen.getByLabelText('Decision'), 'Residual risk accepted')
     await user.click(screen.getByRole('button', { name: 'Save review' }))
 
@@ -201,8 +201,8 @@ describe('Compliance', () => {
     const user = userEvent.setup()
     render(<Compliance workspace={null} client={api} />)
 
-    await screen.findByRole('heading', { name: 'Evidence bundles' })
-    await user.click(screen.getByRole('button', { name: 'Create signed bundle' }))
+    await screen.findByRole('heading', { name: 'Review bundles' })
+    await user.click(screen.getByRole('button', { name: 'Create locked bundle' }))
 
     await waitFor(() => expect(api.createBundle).toHaveBeenCalledWith(null, expect.objectContaining({
       reason: 'Point-in-time compliance review', audience: 'msp_internal',

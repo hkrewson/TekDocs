@@ -17,6 +17,7 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
   const [sources, setSources] = useState<EntityReference[]>([])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [messageKind, setMessageKind] = useState<'success' | 'error'>('success')
 
   const load = useCallback(() => {
     client.reminders(scope).then((result) => { setRecords(result); setPhase('ready') }).catch(() => setPhase('error'))
@@ -44,9 +45,11 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
       setSourceQuery('')
       setSources([])
       setMessage(translate('reminders.created'))
+      setMessageKind('success')
       load()
     } catch {
       setMessage(translate('reminders.createFailed'))
+      setMessageKind('error')
     } finally {
       setSaving(false)
     }
@@ -57,7 +60,7 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
       <div><h1>{translate('reminders.heading')}</h1><p>{translate('reminders.intro')}</p></div>
       <a className="secondary-button" href={client.reminderCalendarUrl(scope)}><Download size={16} />{translate('reminders.calendar')}</a>
     </header>
-    {message && <div className="form-message" role="status">{message}</div>}
+    {message && <div className={`form-message ${messageKind}`} role={messageKind === 'error' ? 'alert' : 'status'}>{message}</div>}
     <section className="content-section operations-create" aria-labelledby="new-reminder-heading">
       <div className="section-heading"><h2 id="new-reminder-heading">{translate('reminders.new')}</h2></div>
       <div className="operations-form">

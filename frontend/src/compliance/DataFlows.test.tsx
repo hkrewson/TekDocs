@@ -142,7 +142,7 @@ it('repeats the reason the server refused a flow', async () => {
   await user.type(screen.getByLabelText('Destination'), 'Elsewhere')
   await user.click(screen.getByRole('button', { name: 'Save data flow' }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('The selected source is unavailable in this workspace.')
+  expect(await screen.findByRole('alert')).toHaveTextContent('The data flow wasn’t saved. Your entries are still here. Try again.')
 })
 
 it('stays out of the page entirely when the member may not read data flows', async () => {

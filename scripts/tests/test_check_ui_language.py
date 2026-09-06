@@ -28,6 +28,7 @@ class UiLanguageContractTests(unittest.TestCase):
         MODULE.validate_infrastructure_migration()
         MODULE.validate_supplier_migration()
         MODULE.validate_invoice_migration()
+        MODULE.validate_governance_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -87,6 +88,16 @@ class UiLanguageContractTests(unittest.TestCase):
                 ValueError, "reviewed invoice copy or confirmation returned"
             ):
                 MODULE.validate_invoice_migration()
+
+    def test_rejects_reintroduced_governance_jargon_or_browser_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "Taxonomies.tsx"
+            source.write_text("window.confirm('Archive taxonomy?')\n", encoding="utf-8")
+            reviewed_files = {source: {"window.confirm"}}
+            with patch.object(MODULE, "REVIEWED_GOVERNANCE_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed governance copy or confirmation returned"
+            ):
+                MODULE.validate_governance_migration()
 
 
 if __name__ == "__main__":

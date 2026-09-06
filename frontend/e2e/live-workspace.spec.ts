@@ -796,7 +796,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await controlReview.getByLabel('Decision').fill('Live monitoring control reviewed')
   await controlReview.getByRole('button', { name: 'Save review' }).click()
   await expect(page.getByText('applicable · implemented')).toBeVisible()
-  await page.getByRole('button', { name: 'Create signed bundle' }).click()
+  await page.getByRole('button', { name: 'Create locked bundle' }).click()
   await expect(page.getByText('Verified', { exact: true })).toBeVisible()
 
   await page.goto(`/workspaces/organizations/${clientId}/domains`)

@@ -37,12 +37,12 @@ function client(): TaxonomiesClient {
 }
 
 describe('Taxonomies', () => {
-  it('lists governed vocabularies and previews exact legacy-tag matches', async () => {
+  it('lists taxonomies and previews exact tag matches', async () => {
     const api = client()
     render(<Taxonomies client={api} />)
     expect(await screen.findByText('Technology')).toBeVisible()
     expect(screen.getByText('2 documents · 1 templates')).toBeVisible()
-    await userEvent.click(screen.getByRole('button', { name: 'Preview migration' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Preview matches' }))
     expect(await screen.findByText('1 matched · 1 unmatched · 0 ambiguous')).toBeVisible()
     expect(screen.getByText('Azure AD')).toBeVisible()
     expect(screen.getByText('Entra ID')).toBeVisible()
@@ -53,25 +53,23 @@ describe('Taxonomies', () => {
     render(<Taxonomies client={api} />)
     await screen.findByText('Technology')
     await userEvent.click(screen.getByRole('button', { name: 'New taxonomy' }))
-    await userEvent.type(screen.getAllByLabelText('Stable key')[0], 'service-tier')
+    await userEvent.type(screen.getByLabelText('Taxonomy key'), 'service-tier')
     const nameInputs = screen.getAllByLabelText('Name')
     await userEvent.type(nameInputs[0], 'Service tier')
     await userEvent.type(screen.getByLabelText('Label'), 'Gold')
-    const keyInputs = screen.getAllByLabelText('Stable key')
-    await userEvent.type(keyInputs[1], 'gold')
+    await userEvent.type(screen.getByLabelText('Term key'), 'gold')
     await userEvent.click(screen.getByRole('button', { name: 'Save taxonomy' }))
     await waitFor(() => expect(createTaxonomy).toHaveBeenCalled())
   })
 
-  it('reorders a revised vocabulary and archives it after confirmation', async () => {
+  it('reorders a revised taxonomy and archives it after an in-page confirmation', async () => {
     const api = client()
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Taxonomies client={api} />)
     await screen.findByText('Technology')
 
     await userEvent.click(screen.getByRole('button', { name: 'New version' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add term' }))
-    const termKeys = screen.getAllByLabelText('Stable key')
+    const termKeys = screen.getAllByLabelText('Term key')
     await userEvent.type(termKeys[termKeys.length - 1], 'intune')
     await userEvent.type(screen.getAllByLabelText('Label').at(-1)!, 'Intune')
     await userEvent.click(screen.getAllByRole('button', { name: 'Move up' }).at(-1)!)
@@ -79,7 +77,8 @@ describe('Taxonomies', () => {
     await waitFor(() => expect(reviseTaxonomy).toHaveBeenCalled())
 
     await userEvent.click(screen.getByRole('button', { name: 'Archive' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Existing documents and published copies will keep their current terms.')
+    await userEvent.click(screen.getByRole('alertdialog').querySelector('.danger-button')!)
     await waitFor(() => expect(archiveTaxonomy).toHaveBeenCalled())
-    expect(confirm).toHaveBeenCalled()
   })
 })

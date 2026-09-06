@@ -22,12 +22,12 @@ export function ActivityLog({ workspace, client = browserOperationsClient }: { w
 
   const activeDateFilterCount = [filters.occurred_after, filters.occurred_before].filter(Boolean).length
   const dateFilterLabel = filters.occurred_after && filters.occurred_before
-    ? 'Custom range'
+    ? translate('activity.customRange')
     : filters.occurred_after
-      ? 'After a date'
+      ? translate('activity.afterDate')
       : filters.occurred_before
-        ? 'Before a date'
-        : 'Any time'
+        ? translate('activity.beforeDate')
+        : translate('activity.anyTime')
 
   return <>
     <header className="page-header">
@@ -38,10 +38,10 @@ export function ActivityLog({ workspace, client = browserOperationsClient }: { w
         <label>{translate('activity.search')}<span className="search-input"><Search size={16} /><input type="search" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value, page: 1 })} /></span></label>
         <FilterMenu groups={[{
           kind: 'custom',
-          label: 'Date range',
+          label: translate('activity.dateRange'),
           valueLabel: dateFilterLabel,
           content: <div className="filter-menu-custom"><label>{translate('activity.after')}<input type="datetime-local" value={filters.occurred_after} onChange={(event) => setFilters({ ...filters, occurred_after: event.target.value, page: 1 })} /></label><label>{translate('activity.before')}<input type="datetime-local" value={filters.occurred_before} onChange={(event) => setFilters({ ...filters, occurred_before: event.target.value, page: 1 })} /></label></div>,
-        }]} activeCount={activeDateFilterCount} onClear={() => setFilters({ ...filters, occurred_after: '', occurred_before: '', page: 1 })} menuLabel="Activity filters" />
+        }]} activeCount={activeDateFilterCount} onClear={() => setFilters({ ...filters, occurred_after: '', occurred_before: '', page: 1 })} menuLabel={translate('activity.filters')} />
       </div>
       {phase === 'loading' && <p role="status">{translate('activity.loading')}</p>}
       {phase === 'error' && <p role="alert">{translate('activity.loadFailed')}</p>}

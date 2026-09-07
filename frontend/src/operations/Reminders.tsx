@@ -30,8 +30,10 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
       return () => window.clearTimeout(clearTimer)
     }
     const controller = new AbortController()
-    const timer = window.setTimeout(() => relationshipsClient.search(scope, sourceQuery, undefined, controller.signal)
-      .then((result) => setSources(result.results)).catch(() => setSources([])), 180)
+    const timer = window.setTimeout(() => {
+      void relationshipsClient.search(scope, sourceQuery, undefined, controller.signal)
+        .then((result) => setSources(result.results)).catch(() => setSources([]))
+    }, 180)
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [relationshipsClient, scope, sourceQuery])
 

@@ -98,7 +98,7 @@ async function openPrimaryBlockEditor(page: Page) {
   if (await blockButton.isVisible()) await blockButton.click()
 }
 
-test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }) => {
+test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }, testInfo) => {
   const health = await request.get('/api/v1/health/ready')
   expect(health.ok()).toBeTruthy()
   await mockAuthenticated(page)
@@ -107,7 +107,8 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(page.getByText('Example MSP', { exact: true })).toBeVisible()
   const skipLink = page.getByRole('link', { name: 'Skip to main content' })
-  await page.keyboard.press('Tab')
+  // Safari's default macOS keyboard model uses Option-Tab to include links.
+  await page.keyboard.press(testInfo.project.name === 'webkit' ? 'Alt+Tab' : 'Tab')
   await expect(skipLink).toBeFocused()
   await expect(skipLink).toBeVisible()
   await page.keyboard.press('Enter')

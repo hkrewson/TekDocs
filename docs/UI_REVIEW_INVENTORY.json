@@ -20,10 +20,10 @@
       "surface": "application shell and shared controls",
       "workspaces": ["msp", "organization"],
       "roles": ["owner", "administrator", "technician"],
-      "problems": ["Full review pending"],
-      "correction": "Review shell, typography, spacing, buttons, inputs, menus, tables, dialogs, statuses, responsive behavior, and shared states before route-specific exceptions.",
-      "evidence": [],
-      "status": "pending"
+      "problems": ["Spacing, corner, control-height, width, and shadow values were repeated without a shared contract", "The shared stylesheet referenced accent and shadow variables that were not defined", "A fixed page-header minimum height and generous panel spacing created avoidable dead space"],
+      "correction": "Use the documented compact token scale for the application frame, page hierarchy, reusable actions, forms, dialogs, messages, empty states, and filter menus; reserve restrained shadows for overlays; retain focus, forced-colors, reduced-motion, mobile, and print behavior.",
+      "evidence": ["docs/UI_FOUNDATIONS.md", "frontend/src/styles.css", "frontend/src/uiFoundations.test.ts", "frontend/e2e/shell.spec.ts", "frontend/e2e/responsive.spec.ts"],
+      "status": "reviewed"
     },
     {
       "surface": "authentication and client portal shells",

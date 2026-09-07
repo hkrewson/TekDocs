@@ -14,9 +14,11 @@ export function ActivityLog({ workspace, client = browserOperationsClient }: { w
 
   useEffect(() => {
     const controller = new AbortController()
-    const timer = window.setTimeout(() => client.activity(scope, filters, controller.signal)
-      .then((value) => { setResult(value); setPhase('ready') })
-      .catch(() => setPhase('error')), 150)
+    const timer = window.setTimeout(() => {
+      void client.activity(scope, filters, controller.signal)
+        .then((value) => { setResult(value); setPhase('ready') })
+        .catch(() => setPhase('error'))
+    }, 150)
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [client, filters, scope])
 

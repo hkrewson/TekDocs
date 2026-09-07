@@ -118,6 +118,26 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
+test('navigation groups collapse, persist, and reveal the active destination', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/overview')
+
+  const infrastructure = page.getByRole('button', { name: 'Infrastructure' })
+  await infrastructure.click()
+  await expect(infrastructure).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('link', { name: 'Assets' })).not.toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'false')
+
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/assets')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await expect(page.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
+  expect((await new AxeBuilder({ page }).include('aside').withTags(wcag22Tags).analyze()).violations).toEqual([])
+})
+
 test('client portal uses plain language without exposing publication internals', async ({ page }) => {
   await mockClientPortal(page)
   await page.goto('/portal')

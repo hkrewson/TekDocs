@@ -1,5 +1,13 @@
 import { translate } from '../i18n/localization'
 
+export const navigationGroupRegistry = [
+  { id: 'Workspace', label: translate('navigation.group.workspace') },
+  { id: 'Infrastructure', label: translate('navigation.group.infrastructure') },
+  { id: 'Relationships', label: translate('navigation.group.relationships') },
+  { id: 'Business', label: translate('navigation.group.business') },
+  { id: 'Governance', label: translate('navigation.group.governance') },
+] as const
+
 export const capabilityRegistry = {
   overview: { label: translate('capability.overview'), path: '/overview', group: 'Workspace', status: 'supported', scopes: ['msp', 'organization'] },
   organizations: { label: translate('capability.organizations'), path: '/organizations', group: 'Workspace', status: 'supported', scopes: ['msp'] },
@@ -29,7 +37,7 @@ export const capabilityRegistry = {
 
 export type WorkspaceCapability = keyof typeof capabilityRegistry
 export type CapabilityStatus = (typeof capabilityRegistry)[WorkspaceCapability]['status']
-export type CapabilityGroup = (typeof capabilityRegistry)[WorkspaceCapability]['group']
+export type CapabilityGroup = (typeof navigationGroupRegistry)[number]['id']
 
 export const workspaceCapabilities = Object.keys(capabilityRegistry) as WorkspaceCapability[]
 export const supportedCapabilitySet = new Set<WorkspaceCapability>(workspaceCapabilities)

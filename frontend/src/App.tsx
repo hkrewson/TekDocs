@@ -84,7 +84,8 @@ import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
-import { capabilityRegistry, workspaceCapabilities } from './product/capabilities'
+import { capabilityRegistry, navigationGroupRegistry, workspaceCapabilities } from './product/capabilities'
+import type { CapabilityGroup } from './product/capabilities'
 import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
@@ -130,6 +131,7 @@ type NavigationItem = {
 }
 
 type NavigationSection = {
+  id: CapabilityGroup
   label: string
   items: NavigationItem[]
 }
@@ -147,42 +149,52 @@ function AppLink({ to, className, children, ...props }: {
   return <NavLink {...props} to={to} className={({ isActive }) => `${className ?? ''}${isActive ? ' active' : ''}`}>{children}</NavLink>
 }
 
-const navigationSections: NavigationSection[] = [
-  { label: translate('navigation.group.workspace'), items: [
-    navigationItem('overview', Activity),
-    navigationItem('organizations', Building2),
-    navigationItem('people', UsersRound),
-    navigationItem('sites', MapPin),
-    navigationItem('documentation', BookOpenText),
-    navigationItem('files', File),
-  ] },
-  { label: translate('navigation.group.infrastructure'), items: [
-    navigationItem('assets', Boxes),
-    navigationItem('licenses', ScrollText),
-    navigationItem('networks', Network),
-    navigationItem('domains', Globe2),
-    navigationItem('certificates', BadgeCheck),
-    navigationItem('credentials', KeyRound),
-    navigationItem('services', BriefcaseBusiness),
-  ] },
-  { label: translate('navigation.group.relationships'), items: [
-    navigationItem('vendors', Handshake),
-    navigationItem('products', Package),
-  ] },
-  { label: translate('navigation.group.business'), items: [
-    navigationItem('invoices', ReceiptText),
-    navigationItem('stock', PackageOpen),
-  ] },
-  { label: translate('navigation.group.governance'), items: [
-    navigationItem('custom_fields', ListPlus),
-    navigationItem('taxonomies', Tags),
-    navigationItem('compliance', ShieldCheck),
-    navigationItem('deadlines', CalendarDays),
-    navigationItem('activity', Activity),
-    navigationItem('recycle_bin', Trash2),
-    navigationItem('integrations', Plug),
-  ] },
-]
+const navigationIcons: Record<WorkspaceCapability, NavigationItem['icon']> = {
+  overview: Activity,
+  organizations: Building2,
+  people: UsersRound,
+  sites: MapPin,
+  documentation: BookOpenText,
+  files: File,
+  assets: Boxes,
+  licenses: ScrollText,
+  networks: Network,
+  domains: Globe2,
+  certificates: BadgeCheck,
+  credentials: KeyRound,
+  services: BriefcaseBusiness,
+  vendors: Handshake,
+  products: Package,
+  invoices: ReceiptText,
+  stock: PackageOpen,
+  custom_fields: ListPlus,
+  taxonomies: Tags,
+  compliance: ShieldCheck,
+  deadlines: CalendarDays,
+  activity: Activity,
+  recycle_bin: Trash2,
+  integrations: Plug,
+}
+
+const navigationSections: NavigationSection[] = navigationGroupRegistry.map((group) => ({
+  ...group,
+  items: workspaceCapabilities
+    .filter((area) => capabilityRegistry[area].group === group.id)
+    .map((area) => navigationItem(area, navigationIcons[area])),
+}))
+
+const navigationSectionsPreferenceKey = 'tekdocs.navigation.collapsed-sections.v1'
+const navigationGroupIds = new Set<CapabilityGroup>(navigationGroupRegistry.map(({ id }) => id))
+
+function readCollapsedNavigationSections(): Set<CapabilityGroup> {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(navigationSectionsPreferenceKey) ?? '[]') as unknown
+    if (!Array.isArray(stored)) return new Set()
+    return new Set(stored.filter((value): value is CapabilityGroup => typeof value === 'string' && navigationGroupIds.has(value as CapabilityGroup)))
+  } catch {
+    return new Set()
+  }
+}
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -193,23 +205,48 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function NavSection({ items, label, collapsed, onNavigate, workspace }: { items: NavigationItem[]; label: string; collapsed: boolean; onNavigate: () => void; workspace: WorkspaceContext | null }) {
+function NavSection({ id, items, label, collapsed, sectionCollapsed, onToggle, onNavigate, workspace }: {
+  id: CapabilityGroup
+  items: NavigationItem[]
+  label: string
+  collapsed: boolean
+  sectionCollapsed: boolean
+  onToggle: () => void
+  onNavigate: () => void
+  workspace: WorkspaceContext | null
+}) {
+  const headingRef = useRef<HTMLButtonElement>(null)
+  const navigationRef = useRef<HTMLElement>(null)
+  const sectionId = `navigation-section-${id.toLowerCase()}`
+
+  function toggle() {
+    if (!sectionCollapsed && navigationRef.current?.contains(document.activeElement)) headingRef.current?.focus()
+    onToggle()
+  }
+
   return (
-    <nav className="nav-list" aria-label={label}>
-      {!collapsed && <span className="nav-section-label">{label}</span>}
-      {items.map(({ label, path, area, icon: Icon }) => (
-        <AppLink
-          key={area}
-          to={workspace ? organizationWorkspacePath(workspace, area) : path}
-          onClick={onNavigate}
-          className="nav-link"
-          title={collapsed ? label : undefined}
-        >
-          <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-          {!collapsed && <span>{label}</span>}
-        </AppLink>
-      ))}
-    </nav>
+    <div className="nav-section">
+      {!collapsed && (
+        <button ref={headingRef} className="nav-section-heading" type="button" aria-expanded={!sectionCollapsed} aria-controls={sectionId} onClick={toggle}>
+          <span>{label}</span>
+          {sectionCollapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+        </button>
+      )}
+      <nav ref={navigationRef} id={sectionId} className="nav-list" aria-label={label} hidden={!collapsed && sectionCollapsed}>
+        {items.map(({ label, path, area, icon: Icon }) => (
+          <AppLink
+            key={area}
+            to={workspace ? organizationWorkspacePath(workspace, area) : path}
+            onClick={onNavigate}
+            className="nav-link"
+            title={collapsed ? label : undefined}
+          >
+            <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+            {!collapsed && <span>{label}</span>}
+          </AppLink>
+        ))}
+      </nav>
+    </div>
   )
 }
 
@@ -226,6 +263,18 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   organizationRoute: boolean
   canManageInvoiceSettings: boolean
 }) {
+  const activeGroup = workspaceCapabilities.includes(activeArea as WorkspaceCapability)
+    ? capabilityRegistry[activeArea as WorkspaceCapability].group
+    : null
+  const [navigationState, setNavigationState] = useState<{
+    collapsedSections: Set<CapabilityGroup>
+    acknowledgedArea: WorkspaceArea | null
+    acknowledgedMobileOpen: boolean
+  }>(() => ({
+    collapsedSections: readCollapsedNavigationSections(),
+    acknowledgedArea: null,
+    acknowledgedMobileOpen: false,
+  }))
   const availableSections = navigationSections
     .map((section) => ({
       ...section,
@@ -234,6 +283,36 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
         : item.area !== 'invoices' || canManageInvoiceSettings),
     }))
     .filter((section) => section.items.length > 0)
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(navigationSectionsPreferenceKey, JSON.stringify([...navigationState.collapsedSections]))
+    } catch {
+      // Storage can be unavailable without preventing navigation.
+    }
+  }, [navigationState.collapsedSections])
+
+  function sectionIsCollapsed(id: CapabilityGroup, state = navigationState): boolean {
+    const mustRevealActive = id === activeGroup && (
+      state.acknowledgedArea !== activeArea
+      || (!state.acknowledgedMobileOpen && mobileOpen)
+    )
+    return state.collapsedSections.has(id) && !mustRevealActive
+  }
+
+  function toggleSection(id: CapabilityGroup) {
+    setNavigationState((current) => {
+      const next = new Set(current.collapsedSections)
+      if (sectionIsCollapsed(id, current)) next.delete(id)
+      else next.add(id)
+      return {
+        collapsedSections: next,
+        acknowledgedArea: activeArea,
+        acknowledgedMobileOpen: mobileOpen,
+      }
+    })
+  }
+
   return (
     <>
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
@@ -251,9 +330,9 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
           {organizationRoute && !workspace
             ? <p className="workspace-navigation-state">{workspaceLoading ? translate('navigation.loading') : translate('navigation.workspaceUnavailable')}</p>
             : availableSections.map((section, index) => (
-              <div key={section.label}>
+              <div key={section.id}>
                 {index > 0 && <div className="nav-divider" />}
-                <NavSection items={section.items} label={section.label} collapsed={collapsed} onNavigate={onMobileClose} workspace={workspace} />
+                <NavSection id={section.id} items={section.items} label={section.label} collapsed={collapsed} sectionCollapsed={sectionIsCollapsed(section.id)} onToggle={() => toggleSection(section.id)} onNavigate={onMobileClose} workspace={workspace} />
               </div>
             ))}
         </div>

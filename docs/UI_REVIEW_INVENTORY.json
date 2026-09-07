@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "issue": 60,
+  "instructions": "For each pending route, exercise every applicable state and viewport below with realistic long and empty values. Record source and browser-test evidence before changing status to reviewed. Retain necessary authorization, provenance, consequence, and validation information.",
+  "viewports_css_pixels": [320, 768, 1024, 1280, 1440],
+  "additional_modes": ["200% zoom", "maintained mobile projects", "print where applicable"],
+  "states": ["loading", "empty", "populated", "long content", "validation", "conflict", "denied", "unavailable", "stale", "destructive confirmation", "success", "failure"],
+  "status_values": ["pending", "in_progress", "reviewed", "blocked", "not_applicable"],
+  "shared_surfaces": [
+    {
+      "surface": "workspace navigation",
+      "workspaces": ["msp", "organization"],
+      "roles": ["owner", "administrator", "technician"],
+      "problems": ["The full destination list required unnecessary scanning", "Group relationships were labels rather than operable structure"],
+      "correction": "Keep every direct link in five task-based groups; use accessible disclosure headings; persist browser choices; reveal the active destination; retain a single-level mobile menu.",
+      "evidence": ["frontend/src/App.test.tsx", "frontend/src/product/capabilities.test.ts", "frontend/e2e/shell.spec.ts", "frontend/e2e/responsive.spec.ts"],
+      "status": "reviewed"
+    },
+    {
+      "surface": "application shell and shared controls",
+      "workspaces": ["msp", "organization"],
+      "roles": ["owner", "administrator", "technician"],
+      "problems": ["Full review pending"],
+      "correction": "Review shell, typography, spacing, buttons, inputs, menus, tables, dialogs, statuses, responsive behavior, and shared states before route-specific exceptions.",
+      "evidence": [],
+      "status": "pending"
+    },
+    {
+      "surface": "authentication and client portal shells",
+      "workspaces": ["pre-authentication", "client portal"],
+      "roles": ["first owner", "invited user", "client user"],
+      "problems": ["Full review pending"],
+      "correction": "Review setup, sign-in, MFA, invitations, client documents/files/invoices, recovery, denial, failure, narrow widths, zoom, and long values.",
+      "evidence": [],
+      "status": "pending"
+    }
+  ],
+  "routes": [
+    { "route": "/overview", "workspace": "msp|organization", "roles": "authorized member", "focus": "summary hierarchy", "status": "pending" },
+    { "route": "/organizations", "workspace": "msp", "roles": "authorized staff", "focus": "record list and forms", "status": "pending" },
+    { "route": "/people", "workspace": "msp|organization", "roles": "authorized staff", "focus": "table, columns and forms", "status": "pending" },
+    { "route": "/sites", "workspace": "msp|organization", "roles": "authorized staff", "focus": "site/location hierarchy", "status": "pending" },
+    { "route": "/documentation", "workspace": "msp|organization", "roles": "reader|editor", "focus": "documents, editor, settings, structured types, reuse, review, publication, PDF and export", "status": "pending" },
+    { "route": "/files", "workspace": "msp|organization", "roles": "authorized staff", "focus": "file list and transfer", "status": "pending" },
+    { "route": "/assets", "workspace": "msp|organization", "roles": "authorized staff", "focus": "inventory, lifecycle and batch actions", "status": "pending" },
+    { "route": "/licenses", "workspace": "msp|organization", "roles": "authorized staff", "focus": "entitlements, coverage and renewals", "status": "pending" },
+    { "route": "/networks", "workspace": "msp|organization", "roles": "authorized staff", "focus": "records, addressing, conflicts and diagrams", "status": "pending" },
+    { "route": "/domains", "workspace": "msp|organization", "roles": "authorized staff", "focus": "hierarchy, renewal and monitoring", "status": "pending" },
+    { "route": "/certificates", "workspace": "msp|organization", "roles": "authorized staff", "focus": "endpoints and validation history", "status": "pending" },
+    { "route": "/credentials", "workspace": "msp|organization", "roles": "authorized staff", "focus": "external references and provider boundary", "status": "pending" },
+    { "route": "/services", "workspace": "msp|organization", "roles": "authorized staff", "focus": "contracts, costs and renewals", "status": "pending" },
+    { "route": "/vendors", "workspace": "msp|organization", "roles": "authorized staff", "focus": "supplier list and provenance", "status": "pending" },
+    { "route": "/products", "workspace": "msp|supplier", "roles": "authorized staff", "focus": "catalogs, models and specifications", "status": "pending" },
+    { "route": "/invoices", "workspace": "msp", "roles": "invoice issuer", "focus": "business settings and numbering", "status": "pending" },
+    { "route": "/workspaces/organizations/{id}/invoices", "workspace": "client", "roles": "invoice staff", "focus": "draft, line items, issuance, delivery, lifecycle and handoff", "status": "pending" },
+    { "route": "/stock", "workspace": "msp", "roles": "authorized staff", "focus": "stock, provenance, quantity history and invoice use", "status": "pending" },
+    { "route": "/custom-fields", "workspace": "msp|organization", "roles": "administrator", "focus": "definitions and validation", "status": "pending" },
+    { "route": "/taxonomies", "workspace": "msp", "roles": "owner|administrator", "focus": "vocabularies, terms, hierarchy and retirement", "status": "pending" },
+    { "route": "/compliance", "workspace": "msp|organization", "roles": "authorized staff", "focus": "controls, evidence, risks, reviews and bundles", "status": "pending" },
+    { "route": "/deadlines", "workspace": "msp|organization", "roles": "authorized staff", "focus": "schedules and calendar export", "status": "pending" },
+    { "route": "/activity", "workspace": "msp|organization", "roles": "authorized staff", "focus": "audit list and filters", "status": "pending" },
+    { "route": "/recycle-bin", "workspace": "msp|organization", "roles": "authorized staff", "focus": "archive, restore and destructive confirmation", "status": "pending" },
+    { "route": "/integrations", "workspace": "msp|organization", "roles": "administrator", "focus": "connections, sync, observations, conflicts, stale state and recovery", "status": "pending" },
+    { "route": "/search", "workspace": "msp|organization", "roles": "authorized staff", "focus": "results, filters, excerpts and no-result state", "status": "pending" },
+    { "route": "/settings", "workspace": "account", "roles": "authenticated user", "focus": "sessions, MFA, tokens and destructive actions", "status": "pending" },
+    { "route": "/staff", "workspace": "msp", "roles": "owner|administrator", "focus": "members, invitations and revocation", "status": "pending" },
+    { "route": "/access-control", "workspace": "msp", "roles": "owner|administrator", "focus": "roles, scopes, assignments and consequences", "status": "pending" },
+    { "route": "/notification-delivery", "workspace": "msp", "roles": "administrator", "focus": "delivery status, retry and failure", "status": "pending" },
+    { "route": "/system-status", "workspace": "msp", "roles": "administrator", "focus": "service state and technical detail hierarchy", "status": "pending" },
+    { "route": "/portal", "workspace": "client portal", "roles": "client user", "focus": "documents, files, invoices, withdrawn, denied and failure", "status": "pending" },
+    { "route": "unknown|unavailable", "workspace": "any", "roles": "authenticated user", "focus": "safe result and recovery without feature advertising", "status": "pending" }
+  ]
+}

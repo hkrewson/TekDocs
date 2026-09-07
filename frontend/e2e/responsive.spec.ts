@@ -37,3 +37,24 @@ test('small-screen shell reflows and navigation remains keyboard and touch opera
   await expectNoHorizontalPageOverflow(page)
   await expect(new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()).resolves.toMatchObject({ violations: [] })
 })
+
+test('navigation groups remain usable at the required review widths and text zoom', async ({ page }) => {
+  await mockAuthenticated(page)
+  await page.goto('/overview')
+
+  for (const width of [320, 768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    if (width <= 800) await page.getByRole('button', { name: 'Open navigation' }).click()
+    const workspace = page.getByRole('button', { name: 'Workspace', exact: true })
+    await expect(workspace).toBeVisible()
+    await expect(workspace).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible()
+    if (width <= 800) await page.getByRole('complementary').getByRole('button', { name: 'Close navigation' }).click()
+    await expectNoHorizontalPageOverflow(page)
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.evaluate(() => { document.body.style.zoom = '2' })
+  await expect(page.getByRole('button', { name: 'Workspace', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible()
+})

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, vi } from 'vitest'
 import { App } from './App'
@@ -86,7 +86,10 @@ const staffAdministrationClient = {
 const app = (initialPath: string) => <App initialPath={initialPath} initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />
 
 describe('application shell', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    window.localStorage.clear()
+  })
 
   it('keeps a client account inside the dedicated portal surface', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(
@@ -200,6 +203,32 @@ describe('application shell', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()
+  })
+
+  it('collapses navigation groups, preserves the preference, and moves focus safely', async () => {
+    render(app('/organizations'))
+
+    expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
+    const infrastructure = screen.getByRole('button', { name: 'Infrastructure' })
+    const assets = screen.getByRole('link', { name: 'Assets' })
+    assets.focus()
+    fireEvent.click(infrastructure)
+
+    expect(infrastructure).toHaveFocus()
+    expect(infrastructure).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Assets' })).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('tekdocs.navigation.collapsed-sections.v1')).toBe('["Infrastructure"]')
+  })
+
+  it('restores collapsed groups but expands the group containing the active destination', async () => {
+    window.localStorage.setItem('tekdocs.navigation.collapsed-sections.v1', '["Infrastructure","Governance"]')
+    render(app('/assets'))
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Governance' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Compliance' })).not.toBeInTheDocument()
   })
 
   it('resolves a deep-linked organization route through the workspace boundary', async () => {

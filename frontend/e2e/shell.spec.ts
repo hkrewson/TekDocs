@@ -64,6 +64,32 @@ async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/documents*', documentsRoute)
 }
 
+async function mockClientPortal(page: Page) {
+  const portalContext = {
+    user: { id: crypto.randomUUID(), email: 'reader@example.com', display_name: 'Client Reader' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'client_user', permissions: [], surface: 'client_portal',
+    organization: { id: crypto.randomUUID(), name: 'Example Client' },
+    mfa_enrollment_required: false,
+  }
+  const sharedDocument = {
+    id: 'shared-document', title: 'Network access guide', category: 'Guide', reason: 'Approved',
+    lifecycle_state: 'review_due', retention: 'review_on', retention_review_on: '2026-09-01',
+    published_at: '2026-08-01T12:00:00Z', content_digest: 'abc', source_kind: 'organization_document',
+    visibility: 'client_visible', artifacts: [{ id: 'shared-pdf', kind: 'pdf', filename: 'network-access-guide.pdf', size: 2048, checksum: 'def' }],
+  }
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ status: 200, json: { status: 200, meta: { is_authenticated: true }, data: { user: portalContext.user } } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: portalContext }))
+  await page.route('**/api/v1/portal/invoices', (route) => route.fulfill({ json: { count: 0, has_more: false, next_cursor: null, results: [] } }))
+  await page.route('**/api/v1/portal/documents**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+    return route.fulfill({ json: pathname.endsWith('/shared-document')
+      ? { ...sharedDocument, sanitized_html: '<h2>Connect to Wi-Fi</h2><p>Ask your administrator for access.</p>' }
+      : { count: 1, has_more: false, next_cursor: null, results: [sharedDocument] } })
+  })
+}
+
 async function openPrimaryBlockEditor(page: Page) {
   await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
   const blockButton = page.getByRole('button', { name: 'Edit this content' })
@@ -90,6 +116,21 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
   await expect(page.locator('main')).toBeFocused()
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
+})
+
+test('client portal uses plain language without exposing publication internals', async ({ page }) => {
+  await mockClientPortal(page)
+  await page.goto('/portal')
+
+  await expect(page.getByRole('heading', { name: 'Example Client' })).toBeVisible()
+  await expect(page.getByText('Invoices and documents shared with your organization.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible()
+  await expect(page.getByText(/STATIC|Client visible/)).not.toBeVisible()
+  await page.getByRole('button', { name: /Network access guide/ }).click()
+  await expect(page.getByText('This document is due for review, but you can still use it.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'network-access-guide.pdf' })).toBeVisible()
+  expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
 test('document filters use one accessible disclosure menu', async ({ page }) => {

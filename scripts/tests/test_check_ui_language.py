@@ -30,6 +30,7 @@ class UiLanguageContractTests(unittest.TestCase):
         MODULE.validate_invoice_migration()
         MODULE.validate_governance_migration()
         MODULE.validate_integration_migration()
+        MODULE.validate_portal_migration()
 
     def test_rejects_promotional_or_internal_catalog_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -109,6 +110,16 @@ class UiLanguageContractTests(unittest.TestCase):
                 ValueError, "reviewed integration copy, raw error, or browser prompt returned"
             ):
                 MODULE.validate_integration_migration()
+
+    def test_rejects_reintroduced_portal_internals_or_raw_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "ClientPortal.tsx"
+            source.write_text("const heading = 'Published documentation'\n", encoding="utf-8")
+            reviewed_files = {source: {"Published documentation"}}
+            with patch.object(MODULE, "REVIEWED_PORTAL_FILES", reviewed_files), self.assertRaisesRegex(
+                ValueError, "reviewed client portal copy or raw error returned"
+            ):
+                MODULE.validate_portal_migration()
 
 
 if __name__ == "__main__":

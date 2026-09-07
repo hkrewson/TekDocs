@@ -735,8 +735,8 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await portalPage.getByLabel('Password', { exact: true }).fill(portalPassword)
   await portalPage.getByLabel('Confirm password').fill(portalPassword)
   await portalPage.getByRole('button', { name: 'Activate account' }).click()
-  await expect(portalPage.getByRole('heading', { name: 'Published documentation' })).toBeVisible()
-  await expect(portalPage.getByText('No documentation has been published to your organization.')).toBeVisible()
+  await expect(portalPage.getByRole('heading', { name: 'Documents' })).toBeVisible()
+  await expect(portalPage.getByText('No documents have been shared with your organization.')).toBeVisible()
   await expect(portalPage.getByRole('link', { name: 'Organizations' })).not.toBeVisible()
 
   await staffPage.goto(`/workspaces/organizations/${clientId}/documentation`)
@@ -751,7 +751,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(portalPage.getByRole('button', { name: /Live Acme onboarding/ })).toBeVisible()
   await portalPage.getByRole('button', { name: /Live Acme onboarding/ }).click()
   await expect(portalPage.getByRole('heading', { name: 'Live Acme onboarding' })).toBeVisible()
-  await expect(portalPage.getByText('Client visible', { exact: true })).toBeVisible()
+  await expect(portalPage.getByText(/STATIC|Client visible/)).not.toBeVisible()
   await expect(portalPage.getByRole('link', { name: 'live-acme-onboarding-static.pdf' })).toBeVisible()
 
   await expect.poll(async () => {
@@ -776,7 +776,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(successStatus(page)).toHaveText('Published version withdrawn. Authorized MSP staff can still view it.')
   await expect(page.getByRole('region', { name: 'Publication history' }).getByText('withdrawn', { exact: true })).toBeVisible()
   await portalPage.reload()
-  await expect(portalPage.getByText('No documentation has been published to your organization.')).toBeVisible()
+  await expect(portalPage.getByText('No documents have been shared with your organization.')).toBeVisible()
   await expect(portalPage.getByText('Live Acme onboarding')).not.toBeVisible()
 
   await page.goto(`/workspaces/organizations/${clientId}/compliance`)

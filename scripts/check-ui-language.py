@@ -168,6 +168,17 @@ REVIEWED_INTEGRATION_FILES = {
         "sanitized exports",
     },
 }
+REVIEWED_PORTAL_FILES = {
+    ROOT / "frontend" / "src" / "portal" / "ClientPortal.tsx": {
+        "reason instanceof Error",
+        "Published documentation",
+        "client-visible STATIC",
+        "No documentation has been published",
+        "Client visible",
+        "STATIC {selected.category}",
+        "This publication is still available",
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -320,6 +331,16 @@ def validate_integration_migration() -> None:
         )
 
 
+def validate_portal_migration() -> None:
+    for source_path, replaced_literals in REVIEWED_PORTAL_FILES.items():
+        source = source_path.read_text(encoding="utf-8")
+        remaining = sorted(literal for literal in replaced_literals if literal in source)
+        require(
+            not remaining,
+            f"reviewed client portal copy or raw error returned in {source_path}: {', '.join(remaining)}",
+        )
+
+
 def main() -> int:
     entries, reviewed, route_count = validate_inventory()
     message_count = validate_catalog()
@@ -329,6 +350,7 @@ def main() -> int:
     validate_invoice_migration()
     validate_governance_migration()
     validate_integration_migration()
+    validate_portal_migration()
     print(
         f"UI language contract passed: {route_count} routes inventoried in {entries} workflow groups, "
         f"{reviewed} reviewed {'group' if reviewed == 1 else 'groups'}, and {message_count} catalog messages checked."

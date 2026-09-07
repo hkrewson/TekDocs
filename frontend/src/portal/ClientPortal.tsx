@@ -41,8 +41,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         : result.results)
       setNextCursor(result.next_cursor ?? null)
       setPhase('ready')
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.')
+    } catch {
+      setError(translate(cursor ? 'portal.moreDocumentsLoadFailed' : 'portal.documentsLoadFailed'))
       if (!cursor) setPhase('error')
     } finally {
       setLoadingMore(false)
@@ -56,9 +56,9 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
       setDocuments(result.results)
       setNextCursor(result.next_cursor ?? null)
       setPhase('ready')
-    }).catch((reason: unknown) => {
+    }).catch(() => {
       if (!active) return
-      setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.')
+      setError(translate('portal.documentsLoadFailed'))
       setPhase('error')
     })
     return () => { active = false }
@@ -66,9 +66,12 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
 
   const loadInvoices = useCallback(async (cursor?: string) => {
     if (cursor) setLoadingMoreInvoices(true)
+    else setInvoicePhase('loading')
     try {
       const result = await portalClient.listInvoices(cursor)
-      setInvoices((current) => cursor ? [...current, ...result.results] : result.results)
+      setInvoices((current) => cursor
+        ? [...current, ...result.results.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : result.results)
       setInvoiceCursor(result.next_cursor)
       setInvoicePhase('ready')
     } catch { if (!cursor) setInvoicePhase('error') }
@@ -89,29 +92,36 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
   async function openDocument(document: PortalDocument) {
     setDetailLoading(true)
     setError(null)
-    try { setSelectedInvoice(null); setSelected(await portalClient.getDocument(document.id)) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.') }
+    setSelected(null)
+    setSelectedInvoice(null)
+    try { setSelected(await portalClient.getDocument(document.id)) }
+    catch { setError(translate('portal.documentUnavailable')) }
     finally { setDetailLoading(false) }
   }
 
   async function openInvoice(invoice: PortalInvoice) {
     setDetailLoading(true)
     setError(null)
-    try { setSelected(null); setSelectedInvoice(await portalClient.getInvoice(invoice.id)) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : translate('portal.invoiceLoadFailed')) }
+    setSelected(null)
+    setSelectedInvoice(null)
+    try { setSelectedInvoice(await portalClient.getInvoice(invoice.id)) }
+    catch { setError(translate('portal.invoiceUnavailable')) }
     finally { setDetailLoading(false) }
   }
 
   async function openNotificationTarget(target: NotificationTarget) {
     if (target.kind === 'portal_documents') {
       setSelected(null)
+      setSelectedInvoice(null)
       return
     }
     if (target.kind === 'portal_document' && target.publication_id) {
       setDetailLoading(true)
       setError(null)
+      setSelected(null)
+      setSelectedInvoice(null)
       try { setSelected(await portalClient.getDocument(target.publication_id)) }
-      catch (reason) { setError(reason instanceof Error ? reason.message : 'Published documentation could not be loaded.') }
+      catch { setError(translate('portal.documentUnavailable')) }
       finally { setDetailLoading(false) }
     }
   }
@@ -124,7 +134,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           <span>{context.user.display_name}</span>
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
           <button className="secondary-button" type="button" disabled={signingOut} onClick={() => { void onSignOut() }}>
-            <LogOut size={16} aria-hidden="true" />{signingOut ? 'Signing out…' : 'Sign out'}
+            <LogOut size={16} aria-hidden="true" />{signingOut ? translate('portal.signingOut') : translate('shell.signOut')}
           </button>
         </div>
       </header>
@@ -133,8 +143,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         <header className="page-header"><div><h1>{organization?.name ?? 'Client portal'}</h1><p>{translate('portal.summary')}</p></div></header>
         {error && <div className="form-error" role="alert">{error}</div>}
         {selectedInvoice ? <article className="content-section portal-document-detail">
-          <div className="portal-document-actions"><button className="secondary-button" type="button" onClick={() => setSelectedInvoice(null)}><ArrowLeft size={16} aria-hidden="true" />{translate('portal.allInvoices')}</button><span className="visibility-label client-visible">{translate('portal.clientVisible')}</span></div>
-          <header><p className="eyebrow">{translate('portal.issuedInvoice')}</p><h2>{selectedInvoice.number}</h2><p>{selectedInvoice.reference || translate('portal.invoiceReferenceFallback')}</p></header>
+          <div className="portal-document-actions"><button className="secondary-button" type="button" onClick={() => setSelectedInvoice(null)}><ArrowLeft size={16} aria-hidden="true" />{translate('portal.allInvoices')}</button></div>
+          <header><h2>{selectedInvoice.number}</h2><p>{selectedInvoice.reference || translate('portal.invoiceReferenceFallback')}</p></header>
           <dl className="inventory-provenance"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{new Date(`${selectedInvoice.invoice_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{new Date(`${selectedInvoice.due_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.lifecycle')}</dt><dd>{portalInvoiceState(selectedInvoice.lifecycle_state ?? 'issued')}</dd></div><div><dt>{translate('accounting.total')}</dt><dd><strong>{selectedInvoice.currency} {selectedInvoice.total}</strong></dd></div><div><dt>{translate('accounting.paid')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.paid_amount ?? '0.00'}</dd></div><div><dt>{translate('accounting.balance')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.balance_amount ?? selectedInvoice.total}</dd></div></dl>
           {selectedInvoice.notes && <p>{selectedInvoice.notes}</p>}
           <section aria-labelledby="portal-invoice-lines"><h3 id="portal-invoice-lines">{translate('accounting.lines')}</h3><ul className="inventory-list">{selectedInvoice.lines.map((line) => <li key={line.id}><div><strong>{line.description}</strong><span>{line.quantity} × {line.currency} {line.unit_amount}</span></div><strong>{line.currency} {line.total}</strong></li>)}</ul></section>
@@ -142,28 +152,27 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
         </article> : selected ? <article className="content-section portal-document-detail">
           <div className="portal-document-actions">
             <button className="secondary-button" type="button" onClick={() => setSelected(null)}><ArrowLeft size={16} aria-hidden="true" />{translate('portal.allDocuments')}</button>
-            <span className="visibility-label client-visible">Client visible</span>
           </div>
-          <header><p className="eyebrow">STATIC {selected.category}</p><h2>{selected.title}</h2><p>{selected.reason}</p></header>
-          {selected.lifecycle_state === 'review_due' && <p className="portal-review-note">This publication is still available, but its scheduled review is due.</p>}
+          <header><h2>{selected.title}</h2></header>
+          {selected.lifecycle_state === 'review_due' && <p className="portal-review-note">{translate('portal.reviewDue')}</p>}
           <SanitizedMarkdown html={selected.sanitized_html} />
-          {selected.artifacts.length > 0 && <section aria-labelledby="portal-downloads"><h3 id="portal-downloads">Downloads</h3><ul className="portal-download-list">{selected.artifacts.map((artifact) => <li key={artifact.id}><a href={portalClient.artifactUrl(selected.id, artifact.id)}><Download size={15} aria-hidden="true" />{artifact.filename}</a><span>{Math.max(1, Math.ceil(artifact.size / 1024))} KB</span></li>)}</ul></section>}
+          {selected.artifacts.length > 0 && <section aria-labelledby="portal-downloads"><h3 id="portal-downloads">{translate('portal.files')}</h3><ul className="portal-download-list">{selected.artifacts.map((artifact) => <li key={artifact.id}><a href={portalClient.artifactUrl(selected.id, artifact.id)}><Download size={15} aria-hidden="true" />{artifact.filename}</a><span>{Math.max(1, Math.ceil(artifact.size / 1024))} KB</span></li>)}</ul></section>}
         </article> : <>
         <section className="content-section" aria-labelledby="portal-invoices-heading">
-          <div className="section-heading"><div><h2 id="portal-invoices-heading">{translate('portal.invoices')}</h2><p>{translate('portal.invoicesDescription')}</p></div><span>{invoices.length}</span></div>
+          <div className="section-heading"><div><h2 id="portal-invoices-heading">{translate('portal.invoices')}</h2><p>{translate('portal.invoicesDescription')}</p></div></div>
           {invoicePhase === 'loading' && <p role="status">{translate('portal.loadingInvoices')}</p>}
-          {invoicePhase === 'error' && <p role="alert">{translate('portal.invoiceLoadFailed')}</p>}
+          {invoicePhase === 'error' && <div role="alert"><p>{translate('portal.invoiceLoadFailed')}</p><button className="secondary-button" type="button" onClick={() => { void loadInvoices() }}>{translate('portal.tryAgain')}</button></div>}
           {invoicePhase === 'ready' && invoices.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noInvoices')}</p></div>}
           {invoicePhase === 'ready' && invoices.length > 0 && <ul className="portal-document-list">{invoices.map((invoice) => <li key={invoice.id}><button type="button" disabled={detailLoading} onClick={() => { void openInvoice(invoice) }}><span><strong>{invoice.number}</strong><small>{invoice.currency} {invoice.total} · {translate('accounting.dueDate')} {new Date(`${invoice.due_date}T00:00:00`).toLocaleDateString()}</small></span><span className="visibility-label client-visible">{portalInvoiceState(invoice.lifecycle_state ?? 'issued')}</span></button></li>)}</ul>}
           {invoicePhase === 'ready' && invoiceCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMoreInvoices} onClick={() => { void loadInvoices(invoiceCursor) }}>{loadingMoreInvoices ? translate('portal.loadingInvoices') : translate('portal.loadMoreInvoices')}</button></div>}
         </section>
         <section className="content-section" aria-labelledby="portal-documents-heading">
-          <div className="section-heading"><div><h2 id="portal-documents-heading">Published documentation</h2><p>Only approved, current client-visible STATIC publications appear here.</p></div><span>{documents.length}</span></div>
-          {phase === 'loading' && <p role="status">Loading published documentation…</p>}
+          <div className="section-heading"><div><h2 id="portal-documents-heading">{translate('portal.documents')}</h2><p>{translate('portal.documentsDescription')}</p></div></div>
+          {phase === 'loading' && <p role="status">{translate('portal.loadingDocuments')}</p>}
           {phase === 'error' && <button className="secondary-button" type="button" onClick={() => { void loadDocuments() }}>{translate('portal.tryAgain')}</button>}
-          {phase === 'ready' && documents.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>No documentation has been published to your organization.</p></div>}
-          {phase === 'ready' && documents.length > 0 && <ul className="portal-document-list">{documents.map((document) => <li key={document.id}><button type="button" disabled={detailLoading} onClick={() => { void openDocument(document) }}><span><strong>{document.title}</strong><small>{document.category} · Published {new Date(document.published_at).toLocaleDateString()}</small></span><span className="visibility-label client-visible">Client visible</span></button></li>)}</ul>}
-          {phase === 'ready' && nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadDocuments(nextCursor) }}>{loadingMore ? 'Loading…' : 'Load more documents'}</button></div>}
+          {phase === 'ready' && documents.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noDocuments')}</p></div>}
+          {phase === 'ready' && documents.length > 0 && <ul className="portal-document-list">{documents.map((document) => <li key={document.id}><button type="button" disabled={detailLoading} onClick={() => { void openDocument(document) }}><span><strong>{document.title}</strong><small>{document.category} · {translate('portal.publishedOn', { date: new Date(document.published_at).toLocaleDateString() })}</small></span></button></li>)}</ul>}
+          {phase === 'ready' && nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadDocuments(nextCursor) }}>{loadingMore ? translate('portal.loadingMoreDocuments') : translate('portal.loadMoreDocuments')}</button></div>}
         </section></>}
       </main>
     </div>

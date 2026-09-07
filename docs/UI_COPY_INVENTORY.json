@@ -523,9 +523,40 @@
       "workflow": "Client portal documents, publications, files, and invoices",
       "routes": ["/portal"],
       "states": ["loading", "empty", "published", "withdrawn", "download", "denied", "failure"],
-      "decisions": [],
-      "status": "pending",
-      "next_review": "Review client-facing publication and invoice language without exposing internal storage, authorization, or provider terms."
+      "decisions": [
+        {
+          "before": "Issued invoices and documentation approved for your organization.",
+          "after": "Invoices and documents shared with your organization.",
+          "reason": "Describes what the client can use without narrating the internal approval workflow."
+        },
+        {
+          "before": "Published documentation / Only approved, current client-visible STATIC publications appear here.",
+          "after": "Documents / Documents shared with your organization.",
+          "reason": "Uses the client's familiar object name and leaves publication and storage terms in the staff workflow."
+        },
+        {
+          "before": "STATIC category, approval reason, and Client visible labels appeared on every opened document.",
+          "after": "The portal shows the document title, content, review notice when needed, and available files.",
+          "reason": "Removes redundant implementation and access labels from a portal where every item is already client-visible."
+        },
+        {
+          "before": "This publication is still available, but its scheduled review is due.",
+          "after": "This document is due for review, but you can still use it.",
+          "reason": "States the condition and answers the client's immediate question."
+        },
+        {
+          "before": "Raw request errors or a generic unavailable message could replace portal recovery guidance.",
+          "after": "List errors offer a retry and contact path; unavailable document and invoice details return the user to the appropriate list without disclosing a reason.",
+          "reason": "Gives clients a safe next step while keeping withdrawn, missing, and denied resources indistinguishable."
+        }
+      ],
+      "status": "reviewed",
+      "evidence": [
+        "frontend/src/portal/ClientPortal.test.tsx",
+        "frontend/e2e/shell.spec.ts",
+        "frontend/e2e/live-workspace.spec.ts",
+        "scripts/tests/test_check_ui_language.py"
+      ]
     }
   ]
 }

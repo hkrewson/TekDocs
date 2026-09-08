@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
 import { translate } from '../i18n/localization'
+import { FilterMenu } from '../FilterMenu'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserSitesClient } from '../sites/api'
 import type { SiteRecord, SitesClient } from '../sites/api'
@@ -188,6 +189,10 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
     changeQuery({ ordering: next })
   }
 
+  const personFilterLabel = query.filter_field
+    ? `${columnLabels[query.filter_field]}${query.filter_value ? `: ${query.filter_value}` : ''}`
+    : translate('people.noFieldFilter')
+
   const save = async (input: PersonInput) => {
     setSaving(true)
     setError(null)
@@ -232,8 +237,15 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
         <div className="section-heading people-list-heading"><h2 id="people-list-heading">{translate('people.directory')}</h2><span>{result ? translate(result.count === 1 ? 'people.countOne' : 'people.countMany', { count: result.count }) : translate('common.loading')}</span></div>
         <div className="people-toolbar">
           <label className="people-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('people.searchAll')}</span><input type="search" aria-label={translate('people.searchAll')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} placeholder={translate('people.searchPlaceholder')} /></label>
-          <label>{translate('people.filterField')}<select aria-label={translate('people.filterField')} value={query.filter_field} onChange={(event) => changeQuery({ filter_field: event.target.value as PersonFilterField | '', filter_value: '' })}><option value="">{translate('people.noFieldFilter')}</option>{optionalColumns.map((column) => <option key={column} value={column}>{columnLabels[column]}</option>)}</select></label>
-          <label>{translate('people.filterValue')}<input aria-label={translate('people.filterValue')} value={query.filter_value} disabled={!query.filter_field} onChange={(event) => changeQuery({ filter_value: event.target.value })} placeholder={query.filter_field ? translate('people.filterPlaceholder', { field: columnLabels[query.filter_field].toLowerCase() }) : translate('people.chooseField')} /></label>
+          <FilterMenu groups={[{
+            kind: 'custom',
+            label: translate('people.personField'),
+            valueLabel: personFilterLabel,
+            content: <div className="filter-menu-custom">
+              <label>{translate('people.filterField')}<select aria-label={translate('people.filterField')} value={query.filter_field} onChange={(event) => changeQuery({ filter_field: event.target.value as PersonFilterField | '', filter_value: '' })}><option value="">{translate('people.noFieldFilter')}</option>{optionalColumns.map((column) => <option key={column} value={column}>{columnLabels[column]}</option>)}</select></label>
+              <label>{translate('people.filterValue')}<input aria-label={translate('people.filterValue')} value={query.filter_value} disabled={!query.filter_field} onChange={(event) => changeQuery({ filter_value: event.target.value })} placeholder={query.filter_field ? translate('people.filterPlaceholder', { field: columnLabels[query.filter_field].toLowerCase() }) : translate('people.chooseField')} /></label>
+            </div>,
+          }]} activeCount={query.filter_field || query.filter_value ? 1 : 0} onClear={() => changeQuery({ filter_field: '', filter_value: '' })} menuLabel={translate('people.filters')} />
           <div className="column-settings" ref={settingsRef}>
             <button className="secondary-button column-settings-trigger" type="button" aria-label={translate('people.chooseColumns')} title={translate('people.chooseColumns')} aria-expanded={columnsOpen} onClick={() => setColumnsOpen((open) => !open)}><Settings2 size={16} aria-hidden="true" /></button>
             {columnsOpen && <fieldset className="column-settings-popover"><legend>{translate('people.visibleColumns')}</legend>{optionalColumns.map((column) => <label key={column}><input type="checkbox" checked={visibleColumns.includes(column)} onChange={() => toggleColumn(column)} />{columnLabels[column]}</label>)}</fieldset>}

@@ -353,6 +353,7 @@ test('client custom-field definitions and Site values remain workspace scoped an
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Sites' }).click()
+  await page.locator('summary[aria-label="More actions for North Campus"]').click()
   await page.getByRole('button', { name: 'Custom fields for site North Campus' }).click()
   await expect(page.getByRole('heading', { name: 'Custom fields for North Campus' })).toBeVisible()
   const doorCode = page.getByRole('textbox', { name: 'Door code' })

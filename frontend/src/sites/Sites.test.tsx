@@ -42,7 +42,7 @@ describe('Sites', () => {
     expect(screen.getByText('100 Main Street · Madison, WI, 53703 · US · NORTH')).toBeInTheDocument()
     expect(screen.getByText('Building A')).toBeInTheDocument()
     expect(screen.getByText('Office 214')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Edit location Office 214' })).toBeInTheDocument()
+    expect(screen.getByLabelText('More actions for Office 214')).toBeInTheDocument()
   })
 
   it('clears prior-workspace sites while a new scope loads', async () => {
@@ -83,6 +83,7 @@ describe('Sites', () => {
     await user.click(screen.getByRole('button', { name: 'Save location' }))
     expect(createLocation).toHaveBeenCalledWith({ organizationId: workspace.id }, site.id, expect.objectContaining({ name: 'Desk 9', kind: 'desk', parent_id: site.locations[1].id }))
 
+    await user.click(screen.getByLabelText('More actions for Office 214'))
     await user.click(screen.getByRole('button', { name: 'Archive location Office 214' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Archive Office 214?' })
     expect(within(dialog).getByText(/keep readable site and location names/)).toBeInTheDocument()

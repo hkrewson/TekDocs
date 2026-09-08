@@ -39,7 +39,9 @@ describe('Organizations', () => {
     expect(screen.getByText('Client, Partner')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Visit website' })).toHaveAttribute('href', 'https://acme.example.com')
 
-    await user.selectOptions(screen.getByLabelText('Show type'), 'vendor')
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(screen.getByText('Show type'))
+    await user.click(screen.getByRole('radio', { name: 'Vendor' }))
     expect(screen.getByText('No vendor organizations were found.')).toBeInTheDocument()
   })
 

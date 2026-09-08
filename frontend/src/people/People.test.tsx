@@ -96,6 +96,8 @@ describe('People', () => {
 
     await user.type(screen.getByRole('searchbox', { name: 'Search all person fields' }), 'north')
     await settleDebounce()
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(screen.getByText('Person field'))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filter field' }), 'role')
     await user.type(screen.getByRole('textbox', { name: 'Filter value' }), 'admin')
     await settleDebounce()

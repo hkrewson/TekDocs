@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
 import { translate } from '../i18n/localization'
 import { Link } from 'react-router'
+import { FilterMenu } from '../FilterMenu'
 import { browserOrganizationClient } from './api'
 import type { Organization, OrganizationClassification, OrganizationClient, OrganizationInput } from './api'
 
@@ -144,7 +145,13 @@ export function Organizations({ client = browserOrganizationClient }: { client?:
       <section className="content-section organization-list-section" aria-labelledby="organization-list-heading">
         <div className="section-heading organization-list-heading">
           <h2 id="organization-list-heading">{translate('organizations.list')}</h2>
-          <label>{translate('organizations.showType')}<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">{translate('organizations.allTypes')}</option>{classifications.map((classification) => <option key={classification} value={classification}>{classificationLabels[classification]}</option>)}</select></label>
+          <FilterMenu groups={[{
+            kind: 'choices',
+            label: translate('organizations.showType'),
+            value: filter,
+            choices: [{ value: 'all', label: translate('organizations.allTypes') }, ...classifications.map((classification) => ({ value: classification, label: classificationLabels[classification] }))],
+            onChange: (value) => setFilter(value as typeof filter),
+          }]} activeCount={filter === 'all' ? 0 : 1} onClear={() => setFilter('all')} menuLabel={translate('organizations.filters')} />
         </div>
         {records === null && !error && <p className="organization-state" role="status">{translate('organizations.loading')}</p>}
         {records !== null && visibleRecords.length === 0 && <p className="organization-state">{filter === 'all' ? translate('organizations.empty') : translate('organizations.noTypeMatch', { type: classificationLabels[filter].toLowerCase() })}</p>}

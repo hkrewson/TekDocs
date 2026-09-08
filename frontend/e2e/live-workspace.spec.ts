@@ -378,6 +378,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Office 214 was added.', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Office 214', { exact: true })).toBeVisible()
+  await page.locator('summary[aria-label="More actions for Live Main Campus"]').click()
   await page.getByRole('button', { name: 'Custom fields for site Live Main Campus' }).click()
   await page.getByLabel('Support tier').selectOption('Priority')
   await page.getByRole('button', { name: 'Save Support tier' }).click()

@@ -61,6 +61,27 @@ describe('Contracts', () => {
     expect(screen.queryByText('19.50')).not.toBeInTheDocument()
   })
 
+  it('confirms contract and cost removal before changing retained records', async () => {
+    const costed = { ...contract, costs: [{ id: 'cost-1', label: 'Managed devices', amount: '19.50', currency: 'USD', billing_interval: 'monthly' as const, quantity: '25.000', starts_on: null, ends_on: null, reference: '' }] }
+    const archiveContract = vi.fn().mockResolvedValue(undefined)
+    const archiveCost = vi.fn().mockResolvedValue({ ...contract, costs: [] })
+    const user = userEvent.setup()
+    render(<Contracts workspace={workspace} client={commercialClient({ archiveContract, archiveCost, listContracts: vi.fn().mockResolvedValue({ results: [costed], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }) })} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Remove cost Managed devices' }))
+    expect(archiveCost).not.toHaveBeenCalled()
+    const removeConfirmation = screen.getByRole('alertdialog')
+    expect(removeConfirmation).toHaveTextContent('The contract itself will remain active.')
+    await user.click(within(removeConfirmation).getByRole('button', { name: 'Cancel' }))
+
+    await user.click(screen.getByRole('button', { name: 'Archive' }))
+    expect(archiveContract).not.toHaveBeenCalled()
+    const archiveConfirmation = screen.getByRole('alertdialog')
+    expect(archiveConfirmation).toHaveTextContent('It can be restored from the recycle bin.')
+    await user.click(within(archiveConfirmation).getByRole('button', { name: 'Archive' }))
+    await waitFor(() => expect(archiveContract).toHaveBeenCalledWith(workspace, 'contract-1'))
+  })
+
   it('clears an open financial editor before switching client context', async () => {
     const costed = { ...contract, costs: [{ id: 'cost-1', label: 'Private rate', amount: '875.50', currency: 'USD', billing_interval: 'monthly' as const, quantity: '1.000', starts_on: null, ends_on: null, reference: '' }] }
     const listContracts = vi.fn().mockImplementation((activeWorkspace: { id: string }) => Promise.resolve(

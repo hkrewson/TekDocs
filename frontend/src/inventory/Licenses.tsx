@@ -134,6 +134,8 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
       {canManage && <button type="button" className="primary-button" aria-label={translate('licenses.new')} title={translate('licenses.new')} onClick={() => { setForm(blank); setMode('create') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('licenses.new')}</span></button>}
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}
+    {mode === 'create' && <LicenseForm title="New software license" form={form} setForm={setForm} choices={choices} busy={busy} requireInstallation cancel={() => setMode('read')} submit={() => void perform(() => client.createLicense(workspace, payloadFromForm(form)))} />}
+    {mode === 'edit' && selected && <LicenseForm title={`Edit ${selected.name}`} form={form} setForm={setForm} choices={choices} busy={busy} cancel={() => setMode('read')} submit={() => void perform(() => client.updateLicense(workspace, selected.id, updatePayloadFromForm(form)))} />}
     {phase === 'loading' && <section className="content-section" role="status">Loading software licenses…</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>Licenses unavailable</h2><p>The workspace license inventory could not be loaded.</p></section>}
     {phase === 'ready' && <div className="inventory-layout">
@@ -144,8 +146,6 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
         {selected ? <LicenseDetail record={selected} canManage={canManage} choices={choices} mode={mode} setMode={setMode} seat={seat} setSeat={setSeat} linkId={linkId} setLinkId={setLinkId} busy={busy} perform={perform} client={client} workspace={workspace} beginEdit={() => { setForm(formFromLicense(selected)); setMode('edit') }} /> : <p className="empty-state">{translate('licenses.choose')}</p>}
       </section>
     </div>}
-    {mode === 'create' && <LicenseForm title="New software license" form={form} setForm={setForm} choices={choices} busy={busy} requireInstallation cancel={() => setMode('read')} submit={() => void perform(() => client.createLicense(workspace, payloadFromForm(form)))} />}
-    {mode === 'edit' && selected && <LicenseForm title={`Edit ${selected.name}`} form={form} setForm={setForm} choices={choices} busy={busy} cancel={() => setMode('read')} submit={() => void perform(() => client.updateLicense(workspace, selected.id, updatePayloadFromForm(form)))} />}
   </>
 }
 
@@ -212,7 +212,7 @@ function LicenseForm({ title, form, setForm, choices, busy, requireInstallation 
 }
 
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
-  return <label><span>{label}</span><input type={type} min={type === 'number' ? 1 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></label>
+  return <label><span>{label}</span><input autoFocus={label === 'License name'} type={type} min={type === 'number' ? 1 : undefined} value={value} onChange={(event) => onChange(event.target.value)} /></label>
 }
 
 function Choice({ label, value, onChange, items }: { label: string; value: string; onChange: (value: string) => void; items: Array<{ id: string; name: string }> }) {

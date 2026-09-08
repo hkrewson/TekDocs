@@ -33,10 +33,18 @@ test('supplier products use plain version language and explain archive consequen
     can_manage: true,
   } }))
 
+  await page.setViewportSize({ width: 320, height: 720 })
   await page.goto(`/workspaces/organizations/${supplierId}/products`)
   await expect(page.getByRole('heading', { name: 'Example Manufacturer products' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Specification templates' })).toBeVisible()
   await expect(page.getByText('ES-24 · Active · version 1')).toBeVisible()
+
+  await page.getByRole('button', { name: 'New product' }).click()
+  const editor = page.getByRole('heading', { name: 'New product' }).locator('..').locator('..').locator('..')
+  await expect(page.getByLabel('Product name')).toBeFocused()
+  expect(await editor.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('.catalog-layout')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+  expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.getByRole('button', { name: 'Cancel' }).click()
 
   await page.getByRole('button', { name: 'Archive EdgeSwitch' }).click()
   const confirmation = page.getByRole('alertdialog')

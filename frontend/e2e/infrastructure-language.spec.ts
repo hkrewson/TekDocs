@@ -30,16 +30,21 @@ test('credential links explain the 1Password boundary without unnecessary contro
     can_manage: true,
   } }))
 
+  await page.setViewportSize({ width: 320, height: 720 })
   await page.goto('/credentials')
   await expect(page.getByRole('heading', { name: 'Credential links' })).toBeVisible()
   await expect(page.getByText('Credentials stay in 1Password')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open in 1Password' })).toHaveAttribute('href', new RegExp(`${credentialId}/open$`))
 
   await page.getByRole('button', { name: 'New link' }).click()
+  const editor = page.getByRole('heading', { name: 'New credential link' }).locator('..').locator('..').locator('..')
   await expect(page.getByRole('heading', { name: 'New credential link' })).toBeVisible()
   await expect(page.getByLabel('Title')).toBeVisible()
+  await expect(page.getByLabel('Title')).toBeFocused()
   await expect(page.getByLabel('1Password Private Link')).toBeVisible()
   await expect(page.getByLabel('Provider')).toHaveCount(0)
+  expect(await editor.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('.credential-reference-section')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+  expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('button', { name: 'Archive Firewall administrator' }).click()

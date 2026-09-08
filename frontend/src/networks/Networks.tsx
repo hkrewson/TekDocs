@@ -120,45 +120,11 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
       </button>}
     </header>
 
-    <section className="content-section network-records" aria-labelledby="network-list-heading">
-      <div className="network-record-toolbar">
-        <div>
-          <h2 id="network-list-heading">Network records</h2>
-          <p>One record describes the location, VLAN, address space, gateway, range, and DNS.</p>
-        </div>
-        <label className="network-search">
-          <span className="sr-only">Search networks</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search networks" />
-        </label>
-      </div>
-
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {records === null && !error && <p role="status">Loading networks…</p>}
-      {records !== null && filtered.length === 0 && <p className="empty-state">{query ? 'No networks match this search.' : 'No networks have been added to this workspace.'}</p>}
-      {records !== null && filtered.length > 0 && <div className="network-table-wrap" role="group" aria-label={translate('networks.recordTable')} tabIndex={0}>
-        <table className="network-table">
-          <thead><tr><th>Name</th><th>Location</th><th>VLAN</th><th>CIDR</th><th>Assignable range</th><th>Gateway</th><th>DNS</th><th><span className="sr-only">Actions</span></th></tr></thead>
-          <tbody>{filtered.map((record) => <tr key={record.id}>
-            <td><strong>{record.name}</strong>{record.description && <small>{record.description}</small>}</td>
-            <td>{record.location_name ? <span className="network-location"><MapPin size={14} aria-hidden="true" />{record.site_name ? `${record.site_name} · ` : ''}{record.location_name}</span> : 'Not assigned'}</td>
-            <td>{record.vlan ?? '—'}</td>
-            <td><code>{record.cidr}</code></td>
-            <td><code>{record.range_start}–{record.range_end}</code></td>
-            <td><code>{record.gateway}</code></td>
-            <td>{[record.primary_dns, record.secondary_dns].filter(Boolean).join(', ') || '—'}</td>
-            <td>{canManage && <button className="row-action" type="button" onClick={() => beginEdit(record)}><Pencil size={14} aria-hidden="true" />{translate('common.edit')}</button>}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>}
-    </section>
-
-    <RelationshipGraph scope={relationshipScope} family="network" client={relationshipsClient} heading="Network relationship map" />
-
     {form && <section className="content-section network-editor" aria-labelledby="network-editor-heading">
       <div className="section-heading"><div><h2 id="network-editor-heading">{editingId ? 'Edit network' : 'New network'}</h2><p>The gateway and usable full range are calculated from the CIDR.</p></div></div>
       <form className="network-form" onSubmit={(event) => void save(event)}>
         <div className="field-grid">
-          <label><span>Name</span><input required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Office LAN" /></label>
+          <label><span>Name</span><input autoFocus required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Office LAN" /></label>
           <label><span>Location</span><select value={form.location_id ?? ''} onChange={(event) => setForm({ ...form, location_id: event.target.value || null })}><option value="">Not assigned</option>{choices?.locations.map((location) => {
             const site = choices.sites.find((item) => item.id === location.site_id)
             return <option key={location.id} value={location.id}>{site ? `${site.name} · ` : ''}{location.name}</option>
@@ -178,5 +144,40 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
         <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save network'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError('') }}>{translate('common.cancel')}</button></div>
       </form>
     </section>}
+
+    <section className="content-section network-records" aria-labelledby="network-list-heading">
+      <div className="network-record-toolbar">
+        <div>
+          <h2 id="network-list-heading">Network records</h2>
+          <p>One record describes the location, VLAN, address space, gateway, range, and DNS.</p>
+        </div>
+        <label className="network-search">
+          <span className="sr-only">Search networks</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search networks" />
+        </label>
+      </div>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {records === null && !error && <p role="status">Loading networks…</p>}
+      {records !== null && filtered.length === 0 && <p className="empty-state">{query ? 'No networks match this search.' : 'No networks have been added to this workspace.'}</p>}
+      {records !== null && filtered.length > 0 && <div className="network-table-wrap" role="group" aria-label={translate('networks.recordTable')} tabIndex={0}>
+        <table className="network-table">
+          <thead><tr><th>Name</th><th>Location</th><th>VLAN</th><th>CIDR</th><th>Assignable range</th><th>Gateway</th><th>DNS</th><th><span className="sr-only">Actions</span></th></tr></thead>
+          <tbody>{filtered.map((record) => <tr key={record.id}>
+            <td><strong>{record.name}</strong>{record.description && <small>{record.description}</small>}</td>
+            <td>{record.location_name ? <span className="network-location"><MapPin size={14} aria-hidden="true" />{record.site_name ? `${record.site_name} · ` : ''}{record.location_name}</span> : 'Not assigned'}</td>
+            <td>{record.vlan ?? '—'}</td>
+            <td><code>{record.cidr}</code></td>
+            <td><code>{record.range_start}–{record.range_end}</code></td>
+            <td><code>{record.gateway}</code></td>
+            <td>{[record.primary_dns, record.secondary_dns].filter(Boolean).join(', ') || '—'}</td>
+            <td>{canManage && <button className="row-action" type="button" aria-label={`Edit ${record.name}`} onClick={() => beginEdit(record)}><Pencil size={14} aria-hidden="true" />{translate('common.edit')}</button>}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+    </section>
+
+    <RelationshipGraph scope={relationshipScope} family="network" client={relationshipsClient} heading="Network relationship map" />
+
   </>
 }

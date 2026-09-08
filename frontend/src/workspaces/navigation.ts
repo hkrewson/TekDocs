@@ -9,7 +9,8 @@ export function workspaceAreaFromPath(pathname: string): WorkspaceArea {
   const segments = pathname.split('/').filter(Boolean)
   const candidate = segments[0] === 'workspaces' ? segments[3] : segments[0]
   if (candidate === 'accounting') return 'invoices'
-  return recognizedAreas.has(candidate as WorkspaceArea) ? candidate as WorkspaceArea : 'overview'
+  if (recognizedAreas.has(candidate as WorkspaceArea)) return candidate as WorkspaceArea
+  return capabilityForPath(pathname) ?? 'overview'
 }
 
 export function mspWorkspacePath(area: WorkspaceArea): string {

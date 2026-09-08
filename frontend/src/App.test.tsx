@@ -231,6 +231,21 @@ describe('application shell', () => {
     expect(screen.queryByRole('link', { name: 'Compliance' })).not.toBeInTheDocument()
   })
 
+  it.each(['Custom fields', 'Recycle bin'])('keeps unrelated navigation groups collapsed after opening %s', async (destination) => {
+    const user = userEvent.setup()
+    render(app('/assets'))
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
+    for (const group of ['Workspace', 'Infrastructure', 'Relationships', 'Business', 'Governance']) {
+      await user.click(screen.getByRole('button', { name: group }))
+    }
+    await user.click(screen.getByRole('button', { name: 'Governance' }))
+    await user.click(screen.getByRole('link', { name: destination }))
+
+    expect(screen.getByRole('button', { name: 'Workspace' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Governance' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('resolves a deep-linked organization route through the workspace boundary', async () => {
     render(app('/workspaces/organizations/00000000-0000-4000-8000-000000000010/overview'))
 

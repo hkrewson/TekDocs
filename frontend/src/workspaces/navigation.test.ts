@@ -19,6 +19,8 @@ describe('workspace navigation', () => {
     expect(mspWorkspacePath('documentation')).toBe('/documentation')
     expect(mspWorkspacePath('invoices')).toBe('/invoices')
     expect(workspaceAreaFromPath('/accounting')).toBe('invoices')
+    expect(workspaceAreaFromPath('/custom-fields')).toBe('custom_fields')
+    expect(workspaceAreaFromPath('/recycle-bin')).toBe('recycle_bin')
   })
 
   it('falls back to overview when the destination lacks the current area', () => {

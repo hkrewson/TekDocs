@@ -139,6 +139,24 @@ test('navigation groups collapse, persist, and reveal the active destination', a
   expect((await new AxeBuilder({ page }).include('aside').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
+test('hyphenated governance routes do not reveal the unrelated Workspace group', async ({ page }) => {
+  await mockAuthenticated(page)
+
+  for (const destination of ['Custom fields', 'Recycle bin']) {
+    await page.goto('/documentation')
+    await page.evaluate(() => window.localStorage.removeItem('tekdocs.navigation.collapsed-sections.v1'))
+    await page.reload()
+    for (const group of ['Workspace', 'Infrastructure', 'Relationships', 'Business', 'Governance']) {
+      await page.getByRole('button', { name: group, exact: true }).click()
+    }
+    await page.getByRole('button', { name: 'Governance', exact: true }).click()
+    await page.getByRole('link', { name: destination }).click()
+
+    await expect(page.getByRole('button', { name: 'Workspace', exact: true })).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByRole('button', { name: 'Governance', exact: true })).toHaveAttribute('aria-expanded', 'true')
+  }
+})
+
 test('client portal uses plain language without exposing publication internals', async ({ page }) => {
   await mockClientPortal(page)
   await page.goto('/portal')

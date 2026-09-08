@@ -128,6 +128,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
 
   return (
     <div className="client-portal-shell">
+      <a className="skip-link" href="#portal-main-content">{translate('shell.skip')}</a>
       <header className="client-portal-header">
         <div className="client-portal-brand"><span className="brand-mark" aria-hidden="true">T</span><span>TekDocs</span></div>
         <div className="client-portal-account">
@@ -138,7 +139,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           </button>
         </div>
       </header>
-      <main className="client-portal-main" aria-busy={phase === 'loading' || invoicePhase === 'loading' || detailLoading || loadingMore || loadingMoreInvoices}>
+      <main id="portal-main-content" className="client-portal-main" aria-busy={phase === 'loading' || invoicePhase === 'loading' || detailLoading || loadingMore || loadingMoreInvoices}>
         {signOutError && <div className="form-error" role="alert">{signOutError}</div>}
         <header className="page-header"><div><h1>{organization?.name ?? 'Client portal'}</h1><p>{translate('portal.summary')}</p></div></header>
         {error && <div className="form-error" role="alert">{error}</div>}

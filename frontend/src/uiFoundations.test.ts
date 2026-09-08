@@ -43,6 +43,10 @@ describe('shared UI foundations', () => {
       '.record-form': ['var(--space-4)', 'var(--radius-panel)', 'var(--shadow-dialog)'],
       '.filter-menu': ['var(--radius-panel)', 'var(--shadow-popover)'],
       '.context-help-popover': ['var(--radius-panel)', 'var(--shadow-popover)'],
+      '.auth-panel': ['var(--space-5)', 'var(--radius-panel)'],
+      '.auth-form input': ['var(--field-height)', 'var(--radius-control)'],
+      '.client-portal-header': ['var(--shell-height)', 'var(--space-5)'],
+      '.client-portal-main': ['var(--content-width)', 'var(--space-5)'],
     }
 
     for (const [selector, tokens] of Object.entries(expectedTokens)) {
@@ -61,11 +65,26 @@ describe('shared UI foundations', () => {
       '.content-section',
       '.record-form',
       '.filter-menu',
+      '.auth-panel',
+      '.client-portal-header',
     ]
 
     for (const selector of sharedSelectors) {
       const body = ruleBody(selector)
       expect(body).not.toMatch(/(?:linear|radial)-gradient|backdrop-filter|filter:\s*blur/i)
     }
+  })
+
+  it('defines every color and surface token used by the reviewed shells', () => {
+    const defined = new Set(Array.from(styles.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gim), (match) => match[1]))
+    const used = new Set(Array.from(styles.matchAll(/var\((--[a-z0-9-]+)/g), (match) => match[1]))
+    expect([...used].filter((token) => !defined.has(token))).toEqual([])
+  })
+
+  it('keeps client portal lifecycle text plain instead of presenting it as a decorative pill', () => {
+    const body = ruleBody('.portal-document-list .visibility-label')
+    expect(body).toContain('border-radius: 0')
+    expect(body).toContain('background: transparent')
+    expect(body).not.toContain('999px')
   })
 })

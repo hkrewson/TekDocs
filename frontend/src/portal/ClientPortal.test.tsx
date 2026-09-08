@@ -17,6 +17,14 @@ const context: AuthenticatedContext = {
 afterEach(() => vi.restoreAllMocks())
 
 describe('ClientPortal', () => {
+  it('provides direct keyboard access to the portal content', () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
+    render(<ClientPortal context={context} onSignOut={vi.fn()} signingOut={false} signOutError={null} />)
+
+    expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#portal-main-content')
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'portal-main-content')
+  })
+
   it('lists and opens a document without exposing publication internals', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url

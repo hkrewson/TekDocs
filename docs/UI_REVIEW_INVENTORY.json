@@ -29,10 +29,10 @@
       "surface": "authentication and client portal shells",
       "workspaces": ["pre-authentication", "client portal"],
       "roles": ["first owner", "invited user", "client user"],
-      "problems": ["Full review pending"],
-      "correction": "Review setup, sign-in, MFA, invitations, client documents/files/invoices, recovery, denial, failure, narrow widths, zoom, and long values.",
-      "evidence": [],
-      "status": "pending"
+      "problems": ["Authentication and portal shells bypassed the shared spacing, control, and width tokens", "The client portal referenced undefined surface and semantic-color variables", "Client invoice state used a decorative pill and the portal lacked a keyboard skip link"],
+      "correction": "Use the compact shared foundations for setup, sign-in, MFA, recovery, account security, and the client portal; keep security consequences and recovery guidance explicit; render portal lifecycle state as plain text; provide a skip link; stack long portal rows at narrow widths.",
+      "evidence": ["frontend/src/styles.css", "frontend/src/uiFoundations.test.ts", "frontend/src/auth/AuthGate.test.tsx", "frontend/src/auth/SecuritySettings.test.tsx", "frontend/src/portal/ClientPortal.test.tsx", "frontend/e2e/mfa.spec.ts", "frontend/e2e/sessions.spec.ts", "frontend/e2e/shell.spec.ts", "frontend/e2e/responsive.spec.ts"],
+      "status": "reviewed"
     }
   ],
   "routes": [

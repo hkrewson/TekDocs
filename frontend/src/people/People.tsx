@@ -93,9 +93,9 @@ function PersonForm({ person, workspaceName, sites, sitesUnavailable, saving, on
   }
 
   return (
-    <section className="content-section people-form-section" aria-labelledby="people-form-heading">
-      <div className="section-heading"><div><h2 id="people-form-heading">{person ? translate('people.edit', { name: person.full_name }) : translate('people.add')}</h2><p>{translate('people.workspaceHelp', { workspace: workspaceName })}</p></div></div>
-      <form className="people-form" onSubmit={submit}>
+    <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="people-form-heading">
+      <form className="record-form record-form-grid people-form" onSubmit={submit}>
+        <div className="section-heading"><div><h2 id="people-form-heading">{person ? translate('people.edit', { name: person.full_name }) : translate('people.add')}</h2><p>{translate('people.workspaceHelp', { workspace: workspaceName })}</p></div></div>
         <label>{translate('people.fullName')}<input autoFocus required maxLength={240} value={input.full_name} onChange={(event) => setInput({ ...input, full_name: event.target.value })} /></label>
         <label>{translate('people.preferredName')} <span>{translate('common.optional')}</span><input maxLength={160} value={input.preferred_name} onChange={(event) => setInput({ ...input, preferred_name: event.target.value })} /></label>
         <label>{translate('people.relationship')}<select value={input.kind} onChange={(event) => setInput({ ...input, kind: event.target.value as PersonInput['kind'] })}><option value="employee">{translate('people.employee')}</option><option value="contact">{translate('people.contact')}</option></select></label>

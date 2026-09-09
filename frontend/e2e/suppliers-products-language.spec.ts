@@ -42,7 +42,10 @@ test('supplier products use plain version language and explain archive consequen
   await page.getByRole('button', { name: 'New product' }).click()
   const editor = page.getByRole('heading', { name: 'New product' }).locator('..').locator('..').locator('..')
   await expect(page.getByLabel('Product name')).toBeFocused()
-  expect(await editor.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('.catalog-layout')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+  expect(await editor.evaluate((element) => {
+    const layout = document.querySelector('.catalog-layout')
+    return Boolean(layout && (element.compareDocumentPosition(layout) & Node.DOCUMENT_POSITION_FOLLOWING))
+  })).toBe(true)
   expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.getByRole('button', { name: 'Cancel' }).click()
 

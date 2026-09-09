@@ -48,11 +48,11 @@ function OrganizationForm({ organization, saving, onCancel, onSave }: {
   }
 
   return (
-    <section className="content-section organization-form-section" aria-labelledby="organization-form-heading">
-      <div className="section-heading">
+    <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="organization-form-heading">
+      <form className="record-form record-form-grid organization-form" onSubmit={submit}>
+        <div className="section-heading">
         <div><h2 id="organization-form-heading">{organization ? translate('organizations.edit', { name: organization.name }) : translate('organizations.add')}</h2>{!organization && <p>{translate('organizations.newAccessHelp')}</p>}</div>
-      </div>
-      <form className="organization-form" onSubmit={submit}>
+        </div>
         <label>{translate('organizations.displayName')}<input autoFocus value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} maxLength={240} required /></label>
         <label>{translate('organizations.legalName')} <span>{translate('common.optional')}</span><input value={input.legal_name} onChange={(event) => setInput({ ...input, legal_name: event.target.value })} maxLength={240} /></label>
         <label>{translate('organizations.website')} <span>{translate('common.optional')}</span><input type="url" placeholder="https://" value={input.website} onChange={(event) => setInput({ ...input, website: event.target.value })} maxLength={500} /></label>

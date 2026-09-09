@@ -553,10 +553,13 @@ export function Compliance({
       )}
       {form && (
         <section
-          className="content-section compliance-version-form"
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
           aria-labelledby="catalog-form-heading"
         >
-          <div className="section-heading">
+          <div className="record-form record-form-wide compliance-version-form">
+            <div className="section-heading">
             <div>
               <h2 id="catalog-form-heading">
                 {form === "new"
@@ -565,8 +568,8 @@ export function Compliance({
               </h2>
               <p>{translate('compliance.versionHelp')}</p>
             </div>
-          </div>
-          {form === "new" && (
+            </div>
+            {form === "new" && (
             <label className="compliance-framework-name">
               <span>Framework name</span>
               <input
@@ -576,8 +579,8 @@ export function Compliance({
                 onChange={(event) => setFrameworkName(event.target.value)}
               />
             </label>
-          )}
-          <CatalogForm
+            )}
+            <CatalogForm
             draft={draft}
             setDraft={setDraft}
             saving={saving}
@@ -586,7 +589,8 @@ export function Compliance({
             }}
             onCancel={() => setForm(null)}
             submitLabel={form === "new" ? "Create framework" : "Create version"}
-          />
+            />
+          </div>
         </section>
       )}
       <div className="compliance-layout">

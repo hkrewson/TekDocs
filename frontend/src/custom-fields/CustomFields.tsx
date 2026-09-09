@@ -53,9 +53,9 @@ function DefinitionForm({ definition, organization, saving, onCancel, onSave }: 
     void onSave({ ...input, options: isChoice ? choiceText.split('\n').map((item) => item.trim()).filter(Boolean) : [] })
   }
   return (
-    <section className="content-section custom-field-form-section" aria-labelledby="custom-field-form-heading">
-      <div className="section-heading"><div><h2 id="custom-field-form-heading">{definition ? translate('customFields.createVersionHeading', { version: definition.current_version.version + 1, name: definition.current_version.label }) : translate('customFields.add')}</h2>{definition && <p>{translate('customFields.versionHelp')}</p>}</div></div>
-      <form className="custom-field-form" onSubmit={submit}>
+    <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-field-form-heading">
+      <form className="record-form record-form-grid custom-field-form" onSubmit={submit}>
+        <div className="section-heading"><div><h2 id="custom-field-form-heading">{definition ? translate('customFields.createVersionHeading', { version: definition.current_version.version + 1, name: definition.current_version.label }) : translate('customFields.add')}</h2>{definition && <p>{translate('customFields.versionHelp')}</p>}</div></div>
         <label>{translate('customFields.label')}<input autoFocus required maxLength={160} value={input.label} onChange={(event) => setInput({ ...input, label: event.target.value })} /></label>
         <label>{translate('customFields.fieldKey')} <span>{translate('customFields.fieldKeyHelp')}</span><input required disabled={Boolean(definition)} pattern="[a-z][a-z0-9_-]*" maxLength={80} value={input.key} onChange={(event) => setInput({ ...input, key: event.target.value.toLowerCase().replace(/\s+/g, '_') })} /></label>
         <label>{translate('customFields.recordType')}<select disabled={Boolean(definition)} value={input.entity_type} onChange={(event) => setInput({ ...input, entity_type: event.target.value as CustomFieldEntityType })}>{(organization ? ['site', 'location'] : ['organization', 'person', 'site', 'location']).map((type) => <option key={type} value={type}>{entityTypeLabels[type as CustomFieldEntityType]}</option>)}</select></label>

@@ -43,11 +43,11 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
 
   return <>
     <div className="asset-transfer-actions">
-      <a className="secondary-button" href={client.assetCsvExportUrl(workspace)} download><Download size={15} />Export CSV</a>
-      {canManage && <button className="secondary-button" type="button" onClick={() => setOpen(true)}><Upload size={15} />{translate('inventory.importCsv')}</button>}
+      <a className="icon-button" href={client.assetCsvExportUrl(workspace)} download aria-label="Export assets as CSV" title="Export assets as CSV"><Download size={17} aria-hidden="true" /></a>
+      {canManage && <button className="icon-button" type="button" aria-label={translate('inventory.importCsv')} title={translate('inventory.importCsv')} onClick={() => setOpen(true)}><Upload size={17} aria-hidden="true" /></button>}
     </div>
-    {open && <section className="content-section asset-csv-panel" aria-labelledby="asset-csv-heading">
-      <div className="section-heading"><div><h2 id="asset-csv-heading">Import assets from CSV</h2><p>Preview is required. Applying a valid file is atomic and safe to retry.</p></div><button className="icon-button" type="button" aria-label="Close CSV import" disabled={busy} onClick={close}><X size={16} /></button></div>
+    {open && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="asset-csv-heading"><div className="record-form asset-csv-panel">
+      <div className="section-heading"><div><h2 id="asset-csv-heading">Import assets from CSV</h2><p>Preview the file before applying it.</p></div><button className="icon-button" type="button" aria-label="Close CSV import" disabled={busy} onClick={close}><X size={16} /></button></div>
       <p className="asset-csv-guidance">Start with the canonical template and set each row's <code>schema_version</code> to <code>tekdocs.assets.v1</code>. New rows need a stable <code>import_key</code>; exported rows use their existing <code>asset_id</code>. Assignments, costs, licenses, contracts, attachments, credentials, and disposal are intentionally excluded.</p>
       <a className="secondary-button" href={client.assetCsvTemplateUrl(workspace)} download><Download size={15} />Download template</a>
       <label className="asset-csv-file"><span>TekDocs asset CSV</span><input type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setResult(null); setError(null) }} /></label>
@@ -60,6 +60,6 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
         {preview.rows.length > 0 && <div className="asset-csv-table-wrap" role="group" aria-label={translate('inventory.csvPreviewTable')} tabIndex={0}><table><thead><tr><th>Row</th><th>Asset</th><th>Type</th><th>Action</th><th>Fields</th></tr></thead><tbody>{preview.rows.map((item) => <tr key={item.row}><td>{item.row}</td><td>{item.name}</td><td>{item.kind}</td><td>{item.action}</td><td>{item.changes.join(', ') || '—'}</td></tr>)}</tbody></table></div>}
         <div className="form-actions"><button className="primary-button" type="button" disabled={busy || !preview.preview_token} onClick={() => { void applyFile() }}>{busy ? 'Importing…' : 'Apply import'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => { setPreview(null); setFile(null) }}>{translate('inventory.chooseAnotherFile')}</button></div>
       </div>}
-    </section>}
+    </div></section>}
   </>
 }

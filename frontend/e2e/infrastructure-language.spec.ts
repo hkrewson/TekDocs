@@ -43,7 +43,10 @@ test('credential links explain the 1Password boundary without unnecessary contro
   await expect(page.getByLabel('Title')).toBeFocused()
   await expect(page.getByLabel('1Password Private Link')).toBeVisible()
   await expect(page.getByLabel('Provider')).toHaveCount(0)
-  expect(await editor.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('.credential-reference-section')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+  expect(await editor.evaluate((element) => {
+    const section = document.querySelector('.credential-reference-section')
+    return Boolean(section && (element.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING))
+  })).toBe(true)
   expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await page.getByRole('button', { name: 'Cancel' }).click()

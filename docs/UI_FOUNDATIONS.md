@@ -21,6 +21,15 @@ This is the implementation contract for TekDocs application-shell and shared-con
 - Focus indicators, forced-colors support, reduced-motion behavior, mobile navigation, narrow-width layouts, and print behavior must remain intact.
 - Intrinsic content dimensions, data visualizations, and genuinely route-specific layouts may use values outside this scale. Record recurring exceptions here instead of silently creating a second foundation.
 
+## Create and edit surfaces
+
+- New and edit workflows open in the shared bounded dialog unless the workflow needs the page itself, such as document editing or a multi-step import review.
+- Dialog forms use a two-column grid by default, one column on narrow screens, and three columns only for dense, clearly grouped settings or stock provenance.
+- The dialog header and action row remain visible when the form body scrolls. Primary and cancel actions stay together at the bottom of the form.
+- Native checkboxes never inherit text-field dimensions. They use the shared accent and a consistent 16-pixel control.
+- Page-level primary actions stay in the page header. Import, export, and bulk actions sit with the collection they affect.
+- A capability uses the same user-facing noun in navigation, headings, actions, and empty states. Internal route and API names may remain stable for compatibility.
+
 ## Reviewed shared surfaces
 
-The current foundation covers the application frame, workspace navigation, top bar, page headers, primary and secondary actions, content sections, searches, forms, dialogs, status messages, empty states, and filter menus. Route-specific tables, status treatments, editors, and specialized workflows remain in the issue #60 inventory until their own interaction and browser review is complete.
+The current foundation covers the application frame, workspace navigation, top bar, page headers, primary and secondary actions, content sections, searches, forms, dialogs, status messages, empty states, and filter menus. The issue #60 review now also covers create and edit treatments for organizations, people, sites, assets, licenses, networks, invoice settings, stock, custom fields, compliance frameworks, integrations, and contracts. Route-specific tables, status treatments, editors, and specialized workflows remain in the issue #60 inventory until their own interaction and browser review is complete.

@@ -120,9 +120,9 @@ export function Networks({ workspace, client = browserNetworksClient, relationsh
       </button>}
     </header>
 
-    {form && <section className="content-section network-editor" aria-labelledby="network-editor-heading">
-      <div className="section-heading"><div><h2 id="network-editor-heading">{editingId ? 'Edit network' : 'New network'}</h2><p>The gateway and usable full range are calculated from the CIDR.</p></div></div>
-      <form className="network-form" onSubmit={(event) => void save(event)}>
+    {form && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="network-editor-heading">
+      <form className="record-form network-form record-form-wide" onSubmit={(event) => void save(event)}>
+        <div className="section-heading"><div><h2 id="network-editor-heading">{editingId ? 'Edit network' : 'New network'}</h2><p>The gateway and usable range are calculated from the CIDR.</p></div></div>
         <div className="field-grid">
           <label><span>Name</span><input autoFocus required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Office LAN" /></label>
           <label><span>Location</span><select value={form.location_id ?? ''} onChange={(event) => setForm({ ...form, location_id: event.target.value || null })}><option value="">Not assigned</option>{choices?.locations.map((location) => {

@@ -196,7 +196,7 @@ type LicenseFormProps = {
 
 function LicenseForm({ title, form, setForm, choices, busy, requireInstallation = false, cancel, submit }: LicenseFormProps) {
   function handleSubmit(event: FormEvent) { event.preventDefault(); submit() }
-  return <section className="content-section inventory-create"><h2>{title}</h2><form className="hardware-form" onSubmit={handleSubmit}><div className="field-grid">
+  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="license-form-title"><form className="record-form license-form" onSubmit={handleSubmit}><div className="section-heading"><h2 id="license-form-title">{title}</h2></div><div className="form-grid">
     <Field label="License name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
     {requireInstallation && <Choice label="Initial software installation" value={form.asset_id} onChange={(value) => setForm((current) => ({ ...current, asset_id: value }))} items={choices.installations.map((item) => ({ id: item.asset_id ?? '', name: `${item.asset_name ?? 'Software asset'} · ${item.product_name ?? 'Unknown product'}` })).filter((item) => item.id)} />}
     <label><span>License kind</span><select value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as SoftwareLicense['kind'] }))}>{['subscription', 'perpetual', 'trial'].map((item) => <option key={item}>{item}</option>)}</select></label>

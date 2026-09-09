@@ -22,7 +22,7 @@ const topics: Record<string, HelpTopic> = {
   domains: { title: 'Domains', summary: 'Record registrations, subdomains, renewal ownership, DNS results, and check history.', slug: 'Domains-and-certificates' },
   certificates: { title: 'Certificates', summary: 'Review TLS endpoints, validation results, expiration dates, and check history.', slug: 'Domains-and-certificates' },
   credentials: { title: 'Credential links', summary: 'Open credentials stored in 1Password without keeping passwords or secrets in TekDocs.', slug: 'Credential-references' },
-  services: { title: 'Services and contracts', summary: 'Record suppliers, contracts, costs, renewals, and service dependencies.', slug: 'Services-and-contracts' },
+  services: { title: 'Contracts', summary: 'Record suppliers, costs, renewals, and contract dependencies.', slug: 'Services-and-contracts' },
   vendors: { title: 'Vendors and manufacturers', summary: 'See the organizations connected to assets and whether they sell, make, or both sell and make products.', slug: 'Vendors-and-products' },
   products: { title: 'Products and models', summary: 'Manage product lines, models, specification templates, saved versions, and documents included with new assets.', slug: 'Vendors-and-products' },
   custom_fields: { title: 'Custom fields', summary: 'Extend supported records with versioned, validated field definitions.', slug: 'Custom-fields' },

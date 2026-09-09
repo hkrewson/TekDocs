@@ -25,9 +25,9 @@ function SiteForm({ site, saving, onCancel, onSave }: { site: SiteRecord | null;
   } : emptySite)
   const submit = (event: FormEvent) => { event.preventDefault(); void onSave(input) }
   return (
-    <section className="content-section site-form-section" aria-labelledby="site-form-heading">
-      <div className="section-heading"><h2 id="site-form-heading">{site ? translate('sites.editSite', { name: site.name }) : translate('sites.addSite')}</h2></div>
-      <form className="site-form" onSubmit={submit}>
+    <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="site-form-heading">
+      <form className="record-form record-form-grid site-form record-form-wide" onSubmit={submit}>
+        <div className="section-heading"><h2 id="site-form-heading">{site ? translate('sites.editSite', { name: site.name }) : translate('sites.addSite')}</h2></div>
         <label>{translate('sites.siteName')}<input autoFocus required maxLength={240} value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} /></label>
         <label>{translate('sites.internalCode')} <span>{translate('common.optional')}</span><input maxLength={64} value={input.code} onChange={(event) => setInput({ ...input, code: event.target.value })} /></label>
         <label className="site-form-wide">{translate('sites.address')}<input maxLength={240} value={input.address_line_1} onChange={(event) => setInput({ ...input, address_line_1: event.target.value })} /></label>

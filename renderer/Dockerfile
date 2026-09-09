@@ -25,7 +25,14 @@ RUN apk upgrade --no-cache \
     && printf '%s\n' "$installed" > /chromium-version \
     && chmod 0444 /chromium-version \
     && addgroup --system --gid 10001 renderer \
-    && adduser --system --uid 10001 --ingroup renderer --home /renderer renderer
+    && adduser --system --uid 10001 --ingroup renderer --home /home/renderer renderer
+
+# The runtime root filesystem is read-only. Keep Chromium's home, configuration,
+# cache, and temporary profile paths on the two writable tmpfs mounts supplied by
+# Compose; otherwise browser startup depends on host-specific fallback behavior.
+ENV HOME=/home/renderer \
+    XDG_CACHE_HOME=/tmp/.chromium-cache \
+    XDG_CONFIG_HOME=/tmp/.chromium-config
 
 # `COPY --chmod` is stated on every copy below: Docker otherwise carries the source
 # file's mode into the image, so a 0600 file on the build host becomes unreadable to
@@ -35,8 +42,8 @@ WORKDIR /renderer
 COPY --chmod=0644 package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --chmod=0644 check-licenses.mjs mermaid-config.json puppeteer-config.json worker.mjs ./
-RUN mkdir -p /jobs \
-    && chown renderer:renderer /renderer /jobs \
+RUN mkdir -p /home/renderer /jobs \
+    && chown renderer:renderer /home/renderer /renderer /jobs \
     && rm -rf \
       /usr/local/lib/node_modules/npm \
       /usr/local/lib/node_modules/corepack \

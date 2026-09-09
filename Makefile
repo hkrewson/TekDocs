@@ -217,6 +217,7 @@ test-file-export-stabilization:
 file-export-release-gate: check test-file-export-stabilization test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
 
 test-diagram-exports:
+	docker compose run --rm migrate
 	docker compose run --rm migrate pytest apps/core/tests/test_diagram_exports.py apps/core/tests/test_documents.py -q
 	./tests/rehearsals/rehearse-diagram-exports.sh
 

@@ -23,6 +23,7 @@ def test_liveness_contract(client):
 
 
 @pytest.mark.django_db
+@override_settings(TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
 def test_readiness_checks_database(client):
     response = client.get(reverse("health-ready"))
     assert response.status_code == 200
@@ -50,7 +51,7 @@ def test_readiness_reports_only_coarse_diagram_renderer_health(client, tmp_path)
 
 
 @pytest.mark.django_db
-@override_settings(TEKDOCS_BOOTSTRAP_TOKEN="")
+@override_settings(TEKDOCS_BOOTSTRAP_TOKEN="", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
 def test_readiness_fails_closed_without_bootstrap_token_before_owner_claim(client):
     assert not InstallationState.objects.get(pk=InstallationState.SINGLETON_ID).is_bootstrapped
 
@@ -66,7 +67,7 @@ def test_readiness_fails_closed_without_bootstrap_token_before_owner_claim(clien
 
 
 @pytest.mark.django_db
-@override_settings(TEKDOCS_BOOTSTRAP_TOKEN="")
+@override_settings(TEKDOCS_BOOTSTRAP_TOKEN="", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
 def test_readiness_allows_bootstrap_token_removal_after_owner_claim(client):
     bootstrap_owner(
         tenant_name="Health MSP",

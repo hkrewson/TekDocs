@@ -1,2 +1,5 @@
 # Static route metadata in historical commit 4edcfa2 is not a credential.
 4edcfa2f2676c56b162b3250cb1398eea91d101a:backend/apps/core/permission_inventory.py:generic-api-key:1031
+
+# Browser-local navigation preference key in historical commit 7a53d3 is not a credential.
+7a53d3a59c975723b63942d030f22f7aa46bec92:frontend/src/App.tsx:generic-api-key:186

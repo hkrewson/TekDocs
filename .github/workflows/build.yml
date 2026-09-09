@@ -294,6 +294,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Prepare the test environment
+        run: ./scripts/bootstrap-env.sh .env
       - name: Run the complete diagram export gate
         run: make test-diagram-exports
       - name: Record diagram authoring and failure evidence

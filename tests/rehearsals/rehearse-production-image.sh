@@ -20,7 +20,7 @@ cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
     echo "Production-target rehearsal failed; recent service logs follow." >&2
-    production_compose logs --no-color --tail=120 backend frontend diagram-renderer >&2 || true
+    production_compose logs --no-color --tail=120 migrate backend frontend diagram-renderer >&2 || true
   fi
   production_compose down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
@@ -39,7 +39,11 @@ copy_environment_secret() {
     exit 1
   fi
   printf '%s\n' "$value" > "$secret_directory/$target"
-  chmod 0600 "$secret_directory/$target"
+  # Compose mounts local secret sources directly on native Linux. The private
+  # 0700 parent directory protects these temporary files on the host, while the
+  # read-only 0444 mount mode lets the deliberately unrelated container UID read
+  # the file. Docker Desktop otherwise masks this ownership boundary in local runs.
+  chmod 0444 "$secret_directory/$target"
 }
 
 copy_environment_secret DJANGO_SECRET_KEY django_secret_key
@@ -58,7 +62,7 @@ email_secret=$(openssl rand -hex 32)
 oidc_secret=$(openssl rand -hex 32)
 printf '%s\n' "$email_secret" > "$secret_directory/email_host_password"
 printf '%s\n' "$oidc_secret" > "$secret_directory/oidc_client_secret"
-chmod 0600 "$secret_directory/email_host_password" "$secret_directory/oidc_client_secret"
+chmod 0444 "$secret_directory/email_host_password" "$secret_directory/oidc_client_secret"
 {
   echo "TEKDOCS_PORT=0"
   echo "MAILPIT_UI_PORT=0"

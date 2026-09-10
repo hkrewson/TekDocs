@@ -67,7 +67,12 @@ def read_secret(
         details = os.fstat(source.fileno())
         if not stat.S_ISREG(details.st_mode):
             raise _configuration_error(name, f"{file_name} must identify a regular file")
-        if details.st_uid not in {0, os.geteuid()}:
+        # Local Compose secrets are read-only bind mounts. On native Linux they
+        # retain the deployment user's host UID, which intentionally need not
+        # exist in (or match the unprivileged user inside) the container. Treat
+        # /run/secrets as the container-runtime trust boundary; custom secret
+        # roots retain the stricter root/current-user ownership requirement.
+        if approved_root != DEFAULT_SECRET_ROOT and details.st_uid not in {0, os.geteuid()}:
             raise _configuration_error(name, f"{file_name} has an unexpected owner")
         if details.st_mode & 0o033:
             raise _configuration_error(name, f"{file_name} cannot be writable or executable by group or other users")

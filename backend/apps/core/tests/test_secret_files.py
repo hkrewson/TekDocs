@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from tekdocs.settings import secret_files
 from tekdocs.settings.secret_files import MAX_SECRET_BYTES, read_secret, require_file_sources
 
 
@@ -37,6 +38,24 @@ def test_file_value_is_read_with_one_terminal_newline_removed(tmp_path):
             secret_root=tmp_path,
         )
         == "printable-secret-value"
+    )
+
+
+def test_compose_secret_accepts_read_only_host_owner(monkeypatch, tmp_path):
+    path = write_secret(tmp_path, "compose-secret", b"compose-runtime-value\n", mode=0o444)
+    real_fstat = os.fstat
+
+    def host_owned_fstat(descriptor):
+        details = list(real_fstat(descriptor))
+        details[4] = os.geteuid() + 1000
+        return os.stat_result(details)
+
+    monkeypatch.setattr(secret_files, "DEFAULT_SECRET_ROOT", tmp_path.resolve())
+    monkeypatch.setattr(secret_files.os, "fstat", host_owned_fstat)
+
+    assert (
+        read_secret("DJANGO_SECRET_KEY", environment={"DJANGO_SECRET_KEY_FILE": str(path)})
+        == "compose-runtime-value"
     )
 
 

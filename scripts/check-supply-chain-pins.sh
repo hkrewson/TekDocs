@@ -19,7 +19,7 @@ done
 grep -q 'zaproxy/zap-stable@sha256:[0-9a-f]\{64\}' tests/rehearsals/rehearse-production-image.sh
 grep -q 'permission_image=postgres:17-alpine@sha256:[0-9a-f]\{64\}' scripts/setup-production.sh
 
-mailpit_references=$(rg --no-filename -o 'axllent/mailpit:edge@sha256:[0-9a-f]{64}' \
+mailpit_references=$(grep -Eho 'axllent/mailpit:edge@sha256:[0-9a-f]{64}' \
   compose.yml Makefile .github/workflows/build.yml)
 mailpit_reference_count=$(printf '%s\n' "$mailpit_references" | wc -l | tr -d ' ')
 mailpit_digest_count=$(printf '%s\n' "$mailpit_references" | sort -u | wc -l | tr -d ' ')
@@ -28,7 +28,7 @@ if [ "$mailpit_reference_count" -ne 3 ] || [ "$mailpit_digest_count" -ne 1 ]; th
   exit 1
 fi
 
-unpinned_actions=$(rg -n 'uses:[[:space:]]+[^[:space:]]+@' .github/workflows \
+unpinned_actions=$(grep -REn 'uses:[[:space:]]+[^[:space:]]+@' .github/workflows \
   | grep -Ev '@[0-9a-f]{40}([[:space:]]|$)' || true)
 if [ -n "$unpinned_actions" ]; then
   printf '%s\n' "$unpinned_actions"

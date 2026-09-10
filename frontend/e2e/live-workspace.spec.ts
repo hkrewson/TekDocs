@@ -544,7 +544,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(successStatus(page)).toHaveText('File-backed document created.')
   await expect(page.getByText(/Primary file · version 1/)).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Local notes' })).toBeVisible()
-  await expect(page.getByText('Client-specific context.')).toBeVisible()
+  await expect(page.getByText('Client-specific context.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Download' })).toBeVisible()
   await page.getByLabel('Replacement primary file').setInputFiles({
     name: 'vendor-source-v2.txt',

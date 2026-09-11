@@ -95,6 +95,9 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_invoiceartifact",
     "core_invoiceline",
     "core_invoicelifecycleevent",
+    "core_recurringinvoiceschedule",
+    "core_recurringinvoiceterms",
+    "core_recurringinvoiceperiod",
 )
 
 TENANT_SCOPED_TABLES = (

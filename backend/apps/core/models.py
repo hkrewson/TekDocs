@@ -2222,6 +2222,100 @@ class ContractCost(TimestampedModel):
             raise ValidationError("Cost end date cannot precede its start date")
 
 
+class RecurringInvoiceSchedule(TimestampedModel):
+    """A permanent source identity and fixed calendar; disabling never releases periods."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="recurring_invoice_schedules")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="recurring_invoice_schedules"
+    )
+    contract_cost = models.OneToOneField(ContractCost, on_delete=models.PROTECT, related_name="recurring_schedule")
+    anchor = models.DateField()
+    ends_on = models.DateField(null=True, blank=True)
+    interval = models.CharField(max_length=16, choices=CostBillingInterval.choices)
+    enabled = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="billing_schedules")
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(interval__in=("monthly", "quarterly", "annual")),
+                                   name="recurring_schedule_interval_valid"),
+            models.CheckConstraint(condition=models.Q(ends_on__isnull=True) | models.Q(ends_on__gte=models.F("anchor")),
+                                   name="recurring_schedule_dates_valid"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Recurring schedule {self.pk}"
+
+
+class RecurringInvoiceTerms(models.Model):
+    """Immutable approved sell terms; the first slice permits only version one."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="recurring_invoice_terms")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="recurring_invoice_terms")
+    schedule = models.ForeignKey(RecurringInvoiceSchedule, on_delete=models.PROTECT, related_name="terms")
+    version = models.PositiveIntegerField(default=1)
+    description = models.CharField(max_length=1000)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_amount = models.DecimalField(max_digits=18, decimal_places=4)
+    currency = models.CharField(max_length=3)
+    tax_rate = models.ForeignKey(TaxRate, on_delete=models.PROTECT, null=True, blank=True)
+    due_days = models.PositiveSmallIntegerField(default=30)
+    source_digest = models.CharField(max_length=64)
+    source_snapshot = models.JSONField()
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="billing_terms")
+    approved_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("schedule", "version"), name="recurring_terms_version_unique"),
+            models.CheckConstraint(condition=models.Q(version=1), name="recurring_terms_initial_version_only"),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name="recurring_terms_quantity_positive"),
+            models.CheckConstraint(condition=models.Q(unit_amount__gte=0), name="recurring_terms_amount_nonnegative"),
+            models.CheckConstraint(condition=models.Q(due_days__lte=3650), name="recurring_terms_due_days_bounded"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Recurring terms {self.schedule_id} v{self.version}"
+
+
+class RecurringInvoicePeriod(models.Model):
+    """Permanent period claim; protected invoice/line references prevent accidental rebilling."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="recurring_invoice_periods")
+    organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="recurring_invoice_periods")
+    schedule = models.ForeignKey(RecurringInvoiceSchedule, on_delete=models.PROTECT, related_name="periods")
+    terms = models.ForeignKey(RecurringInvoiceTerms, on_delete=models.PROTECT, related_name="periods")
+    starts_on = models.DateField()
+    ends_before = models.DateField()
+    invoice = models.OneToOneField(Invoice, on_delete=models.PROTECT, related_name="recurring_period")
+    line = models.OneToOneField(InvoiceLine, on_delete=models.PROTECT, related_name="recurring_period")
+    generated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="billing_periods")
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("schedule", "starts_on"), name="recurring_period_once"),
+            models.CheckConstraint(condition=models.Q(ends_before__gt=models.F("starts_on")),
+                                   name="recurring_period_dates_valid"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Recurring period {self.starts_on}"
+
+
 class ClientAssetDocumentProvenance(models.Model):
     """Append-only client projection of one exact supplier STATIC publication."""
 

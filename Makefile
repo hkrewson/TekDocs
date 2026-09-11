@@ -246,7 +246,7 @@ test-billing-foundation:
 	docker compose run --rm migrate pytest apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
 test-invoice-recurrence:
-	docker compose run --rm migrate pytest apps/core/tests/test_invoice_recurrence.py apps/core/tests/test_money.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_invoice_recurrence.py apps/core/tests/test_recurring_invoices.py apps/core/tests/test_money.py -q
 
 test-invoice-drafts:
 	docker compose run --rm migrate pytest apps/core/tests/test_invoice_issue.py apps/core/tests/test_invoice_drafts.py apps/core/tests/test_stock_inventory.py apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q

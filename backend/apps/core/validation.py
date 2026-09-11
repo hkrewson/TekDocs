@@ -23,7 +23,13 @@ class TenantModelContract:
 # foreign key must be assigned to one reviewed boundary before validation
 # can pass; model discovery tests reject unclassified additions.
 TENANT_MODEL_CONTRACTS = tuple(
-    TenantModelContract(table, IsolationBoundary.FORCED_RLS, "Tenant-owned entity-domain data.")
+    TenantModelContract(
+        table,
+        IsolationBoundary.FORCED_RLS,
+        "Exact-client recurring enrollment, approved terms, and permanent period claims."
+        if table.startswith("core_recurringinvoice")
+        else "Tenant-owned entity-domain data.",
+    )
     for table in RLS_TABLES
 ) + (
     TenantModelContract(

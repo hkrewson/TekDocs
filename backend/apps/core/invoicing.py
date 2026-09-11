@@ -758,6 +758,8 @@ def delete_invoice(*, invoice: Invoice, actor_id: UUID) -> None:
     locked = Invoice.objects.select_for_update().select_related("entity").get(pk=invoice.pk)
     if locked.state != "draft":
         raise InvoiceError("Only draft invoices can be deleted")
+    if hasattr(locked, "recurring_period"):
+        raise InvoiceError("Recurring drafts retain their billing-period claim and cannot be deleted")
     stock_lines = InvoiceLine.objects.select_for_update().filter(
         invoice=locked, stock_item__isnull=False, stock_quantity_consumed__gt=0
     )
@@ -942,6 +944,8 @@ def update_line(*, line: InvoiceLine, actor_id: UUID, values: dict[str, object])
 
 @transaction.atomic
 def delete_line(*, line: InvoiceLine, actor_id: UUID) -> None:
+    if hasattr(line, "recurring_period"):
+        raise InvoiceError("A generated recurring line retains its billing-period claim and cannot be deleted")
     locked = InvoiceLine.objects.select_for_update().select_related("invoice", "organization").get(pk=line.pk)
     if locked.invoice.state != "draft":
         raise InvoiceError("Only draft invoice lines can be deleted")

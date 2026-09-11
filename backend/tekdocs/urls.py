@@ -356,6 +356,13 @@ from apps.core.portal_views import (
     ClientPortalInvoiceListView,
     ClientPortalInvoicePDFDownloadView,
 )
+from apps.core.recurring_invoice_views import (
+    RecurringApplyView,
+    RecurringEnrollmentView,
+    RecurringPreviewView,
+    RecurringScheduleView,
+    RecurringSourceView,
+)
 from apps.core.recycle_views import (
     MSPRecycleBinListView,
     MSPRecycleBinRestoreView,
@@ -1454,6 +1461,31 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/specification-definitions/<uuid:definition_id>/versions",
         CatalogSpecificationDefinitionVersionView.as_view(),
         name="organization-catalog-specification-definition-version-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/sources/<uuid:cost_id>",
+        RecurringSourceView.as_view(),
+        name="organization-recurring-invoice-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices",
+        RecurringEnrollmentView.as_view(),
+        name="organization-recurring-invoice-enroll",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>",
+        RecurringScheduleView.as_view(),
+        name="organization-recurring-invoice-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/preview",
+        RecurringPreviewView.as_view(),
+        name="organization-recurring-invoice-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/apply",
+        RecurringApplyView.as_view(),
+        name="organization-recurring-invoice-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices",

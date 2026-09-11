@@ -6996,6 +6996,86 @@ export interface paths {
         readonly patch: operations["people_organization_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_recurring_invoices_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_recurring_invoices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/apply": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_recurring_invoices_apply_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_recurring_invoices_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources/{cost_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_recurring_invoices_sources_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recycle-bin": {
         readonly parameters: {
             readonly query?: never;
@@ -12740,6 +12820,116 @@ export interface components {
             readonly ip_address_id?: string | null;
             /** @default  */
             readonly description: string;
+        };
+        readonly RecurringApply: {
+            readonly preview_token: string;
+        };
+        readonly RecurringClaim: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: date */
+            readonly starts_on: string;
+            /** Format: date */
+            readonly ends_before: string;
+            /** Format: uuid */
+            readonly invoice_entity_id: string;
+            /** Format: uuid */
+            readonly line_id: string;
+        };
+        readonly RecurringEnrollment: {
+            /** Format: uuid */
+            readonly cost_id: string;
+            readonly expected_source_digest: string;
+            /** Format: date */
+            readonly anchor: string;
+            /** Format: date */
+            readonly ends_on: string | null;
+            readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount: string;
+            /** Format: decimal */
+            readonly quantity: string;
+            readonly currency: string;
+            readonly due_days: number;
+            /** Format: uuid */
+            readonly tax_rate_id?: string | null;
+        };
+        readonly RecurringError: {
+            readonly detail: string;
+        };
+        readonly RecurringExistingInvoice: {
+            /** Format: date */
+            readonly starts_on: string;
+            /** Format: uuid */
+            readonly invoice_entity_id: string;
+        };
+        readonly RecurringPeriodPreview: {
+            /** Format: date */
+            readonly starts_on: string;
+            /** Format: date */
+            readonly ends_before: string;
+            /** Format: date */
+            readonly due_date: string;
+            readonly net: string;
+            readonly tax: string;
+            readonly total: string;
+        };
+        readonly RecurringPreview: {
+            readonly preview_id: string;
+            readonly preview_token: string;
+            readonly expires_in_seconds: number;
+            /** Format: uuid */
+            readonly schedule_id: string;
+            /** Format: uuid */
+            readonly terms_id: string;
+            readonly source_digest: string;
+            /** Format: date */
+            readonly as_of: string;
+            readonly currency: string;
+            readonly description: string;
+            readonly quantity: string;
+            readonly unit_amount: string;
+            readonly periods: readonly components["schemas"]["RecurringPeriodPreview"][];
+            readonly existing_invoices: readonly components["schemas"]["RecurringExistingInvoice"][];
+        };
+        readonly RecurringPreviewWrite: {
+            readonly starts_on: readonly string[];
+            /** Format: date */
+            readonly as_of: string;
+        };
+        readonly RecurringSchedule: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly contract_cost_id: string;
+            /** Format: date */
+            readonly anchor: string;
+            /** Format: date */
+            readonly ends_on: string | null;
+            readonly interval: string;
+            readonly enabled: boolean;
+            readonly terms: readonly components["schemas"]["RecurringTerms"][];
+        };
+        readonly RecurringSource: {
+            readonly source: {
+                readonly [key: string]: unknown;
+            };
+            readonly source_digest: string;
+        };
+        readonly RecurringTerms: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly version: number;
+            readonly description: string;
+            /** Format: decimal */
+            readonly quantity: string;
+            /** Format: decimal */
+            readonly unit_amount: string;
+            readonly currency: string;
+            readonly due_days: number;
+            /** Format: uuid */
+            readonly tax_rate_id: string | null;
+            readonly source_digest: string;
         };
         readonly RecycleBinItem: {
             /** Format: uuid */
@@ -32113,6 +32303,313 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringEnrollment"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringEnrollment"];
+                readonly "multipart/form-data": components["schemas"]["RecurringEnrollment"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSchedule"];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSchedule"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_apply_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringApply"];
+                readonly "multipart/form-data": components["schemas"]["RecurringApply"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["RecurringClaim"][];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_preview_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringPreviewWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringPreviewWrite"];
+                readonly "multipart/form-data": components["schemas"]["RecurringPreviewWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringPreview"];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_sources_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly cost_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSource"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
                 };
             };
         };

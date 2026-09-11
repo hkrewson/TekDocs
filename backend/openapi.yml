@@ -24244,6 +24244,412 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices:
+    post:
+      operationId: workspaces_organizations_recurring_invoices_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringEnrollment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringEnrollment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringEnrollment'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringSchedule'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}:
+    get:
+      operationId: workspaces_organizations_recurring_invoices_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringSchedule'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/apply:
+    post:
+      operationId: workspaces_organizations_recurring_invoices_apply_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringApply'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecurringClaim'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/preview:
+    post:
+      operationId: workspaces_organizations_recurring_invoices_preview_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringPreviewWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringPreviewWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringPreviewWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPreview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources/{cost_id}:
+    get:
+      operationId: workspaces_organizations_recurring_invoices_sources_retrieve
+      parameters:
+      - in: path
+        name: cost_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/recycle-bin:
     get:
       operationId: recycle_bin_organization_list
@@ -38141,6 +38547,278 @@ components:
       - record_type
       - value
       - zone_id
+    RecurringApply:
+      type: object
+      properties:
+        preview_token:
+          type: string
+          maxLength: 65536
+      required:
+      - preview_token
+    RecurringClaim:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        starts_on:
+          type: string
+          format: date
+        ends_before:
+          type: string
+          format: date
+        invoice_entity_id:
+          type: string
+          format: uuid
+        line_id:
+          type: string
+          format: uuid
+      required:
+      - ends_before
+      - id
+      - invoice_entity_id
+      - line_id
+      - starts_on
+    RecurringEnrollment:
+      type: object
+      properties:
+        cost_id:
+          type: string
+          format: uuid
+        expected_source_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        anchor:
+          type: string
+          format: date
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        description:
+          type: string
+          maxLength: 1000
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+        due_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+        tax_rate_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - anchor
+      - cost_id
+      - currency
+      - description
+      - due_days
+      - ends_on
+      - expected_source_digest
+      - quantity
+      - unit_amount
+    RecurringError:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    RecurringExistingInvoice:
+      type: object
+      properties:
+        starts_on:
+          type: string
+          format: date
+        invoice_entity_id:
+          type: string
+          format: uuid
+      required:
+      - invoice_entity_id
+      - starts_on
+    RecurringPeriodPreview:
+      type: object
+      properties:
+        starts_on:
+          type: string
+          format: date
+        ends_before:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        net:
+          type: string
+        tax:
+          type: string
+        total:
+          type: string
+      required:
+      - due_date
+      - ends_before
+      - net
+      - starts_on
+      - tax
+      - total
+    RecurringPreview:
+      type: object
+      properties:
+        preview_id:
+          type: string
+        preview_token:
+          type: string
+        expires_in_seconds:
+          type: integer
+        schedule_id:
+          type: string
+          format: uuid
+        terms_id:
+          type: string
+          format: uuid
+        source_digest:
+          type: string
+        as_of:
+          type: string
+          format: date
+        currency:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: string
+        unit_amount:
+          type: string
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringPeriodPreview'
+        existing_invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringExistingInvoice'
+      required:
+      - as_of
+      - currency
+      - description
+      - existing_invoices
+      - expires_in_seconds
+      - periods
+      - preview_id
+      - preview_token
+      - quantity
+      - schedule_id
+      - source_digest
+      - terms_id
+      - unit_amount
+    RecurringPreviewWrite:
+      type: object
+      properties:
+        starts_on:
+          type: array
+          items:
+            type: string
+            format: date
+          maxItems: 120
+          minItems: 1
+        as_of:
+          type: string
+          format: date
+      required:
+      - as_of
+      - starts_on
+    RecurringSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        contract_cost_id:
+          type: string
+          format: uuid
+        anchor:
+          type: string
+          format: date
+        ends_on:
+          type: string
+          format: date
+          nullable: true
+        interval:
+          type: string
+        enabled:
+          type: boolean
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringTerms'
+      required:
+      - anchor
+      - contract_cost_id
+      - enabled
+      - ends_on
+      - id
+      - interval
+      - terms
+    RecurringSource:
+      type: object
+      properties:
+        source:
+          type: object
+          additionalProperties: {}
+        source_digest:
+          type: string
+      required:
+      - source
+      - source_digest
+    RecurringTerms:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        description:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        currency:
+          type: string
+        due_days:
+          type: integer
+        tax_rate_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_digest:
+          type: string
+      required:
+      - currency
+      - description
+      - due_days
+      - id
+      - quantity
+      - source_digest
+      - tax_rate_id
+      - unit_amount
+      - version
     RecycleBinItem:
       type: object
       properties:

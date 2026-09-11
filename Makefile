@@ -17,7 +17,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-public-beta-performance test-entity-rbac-validation test-documentation-validation \
 	test-file-export-stabilization test-diagram-exports \
 	test-publication-control test-credential-references test-catalogs test-inventory \
-	test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-networks test-network-stabilization \
+	test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-invoice-recurrence test-networks test-network-stabilization \
 	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
 	test-browser-artifact-hygiene test-e2e-live
 
@@ -244,6 +244,9 @@ test-commercial:
 
 test-billing-foundation:
 	docker compose run --rm migrate pytest apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
+
+test-invoice-recurrence:
+	docker compose run --rm migrate pytest apps/core/tests/test_invoice_recurrence.py apps/core/tests/test_money.py -q
 
 test-invoice-drafts:
 	docker compose run --rm migrate pytest apps/core/tests/test_invoice_issue.py apps/core/tests/test_invoice_drafts.py apps/core/tests/test_stock_inventory.py apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q

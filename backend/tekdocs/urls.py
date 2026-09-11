@@ -362,6 +362,7 @@ from apps.core.recurring_invoice_views import (
     RecurringEnrollmentView,
     RecurringPreviewView,
     RecurringScheduleView,
+    RecurringSourceListView,
     RecurringSourceView,
 )
 from apps.core.recycle_views import (
@@ -1462,6 +1463,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/catalog/specification-definitions/<uuid:definition_id>/versions",
         CatalogSpecificationDefinitionVersionView.as_view(),
         name="organization-catalog-specification-definition-version-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/sources",
+        RecurringSourceListView.as_view(),
+        name="organization-recurring-invoice-sources",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/sources/<uuid:cost_id>",

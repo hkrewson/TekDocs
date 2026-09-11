@@ -303,3 +303,43 @@ def test_discovery_requires_current_permissions(browser, setup):
     assert (
         browser.get(url(setup, "due", schedule), {"due_from": "2025-01-01", "as_of": "2025-02-01"}).status_code == 403
     )
+
+
+@pytest.mark.django_db
+def test_enrollment_sources_exclude_claimed_inactive_and_sibling_costs(browser, setup):
+    address = url(setup, "sources")
+    result = browser.get(address, {"q": "Provider", "page_size": 1})
+    assert result.status_code == 200 and result.json()["count"] == 1
+    assert result.json()["results"][0]["id"] == str(setup[4].pk)
+    assert browser.get(url(setup, "sources", organization=setup[2])).json()["count"] == 0
+    assert browser.get(address, {"page": 2}).json()["results"] == []
+    assert browser.get(address, {"q": "no matching source"}).json()["count"] == 0
+    assert browser.get(address, {"surprise": "all"}).status_code == 400
+    setup[3].status = "terminated"
+    setup[3].save(update_fields=("status", "updated_at"))
+    assert browser.get(address).json()["count"] == 0
+    setup[3].status = "active"
+    setup[3].save(update_fields=("status", "updated_at"))
+    enroll(setup)
+    assert browser.get(address).json()["count"] == 0
+
+
+@pytest.mark.django_db
+def test_source_review_reports_intersection_and_sources_require_current_permission(browser, setup):
+    update_cost(
+        contract=setup[3],
+        cost_id=setup[4].pk,
+        actor_id=setup[0].owner.pk,
+        values={
+            "starts_on": date(2025, 2, 1),
+            "ends_on": date(2025, 6, 30),
+        },
+    )
+    review = browser.get(url(setup, "source")).json()
+    assert review["earliest_anchor"] == "2025-02-01" and review["latest_end"] == "2025-06-30"
+    assert review["source"]["amount"] == "20.00"
+    reader = User.objects.create_user(email="enrollment-source-reader@example.invalid")
+    TenantMembership.objects.create(tenant=setup[0].tenant, user=reader, role=BuiltInRole.READ_ONLY)
+    browser.force_login(reader)
+    assert browser.get(url(setup, "sources")).status_code == 403
+    assert browser.get(url(setup, "source")).status_code == 403

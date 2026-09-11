@@ -123,9 +123,42 @@ class RecurringDueSerializer(serializers.Serializer):
     as_of = serializers.DateField()
 
 
+class RecurringSourceSnapshotSerializer(serializers.Serializer):
+    cost_id = serializers.UUIDField()
+    contract_id = serializers.UUIDField()
+    label = serializers.CharField()
+    amount = serializers.CharField()
+    quantity = serializers.CharField()
+    currency = serializers.CharField()
+    interval = serializers.ChoiceField(choices=["monthly", "quarterly", "annual"])
+    cost_starts_on = serializers.DateField(allow_null=True)
+    cost_ends_on = serializers.DateField(allow_null=True)
+    contract_starts_on = serializers.DateField(allow_null=True)
+    contract_ends_on = serializers.DateField(allow_null=True)
+
+
 class RecurringSourceSerializer(serializers.Serializer):
-    source = serializers.DictField()
+    source = RecurringSourceSnapshotSerializer()
     source_digest = serializers.CharField()
+    earliest_anchor = serializers.DateField(allow_null=True)
+    latest_end = serializers.DateField(allow_null=True)
+    business_date = serializers.DateField()
+
+
+class RecurringSourceChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField()
+    contract_name = serializers.CharField(source="contract.entity.display_name")
+    currency = serializers.CharField()
+    billing_interval = serializers.CharField()
+
+
+class RecurringSourcePageSerializer(OffsetPageSerializer):
+    results = RecurringSourceChoiceSerializer(many=True)
+
+
+class RecurringSourceQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=200, required=False, default="", allow_blank=True)
 
 
 class RecurringPreviewWriteSerializer(RecurringWriteSerializer):
@@ -357,3 +390,47 @@ class RecurringDueView(APIView):
             **query.validated_data,
         )
         return Response(RecurringDueSerializer(result).data)
+
+
+class RecurringSourceListView(APIView):
+    @extend_schema(
+        operation_id="organization_recurring_sources_list",
+        parameters=[RecurringSourceQuerySerializer],
+        responses={200: RecurringSourcePageSerializer},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        from django.db.models import Q
+
+        workspace = _authorized_workspace(request, organization_entity_id)
+        query = RecurringSourceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = (
+            ContractCost.scoped.for_scope(workspace.data_scope)
+            .filter(
+                billing_interval__in=["monthly", "quarterly", "annual"],
+                archived_at__isnull=True,
+                contract__archived_at__isnull=True,
+                contract__entity__archived_at__isnull=True,
+                contract__status="active",
+                recurring_schedule__isnull=True,
+            )
+            .select_related("contract__entity")
+            .order_by("label", "pk")
+        )
+        if values["q"]:
+            records = records.filter(
+                Q(label__icontains=values["q"]) | Q(contract__entity__display_name__icontains=values["q"])
+            )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        return Response(
+            RecurringSourcePageSerializer(
+                {
+                    "results": page.records,
+                    "count": page.count,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "has_more": page.has_more,
+                }
+            ).data
+        )

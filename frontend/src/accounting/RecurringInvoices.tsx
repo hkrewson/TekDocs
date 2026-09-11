@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { RecurringEnrollment } from './RecurringEnrollment'
+import { browserEnrollmentClient } from './enrollmentApi'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate as t } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -7,6 +9,7 @@ import type { RecurringClient, RecurringPage, RecurringSchedule, RecurringDue, R
 export function RecurringInvoices({ workspace, client, openInvoice }: {
   workspace: WorkspaceContext; client: RecurringClient; openInvoice: (id: string) => Promise<void>
 }) {
+  const [enrolling, setEnrolling] = useState(false)
   const [page, setPage] = useState(1)
   const [listing, setListing] = useState<RecurringPage | null>(null)
   const [schedule, setSchedule] = useState<RecurringSchedule | null>(null)
@@ -78,10 +81,14 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
   return <section className="content-section" aria-labelledby="recurring-title">
     <h2 id="recurring-title">{t('recurring.title')}</h2>
     <p>{t('recurring.help')}</p>
+    {!enrolling && <button type="button" className="secondary-button" disabled={busy} onClick={() => setEnrolling(true)}>{t('enrollment.title')}</button>}
+    {enrolling && <RecurringEnrollment key={workspace.id} workspace={workspace} client={browserEnrollmentClient} cancel={() => { setEnrolling(false); setPage(1); setReload((value) => value + 1) }} enrolled={(record) => {
+      setEnrolling(false); choose(record); setPage(1); setReload((value) => value + 1)
+    }} />}
     {error && <p role="alert">{t('recurring.failed')}</p>}
     {!listing && !error && <p role="status">{t('recurring.loading')}</p>}
     {!listing && error && <button type="button" className="secondary-button" onClick={() => { setError(false); setReload((value) => value + 1) }}>{t('recurring.retry')}</button>}
-    {listing && <>
+    {!enrolling && listing && <>
       {listing.results.length === 0 && <p>{t('recurring.empty')}</p>}
       <ul className="inventory-list">{listing.results.map((record) => <li key={record.id}>
         <button type="button" disabled={busy} aria-pressed={schedule?.id === record.id} onClick={() => choose(record)}>
@@ -93,7 +100,7 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
         <button type="button" className="secondary-button" disabled={busy || !listing.has_more} onClick={() => { invalidate(); setSchedule(null); setListing(null); setPage(page + 1) }}>{t('recurring.next')}</button>
       </div>
     </>}
-    {schedule && <>
+    {!enrolling && schedule && <>
       <h3>{schedule.terms[0]?.description}</h3>
       <p>{t('recurring.approved', { currency: schedule.terms[0]?.currency ?? '', amount: schedule.terms[0]?.unit_amount ?? '', quantity: schedule.terms[0]?.quantity ?? '' })}</p>
       <form className="record-form" onSubmit={(event) => { void loadDue(event) }}>

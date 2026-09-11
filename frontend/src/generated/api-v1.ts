@@ -7076,6 +7076,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_recurring_sources_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources/{cost_id}": {
         readonly parameters: {
             readonly query?: never;
@@ -12965,10 +12981,55 @@ export interface components {
             readonly business_date: string;
         };
         readonly RecurringSource: {
-            readonly source: {
-                readonly [key: string]: unknown;
-            };
+            readonly source: components["schemas"]["RecurringSourceSnapshot"];
             readonly source_digest: string;
+            /** Format: date */
+            readonly earliest_anchor: string | null;
+            /** Format: date */
+            readonly latest_end: string | null;
+            /** Format: date */
+            readonly business_date: string;
+        };
+        readonly RecurringSourceChoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly label: string;
+            readonly contract_name: string;
+            readonly currency: string;
+            readonly billing_interval: string;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly RecurringSourcePage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["RecurringSourceChoice"][];
+        };
+        readonly RecurringSourceSnapshot: {
+            /** Format: uuid */
+            readonly cost_id: string;
+            /** Format: uuid */
+            readonly contract_id: string;
+            readonly label: string;
+            readonly amount: string;
+            readonly quantity: string;
+            readonly currency: string;
+            /**
+             * @description * `monthly` - monthly
+             *     * `quarterly` - quarterly
+             *     * `annual` - annual
+             * @enum {string}
+             */
+            readonly interval: "monthly" | "quarterly" | "annual";
+            /** Format: date */
+            readonly cost_starts_on: string | null;
+            /** Format: date */
+            readonly cost_ends_on: string | null;
+            /** Format: date */
+            readonly contract_starts_on: string | null;
+            /** Format: date */
+            readonly contract_ends_on: string | null;
         };
         readonly RecurringTerms: {
             /** Format: uuid */
@@ -32703,6 +32764,33 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly organization_recurring_sources_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSourcePage"];
                 };
             };
         };

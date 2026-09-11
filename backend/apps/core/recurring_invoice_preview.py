@@ -8,6 +8,7 @@ from uuid import UUID
 
 from django.core import signing
 from django.db import transaction
+from django.utils import timezone
 
 from apps.accounts.models import User
 
@@ -21,8 +22,17 @@ PREVIEW_MAX_AGE = 15 * 60
 
 
 def review_recurring_source(*, user: User, organization: Organization, cost_id: UUID) -> dict[str, object]:
-    snapshot = _snapshot(_source(_scope(user, organization), cost_id))
-    return {"source": snapshot, "source_digest": _digest(snapshot)}
+    cost = _source(_scope(user, organization), cost_id)
+    snapshot = _snapshot(cost)
+    starts = [value for value in (cost.starts_on, cost.contract.starts_on) if value is not None]
+    ends = [value for value in (cost.ends_on, cost.contract.ends_on) if value is not None]
+    return {
+        "source": snapshot,
+        "source_digest": _digest(snapshot),
+        "earliest_anchor": max(starts) if starts else None,
+        "latest_end": min(ends) if ends else None,
+        "business_date": timezone.localdate(),
+    }
 
 
 def _plan(

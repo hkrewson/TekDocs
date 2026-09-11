@@ -39,7 +39,7 @@ describe('recurring review', () => {
     expect(screen.getByText(/USD 150.00/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Create reviewed drafts' }))
     const openButton = await screen.findByRole('button', { name: /Open invoice for/ })
-    await act(async () => { fireEvent.click(openButton) })
+    await act(async () => { fireEvent.click(openButton); await Promise.resolve() })
     expect(client.apply).toHaveBeenCalledWith(workspace, 'schedule', 'opaque-review')
     expect(openInvoice).toHaveBeenCalledWith('new-invoice')
   })

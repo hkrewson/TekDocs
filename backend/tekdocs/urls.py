@@ -358,6 +358,7 @@ from apps.core.portal_views import (
 )
 from apps.core.recurring_invoice_views import (
     RecurringApplyView,
+    RecurringDueView,
     RecurringEnrollmentView,
     RecurringPreviewView,
     RecurringScheduleView,
@@ -1466,6 +1467,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/sources/<uuid:cost_id>",
         RecurringSourceView.as_view(),
         name="organization-recurring-invoice-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/due",
+        RecurringDueView.as_view(),
+        name="organization-recurring-invoice-due",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices",

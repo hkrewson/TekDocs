@@ -7003,7 +7003,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["organization_recurring_invoices_list"];
         readonly put?: never;
         readonly post: operations["workspaces_organizations_recurring_invoices_create"];
         readonly delete?: never;
@@ -7038,6 +7038,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_organizations_recurring_invoices_apply_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/due": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_recurring_invoices_due_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -12836,6 +12852,32 @@ export interface components {
             /** Format: uuid */
             readonly line_id: string;
         };
+        readonly RecurringDue: {
+            readonly periods: readonly components["schemas"]["RecurringDuePeriod"][];
+            /** Format: date */
+            readonly due_from: string;
+            /** Format: date */
+            readonly as_of: string;
+        };
+        readonly RecurringDuePeriod: {
+            /** Format: date */
+            readonly starts_on: string;
+            /** Format: date */
+            readonly ends_before: string;
+            /** Format: uuid */
+            readonly invoice_entity_id: string | null;
+            readonly can_generate: boolean;
+            /**
+             * @description * `` -
+             *     * `disabled` - disabled
+             *     * `source_changed` - source_changed
+             *     * `source_unavailable` - source_unavailable
+             *     * `partial` - partial
+             *     * `tax` - tax
+             * @enum {string}
+             */
+            readonly blocked_reason: "" | "disabled" | "source_changed" | "source_unavailable" | "partial" | "tax";
+        };
         readonly RecurringEnrollment: {
             /** Format: uuid */
             readonly cost_id: string;
@@ -12898,6 +12940,8 @@ export interface components {
             readonly as_of: string;
         };
         readonly RecurringSchedule: {
+            readonly source_label: string;
+            readonly contract_name: string;
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
@@ -12909,6 +12953,16 @@ export interface components {
             readonly interval: string;
             readonly enabled: boolean;
             readonly terms: readonly components["schemas"]["RecurringTerms"][];
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly RecurringSchedulePage: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["RecurringSchedule"][];
+            /** Format: date */
+            readonly business_date: string;
         };
         readonly RecurringSource: {
             readonly source: {
@@ -32307,6 +32361,32 @@ export interface operations {
             };
         };
     };
+    readonly organization_recurring_invoices_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSchedulePage"];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_recurring_invoices_create: {
         readonly parameters: {
             readonly query?: never;
@@ -32446,6 +32526,73 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": readonly components["schemas"]["RecurringClaim"][];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_due_retrieve: {
+        readonly parameters: {
+            readonly query: {
+                readonly as_of: string;
+                readonly due_from: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringDue"];
                 };
             };
             readonly 400: {

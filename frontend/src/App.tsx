@@ -491,7 +491,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'compliance') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCompliance')}</section>}><Compliance workspace={state.workspace} client={complianceClient} /></Suspense>
   if (area === 'deadlines') return <Reminders workspace={state.workspace} relationshipsClient={relationshipsClient} />
   if (area === 'activity') return <ActivityLog workspace={state.workspace} />
-  if (area === 'invoices') return <Suspense fallback={<section className="content-section" role="status">{translate('accounting.loading')}</section>}><Invoices workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
+  if (area === 'invoices') return <Suspense fallback={<section className="content-section" role="status">{translate('accounting.loading')}</section>}><Invoices key={state.workspace.id} workspace={state.workspace} client={browserInvoiceClient} /></Suspense>
   if (area === 'domains') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDomains')}</section>}><Domains workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'certificates') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCertificates')}</section>}><Certificates workspace={state.workspace} client={domainsClient} /></Suspense>
   if (area === 'recycle_bin') return <RecycleBin workspace={state.workspace} client={recycleBinClient} />

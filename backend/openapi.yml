@@ -24245,6 +24245,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices:
+    get:
+      operationId: organization_recurring_invoices_list
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringSchedulePage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
     post:
       operationId: workspaces_organizations_recurring_invoices_create
       parameters:
@@ -24431,6 +24472,100 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/RecurringClaim'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/due:
+    get:
+      operationId: workspaces_organizations_recurring_invoices_due_retrieve
+      parameters:
+      - in: query
+        name: as_of
+        schema:
+          type: string
+          format: date
+        required: true
+      - in: query
+        name: due_from
+        schema:
+          type: string
+          format: date
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringDue'
           description: ''
           headers:
             X-Request-ID:
@@ -38579,6 +38714,57 @@ components:
       - invoice_entity_id
       - line_id
       - starts_on
+    RecurringDue:
+      type: object
+      properties:
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringDuePeriod'
+        due_from:
+          type: string
+          format: date
+        as_of:
+          type: string
+          format: date
+      required:
+      - as_of
+      - due_from
+      - periods
+    RecurringDuePeriod:
+      type: object
+      properties:
+        starts_on:
+          type: string
+          format: date
+        ends_before:
+          type: string
+          format: date
+        invoice_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        can_generate:
+          type: boolean
+        blocked_reason:
+          enum:
+          - ''
+          - disabled
+          - source_changed
+          - source_unavailable
+          - partial
+          - tax
+          type: string
+          description: "* `` - \n* `disabled` - disabled\n* `source_changed` - source_changed\n\
+            * `source_unavailable` - source_unavailable\n* `partial` - partial\n*\
+            \ `tax` - tax"
+          x-spec-enum-id: 7d80cbc3e7da984e
+      required:
+      - blocked_reason
+      - can_generate
+      - ends_before
+      - invoice_entity_id
+      - starts_on
     RecurringEnrollment:
       type: object
       properties:
@@ -38741,6 +38927,10 @@ components:
     RecurringSchedule:
       type: object
       properties:
+        source_label:
+          type: string
+        contract_name:
+          type: string
         id:
           type: string
           format: uuid
@@ -38765,11 +38955,43 @@ components:
       required:
       - anchor
       - contract_cost_id
+      - contract_name
       - enabled
       - ends_on
       - id
       - interval
+      - source_label
       - terms
+    RecurringSchedulePage:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringSchedule'
+        business_date:
+          type: string
+          format: date
+      required:
+      - business_date
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     RecurringSource:
       type: object
       properties:

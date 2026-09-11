@@ -16,12 +16,23 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
+from .collection_pagination import (
+    BoundedCollectionQuerySerializer,
+    OffsetPageSerializer,
+    StrictQuerySerializer,
+    paginate,
+)
 from .invoice_recurrence import RecurrenceError
 from .invoice_views import StrictSerializer, _workspace
 from .invoicing import InvoiceError
 from .models import ContractCost, RecurringInvoiceSchedule
 from .money import MoneyError
-from .recurring_invoice_preview import apply_recurring_preview, preview_recurring_drafts, review_recurring_source
+from .recurring_invoice_preview import (
+    apply_recurring_preview,
+    discover_recurring_periods,
+    preview_recurring_drafts,
+    review_recurring_source,
+)
 from .recurring_invoices import enroll_recurring_schedule
 from .workspaces import ResolvedWorkspace
 
@@ -70,6 +81,8 @@ class RecurringTermsSerializer(serializers.Serializer):
 
 
 class RecurringScheduleSerializer(serializers.Serializer):
+    source_label = serializers.CharField(source="contract_cost.label")
+    contract_name = serializers.CharField(source="contract_cost.contract.entity.display_name")
     id = serializers.UUIDField()
     contract_cost_id = serializers.UUIDField()
     anchor = serializers.DateField()
@@ -77,6 +90,37 @@ class RecurringScheduleSerializer(serializers.Serializer):
     interval = serializers.CharField()
     enabled = serializers.BooleanField()
     terms = RecurringTermsSerializer(many=True)
+
+
+class RecurringSchedulePageSerializer(OffsetPageSerializer):
+    results = RecurringScheduleSerializer(many=True)
+    business_date = serializers.DateField()
+
+
+class RecurringDueQuerySerializer(StrictQuerySerializer):
+    due_from = serializers.DateField()
+    as_of = serializers.DateField()
+
+    def validate_as_of(self, value):  # type: ignore[no-untyped-def]
+        if value > timezone.localdate():
+            raise serializers.ValidationError("The planning date cannot be later than today.")
+        return value
+
+
+class RecurringDuePeriodSerializer(serializers.Serializer):
+    starts_on = serializers.DateField()
+    ends_before = serializers.DateField()
+    invoice_entity_id = serializers.UUIDField(allow_null=True)
+    can_generate = serializers.BooleanField()
+    blocked_reason = serializers.ChoiceField(
+        choices=["", "disabled", "source_changed", "source_unavailable", "partial", "tax"]
+    )
+
+
+class RecurringDueSerializer(serializers.Serializer):
+    periods = RecurringDuePeriodSerializer(many=True)
+    due_from = serializers.DateField()
+    as_of = serializers.DateField()
 
 
 class RecurringSourceSerializer(serializers.Serializer):
@@ -179,6 +223,35 @@ class RecurringSourceView(APIView):
 
 class RecurringEnrollmentView(APIView):
     @extend_schema(
+        operation_id="organization_recurring_invoices_list",
+        parameters=[BoundedCollectionQuerySerializer],
+        responses={200: RecurringSchedulePageSerializer},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _authorized_workspace(request, organization_entity_id)
+        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        records = (
+            RecurringInvoiceSchedule.scoped.for_scope(workspace.data_scope)
+            .select_related("contract_cost__contract__entity")
+            .prefetch_related("terms")
+            .order_by("created_at", "pk")
+        )
+        page = paginate(records, **query.validated_data)
+        return Response(
+            RecurringSchedulePageSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "business_date": timezone.localdate(),
+                }
+            ).data
+        )
+
+    @extend_schema(
         request=RecurringEnrollmentSerializer,
         responses={
             201: RecurringScheduleSerializer,
@@ -258,3 +331,29 @@ class RecurringApplyView(APIView):
             **data.validated_data,
         )
         return Response(RecurringClaimSerializer(result, many=True).data)
+
+
+class RecurringDueView(APIView):
+    @extend_schema(
+        parameters=[RecurringDueQuerySerializer],
+        responses={
+            200: RecurringDueSerializer,
+            400: RecurringErrorSerializer,
+            403: RecurringErrorSerializer,
+            404: RecurringErrorSerializer,
+            409: RecurringErrorSerializer,
+        },
+    )
+    def get(self, request, organization_entity_id, schedule_id):  # type: ignore[no-untyped-def]
+        workspace = _authorized_workspace(request, organization_entity_id)
+        _schedule(workspace, schedule_id)
+        query = RecurringDueQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        result = _call(
+            discover_recurring_periods,
+            user=request.user,
+            organization=workspace.organization,
+            schedule_id=schedule_id,
+            **query.validated_data,
+        )
+        return Response(RecurringDueSerializer(result).data)

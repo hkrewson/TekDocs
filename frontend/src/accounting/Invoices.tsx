@@ -7,6 +7,9 @@ import type { MessageId } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { InvoiceClient, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
 
+import { RecurringInvoices } from './RecurringInvoices'
+import { browserRecurringClient } from './recurringApi'
+
 type DraftForm = { currency: string; invoice_date: string; due_date: string; reference: string; notes: string }
 type LineForm = {
   originKey: string
@@ -86,6 +89,7 @@ function summaryStatuses(record: InvoiceDraft) {
 }
 
 export function Invoices({ workspace, client }: { workspace: WorkspaceContext; client: InvoiceClient }) {
+  const [showRecurring, setShowRecurring] = useState(false)
   const [records, setRecords] = useState<InvoiceDraft[]>([])
   const [origins, setOrigins] = useState<InvoiceOrigin[]>([])
   const [taxRates, setTaxRates] = useState<TaxRateChoice[]>([])
@@ -192,9 +196,15 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     <header className="page-header">
       <div><h1>{translate('accounting.heading')}</h1></div>
       <div className="form-actions">
+        {canManage && <button type="button" className="secondary-button" aria-expanded={showRecurring} onClick={() => setShowRecurring(!showRecurring)}>{translate(showRecurring ? 'recurring.close' : 'recurring.title')}</button>}
         {canManage && <button type="button" className="primary-button" aria-label={translate('accounting.newDraft')} onClick={() => { setDraft(emptyDraft()); setEditor('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('accounting.newDraft')}</span></button>}
       </div>
     </header>
+    {showRecurring && <RecurringInvoices key={workspace.id} workspace={workspace} client={browserRecurringClient} openInvoice={async (id) => {
+      const result = await client.list(workspace)
+      if (!result.results.some((record) => record.id === id)) throw new Error('Invoice unavailable')
+      setRecords(result.results); setSelectedId(id); setShowRecurring(false)
+    }} />}
     {error && <div className="form-message error" role="alert">{error}{needsSettings && <> <Link to="/invoices">{translate('accounting.openSettings')}</Link></>}</div>}
     {phase === 'loading' && <section className="content-section" role="status">{translate('accounting.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.unavailable')}</h2><p>{translate('accounting.loadFailed')}</p></section>}

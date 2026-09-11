@@ -162,3 +162,55 @@ def apply_recurring_preview(
         )
         for start in starts
     ]
+
+
+def discover_recurring_periods(
+    *, user: User, organization: Organization, schedule_id: UUID, due_from: date, as_of: date
+) -> dict[str, object]:
+    """Read-only discovery; apply independently rechecks every condition under locks."""
+    scope = _scope(user, organization)
+    schedule = RecurringInvoiceSchedule.scoped.for_scope(scope).get(pk=schedule_id)
+    terms = RecurringInvoiceTerms.scoped.for_scope(scope).select_related("tax_rate").get(schedule=schedule, version=1)
+    reason = ""
+    if not schedule.enabled:
+        reason = "disabled"
+    else:
+        try:
+            cost = _source(scope, schedule.contract_cost_id)
+            if _digest(_snapshot(cost)) != terms.source_digest:
+                reason = "source_changed"
+        except RecurrenceError:
+            reason = "source_unavailable"
+    periods = recurring_periods_due(
+        anchor=schedule.anchor,
+        interval=schedule.interval,
+        ends_on=schedule.ends_on,
+        due_from=due_from,
+        as_of=as_of,
+    )
+    claims = {
+        claim.starts_on: str(claim.invoice.entity_id)
+        for claim in RecurringInvoicePeriod.scoped.for_scope(scope)
+        .filter(schedule=schedule, starts_on__gte=due_from, starts_on__lte=as_of)
+        .select_related("invoice")
+    }
+    results = []
+    for period in periods:
+        blocked = reason
+        if period.requires_proration_review:
+            blocked = "partial"
+        if terms.tax_rate and not blocked:
+            try:
+                _tax_date(terms.tax_rate, period.starts_on)
+            except RecurrenceError:
+                blocked = "tax"
+        results.append(
+            {
+                "starts_on": period.starts_on,
+                "ends_before": period.ends_before,
+                "invoice_entity_id": claims.get(period.starts_on),
+                "blocked_reason": blocked,
+                "can_generate": not blocked and period.starts_on not in claims,
+            }
+        )
+    return {"periods": results, "as_of": as_of, "due_from": due_from}

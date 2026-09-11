@@ -114,3 +114,62 @@ test('a stock line records its quantity for the client in one save', async ({ pa
   await expect(page.getByText('125.500 × USD 0.30')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
+
+for (const width of [1280, 390]) {
+  test(`recurring invoices review and apply at ${width}px`, async ({ page, baseURL }) => {
+    await page.setViewportSize({ width, height: 900 })
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['invoices.view', 'invoices.edit', 'invoices.issue'],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: clientId, name: 'Example Client', classifications: ['client'], capabilities: ['overview', 'invoices'],
+    organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [issuedInvoice], can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/events`, async (route) => {
+    expect(await route.request().postDataJSON()).toMatchObject({ event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'invoice-44' })
+    await route.fulfill({ json: { ...issuedInvoice, lifecycle_state: 'externally_synchronized', reconciliation_state: 'synchronized', lifecycle_events: [...issuedInvoice.lifecycle_events, { id: crypto.randomUUID(), event_type: 'accounting_synchronized', occurred_at: '2026-09-01T12:00:00Z', recorded_at: '2026-09-01T12:00:00Z', actor: 'Primary Owner', provider: 'ledger', external_id: 'invoice-44', amount: null, currency: '', related_invoice_id: null, note: '' }] } })
+  })
+
+
+    const recurringPath = `**/api/v1/workspaces/organizations/${clientId}/recurring-invoices`
+    const schedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
+    await page.route(`${recurringPath}?*`, (route) => route.fulfill({ json: { results: [schedule], page: 1, page_size: 20, count: 1, has_more: false, business_date: '2025-03-01' } }))
+    await page.route(`${recurringPath}/schedule/due?*`, (route) => route.fulfill({ json: { due_from: '2025-01-01', as_of: '2025-03-01', periods: [
+      { starts_on: '2025-01-01', ends_before: '2025-02-01', invoice_entity_id: invoiceId, can_generate: false, blocked_reason: '' },
+      { starts_on: '2025-02-01', ends_before: '2025-03-01', invoice_entity_id: null, can_generate: true, blocked_reason: '' },
+      { starts_on: '2025-03-01', ends_before: '2025-03-16', invoice_entity_id: null, can_generate: false, blocked_reason: 'partial' },
+    ] } }))
+    await page.route(`${recurringPath}/schedule/preview`, async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ starts_on: ['2025-02-01'], as_of: '2025-03-01' })
+      await route.fulfill({ json: { preview_id: 'preview', preview_token: 'synthetic-review', expires_in_seconds: 900, schedule_id: 'schedule', terms_id: 'terms', source_digest: 'digest', as_of: '2025-03-01', currency: 'USD', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', existing_invoices: [], periods: [{ starts_on: '2025-02-01', ends_before: '2025-03-01', due_date: '2025-03-03', net: '150.00', tax: '0.00', total: '150.00' }] } })
+    })
+    await page.route(`${recurringPath}/schedule/apply`, async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ preview_token: 'synthetic-review' })
+      await route.fulfill({ json: [{ id: 'claim', starts_on: '2025-02-01', ends_before: '2025-03-01', invoice_entity_id: invoiceId, line_id: 'line' }] })
+    })
+    await page.goto(`/workspaces/organizations/${clientId}/invoices`)
+    await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+    await page.getByRole('button', { name: /Managed support/ }).click()
+    await page.getByRole('button', { name: 'Find due periods' }).click()
+    await expect(page.getByRole('checkbox').nth(0)).toBeDisabled()
+    await expect(page.getByRole('checkbox').nth(2)).toBeDisabled()
+    await page.getByRole('checkbox').nth(1).focus()
+    await page.keyboard.press('Space')
+    await page.getByRole('button', { name: 'Review selected periods' }).click()
+    await expect(page.getByText(/USD 150.00/)).toBeVisible()
+    expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.getByRole('button', { name: 'Create reviewed drafts' }).click()
+    await expect(page.getByText('Draft invoices are ready. Nothing has been issued or sent.')).toBeVisible()
+    await page.getByRole('button', { name: /Open invoice for/ }).click()
+    await expect(page.getByRole('heading', { name: 'Recurring invoices' })).toHaveCount(0)
+  })
+}

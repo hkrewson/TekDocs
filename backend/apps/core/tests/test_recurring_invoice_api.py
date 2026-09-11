@@ -258,3 +258,48 @@ def test_non_object_payload_is_a_controlled_bad_request(browser, setup, action):
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "validation_error"
     assert Invoice.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_schedule_discovery_is_paginated_and_client_scoped(browser, setup):
+    schedule = enroll(setup)
+    result = browser.get(url(setup, "enroll"), {"page_size": 1}).json()
+    assert result["count"] == 1 and result["results"][0]["id"] == str(schedule.pk)
+    assert result["results"][0]["source_label"] == "Provider fee"
+    assert browser.get(url(setup, "enroll", organization=setup[2])).json()["results"] == []
+    assert browser.get(url(setup, "enroll"), {"page": 2}).json()["results"] == []
+    assert browser.get(url(setup, "enroll"), {"unknown": "yes"}).status_code == 400
+
+
+@pytest.mark.django_db
+def test_due_discovery_marks_existing_partial_and_changed_periods(browser, setup):
+    from apps.core.tests.test_recurring_invoices import generate
+
+    schedule = enroll(setup, ends_on=date(2025, 3, 15))
+    claim = generate(setup, schedule)
+    address = url(setup, "due", schedule)
+    query = {"due_from": "2025-01-01", "as_of": "2025-03-01"}
+    result = browser.get(address, query)
+    assert result.status_code == 200, result.content
+    periods = result.json()["periods"]
+    assert periods[0]["invoice_entity_id"] == str(claim.invoice.entity_id) and not periods[0]["can_generate"]
+    assert periods[1]["can_generate"]
+    assert periods[2]["blocked_reason"] == "partial" and not periods[2]["can_generate"]
+    update_cost(contract=setup[3], cost_id=setup[4].pk, actor_id=setup[0].owner.pk, values={"amount": Decimal("23.00")})
+    assert browser.get(address, query).json()["periods"][1]["blocked_reason"] == "source_changed"
+    assert Invoice.objects.count() == 1
+    assert browser.get(url(setup, "due", schedule, setup[2]), query).status_code == 404
+    assert browser.get(address, {**query, "as_of": "9999-01-01"}).status_code == 400
+    assert browser.get(address, {**query, "due_from": "2025-04-01"}).status_code == 409
+
+
+@pytest.mark.django_db
+def test_discovery_requires_current_permissions(browser, setup):
+    schedule = enroll(setup)
+    reader = User.objects.create_user(email="discovery-reader@example.invalid")
+    TenantMembership.objects.create(tenant=setup[0].tenant, user=reader, role=BuiltInRole.READ_ONLY)
+    browser.force_login(reader)
+    assert browser.get(url(setup, "enroll")).status_code == 403
+    assert (
+        browser.get(url(setup, "due", schedule), {"due_from": "2025-01-01", "as_of": "2025-02-01"}).status_code == 403
+    )

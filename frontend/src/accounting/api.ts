@@ -155,11 +155,11 @@ async function parse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>
 }
 
-async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
+export async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
   return parse(await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
 }
 
-async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: object): Promise<T> {
+export async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: object): Promise<T> {
   await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
   return parse(await fetch(path, {
     method,

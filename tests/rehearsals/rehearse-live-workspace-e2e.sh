@@ -1,4 +1,10 @@
 #!/bin/sh
+
+#=======================# Live workspace rehearsal #=======================#
+# Exercise the real browser and PostgreSQL, then verify retained records.
+# Each run owns an isolated Compose project; cleanup preserves other stacks.
+
+#=======================# VARIABLES #=======================#
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
@@ -6,6 +12,8 @@ work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-live-workspace.XXXXXX")
 environment_file="$work_directory/live-workspace.env"
 project_name="tekdocs_live_workspace_$$"
 playwright_image="tekdocs-live-workspace-e2e:local"
+
+#======================# FUNCTIONS #=======================#
 
 live_compose() {
   docker compose --project-name "$project_name" --env-file "$environment_file" \
@@ -24,6 +32,8 @@ cleanup() {
   docker image rm -f "$playwright_image" >/dev/null 2>&1 || true
   rm -rf "$work_directory"
 }
+#=========================# MAIN #==========================#
+
 trap cleanup EXIT HUP INT TERM
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
@@ -52,11 +62,14 @@ docker run --rm \
   "$playwright_image" npx playwright test --config=playwright.live.config.ts
 
 live_compose run --rm -v "${project_name}_media_data:/app/media:ro" migrate python manage.py shell -c '
+from datetime import timedelta
+from decimal import Decimal
 from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
 from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
@@ -248,6 +261,46 @@ cost = ContractCost.objects.get(contract=contract, archived_at__isnull=True)
 assert str(cost.amount) == "875.50"
 assert cost.currency == "USD"
 assert cost.reference == "LIVE-PRIVATE-RATE"
+assert cost.billing_interval == "monthly"
+schedule = RecurringInvoiceSchedule.objects.get(contract_cost=cost)
+terms = RecurringInvoiceTerms.objects.get(schedule=schedule)
+period = RecurringInvoicePeriod.objects.select_related("invoice", "line").get(schedule=schedule)
+assert schedule.organization == organization
+assert schedule.tenant == organization.tenant
+assert schedule.enabled is True
+assert schedule.interval == "monthly"
+assert terms.version == 1
+assert terms.description == "Live approved monthly support"
+assert terms.quantity == Decimal("2.000")
+assert terms.unit_amount == Decimal("75.0000")
+assert terms.currency == "USD"
+assert terms.tax_rate_id is None
+assert terms.due_days == 30
+assert period.terms == terms
+assert period.starts_on == schedule.anchor
+assert period.ends_before > period.starts_on
+assert period.organization == organization
+assert period.tenant == organization.tenant
+invoice = period.invoice
+line = period.line
+assert Invoice.objects.filter(organization=organization).count() == 1
+assert InvoiceLine.objects.filter(invoice=invoice).count() == 1
+assert invoice.organization == organization
+assert invoice.tenant == organization.tenant
+assert invoice.state == "draft"
+assert invoice.number == ""
+assert invoice.issued_at is None
+assert invoice.invoice_date == schedule.anchor
+assert invoice.due_date == schedule.anchor + timedelta(days=30)
+assert line.invoice == invoice
+assert line.description == terms.description
+assert line.quantity == terms.quantity
+assert line.unit_amount == terms.unit_amount
+assert line.currency == "USD"
+assert not InvoiceArtifact.objects.filter(invoice=invoice).exists()
+assert not InvoiceLifecycleEvent.objects.filter(invoice=invoice).exists()
+print("Live recurring enrollment retained one approved schedule, period claim, and unissued draft.")
+
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

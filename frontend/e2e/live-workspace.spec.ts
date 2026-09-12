@@ -77,6 +77,69 @@ async function completeRequiredPrivilegedTotp(page: Page, password: string, acco
   await page.getByRole('button', { name: 'Enter MSP workspace' }).click()
 }
 
+async function rehearseRecurringDraft(page: Page) {
+  await page.getByRole('link', { name: 'Invoices', exact: true }).click()
+  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('button', { name: 'Enroll recurring service' }).click()
+  const sourceResponse = page.waitForResponse((response) => /\/recurring-invoices\/sources\/[^/]+$/.test(response.url()) && response.request().method() === 'GET')
+  await page.getByRole('button', { name: /Managed service base/ }).click()
+  const reviewed = await sourceResponse
+  expect(reviewed.status()).toBe(200)
+  const source = await reviewed.json() as { business_date: string }
+  // One starts-in-advance period, bounded by the installation's own date.
+  const anchor = source.business_date
+  await expect(page.getByLabel('Client unit price')).toHaveValue('')
+  await expect(page.getByLabel('Client quantity')).toHaveValue('')
+  await page.getByLabel('Client invoice description').fill('Live approved monthly support')
+  await page.getByLabel('Client unit price').fill('75.00')
+  await page.getByLabel('Client quantity').fill('2.000')
+  await page.getByLabel('First billing date').fill(anchor)
+  await page.getByLabel('Payment due days after period start').fill('30')
+  await page.getByLabel('Approved tax treatment').selectOption('__none__')
+  await page.getByRole('checkbox').focus()
+  await page.keyboard.press('Space')
+  await page.getByRole('button', { name: 'Save approved schedule' }).click()
+  await expect(page.getByRole('heading', { name: 'Live approved monthly support' })).toBeVisible()
+  await page.getByLabel('Period starts from').fill(anchor)
+  await page.getByLabel('Due as of').fill(anchor)
+  await page.getByRole('button', { name: 'Find due periods' }).click()
+  await expect(page.getByRole('checkbox')).toHaveCount(1)
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Review selected periods' }).click()
+  await expect(page.getByText(/USD 150.00/)).toBeVisible()
+  const appliedResponse = page.waitForResponse((response) => response.url().endsWith('/apply') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Create reviewed drafts' }).click()
+  const applied = await appliedResponse
+  expect(applied.status()).toBe(200)
+  const claims = await applied.json() as Array<{ invoice_entity_id: string }>
+  expect(claims).toHaveLength(1)
+  await expect(page.getByText('Draft invoices are ready. Nothing has been issued or sent.')).toBeVisible()
+  await page.getByRole('button', { name: /Open invoice for/ }).click()
+  await expect(page.getByRole('region', { name: 'Recurring invoices', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
+  await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
+
+  // A fresh page must rediscover the retained claim and open the same invoice.
+  await page.reload()
+  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
+  await page.getByLabel('Period starts from').fill(anchor)
+  await page.getByLabel('Due as of').fill(anchor)
+  const dueResponse = page.waitForResponse((response) => response.url().includes('/due?'))
+  await page.getByRole('button', { name: 'Find due periods' }).click()
+  const due = await dueResponse
+  expect(due.status()).toBe(200)
+  const discovered = await due.json() as { periods: Array<{ invoice_entity_id: string; can_generate: boolean }> }
+  expect(discovered.periods).toHaveLength(1)
+  expect(discovered.periods[0]).toMatchObject({ invoice_entity_id: claims[0].invoice_entity_id, can_generate: false })
+  await expect(page.getByRole('checkbox')).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Review selected periods' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Open existing invoice' }).click()
+  await expect(page.getByRole('region', { name: 'Recurring invoices', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
+  await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
+}
+
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
   test.setTimeout(300_000)
   page.setDefaultTimeout(15_000)
@@ -493,11 +556,13 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('heading', { name: 'Live managed services agreement' })).toBeVisible()
   await page.getByRole('button', { name: 'Add cost' }).click()
   await page.getByLabel('Cost label').fill('Managed service base')
+  await page.getByLabel('Billing interval').selectOption('monthly')
   await page.getByLabel('Amount').fill('875.50')
   await page.getByLabel('Quantity').fill('1')
   await page.getByLabel('Reference').fill('LIVE-PRIVATE-RATE')
   await page.getByRole('dialog').getByRole('button', { name: 'Add cost' }).click()
   await expect(page.getByText(/USD 875.50/)).toBeVisible()
+  await rehearseRecurringDraft(page)
 
   await page.getByRole('link', { name: 'Documentation' }).click()
   await page.getByRole('button', { name: 'New document' }).click()

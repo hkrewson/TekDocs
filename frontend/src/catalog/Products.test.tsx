@@ -117,6 +117,31 @@ describe('Products', () => {
     await waitFor(() => expect(versionDefinition).toHaveBeenCalledWith(workspace, 'definition-1', expect.objectContaining({ additionalProperties: false })))
   })
 
+  it.each([
+    ['no templates', []],
+    ['only a different product type', [{ ...definition, product_kind: 'software' as const }]],
+  ])('keeps Add model usable with %s', async (_label, definitions) => {
+    const user = userEvent.setup()
+    const createModel = vi.fn()
+    const api = catalogClient({
+      createModel,
+      listProducts: vi.fn().mockResolvedValue({ results: [{ ...product, models: [] }], can_manage: true }),
+      listDefinitions: vi.fn().mockResolvedValue({ results: definitions, can_manage: true }),
+    })
+    render(<Products workspace={workspace} client={api} />)
+    await user.click(await screen.findByRole('button', { name: 'Add model' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Create a hardware specification template before adding a model.')
+    expect(screen.getByRole('heading', { name: 'EdgeSwitch' })).toBeInTheDocument()
+    const editor = screen.getByRole('heading', { name: 'Add model' }).closest('section')!
+    expect(within(editor).queryByRole('button', { name: 'Add model' })).not.toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('heading', { name: 'Add model' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Specification templates' }))
+    await user.click(screen.getByRole('button', { name: 'New specification template' }))
+    expect(screen.getByRole('heading', { name: 'New specification template' })).toBeInTheDocument()
+    expect(createModel).not.toHaveBeenCalled()
+  })
+
   it('creates and revises a model from schema-driven fields', async () => {
     const createModel = vi.fn().mockResolvedValue(product.models[0])
     const reviseModel = vi.fn().mockResolvedValue(product.models[0])

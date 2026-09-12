@@ -55,3 +55,54 @@ test('supplier products use plain version language and explain archive consequen
   await expect(confirmation).toContainText('TekDocs does not provide a restore action')
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
+
+for (const width of [1280, 390]) {
+  test(`adding a model without templates keeps the catalog usable at ${width}px`, async ({ page, baseURL }) => {
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.invalid', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['assets.view', 'assets.edit'],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${supplierId}`, (route) => route.fulfill({ json: {
+    kind: 'organization',
+    id: supplierId,
+    name: 'Example Manufacturer',
+    classifications: ['vendor', 'manufacturer'],
+    capabilities: ['overview', 'products'],
+    organization: { id: supplierId, name: 'Example Manufacturer', legal_name: '', website: '', classifications: ['vendor', 'manufacturer'], created_at: '2026-09-05T12:00:00Z', updated_at: '2026-09-05T12:00:00Z' },
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${supplierId}/catalog/specification-definitions`, (route) => route.fulfill({ json: {
+    results: [{ id: 'template-1', name: 'Managed switch', product_kind: 'hardware', versions: [{ id: 'template-version-1', version: 1, schema: { type: 'object', additionalProperties: false, properties: { ports: { type: 'integer', title: 'Port count' } }, required: ['ports'] }, checksum: 'a'.repeat(64), created_by: 'Primary Owner', created_at: '2026-09-05T12:00:00Z' }] }],
+    can_manage: true,
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${supplierId}/catalog/products*`, (route) => route.fulfill({ json: {
+    results: [{
+      id: 'product-1', name: 'EdgeSwitch', kind: 'hardware', description: 'Managed switching product line', updated_at: '2026-09-05T12:00:00Z', documents: [],
+      models: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', current_revision: { id: 'revision-1', revision: 1, parent_id: null, specification_version_id: 'template-version-1', specification_definition_id: 'template-1', specification_definition_name: 'Managed switch', specification_version: 1, lifecycle: 'active', specifications: { ports: 24 }, notes: '', checksum: 'b'.repeat(64), created_by: 'Primary Owner', created_at: '2026-09-05T12:00:00Z' }, revisions: [] }],
+    }],
+    can_manage: true,
+  } }))
+
+    await page.route(`**/api/v1/workspaces/organizations/${supplierId}/catalog/specification-definitions`, (route) => route.fulfill({ json: { results: [], can_manage: true } }))
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`/workspaces/organizations/${supplierId}/products`)
+    await page.getByRole('button', { name: 'Add model', exact: true }).click()
+    await expect(page.getByRole('alert')).toHaveText('Create a hardware specification template before adding a model.')
+    await expect(page.getByRole('heading', { name: 'Example Manufacturer products' })).toBeVisible()
+    expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+    expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await page.getByRole('button', { name: 'Cancel', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Add model' })).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Specification templates' }).click()
+    await page.getByRole('button', { name: 'New specification template' }).click()
+    await expect(page.getByRole('heading', { name: 'New specification template' })).toBeVisible()
+    expect(errors).toEqual([])
+  })
+}

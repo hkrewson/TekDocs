@@ -88,7 +88,8 @@ function ModelForm({ product, definitions, model, saving, onCancel, onSave }: {
   onSave: (draft: ModelDraft) => Promise<void>
 }) {
   const applicable = definitions.filter((definition) => definition.product_kind === product.kind)
-  const initialVersionId = model?.current_revision.specification_version_id ?? latestDefinitionVersion(applicable[0])?.id ?? ''
+  const defaultVersion = applicable[0] ? latestDefinitionVersion(applicable[0]) : undefined
+  const initialVersionId = model?.current_revision.specification_version_id ?? defaultVersion?.id ?? ''
   const [draft, setDraft] = useState<ModelDraft>({
     name: model?.name ?? '',
     model_number: model?.model_number ?? '',
@@ -101,7 +102,10 @@ function ModelForm({ product, definitions, model, saving, onCancel, onSave }: {
 
   return <section className="catalog-editor" aria-labelledby="model-editor-heading">
     <div className="section-heading"><div><h3 id="model-editor-heading">{model ? translate('catalog.updateModelHeading', { name: model.name }) : translate('catalog.addModel')}</h3><p>{translate(model ? 'catalog.updateModelHelp' : 'catalog.addModelHelp')}</p></div></div>
-    {applicable.length === 0 ? <p className="form-message error" role="alert">{translate('catalog.modelNeedsTemplate', { type: productKindLabel(product.kind).toLowerCase() })}</p> : <>
+    {applicable.length === 0 ? <>
+      <p className="form-message error" role="alert">{translate('catalog.modelNeedsTemplate', { type: productKindLabel(product.kind).toLowerCase() })}</p>
+      <button type="button" className="secondary-button" onClick={onCancel}>{translate('common.cancel')}</button>
+    </> : <>
       <div className="catalog-form-grid">
         <label><span>{translate('catalog.modelName')}</span><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
         <label><span>{translate('catalog.modelNumber')}</span><input value={draft.model_number} onChange={(event) => setDraft({ ...draft, model_number: event.target.value })} /></label>

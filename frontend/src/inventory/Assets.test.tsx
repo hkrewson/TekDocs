@@ -1,9 +1,13 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
+import { act, render as rawRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Assets } from './Assets'
 import type { HardwareLifecycleEvent } from './api'
 import type { ClientAsset, InventoryClient } from './api'
+
+function render(children: ReactNode) { return rawRender(<ApplicationRouter initialPath="/assets">{children}</ApplicationRouter>) }
 
 const workspace = { id: 'client-1', name: 'Contoso', classifications: ['client'] } as never
 const asset: ClientAsset = {
@@ -70,6 +74,68 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
 }
 
 describe('Assets', () => {
+  it('closes untouched editors without a discard prompt when opening another section', async () => {
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient()} />)
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    await user.click(screen.getByRole('button', { name: 'Add address' }))
+    expect(screen.queryByLabelText('Serial number')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('MAC address')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByLabelText('MAC address')).not.toBeInTheDocument()
+  })
+
+  it('shows a failed create inside the editor and retains values through cancelled closing', async () => {
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ createAsset: vi.fn().mockRejectedValue(new Error('Model no longer available')) })} />)
+    await user.click(await screen.findByRole('button', { name: 'New asset' }))
+    const form = screen.getByRole('dialog', { name: 'New asset' })
+    await within(form).findByRole('option', { name: /Northwind/ })
+    await user.selectOptions(within(form).getByLabelText('Supplier model'), 'model-1')
+    await user.type(within(form).getByLabelText('Asset name (optional)'), 'Draft laptop')
+    await user.click(within(form).getByRole('button', { name: 'Create asset' }))
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Model no longer available')
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(within(form).getByLabelText('Asset name (optional)')).toHaveValue('Draft laptop')
+    expect(within(form).getByLabelText('Supplier model')).toHaveValue('model-1')
+  })
+
+  it('keeps a successful hardware write successful when history refresh fails', async () => {
+    const user = userEvent.setup()
+    const listHardwareLifecycle = vi.fn().mockResolvedValueOnce([]).mockRejectedValue(new Error('History unavailable'))
+    render(<Assets workspace={workspace} client={inventoryClient({ listHardwareLifecycle })} />)
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    await user.type(screen.getByLabelText('Serial number'), '-updated')
+    await user.click(screen.getByRole('button', { name: 'Save details' }))
+    expect(await screen.findByRole('button', { name: 'Edit details' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save details' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('history')
+  })
+
+  it('guards record changes and preserves failed edits until explicitly discarded', async () => {
+    const user = userEvent.setup()
+    const second = { ...asset, id: 'asset-2', name: 'Second switch' }
+    const client = inventoryClient({
+      listAssets: vi.fn().mockResolvedValue({ results: [asset, second], page: 1, page_size: 50, count: 2, has_more: false, can_manage: true }),
+      updateHardware: vi.fn().mockRejectedValue(new Error('Permission changed')),
+    })
+    render(<Assets workspace={workspace} client={client} />)
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    await user.clear(screen.getByLabelText('Serial number'))
+    await user.type(screen.getByLabelText('Serial number'), 'Unsaved serial')
+    await user.click(screen.getByRole('button', { name: 'Save details' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Permission changed')
+    await user.click(screen.getByRole('button', { name: /Second switch/ }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByLabelText('Serial number')).toHaveValue('Unsaved serial')
+    await user.click(screen.getByRole('button', { name: /Second switch/ }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    expect(await screen.findByRole('heading', { name: 'Second switch' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Serial number')).not.toBeInTheDocument()
+  })
+
   it('shows saved supplier details and published product documents', async () => {
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient()} />)

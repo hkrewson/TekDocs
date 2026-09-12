@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { useState } from 'react'
 import { Download, Upload, X } from 'lucide-react'
 import { translate } from '../i18n/localization'
@@ -16,6 +17,8 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
+
+  const attempt = useUnsavedChanges(open && Boolean(file), busy, close, open)
 
   function close() {
     if (busy) return
@@ -44,10 +47,10 @@ export function AssetCsvTransfer({ workspace, client, canManage, onApplied }: {
   return <>
     <div className="asset-transfer-actions">
       <a className="icon-button" href={client.assetCsvExportUrl(workspace)} download aria-label="Export assets as CSV" title="Export assets as CSV"><Download size={17} aria-hidden="true" /></a>
-      {canManage && <button className="icon-button" type="button" aria-label={translate('inventory.importCsv')} title={translate('inventory.importCsv')} onClick={() => setOpen(true)}><Upload size={17} aria-hidden="true" /></button>}
+      {canManage && <button className="icon-button" type="button" aria-label={translate('inventory.importCsv')} title={translate('inventory.importCsv')} onClick={() => attempt(() => setOpen(true))}><Upload size={17} aria-hidden="true" /></button>}
     </div>
     {open && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="asset-csv-heading"><div className="record-form asset-csv-panel">
-      <div className="section-heading"><div><h2 id="asset-csv-heading">Import assets from CSV</h2><p>Preview the file before applying it.</p></div><button className="icon-button" type="button" aria-label="Close CSV import" disabled={busy} onClick={close}><X size={16} /></button></div>
+      <div className="section-heading"><div><h2 id="asset-csv-heading">Import assets from CSV</h2><p>Preview the file before applying it.</p></div><button className="icon-button" type="button" aria-label="Close CSV import" disabled={busy} onClick={() => attempt(close)}><X size={16} /></button></div>
       <p className="asset-csv-guidance">Start with the canonical template and set each row's <code>schema_version</code> to <code>tekdocs.assets.v1</code>. New rows need a stable <code>import_key</code>; exported rows use their existing <code>asset_id</code>. Assignments, costs, licenses, contracts, attachments, credentials, and disposal are intentionally excluded.</p>
       <a className="secondary-button" href={client.assetCsvTemplateUrl(workspace)} download><Download size={15} />Download template</a>
       <label className="asset-csv-file"><span>TekDocs asset CSV</span><input type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setResult(null); setError(null) }} /></label>

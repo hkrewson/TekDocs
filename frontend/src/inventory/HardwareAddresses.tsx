@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { useState } from 'react'
 import { Pencil, Plus } from 'lucide-react'
 import { translate } from '../i18n/localization'
@@ -17,6 +18,9 @@ export function HardwareAddresses({ asset, workspace, client, canManage, onChang
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const dirty = editing === 'new' ? Boolean(address || description) : Boolean(editing && (address !== editing.address || description !== editing.description))
+  const attempt = useUnsavedChanges(dirty, busy, () => setEditing(null), editing !== null)
 
   function begin(value: AssetMACAddress | 'new') {
     setEditing(value)
@@ -47,13 +51,13 @@ export function HardwareAddresses({ asset, workspace, client, canManage, onChang
   return <section className="hardware-addresses" aria-labelledby="hardware-addresses-heading">
     <div className="section-heading">
       <div><h3 id="hardware-addresses-heading">MAC addresses</h3><p>Physical interface addresses belonging to this asset.</p></div>
-      {canManage && editing === null && <button className="secondary-button" type="button" onClick={() => begin('new')}><Plus size={15} aria-hidden="true" />{translate('inventory.addAddress')}</button>}
+      {canManage && editing === null && <button className="secondary-button" type="button" onClick={() => attempt(() => begin('new'))}><Plus size={15} aria-hidden="true" />{translate('inventory.addAddress')}</button>}
     </div>
-    {asset.mac_addresses.length === 0 && editing === null ? <p className="empty-state">No MAC addresses are recorded for this asset.</p> : <ul className="hardware-address-list">{asset.mac_addresses.map((item) => <li key={item.id}><span><code>{item.address}</code>{item.description && <small>{item.description}</small>}</span>{canManage && <button className="row-action" type="button" onClick={() => begin(item)}><Pencil size={14} aria-hidden="true" />{translate('common.edit')}</button>}</li>)}</ul>}
+    {asset.mac_addresses.length === 0 && editing === null ? <p className="empty-state">No MAC addresses are recorded for this asset.</p> : <ul className="hardware-address-list">{asset.mac_addresses.map((item) => <li key={item.id}><span><code>{item.address}</code>{item.description && <small>{item.description}</small>}</span>{canManage && <button className="row-action" type="button" onClick={() => attempt(() => begin(item))}><Pencil size={14} aria-hidden="true" />{translate('common.edit')}</button>}</li>)}</ul>}
     {editing !== null && <form className="hardware-form hardware-address-form" onSubmit={(event) => void save(event)}>
       <label><span>MAC address</span><input required maxLength={17} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="00:11:22:33:44:55" /></label>
       <label><span>Description</span><input maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ethernet or Wi-Fi" /></label>
-      <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save address'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => setEditing(null)}>{translate('common.cancel')}</button></div>
+      <div className="form-actions"><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save address'}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => attempt(() => setEditing(null))}>{translate('common.cancel')}</button></div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </form>}
   </section>

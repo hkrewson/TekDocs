@@ -1,0 +1,4 @@
+.unsaved-changes-dialog { box-sizing: border-box; width: min(30rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); overflow: auto; overflow-wrap: anywhere; }
+.unsaved-changes-dialog::backdrop { background: rgb(0 0 0 / 40%); }
+.unsaved-changes-dialog h2 { margin-top: 0; font-size: 1.25rem; }
+.unsaved-changes-dialog .form-actions { flex-wrap: wrap; }

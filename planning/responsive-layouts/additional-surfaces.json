@@ -54,5 +54,27 @@
     ],
     "status": "pending",
     "evidence": []
+  },
+  {
+    "surface": "registered asset edit navigation confirmation",
+    "source": "frontend/src/navigation/NavigationGuardProvider.tsx",
+    "entry": "Assets edit workflows and guarded transitions",
+    "states": [
+      "dirty",
+      "clean",
+      "busy",
+      "failed save",
+      "keep editing",
+      "discard",
+      "Back/Forward",
+      "native unload"
+    ],
+    "status": "implemented; focused browser, make check and live database gates passed",
+    "evidence": [
+      "frontend/src/navigation/NavigationGuardProvider.test.tsx",
+      "frontend/src/inventory/Assets.test.tsx",
+      "frontend/e2e/asset-edit-navigation.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ]
   }
 ]

@@ -1,6 +1,8 @@
+import { ApplicationRouter } from './navigation/ApplicationRouter'
+import { useNavigationGuard } from './navigation/navigationGuard'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BrowserRouter, Link, MemoryRouter, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import {
   Activity,
   BadgeCheck,
@@ -445,34 +447,15 @@ function OrganizationWorkspaceRoute({ state, relationshipsClient }: { state: Org
   return <WorkspaceOverview workspace={state.workspace} relationshipsClient={relationshipsClient} />
 }
 
-const organizationAreaDetails: Partial<Record<WorkspaceCapability, { title: string; description: string; release: string }>> = {
-  people: { title: 'People', description: 'Employees and contacts scoped to this organization.', release: '0.1.5' },
-  sites: { title: 'Sites', description: 'Sites and nested physical locations scoped to this organization.', release: '0.1.6' },
-  custom_fields: { title: 'Custom fields', description: 'Versioned extensions scoped to this organization or inherited from the MSP.', release: '0.1.7' },
-  documentation: { title: 'Documentation', description: 'Documentation owned by or explicitly referenced into this organization.', release: '0.2.8' },
-  files: { title: 'Files', description: 'Files owned by or explicitly referenced into this organization.', release: '0.3.8' },
-  assets: { title: translate('workspace.area.assets'), description: translate('workspace.area.assetsHelp'), release: '0.3.5' },
-  licenses: { title: translate('workspace.area.licenses'), description: translate('workspace.area.licensesHelp'), release: '0.3.6' },
-  networks: { title: 'Networks', description: 'Simple location-owned network records; physical devices and MAC addresses belong to Assets.', release: '0.5.10' },
-  domains: { title: translate('workspace.area.domains'), description: translate('workspace.area.domainsHelp'), release: '0.7.8' },
-  certificates: { title: translate('workspace.area.certificates'), description: translate('workspace.area.certificatesHelp'), release: '0.7.9' },
-  credentials: { title: translate('workspace.area.credentials'), description: translate('workspace.area.credentialsHelp'), release: '0.3.1' },
-  services: { title: translate('workspace.area.services'), description: translate('workspace.area.servicesHelp'), release: '0.3.7' },
-  vendors: { title: translate('workspace.area.vendors'), description: translate('workspace.area.vendorsHelp'), release: '0.3.4' },
-  products: { title: translate('workspace.area.products'), description: translate('workspace.area.productsHelp'), release: '0.3.3' },
-  recycle_bin: { title: 'Recycle bin', description: 'Archived records that can be recovered into this organization.', release: '0.1.13' },
-  integrations: { title: 'Integrations', description: 'Preview safe imports, manage signed webhooks, and reconcile provider data in this organization.', release: '0.6.3' },
-  compliance: { title: 'Compliance', description: 'Versioned control catalogs scoped to this organization.', release: '0.7.1' },
-  deadlines: { title: 'Reminders', description: 'Review, renewal, and operational deadlines scoped to this organization.', release: '0.8.42' },
-  activity: { title: 'Activity', description: 'Permission-aware append-only changes scoped to this organization.', release: '0.8.42' },
-  invoices: { title: 'Invoices', description: 'Draft, issue, deliver, and download immutable signed invoices for this client organization.', release: '0.8.46' },
-}
+const organizationWorkspaceAreas = workspaceCapabilities.filter((area) =>
+  area !== 'overview' && capabilityRegistry[area].scopes.some((scope) => scope === 'organization'),
+)
 
 function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
   if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingOrganizationWorkspace')}</section>
   if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
-  if (!state.workspace.capabilities.includes(area) || !organizationAreaDetails[area]) {
+  if (!state.workspace.capabilities.includes(area) || !organizationWorkspaceAreas.includes(area)) {
     return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.areaUnavailable')}</h1><p>{translate('navigation.areaUnavailableHelp')}</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>{translate('navigation.returnToOverview')}</Link></section>
   }
   if (area === 'people') return <People workspace={state.workspace} client={peopleClient} sitesClient={sitesClient} />
@@ -529,6 +512,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   signingOut?: boolean
   signOutError?: string | null
 }) {
+  const attemptNavigation = useNavigationGuard()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [shellContext, setShellContext] = useState(authContext)
@@ -607,7 +591,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
           <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
-          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} canViewSystemStatus={shellContext.permissions?.includes('system_diagnostics.view') ?? false} onSignOut={onSignOut} signingOut={signingOut} />
+          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} canViewSystemStatus={shellContext.permissions?.includes('system_diagnostics.view') ?? false} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
@@ -648,7 +632,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
             <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
             <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} searchClient={searchClient} />} />
-            {(Object.keys(organizationAreaDetails) as WorkspaceCapability[]).map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} />} />)}
+            {organizationWorkspaceAreas.map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} />} />)}
             <Route path="/workspaces/organizations/:organizationId/accounting" element={<Navigate to={`/workspaces/organizations/${organizationId}/invoices`} replace />} />
             <Route path="/workspaces/organizations/:organizationId/*" element={<UnavailablePage organizationOverview={`/workspaces/organizations/${organizationId}/overview`} />} />
             <Route path="*" element={<UnavailablePage />} />
@@ -718,7 +702,5 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
       )}
     </AuthGate>
   )
-  return initialPath
-    ? <MemoryRouter initialEntries={[initialPath]}>{application}</MemoryRouter>
-    : <BrowserRouter>{application}</BrowserRouter>
+  return <ApplicationRouter initialPath={initialPath}>{application}</ApplicationRouter>
 }

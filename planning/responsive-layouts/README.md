@@ -10,7 +10,7 @@ Quick right overlay drawer (full-screen below 768px), no nested drawer/tabs, bac
 
 ## Delivery
 
-1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API foundation only.
+1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API and navigation/edit-protection foundations implemented.
 2. **Assets** — Complete reference layout, operational overview, focused tabs and concise preview. Status: pending.
 3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: pending.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
@@ -33,6 +33,7 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Navigation and edit protection](navigation-foundation.md)
 - [Assets collection API and next integration dependencies](asset-collection.md)
 - [Implementation issues](issues.json)
 - [Progress and verification](progress.md)

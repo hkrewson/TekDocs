@@ -8,6 +8,8 @@ export type RecurringDue = components['schemas']['RecurringDue']
 export type RecurringClaim = components['schemas']['RecurringClaim']
 export type RecurringPage = components['schemas']['RecurringSchedulePage']
 export interface RecurringClient {
+  get(this: void, workspace: WorkspaceContext, id: string): Promise<RecurringSchedule>
+  stop(this: void, workspace: WorkspaceContext, id: string, reason: string): Promise<RecurringSchedule>
   list(this: void, workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<RecurringPage>
   due(this: void, workspace: WorkspaceContext, id: string, from: string, asOf: string, signal?: AbortSignal): Promise<RecurringDue>
   preview(this: void, workspace: WorkspaceContext, id: string, starts: string[], asOf: string): Promise<RecurringPreview>
@@ -15,6 +17,8 @@ export interface RecurringClient {
 }
 const base = (workspace: WorkspaceContext) => `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/recurring-invoices`
 export const browserRecurringClient: RecurringClient = {
+  get: (workspace, id) => read(`${base(workspace)}/${encodeURIComponent(id)}`),
+  stop: (workspace, id, reason) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/stop`, 'POST', { reason }),
   list: (workspace, page, signal) => read(`${base(workspace)}?${new URLSearchParams({ page: String(page), page_size: '20' })}`, signal),
   due: (workspace, id, from, asOf, signal) => read(`${base(workspace)}/${encodeURIComponent(id)}/due?${new URLSearchParams({ due_from: from, as_of: asOf })}`, signal),
   preview: (workspace, id, starts, asOf) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/preview`, 'POST', { starts_on: starts, as_of: asOf }),

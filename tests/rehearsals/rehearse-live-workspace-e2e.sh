@@ -267,7 +267,10 @@ terms = RecurringInvoiceTerms.objects.get(schedule=schedule)
 period = RecurringInvoicePeriod.objects.select_related("invoice", "line").get(schedule=schedule)
 assert schedule.organization == organization
 assert schedule.tenant == organization.tenant
-assert schedule.enabled is True
+assert schedule.enabled is False
+stop_event = AuditEvent.objects.get(action="invoice.recurring_stopped", entity_id=contract.entity_id)
+assert stop_event.metadata == {"schedule_id": str(schedule.pk), "reason": "Live service ended"}
+assert stop_event.actor_id == User.objects.get(display_name="Live Workspace Owner").pk
 assert schedule.interval == "monthly"
 assert terms.version == 1
 assert terms.description == "Live approved monthly support"
@@ -299,7 +302,7 @@ assert line.unit_amount == terms.unit_amount
 assert line.currency == "USD"
 assert not InvoiceArtifact.objects.filter(invoice=invoice).exists()
 assert not InvoiceLifecycleEvent.objects.filter(invoice=invoice).exists()
-print("Live recurring enrollment retained one approved schedule, period claim, and unissued draft.")
+print("Live recurring stop retained its audit reason, approved schedule, period claim, and unissued draft.")
 
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization

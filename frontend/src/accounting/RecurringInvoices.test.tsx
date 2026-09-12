@@ -7,8 +7,11 @@ import type { WorkspaceContext } from '../workspaces/api'
 const workspace: WorkspaceContext = { kind: 'organization', id: 'client', name: 'Client', classifications: ['client'], capabilities: ['invoices'], organization: null }
 const schedule: RecurringSchedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
 function fixture() {
+  let retained = schedule
   const client: RecurringClient = {
-    list: vi.fn().mockResolvedValue({ results: [schedule], page: 1, page_size: 20, count: 1, has_more: false, business_date: '2025-03-01' }),
+    get: vi.fn().mockImplementation(() => Promise.resolve(retained)),
+    stop: vi.fn().mockImplementation(() => { retained = { ...schedule, enabled: false }; return Promise.resolve(retained) }),
+    list: vi.fn().mockImplementation(() => Promise.resolve({ results: [retained], page: 1, page_size: 20, count: 1, has_more: false, business_date: '2025-03-01' })),
     due: vi.fn().mockResolvedValue({ due_from: '2025-01-01', as_of: '2025-03-01', periods: [
       { starts_on: '2025-01-01', ends_before: '2025-02-01', invoice_entity_id: 'old-invoice', can_generate: false, blocked_reason: '' },
       { starts_on: '2025-02-01', ends_before: '2025-03-01', invoice_entity_id: null, can_generate: true, blocked_reason: '' },
@@ -69,6 +72,59 @@ describe('recurring review', () => {
       expect(screen.getByText('This review expired. Review the selected periods again.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create reviewed drafts' })).toBeDisabled()
     } finally { vi.useRealTimers() }
+  })
+  it('requires confirmation and a reason, clears preview, and retains invoice links after stop', async () => {
+    const { client, openInvoice } = fixture(); await select()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop future drafts' }))
+    expect(screen.queryByRole('button', { name: 'Create reviewed drafts' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm stop' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Reason for stopping'), { target: { value: '  Service ended  ' } })
+    expect(client.stop).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm stop' }))
+    await screen.findByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')
+    expect(client.stop).toHaveBeenCalledWith(workspace, 'schedule', 'Service ended')
+    expect(screen.queryByRole('button', { name: 'Stop future drafts' })).not.toBeInTheDocument()
+    const checks = await screen.findAllByRole('checkbox')
+    checks.forEach((check) => expect(check).toBeDisabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Open existing invoice' })); await Promise.resolve() })
+    expect(openInvoice).toHaveBeenCalledWith('old-invoice')
+  })
+  it('cancels confirmation without sending a stop or retaining the old preview', async () => {
+    const { client } = fixture(); await select()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop future drafts' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(client.stop).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Create reviewed drafts' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find due periods' })).toBeEnabled()
+  })
+  it('keeps generation blocked after denial until a successful status check', async () => {
+    const { client } = fixture(); await select()
+    vi.mocked(client.stop).mockRejectedValueOnce(new Error('Denied'))
+    vi.mocked(client.get).mockRejectedValueOnce(new Error('Still denied')).mockResolvedValueOnce(schedule)
+    fireEvent.click(screen.getByRole('button', { name: 'Stop future drafts' }))
+    fireEvent.change(screen.getByLabelText('Reason for stopping'), { target: { value: 'End service' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm stop' }))
+    await screen.findByRole('alert')
+    expect(screen.getByRole('button', { name: 'Find due periods' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Check schedule status' }))
+    await waitFor(() => expect(client.get).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check schedule status' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Check schedule status' }))
+    await screen.findByRole('button', { name: 'Stop future drafts' })
+    expect(screen.queryByRole('button', { name: 'Create reviewed drafts' })).not.toBeInTheDocument()
+    expect(client.apply).not.toHaveBeenCalled()
+  })
+  it('retries an uncertain stop with the same reason', async () => {
+    const { client } = fixture(); await select()
+    vi.mocked(client.stop).mockRejectedValueOnce(new Error('Lost response'))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop future drafts' }))
+    fireEvent.change(screen.getByLabelText('Reason for stopping'), { target: { value: 'End service' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm stop' }))
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText('Reason for stopping')).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry stop' }))
+    await screen.findByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')
+    expect(vi.mocked(client.stop).mock.calls[0]).toEqual(vi.mocked(client.stop).mock.calls[1])
   })
   it('shows a denied discovery request without exposing schedules', async () => {
     const client = { list: vi.fn().mockRejectedValue(new Error('Denied')) } as unknown as RecurringClient

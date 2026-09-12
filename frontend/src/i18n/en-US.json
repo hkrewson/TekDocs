@@ -2097,5 +2097,15 @@
   "enrollment.taxHelp": "The selected tax version must cover the first billing date and each later period. The server validates its effective dates.",
   "enrollment.fixedHelp": "This enrollment fixes the calendar and approved terms. Changes and replacement are not yet supported. Partial periods require a separate decision and cannot be generated. Enrolling creates no invoices.",
   "enrollment.approve": "I approve these client prices, dates, and tax treatment.",
-  "enrollment.save": "Save approved schedule"
+  "enrollment.save": "Save approved schedule",
+  "recurring.stop": "Stop future drafts",
+  "recurring.stopConfirm": "Confirm stop",
+  "recurring.stopReason": "Reason for stopping",
+  "recurring.stopHelp": "Stop generating new drafts for this schedule. Existing invoices and billing history remain. A generation already in progress may finish. This does not cancel the contract or any invoice, and restarting is not supported.",
+  "recurring.stopUncertain": "The stop could not be confirmed. You may no longer have permission, or the response may have been lost. Check the schedule status or retry the stop before generating more drafts.",
+  "recurring.stopRetry": "Retry stop",
+  "recurring.stopCheck": "Check schedule status",
+  "recurring.stopWorking": "Checking schedule…",
+  "recurring.stoppedLabel": "Stopped",
+  "recurring.stoppedHelp": "Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported."
 }

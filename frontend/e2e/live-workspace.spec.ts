@@ -119,10 +119,18 @@ async function rehearseRecurringDraft(page: Page) {
   await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
   await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
 
-  // A fresh page must rediscover the retained claim and open the same invoice.
+  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
+  await page.getByRole('button', { name: 'Stop future drafts' }).click()
+  await page.getByLabel('Reason for stopping').fill('Live service ended')
+  await page.getByRole('button', { name: 'Confirm stop', exact: true }).click()
+  await expect(page.getByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')).toBeVisible()
+
+  // A fresh page must retain the stop and rediscover the same invoice.
   await page.reload()
   await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
   await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
+  await expect(page.getByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')).toBeVisible()
   await page.getByLabel('Period starts from').fill(anchor)
   await page.getByLabel('Due as of').fill(anchor)
   const dueResponse = page.waitForResponse((response) => response.url().includes('/due?'))

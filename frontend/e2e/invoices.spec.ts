@@ -147,6 +147,13 @@ for (const width of [1280, 390]) {
       { starts_on: '2025-02-01', ends_before: '2025-03-01', invoice_entity_id: null, can_generate: true, blocked_reason: '' },
       { starts_on: '2025-03-01', ends_before: '2025-03-16', invoice_entity_id: null, can_generate: false, blocked_reason: 'partial' },
     ] } }))
+    await page.route(`${recurringPath}/schedule`, (route) => route.fulfill({ json: schedule }))
+    await page.route(`${recurringPath}/schedule/stop`, async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ reason: 'Service ended' })
+      schedule.enabled = false
+      // Mobile covers a committed stop whose response was lost.
+      await route.fulfill(width === 390 ? { status: 500, json: {} } : { json: schedule })
+    })
     await page.route(`${recurringPath}/schedule/preview`, async (route) => {
       expect(route.request().postDataJSON()).toEqual({ starts_on: ['2025-02-01'], as_of: '2025-03-01' })
       await route.fulfill({ json: { preview_id: 'preview', preview_token: 'synthetic-review', expires_in_seconds: 900, schedule_id: 'schedule', terms_id: 'terms', source_digest: 'digest', as_of: '2025-03-01', currency: 'USD', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', existing_invoices: [], periods: [{ starts_on: '2025-02-01', ends_before: '2025-03-01', due_date: '2025-03-03', net: '150.00', tax: '0.00', total: '150.00' }] } })
@@ -170,6 +177,25 @@ for (const width of [1280, 390]) {
     await page.getByRole('button', { name: 'Create reviewed drafts' }).click()
     await expect(page.getByText('Draft invoices are ready. Nothing has been issued or sent.')).toBeVisible()
     await page.getByRole('button', { name: /Open invoice for/ }).click()
+    await expect(page.getByRole('heading', { name: 'Recurring invoices' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+    await page.getByRole('button', { name: /Managed support/ }).click()
+    await page.getByRole('button', { name: 'Stop future drafts' }).click()
+    await expect(page.getByRole('button', { name: 'Confirm stop', exact: true })).toBeDisabled()
+    await expect(page.getByLabel('Reason for stopping')).toBeFocused()
+    await page.getByLabel('Reason for stopping').fill('Service ended')
+    expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.getByRole('button', { name: 'Confirm stop', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    if (width === 390) {
+      await expect(page.getByRole('button', { name: 'Find due periods' })).toBeDisabled()
+      await page.getByRole('button', { name: 'Check schedule status' }).click()
+    }
+    await expect(page.getByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')).toBeVisible()
+    await expect(page.getByRole('checkbox').nth(1)).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Review selected periods' })).toBeDisabled()
+    await page.getByRole('button', { name: 'Open existing invoice' }).click()
     await expect(page.getByRole('heading', { name: 'Recurring invoices' })).toHaveCount(0)
   })
 }

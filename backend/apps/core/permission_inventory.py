@@ -526,6 +526,51 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.ASSETS_EDIT,),
         organization_scoped=True,
     ),
+    # Recurring reads also require invoice editing/MFA; the views additionally
+    # require invoice and cost visibility in the same organization.
+    route(
+        "organization-recurring-invoice-sources",
+        ("GET",),
+        PermissionKey.INVOICES_EDIT,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-source",
+        ("GET",),
+        PermissionKey.INVOICES_EDIT,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-enroll",
+        ("GET", "POST"),
+        PermissionKey.INVOICES_EDIT,
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-detail",
+        ("GET",),
+        PermissionKey.INVOICES_EDIT,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-due",
+        ("GET",),
+        PermissionKey.INVOICES_EDIT,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-preview",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-apply",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
     route(
         "organization-invoice-list-create",
         ("GET", "POST"),

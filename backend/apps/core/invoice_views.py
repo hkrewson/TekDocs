@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
@@ -66,6 +67,8 @@ class RecentAuthenticationRequired(PermissionDenied):
 
 class StrictSerializer(serializers.Serializer):
     def to_internal_value(self, data):  # type: ignore[no-untyped-def]
+        if not isinstance(data, Mapping):
+            raise serializers.ValidationError({"non_field_errors": ["Expected a JSON object."]})
         unexpected = set(data) - set(self.fields)
         if unexpected:
             raise serializers.ValidationError({key: "This field is not accepted." for key in sorted(unexpected)})

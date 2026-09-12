@@ -1,6 +1,6 @@
 """Operator-initiated enrollment and reviewed recurring drafts; never automatic issue."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any, TypeVar
 from uuid import UUID
@@ -48,14 +48,7 @@ class RecurringErrorSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
 
-class RecurringWriteSerializer(StrictSerializer):
-    def to_internal_value(self, data):  # type: ignore[no-untyped-def]
-        if not isinstance(data, Mapping):
-            raise serializers.ValidationError({"non_field_errors": ["Expected a JSON object."]})
-        return super().to_internal_value(data)  # type: ignore[no-untyped-call]
-
-
-class RecurringEnrollmentSerializer(RecurringWriteSerializer):
+class RecurringEnrollmentSerializer(StrictSerializer):
     cost_id = serializers.UUIDField()
     expected_source_digest = serializers.RegexField(r"^[0-9a-f]{64}$")
     anchor = serializers.DateField()
@@ -161,7 +154,7 @@ class RecurringSourceQuerySerializer(BoundedCollectionQuerySerializer):
     q = serializers.CharField(max_length=200, required=False, default="", allow_blank=True)
 
 
-class RecurringPreviewWriteSerializer(RecurringWriteSerializer):
+class RecurringPreviewWriteSerializer(StrictSerializer):
     starts_on = serializers.ListField(child=serializers.DateField(), min_length=1, max_length=120)
     as_of = serializers.DateField()
 
@@ -173,7 +166,7 @@ class RecurringPreviewWriteSerializer(RecurringWriteSerializer):
         return value
 
 
-class RecurringApplySerializer(RecurringWriteSerializer):
+class RecurringApplySerializer(StrictSerializer):
     preview_token = serializers.CharField(max_length=65536)
 
 

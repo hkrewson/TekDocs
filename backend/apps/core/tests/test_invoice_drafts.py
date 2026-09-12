@@ -1,3 +1,4 @@
+import json
 import secrets
 import uuid
 from datetime import date
@@ -315,3 +316,44 @@ def test_invoice_database_guards_and_forced_rls_reject_cross_scope_links():
 
     assert Invoice.objects.count() == 0
     assert InvoiceLine.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_invoice_writes_reject_non_objects_and_unknown_fields_without_mutation(owner_client, installation):
+    client = organization(installation, "Input validation client", "client")
+    scope = {"organization_entity_id": client.entity_id}
+    collection = reverse("organization-invoice-list-create", kwargs=scope)
+    created = owner_client.post(
+        collection,
+        {"currency": "USD", "invoice_date": "2026-08-29", "due_date": "2026-09-01"},
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    invoice_scope = {**scope, "invoice_entity_id": created.json()["id"]}
+    detail = reverse("organization-invoice-detail", kwargs=invoice_scope)
+    lines = reverse("organization-invoice-line-list-create", kwargs=invoice_scope)
+    line = owner_client.post(
+        lines,
+        {"description": "Retained work", "quantity": "2.000", "unit_amount": "10.00"},
+        content_type="application/json",
+    )
+    assert line.status_code == 201
+    line_detail = reverse(
+        "organization-invoice-line-detail",
+        kwargs={**invoice_scope, "line_id": line.json()["lines"][0]["id"]},
+    )
+    before = owner_client.get(detail).json()
+    for method, url in (("post", collection), ("patch", detail), ("post", lines), ("patch", line_detail)):
+        for payload in ([{}], [], ["currency"], "USD", 42, True, None):
+            response = owner_client.generic(method.upper(), url, json.dumps(payload), content_type="application/json")
+            assert response.status_code == 400, (method, url, payload)
+            assert response.json()["error"]["code"] == "validation_error"
+            assert "non_field_errors" in response.json()["error"]["fields"]
+        response = owner_client.generic(
+            method.upper(), url, json.dumps({"unaccepted_field": "value"}), content_type="application/json"
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["fields"] == {"unaccepted_field": ["This field is not accepted."]}
+    assert Invoice.objects.count() == 1
+    assert InvoiceLine.objects.count() == 1
+    assert owner_client.get(detail).json() == before

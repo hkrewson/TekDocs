@@ -127,6 +127,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: make supported-recovery-rehearsal
+      - name: Verify recurring invoice history after restore
+        run: make recurring-invoice-backup-rehearsal
       - name: Write commit-bound evidence
         run: >-
           python3 scripts/write_security_evidence.py

@@ -7942,3 +7942,28 @@ class DataFlowSnapshot(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Data flow snapshots are retained")
+
+
+class CollectionPreference(TimestampedModel):
+    """Installation/user/feature presentation state shared across workspaces."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    feature = models.CharField(max_length=64)
+    columns = models.JSONField(default=list)
+    page_size = models.PositiveSmallIntegerField(default=25)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "user", "feature"), name="collection_preference_owner_unique"),
+            models.CheckConstraint(
+                condition=models.Q(page_size__in=(25, 50, 100)), name="collection_preference_page_size"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}: {self.feature}"

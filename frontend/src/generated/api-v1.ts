@@ -2276,6 +2276,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/collection-preferences/{feature}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_collection_preferences_retrieve"];
+        readonly put: operations["workspaces_msp_collection_preferences_update"];
+        readonly post?: never;
+        readonly delete: operations["workspaces_msp_collection_preferences_destroy"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/compliance/assignments/{assignment_id}/evidence": {
         readonly parameters: {
             readonly query?: never;
@@ -4399,6 +4415,22 @@ export interface paths {
         readonly put?: never;
         readonly post: operations["workspaces_organizations_client_invitations_create"];
         readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/collection-preferences/{feature}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_collection_preferences_retrieve"];
+        readonly put: operations["workspaces_organizations_collection_preferences_update"];
+        readonly post?: never;
+        readonly delete: operations["workspaces_organizations_collection_preferences_destroy"];
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -8221,6 +8253,28 @@ export interface components {
             readonly count: number;
             readonly has_more: boolean;
             readonly can_manage: boolean;
+        };
+        readonly CollectionPreference: {
+            readonly columns: readonly string[];
+            /**
+             * @description * `25` - 25
+             *     * `50` - 50
+             *     * `100` - 100
+             * @enum {integer}
+             */
+            readonly page_size: 25 | 50 | 100;
+            readonly available_columns: readonly string[];
+            readonly default_columns: readonly string[];
+        };
+        readonly CollectionPreferenceWrite: {
+            readonly columns: readonly string[];
+            /**
+             * @description * `25` - 25
+             *     * `50` - 50
+             *     * `100` - 100
+             * @enum {integer}
+             */
+            readonly page_size: 25 | 50 | 100;
         };
         readonly ComplianceAssignment: {
             /** Format: uuid */
@@ -20357,6 +20411,81 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_collection_preferences_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_collection_preferences_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CollectionPreferenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CollectionPreferenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["CollectionPreferenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_collection_preferences_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
+                };
+            };
+        };
+    };
     readonly msp_compliance_assignment_evidence_link: {
         readonly parameters: {
             readonly query?: never;
@@ -25690,6 +25819,84 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Invitation"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_collection_preferences_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_collection_preferences_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CollectionPreferenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["CollectionPreferenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["CollectionPreferenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_collection_preferences_destroy: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly feature: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CollectionPreference"];
                 };
             };
         };

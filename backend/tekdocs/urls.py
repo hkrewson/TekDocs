@@ -44,6 +44,7 @@ from apps.core.catalog_views import (
     CatalogSpecificationDefinitionListCreateView,
     CatalogSpecificationDefinitionVersionView,
 )
+from apps.core.collection_preferences import CollectionPreferenceView
 from apps.core.commercial_views import (
     CommercialContractDetailView,
     CommercialContractListCreateView,
@@ -1621,6 +1622,16 @@ urlpatterns = [
         ClientAssetModelChoiceListView.as_view(),
         {"organization_entity_id": None},
         name="msp-asset-model-choices",
+    ),
+    path(
+        "api/v1/workspaces/msp/collection-preferences/<str:feature>",
+        CollectionPreferenceView.as_view(),
+        name="msp-collection-preferences",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/collection-preferences/<str:feature>",
+        CollectionPreferenceView.as_view(),
+        name="organization-collection-preferences",
     ),
     path(
         "api/v1/workspaces/msp/assets/collection",

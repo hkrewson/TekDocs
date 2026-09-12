@@ -26,7 +26,9 @@ TENANT_MODEL_CONTRACTS = tuple(
     TenantModelContract(
         table,
         IsolationBoundary.FORCED_RLS,
-        "Exact-client recurring enrollment, approved terms, and permanent period claims."
+        "Personal presentation identifiers; tenant/user RLS and per-request workspace policy."
+        if table == "core_collectionpreference"
+        else "Exact-client recurring enrollment, approved terms, and permanent period claims."
         if table.startswith("core_recurringinvoice")
         else "Tenant-owned entity-domain data.",
     )

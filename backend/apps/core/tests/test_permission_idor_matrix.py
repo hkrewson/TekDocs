@@ -560,6 +560,11 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-stock-detail": ("item_id",),
         "msp-stock-movement-create": ("item_id",),
     }
+    if route_name in {"msp-collection-preferences", "organization-collection-preferences"}:
+        kwargs = {"feature": "assets"}
+        if route_name.startswith("organization-"):
+            kwargs["organization_entity_id"] = value
+        return kwargs
     if route_name in {"msp-recycle-bin-restore", "organization-recycle-bin-restore"}:
         kwargs = {"record_type": "site", "record_id": value}
         if route_name.startswith("organization-"):

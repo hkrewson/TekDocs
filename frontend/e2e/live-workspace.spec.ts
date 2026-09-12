@@ -244,6 +244,25 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   const assignedWorkspace = await staffPage.request.get(`/api/v1/workspaces/organizations/${clientId}`)
   expect(assignedWorkspace.status()).toBe(200)
+  // Personal presentation state crosses workspaces, never user boundaries.
+  const preferenceUrl = `/api/v1/workspaces/organizations/${clientId}/collection-preferences/assets`
+  const preferenceCsrf = (await staffPage.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+  if (!preferenceCsrf) throw new Error('Missing preferences CSRF cookie')
+  const preferenceWrite = await staffPage.request.put(preferenceUrl, {
+    data: { columns: ['site', 'name'], page_size: 50 },
+    headers: { 'X-CSRFToken': preferenceCsrf.value },
+  })
+  expect(preferenceWrite.status()).toBe(200)
+  expect((await preferenceWrite.json() as { columns: string[] }).columns).toEqual(['name', 'site'])
+  const preferenceRead = await staffPage.request.get('/api/v1/workspaces/msp/collection-preferences/assets')
+  expect(preferenceRead.status()).toBe(200)
+  expect((await preferenceRead.json() as { page_size: number }).page_size).toBe(50)
+  const ownerPreferences = await page.request.get(preferenceUrl)
+  expect(ownerPreferences.status()).toBe(200)
+  expect((await ownerPreferences.json() as { page_size: number }).page_size).toBe(25)
+  const preferenceReset = await staffPage.request.delete(preferenceUrl, { headers: { 'X-CSRFToken': preferenceCsrf.value } })
+  expect(preferenceReset.status()).toBe(200)
+  expect((await preferenceReset.json() as { page_size: number }).page_size).toBe(25)
   await staffPage.goto(clientHref)
   await expect(staffPage.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
 

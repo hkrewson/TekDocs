@@ -7588,6 +7588,97 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/collection-preferences/{feature}:
+    get:
+      operationId: workspaces_msp_collection_preferences_retrieve
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_msp_collection_preferences_update
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_msp_collection_preferences_destroy
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/compliance/assignments/{assignment_id}/evidence:
     post:
       operationId: msp_compliance_assignment_evidence_link
@@ -14544,6 +14635,115 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Invitation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/collection-preferences/{feature}:
+    get:
+      operationId: workspaces_organizations_collection_preferences_retrieve
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_organizations_collection_preferences_update
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CollectionPreferenceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    delete:
+      operationId: workspaces_organizations_collection_preferences_destroy
+      parameters:
+      - in: path
+        name: feature
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPreference'
           description: ''
           headers:
             X-Request-ID:
@@ -28351,6 +28551,62 @@ components:
       - page
       - page_size
       - results
+    CollectionPreference:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+            maxLength: 64
+          maxItems: 32
+        page_size:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          description: |-
+            * `25` - 25
+            * `50` - 50
+            * `100` - 100
+          x-spec-enum-id: 73dd9410cc002acc
+        available_columns:
+          type: array
+          items:
+            type: string
+        default_columns:
+          type: array
+          items:
+            type: string
+      required:
+      - available_columns
+      - columns
+      - default_columns
+      - page_size
+    CollectionPreferenceWrite:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+            maxLength: 64
+          maxItems: 32
+        page_size:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          description: |-
+            * `25` - 25
+            * `50` - 50
+            * `100` - 100
+          x-spec-enum-id: 73dd9410cc002acc
+      required:
+      - columns
+      - page_size
     ComplianceAssignment:
       type: object
       properties:

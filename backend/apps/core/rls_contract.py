@@ -115,6 +115,7 @@ TENANT_SCOPED_TABLES = (
     "core_outboxdeliveryreceipt",
     "core_inboxnotification",
     "core_notificationpreference",
+    "core_collectionpreference",
     "core_notificationemaildelivery",
     "core_documenttemplaterevision",
     "core_taxonomy",

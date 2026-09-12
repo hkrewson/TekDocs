@@ -33,6 +33,7 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Personal collection preferences](personal-preferences.md)
 - [Navigation and edit protection](navigation-foundation.md)
 - [Assets collection API and next integration dependencies](asset-collection.md)
 - [Implementation issues](issues.json)

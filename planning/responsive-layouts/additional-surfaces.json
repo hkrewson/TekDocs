@@ -76,5 +76,29 @@
       "frontend/e2e/asset-edit-navigation.spec.ts",
       "frontend/e2e/live-workspace.spec.ts"
     ]
+  },
+  {
+    "surface": "personal collection preferences API and client foundation",
+    "source": "backend/apps/core/collection_preferences.py",
+    "entry": "MSP and organization collection-preferences/assets APIs",
+    "states": [
+      "default",
+      "saved",
+      "reset",
+      "denied",
+      "permission changed",
+      "malformed",
+      "offline fallback",
+      "canceled read",
+      "failed write",
+      "upgrade",
+      "restored"
+    ],
+    "status": "implemented foundation; API, upgrade/restore, make check and live gates passed; chooser UI pending",
+    "evidence": [
+      "backend/apps/core/tests/test_collection_preferences.py",
+      "frontend/src/collections/preferences.test.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ]
   }
 ]

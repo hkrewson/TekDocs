@@ -1,0 +1,415 @@
+[
+  {
+    "route": "*",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/access-control",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/accounting",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/activity",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/assets",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/auth/invitations/accept",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/certificates",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/compliance",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/credentials",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/custom-fields",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/deadlines",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/documentation",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/domains",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/files",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/integrations",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/invoices",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/licenses",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/networks",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/notification-delivery",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/organizations",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/overview",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/people",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/products",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/recycle-bin",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/search",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/services",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/settings",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/sites",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/staff",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/stock",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/system-status",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/taxonomies",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/vendors",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/*",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/accounting",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/activity",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/assets",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/certificates",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/compliance",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/credentials",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/custom_fields",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/deadlines",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/documentation",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/domains",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/files",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/integrations",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/invoices",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/licenses",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/networks",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/overview",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/people",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/products",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/recycle_bin",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/search",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/services",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/sites",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  },
+  {
+    "route": "/workspaces/organizations/:organizationId/vendors",
+    "source": "frontend/src/App.tsx",
+    "status": "pending",
+    "evidence": [],
+    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+  }
+]

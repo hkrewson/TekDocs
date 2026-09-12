@@ -2180,6 +2180,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/assets/collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_assets_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/assets/csv/apply": {
         readonly parameters: {
             readonly query?: never;
@@ -4126,6 +4142,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_organizations_assets_bulk_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_assets_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -7544,6 +7576,31 @@ export interface components {
             readonly conventions: {
                 readonly [key: string]: unknown;
             };
+        };
+        readonly AssetCollectionItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly kind: string;
+            readonly model_name: string;
+            readonly model_number: string;
+            readonly status: string | null;
+            readonly assignment: string | null;
+            readonly site: string | null;
+            /** Format: date */
+            readonly warranty_ends_on: string | null;
+        };
+        /** @description Canonical metadata shared by offset-paginated public collections. */
+        readonly AssetCollectionResult: {
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly results: readonly components["schemas"]["AssetCollectionItem"][];
+            readonly can_manage: boolean;
+            readonly can_view_relationships: boolean;
+            readonly can_create_relationships: boolean;
+            readonly can_archive_relationships: boolean;
         };
         readonly AssetCsvApply: {
             /** Format: uri */
@@ -20111,6 +20168,78 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_assets_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                readonly assigned?: boolean;
+                /**
+                 * @description * `hardware` - hardware
+                 *     * `software` - software
+                 */
+                readonly kind?: "hardware" | "software";
+                /**
+                 * @description * `name` - name
+                 *     * `model` - model
+                 *     * `kind` - kind
+                 *     * `status` - status
+                 *     * `assignment` - assignment
+                 *     * `site` - site
+                 *     * `warranty` - warranty
+                 *     * `-name` - -name
+                 *     * `-model` - -model
+                 *     * `-kind` - -kind
+                 *     * `-status` - -status
+                 *     * `-assignment` - -assignment
+                 *     * `-site` - -site
+                 *     * `-warranty` - -warranty
+                 */
+                readonly ordering?: "name" | "model" | "kind" | "status" | "assignment" | "site" | "warranty" | "-name" | "-model" | "-kind" | "-status" | "-assignment" | "-site" | "-warranty";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly search?: string;
+                readonly site?: string;
+                /**
+                 * @description * `in_stock` - in_stock
+                 *     * `in_service` - in_service
+                 *     * `repair` - repair
+                 *     * `retired` - retired
+                 *     * `disposed` - disposed
+                 *     * `planned` - planned
+                 *     * `installed` - installed
+                 *     * `suspended` - suspended
+                 *     * `uninstalled` - uninstalled
+                 */
+                readonly status?: "in_stock" | "in_service" | "repair" | "retired" | "disposed" | "planned" | "installed" | "suspended" | "uninstalled";
+                /**
+                 * @description * `expired` - expired
+                 *     * `current` - current
+                 *     * `missing` - missing
+                 */
+                readonly warranty?: "expired" | "current" | "missing";
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetCollectionResult"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_assets_csv_apply_create: {
         readonly parameters: {
             readonly query?: never;
@@ -24897,6 +25026,80 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ClientAssetBulkResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_assets_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                readonly assigned?: boolean;
+                /**
+                 * @description * `hardware` - hardware
+                 *     * `software` - software
+                 */
+                readonly kind?: "hardware" | "software";
+                /**
+                 * @description * `name` - name
+                 *     * `model` - model
+                 *     * `kind` - kind
+                 *     * `status` - status
+                 *     * `assignment` - assignment
+                 *     * `site` - site
+                 *     * `warranty` - warranty
+                 *     * `-name` - -name
+                 *     * `-model` - -model
+                 *     * `-kind` - -kind
+                 *     * `-status` - -status
+                 *     * `-assignment` - -assignment
+                 *     * `-site` - -site
+                 *     * `-warranty` - -warranty
+                 */
+                readonly ordering?: "name" | "model" | "kind" | "status" | "assignment" | "site" | "warranty" | "-name" | "-model" | "-kind" | "-status" | "-assignment" | "-site" | "-warranty";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly search?: string;
+                readonly site?: string;
+                /**
+                 * @description * `in_stock` - in_stock
+                 *     * `in_service` - in_service
+                 *     * `repair` - repair
+                 *     * `retired` - retired
+                 *     * `disposed` - disposed
+                 *     * `planned` - planned
+                 *     * `installed` - installed
+                 *     * `suspended` - suspended
+                 *     * `uninstalled` - uninstalled
+                 */
+                readonly status?: "in_stock" | "in_service" | "repair" | "retired" | "disposed" | "planned" | "installed" | "suspended" | "uninstalled";
+                /**
+                 * @description * `expired` - expired
+                 *     * `current` - current
+                 *     * `missing` - missing
+                 */
+                readonly warranty?: "expired" | "current" | "missing";
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetCollectionResult"];
                 };
             };
         };

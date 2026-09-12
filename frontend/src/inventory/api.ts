@@ -1,3 +1,4 @@
+import type { components, operations } from '../generated/api-v1'
 import type { WorkspaceContext } from '../workspaces/api'
 
 export type AssetDocument = {
@@ -202,4 +203,25 @@ export const browserInventoryClient: InventoryClient = {
     const body = new FormData(); body.append('file', file); body.append('preview_token', previewToken)
     return mutateForm(`${basePath(workspace)}/assets/csv/apply`, body)
   },
+}
+
+// Browsing is additive: legacy consumers retain full records and their page defaults.
+export type AssetCollectionQuery = NonNullable<operations['workspaces_msp_assets_collection_retrieve']['parameters']['query']>
+export type AssetCollectionResult = components['schemas']['AssetCollectionResult']
+export type AssetSummary = components['schemas']['AssetCollectionItem']
+
+export interface AssetCollectionClient {
+  list(workspace: WorkspaceContext, query: AssetCollectionQuery, signal?: AbortSignal): Promise<AssetCollectionResult>
+  detail(workspace: WorkspaceContext, assetId: string, signal?: AbortSignal): Promise<ClientAsset>
+}
+
+export const browserAssetCollectionClient: AssetCollectionClient = {
+  list(workspace, query, signal) {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) params.set(key, String(value))
+    }
+    return get(`${basePath(workspace)}/assets/collection?${params}`, signal)
+  },
+  detail: (workspace, assetId, signal) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}`, signal),
 }

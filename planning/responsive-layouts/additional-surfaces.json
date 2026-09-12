@@ -1,0 +1,58 @@
+[
+  {
+    "surface": "authentication and setup",
+    "source": "frontend/src/auth/AuthGate.tsx",
+    "entry": "AuthGate state on all application paths",
+    "states": [
+      "bootstrap",
+      "error",
+      "invitation",
+      "invitation-unavailable",
+      "loading",
+      "mfa-challenge",
+      "password-reset",
+      "password-reset-complete",
+      "password-reset-request",
+      "password-reset-sent",
+      "password-reset-unavailable",
+      "password-reset-validating",
+      "sign-in"
+    ],
+    "status": "pending",
+    "evidence": []
+  },
+  {
+    "surface": "client portal",
+    "source": "frontend/src/portal/ClientPortal.tsx",
+    "entry": "authenticated context.surface = client_portal",
+    "states": [
+      "document library",
+      "retained publication reader",
+      "invoice register",
+      "invoice detail",
+      "notifications",
+      "sign out",
+      "loading",
+      "empty",
+      "denied",
+      "failed"
+    ],
+    "status": "pending",
+    "evidence": []
+  },
+  {
+    "surface": "cross-cutting overlays",
+    "source": "frontend/src/App.tsx",
+    "entry": "application shell",
+    "states": [
+      "workspace selector",
+      "navigation collapse",
+      "contextual help",
+      "notification inbox",
+      "sign out",
+      "unavailable workspace"
+    ],
+    "status": "pending",
+    "evidence": []
+  }
+]

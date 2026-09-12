@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Phase 1: Responsive route inventory and shared foundations",
+    "url": "https://github.com/hkrewson/TekDocs/issues/78"
+  },
+  {
+    "title": "Phase 2: Assets responsive reference implementation",
+    "url": "https://github.com/hkrewson/TekDocs/issues/79"
+  },
+  {
+    "title": "Phase 3: Contracts and Networks responsive validation",
+    "url": "https://github.com/hkrewson/TekDocs/issues/80"
+  },
+  {
+    "title": "Phase 4: Remaining operational record layouts",
+    "url": "https://github.com/hkrewson/TekDocs/issues/81"
+  },
+  {
+    "title": "Phase 5: Documentation and file layouts",
+    "url": "https://github.com/hkrewson/TekDocs/issues/82"
+  },
+  {
+    "title": "Phase 6: Financial compliance and integration layouts",
+    "url": "https://github.com/hkrewson/TekDocs/issues/83"
+  },
+  {
+    "title": "Phase 7: Shell and remaining responsive surfaces",
+    "url": "https://github.com/hkrewson/TekDocs/issues/84"
+  },
+  {
+    "title": "Phase 8: Responsive pre-1.0 acceptance",
+    "url": "https://github.com/hkrewson/TekDocs/issues/85"
+  },
+  {
+    "title": "Responsive collection APIs: bounded authorized summaries",
+    "url": "https://github.com/hkrewson/TekDocs/issues/86"
+  },
+  {
+    "title": "Personal collection preferences: persistence and isolation",
+    "url": "https://github.com/hkrewson/TekDocs/issues/87"
+  },
+  {
+    "title": "Record navigation, URL state and dirty-form protection",
+    "url": "https://github.com/hkrewson/TekDocs/issues/88"
+  }
+]

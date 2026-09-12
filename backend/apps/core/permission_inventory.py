@@ -678,6 +678,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("PATCH", "DELETE"),
         mutations=(PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
     ),
+    route("msp-asset-collection", ("GET",), PermissionKey.ASSETS_VIEW),
+    route("organization-asset-collection", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-list-create", ("GET", "POST"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-bulk", ("POST",), mutations=(PermissionKey.ASSETS_EDIT,)),
     route("msp-asset-csv-template", ("GET",), PermissionKey.ASSETS_VIEW),

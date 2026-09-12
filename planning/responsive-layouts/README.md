@@ -1,0 +1,38 @@
+# Pre-1.0 responsive layouts and record navigation
+
+Required 1.0 acceptance under #60; coordinates with #40 and #39 and preserves #75/#76 obligations. Version remains 0.8.46. No deployment or publication implied.
+
+## Accepted interaction contract
+
+Balanced lists; personal feature-specific column choices in curated order; immutable identity column; 25/50/100 rows, default 25. Whole-collection authorized search/filter/sort with deterministic ties. Current-page bulk selection only; query/order/page changes clear it. Shared filter menu plus active-condition summary. URL-addressed query, preview, record and section state, with list scroll/focus restoration.
+
+Quick right overlay drawer (full-screen below 768px), no nested drawer/tabs, background locked and one scrolling body. Concise operational facts and bounded explicit actions only. Full record tabs: Overview first, active section editor with Save/Cancel; mobile Sections menu. Dirty navigation offers Keep editing/Discard. Preserve failed writes and never blindly retry uncertain mutations. Major actions keep existing review/confirmation workflows. Urgent issues remain on Overview. Existing permission and data-integrity policy remains authoritative.
+
+## Delivery
+
+1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API foundation only.
+2. **Assets** — Complete reference layout, operational overview, focused tabs and concise preview. Status: pending.
+3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: pending.
+4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
+5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: pending.
+6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: pending.
+7. **Shell and remaining surfaces** — Search, overviews, reminders, activity, notifications, recycle bin, metadata, account/access/setup/help/system status and client portal. Status: pending.
+8. **Release acceptance** — Route/state completion, technician walkthroughs, production image and release gates. Status: pending.
+
+Separate work items cover navigation, collection APIs and personal preferences. Every migrated surface must remove its prior competing layout. Current shell routes are listed in routes.json from App.tsx; authentication, portal, and nested record/workflow states still need expansion during Phase 1; state/viewport requirements are specified in acceptance.json, and evidence must be recorded explicitly before marking a surface complete.
+
+## APIs and compatibility
+
+Additive bounded summary collections preserve legacy APIs. Detail/tab data loads on demand. Personal preferences are authenticated, installation/user/feature scoped, contain only column identifiers and page size, and have safe defaults. Django migrations and reviewed RLS classification govern persistence. Preserve existing links, contracts and operation IDs; regenerate OpenAPI/types for intentional additions.
+
+## Acceptance
+
+Docker make check plus focused API/component/browser tests per slice. Real backend journeys for migrated workflows. Final production-image, upgrade/recovery and release gates. Test 320/390/768/1024/1280/1440px, short heights, 200% zoom, keyboard/touch and maintained engines. Explicitly cover denied, stale, conflicts, dirty forms, permission changes, large collections, off-page search, stable sorting, bounded queries, focus/history restoration, deep links and missing records. No horizontal page overflow. Specialized code/table/PDF/topology scrolling requires a recorded reason.
+
+Excluded: named saved views, resizable/reorderable columns, density modes, infinite scrolling and cross-page selection. Existing security/recurring/pilot obligations remain open. User and demo data must be preserved.
+
+## Implementation records
+
+- [Assets collection API and next integration dependencies](asset-collection.md)
+- [Implementation issues](issues.json)
+- [Progress and verification](progress.md)

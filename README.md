@@ -103,6 +103,8 @@ Database migrations run through a one-shot owner container. The web, worker, and
 
 Production secrets are file-backed. Direct environment values and secret-file sources are mutually exclusive in the production profile.
 
+Required pre-1.0 interface work is tracked in the [responsive layouts implementation plan](planning/responsive-layouts/README.md). Version remains 0.8.46 until explicitly changed; this plan supplements existing release obligations.
+
 ## Development gates
 
 Run the fast local gate:

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { browserInventoryClient } from './api'
+import { browserAssetCollectionClient, browserInventoryClient } from './api'
 
 describe('inventory API client', () => {
   beforeEach(() => {
@@ -49,5 +49,29 @@ describe('inventory API client', () => {
     expect(applyBody.get('preview_token')).toBe('signed-preview')
     expect((calls[1][1]?.headers as Record<string, string>)['Content-Type']).toBeUndefined()
     expect((calls[1][1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('inventory-csrf')
+  })
+})
+
+
+describe('asset summary browsing', () => {
+  it('encodes collection conditions, retains false filters, and propagates cancellation', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0 }), { status: 200 }))
+    vi.stubGlobal('fetch', request)
+    const controller = new AbortController()
+    await browserAssetCollectionClient.list({ kind: 'organization', id: 'client/1' } as never, {
+      search: 'serial & tag', page: 2, page_size: 25, assigned: false, ordering: '-name', kind: undefined,
+    }, controller.signal)
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/assets/collection?search=serial+%26+tag&page=2&page_size=25&assigned=false&ordering=-name',
+      expect.objectContaining({ credentials: 'same-origin', signal: controller.signal }),
+    )
+  })
+
+  it('loads only the requested detail and surfaces failures without retrying', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'Unavailable' }), { status: 404 }))
+    vi.stubGlobal('fetch', request)
+    await expect(browserAssetCollectionClient.detail({ kind: 'msp' } as never, 'asset/1')).rejects.toThrow('Unavailable')
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets/asset%2F1', expect.any(Object))
   })
 })

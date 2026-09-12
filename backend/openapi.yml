@@ -7315,6 +7315,153 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/assets/collection:
+    get:
+      operationId: workspaces_msp_assets_collection_retrieve
+      parameters:
+      - in: query
+        name: assigned
+        schema:
+          type: boolean
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - hardware
+          - software
+          type: string
+          x-spec-enum-id: 5aded443857b1518
+          minLength: 1
+        description: |-
+          * `hardware` - hardware
+          * `software` - software
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - model
+          - kind
+          - status
+          - assignment
+          - site
+          - warranty
+          - -name
+          - -model
+          - -kind
+          - -status
+          - -assignment
+          - -site
+          - -warranty
+          type: string
+          x-spec-enum-id: 7c68e021e1c47c43
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `model` - model
+          * `kind` - kind
+          * `status` - status
+          * `assignment` - assignment
+          * `site` - site
+          * `warranty` - warranty
+          * `-name` - -name
+          * `-model` - -model
+          * `-kind` - -kind
+          * `-status` - -status
+          * `-assignment` - -assignment
+          * `-site` - -site
+          * `-warranty` - -warranty
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: site
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - in_stock
+          - in_service
+          - repair
+          - retired
+          - disposed
+          - planned
+          - installed
+          - suspended
+          - uninstalled
+          type: string
+          x-spec-enum-id: bc9092864250a839
+          minLength: 1
+        description: |-
+          * `in_stock` - in_stock
+          * `in_service` - in_service
+          * `repair` - repair
+          * `retired` - retired
+          * `disposed` - disposed
+          * `planned` - planned
+          * `installed` - installed
+          * `suspended` - suspended
+          * `uninstalled` - uninstalled
+      - in: query
+        name: warranty
+        schema:
+          enum:
+          - expired
+          - current
+          - missing
+          type: string
+          x-spec-enum-id: 6ec213e75613d6af
+          minLength: 1
+        description: |-
+          * `expired` - expired
+          * `current` - current
+          * `missing` - missing
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCollectionResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/assets/csv/apply:
     post:
       operationId: workspaces_msp_assets_csv_apply_create
@@ -13431,6 +13578,159 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClientAssetBulkResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/collection:
+    get:
+      operationId: workspaces_organizations_assets_collection_retrieve
+      parameters:
+      - in: query
+        name: assigned
+        schema:
+          type: boolean
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - hardware
+          - software
+          type: string
+          x-spec-enum-id: 5aded443857b1518
+          minLength: 1
+        description: |-
+          * `hardware` - hardware
+          * `software` - software
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - model
+          - kind
+          - status
+          - assignment
+          - site
+          - warranty
+          - -name
+          - -model
+          - -kind
+          - -status
+          - -assignment
+          - -site
+          - -warranty
+          type: string
+          x-spec-enum-id: 7c68e021e1c47c43
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `model` - model
+          * `kind` - kind
+          * `status` - status
+          * `assignment` - assignment
+          * `site` - site
+          * `warranty` - warranty
+          * `-name` - -name
+          * `-model` - -model
+          * `-kind` - -kind
+          * `-status` - -status
+          * `-assignment` - -assignment
+          * `-site` - -site
+          * `-warranty` - -warranty
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: site
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - in_stock
+          - in_service
+          - repair
+          - retired
+          - disposed
+          - planned
+          - installed
+          - suspended
+          - uninstalled
+          type: string
+          x-spec-enum-id: bc9092864250a839
+          minLength: 1
+        description: |-
+          * `in_stock` - in_stock
+          * `in_service` - in_service
+          * `repair` - repair
+          * `retired` - retired
+          * `disposed` - disposed
+          * `planned` - planned
+          * `installed` - installed
+          * `suspended` - suspended
+          * `uninstalled` - uninstalled
+      - in: query
+        name: warranty
+        schema:
+          enum:
+          - expired
+          - current
+          - missing
+          type: string
+          x-spec-enum-id: 6ec213e75613d6af
+          minLength: 1
+        description: |-
+          * `expired` - expired
+          * `current` - current
+          * `missing` - missing
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCollectionResult'
           description: ''
           headers:
             X-Request-ID:
@@ -26468,6 +26768,81 @@ components:
       - schema_url
       - status
       - version
+    AssetCollectionItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+        model_name:
+          type: string
+        model_number:
+          type: string
+        status:
+          type: string
+          nullable: true
+        assignment:
+          type: string
+          nullable: true
+        site:
+          type: string
+          nullable: true
+        warranty_ends_on:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - assignment
+      - id
+      - kind
+      - model_name
+      - model_number
+      - name
+      - site
+      - status
+      - warranty_ends_on
+    AssetCollectionResult:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetCollectionItem'
+        can_manage:
+          type: boolean
+        can_view_relationships:
+          type: boolean
+        can_create_relationships:
+          type: boolean
+        can_archive_relationships:
+          type: boolean
+      required:
+      - can_archive_relationships
+      - can_create_relationships
+      - can_manage
+      - can_view_relationships
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     AssetCsvApply:
       type: object
       properties:

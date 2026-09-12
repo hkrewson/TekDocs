@@ -1,0 +1,41 @@
+{
+  "widths": [
+    320,
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ],
+  "zoom_percent": [
+    100,
+    200
+  ],
+  "short_height": 600,
+  "states": [
+    "loading",
+    "empty",
+    "populated",
+    "long-content",
+    "validation",
+    "conflict",
+    "denied",
+    "unavailable",
+    "stale",
+    "confirmation",
+    "success",
+    "failure"
+  ],
+  "engines": [
+    "chromium",
+    "firefox",
+    "webkit"
+  ],
+  "evidence_required": [
+    "component",
+    "browser",
+    "authorized-api",
+    "live-runtime"
+  ],
+  "default_status": "pending"
+}

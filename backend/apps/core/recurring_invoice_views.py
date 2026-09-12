@@ -33,7 +33,7 @@ from .recurring_invoice_preview import (
     preview_recurring_drafts,
     review_recurring_source,
 )
-from .recurring_invoices import enroll_recurring_schedule
+from .recurring_invoices import enroll_recurring_schedule, stop_recurring_schedule
 from .workspaces import ResolvedWorkspace
 
 Result = TypeVar("Result")
@@ -427,3 +427,35 @@ class RecurringSourceListView(APIView):
                 }
             ).data
         )
+
+
+class RecurringStopSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=500)
+
+
+class RecurringStopView(APIView):
+    @extend_schema(
+        request=RecurringStopSerializer,
+        responses={
+            200: RecurringScheduleSerializer,
+            400: RecurringErrorSerializer,
+            403: RecurringErrorSerializer,
+            404: RecurringErrorSerializer,
+        },
+        description="Stop future draft generation without cancelling existing invoices or releasing period claims. "
+        "A generation already holding the schedule lock may finish first. Repeated stops retain the "
+        "first audit reason. Restart, replacement, and term changes are not supported by this action.",
+    )
+    def post(self, request, organization_entity_id, schedule_id):  # type: ignore[no-untyped-def]
+        workspace = _authorized_workspace(request, organization_entity_id)
+        _schedule(workspace, schedule_id)
+        data = RecurringStopSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        schedule = _call(
+            stop_recurring_schedule,
+            user=request.user,
+            organization=workspace.organization,
+            schedule_id=schedule_id,
+            **data.validated_data,
+        )
+        return Response(RecurringScheduleSerializer(schedule).data)

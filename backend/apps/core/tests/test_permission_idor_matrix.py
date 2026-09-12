@@ -290,6 +290,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "organization_entity_id",
             "definition_id",
         ),
+        "organization-recurring-invoice-stop": ("organization_entity_id", "schedule_id"),
         "organization-recurring-invoice-sources": ("organization_entity_id",),
         "organization-recurring-invoice-source": ("organization_entity_id", "cost_id",),
         "organization-recurring-invoice-enroll": ("organization_entity_id",),

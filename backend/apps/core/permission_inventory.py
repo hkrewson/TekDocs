@@ -526,6 +526,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.ASSETS_EDIT,),
         organization_scoped=True,
     ),
+    route(
+        "organization-recurring-invoice-stop",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
     # Recurring reads also require invoice editing/MFA; the views additionally
     # require invoice and cost visibility in the same organization.
     route(

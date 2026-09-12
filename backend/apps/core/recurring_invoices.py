@@ -261,3 +261,33 @@ def generate_recurring_draft(
         metadata={"schedule_id": str(schedule.pk), "period_id": str(claim.pk)},
     )
     return claim
+
+
+@transaction.atomic
+def stop_recurring_schedule(
+    *, user: User, organization: Organization, schedule_id: UUID, reason: str
+) -> RecurringInvoiceSchedule:
+    """Stop future generation; retain claims and the first stop reason on retries.
+
+    Only the schedule is locked. Generation takes that same lock after its source
+    locks, so an already-running generation may finish before this stop commits.
+    Source drift or archival must never prevent stopping a retained schedule.
+    """
+    scope = _scope(user, organization)
+    if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 500:
+        raise RecurrenceError("A stop reason of between 1 and 500 characters is required")
+    schedule = RecurringInvoiceSchedule.scoped.for_scope(scope).select_for_update().filter(pk=schedule_id).first()
+    if schedule is None:
+        raise RecurrenceError("The recurring schedule is unavailable in this Workspace")
+    if not schedule.enabled:
+        return schedule
+    schedule.enabled = False
+    schedule.save(update_fields=("enabled", "updated_at"))
+    AuditEvent.objects.create(
+        tenant_id=scope.tenant_id,
+        actor=user,
+        action="invoice.recurring_stopped",
+        entity_id=schedule.contract_cost.contract.entity_id,
+        metadata={"schedule_id": str(schedule.pk), "reason": reason.strip()},
+    )
+    return schedule

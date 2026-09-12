@@ -7076,6 +7076,23 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/stop": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** @description Stop future draft generation without cancelling existing invoices or releasing period claims. A generation already holding the schedule lock may finish first. Repeated stops retain the first audit reason. Restart, replacement, and term changes are not supported by this action. */
+        readonly post: operations["workspaces_organizations_recurring_invoices_stop_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources": {
         readonly parameters: {
             readonly query?: never;
@@ -13030,6 +13047,9 @@ export interface components {
             readonly contract_starts_on: string | null;
             /** Format: date */
             readonly contract_ends_on: string | null;
+        };
+        readonly RecurringStop: {
+            readonly reason: string;
         };
         readonly RecurringTerms: {
             /** Format: uuid */
@@ -32757,6 +32777,66 @@ export interface operations {
                 };
             };
             readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_stop_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringStop"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringStop"];
+                readonly "multipart/form-data": components["schemas"]["RecurringStop"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringSchedule"];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

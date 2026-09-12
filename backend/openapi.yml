@@ -24715,6 +24715,92 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/stop:
+    post:
+      operationId: workspaces_organizations_recurring_invoices_stop_create
+      description: Stop future draft generation without cancelling existing invoices
+        or releasing period claims. A generation already holding the schedule lock
+        may finish first. Repeated stops retain the first audit reason. Restart, replacement,
+        and term changes are not supported by this action.
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringStop'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringStop'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringStop'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringSchedule'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringError'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources:
     get:
       operationId: organization_recurring_sources_list
@@ -39166,6 +39252,14 @@ components:
       - interval
       - label
       - quantity
+    RecurringStop:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+      required:
+      - reason
     RecurringTerms:
       type: object
       properties:

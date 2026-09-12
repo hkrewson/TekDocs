@@ -453,3 +453,31 @@ def test_foreign_tenant_cannot_reuse_enrollment_or_terms(setup):
             approved_by=setup[0].owner,
         )
     assert Invoice.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_stops_retain_one_audit_event(setup):
+    from apps.core.models import AuditEvent, Organization
+    from apps.core.recurring_invoices import stop_recurring_schedule
+
+    schedule = enroll(setup)
+    user_id, organization_id = setup[0].owner.pk, setup[1].pk
+
+    def stop(index):
+        close_old_connections()
+        try:
+            return stop_recurring_schedule(
+                user=User.objects.get(pk=user_id),
+                organization=Organization.objects.get(pk=organization_id),
+                schedule_id=schedule.pk,
+                reason=f"Operator stop {index}",
+            ).enabled
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        assert list(executor.map(stop, range(4))) == [False] * 4
+    assert AuditEvent.objects.filter(action="invoice.recurring_stopped").count() == 1
+    assert Invoice.objects.count() == 0
+    with pytest.raises(RecurrenceError, match="disabled"):
+        generate(setup, schedule)

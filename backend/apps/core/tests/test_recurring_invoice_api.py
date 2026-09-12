@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core.commercial import update_cost
-from apps.core.models import Invoice, RecurringInvoicePeriod, RecurringInvoiceSchedule
+from apps.core.models import AuditEvent, Invoice, RecurringInvoicePeriod, RecurringInvoiceSchedule
 from apps.core.recurring_invoice_preview import PREVIEW_SALT
 from apps.core.tests import test_recurring_invoices as recurrence_fixtures
 
@@ -343,3 +343,119 @@ def test_source_review_reports_intersection_and_sources_require_current_permissi
     browser.force_login(reader)
     assert browser.get(url(setup, "sources")).status_code == 403
     assert browser.get(url(setup, "source")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_stop_is_audited_once_retains_claims_and_invalidates_previews(browser, setup):
+    schedule = enroll(setup)
+    first = recurrence_fixtures.generate(setup, schedule)
+    before = browser.get(url(setup, "detail", schedule)).json()
+    token = preview(browser, setup, schedule).json()["preview_token"]
+    stopped = browser.post(
+        url(setup, "stop", schedule), {"reason": "  Service ended  "}, content_type="application/json"
+    )
+    assert stopped.status_code == 200 and stopped.json()["enabled"] is False
+    assert stopped.json()["terms"] == before["terms"]
+    assert stopped.json()["anchor"] == before["anchor"]
+    again = browser.post(url(setup, "stop", schedule), {"reason": "Retry"}, content_type="application/json")
+    assert again.status_code == 200
+    event = AuditEvent.objects.get(action="invoice.recurring_stopped")
+    assert event.actor_id == setup[0].owner.pk and event.tenant_id == setup[0].tenant.pk
+    assert event.metadata == {"schedule_id": str(schedule.pk), "reason": "Service ended"}
+    assert apply(browser, setup, schedule, token).status_code == 409
+    assert preview(browser, setup, schedule).status_code == 409
+    assert RecurringInvoicePeriod.objects.get().pk == first.pk and Invoice.objects.count() == 1
+    assert recurrence_fixtures.generate(setup, schedule).pk == first.pk
+    due = browser.get(url(setup, "due", schedule), {"due_from": "2025-01-01", "as_of": "2025-02-01"}).json()
+    assert all(not item["can_generate"] for item in due["periods"])
+    assert due["periods"][0]["invoice_entity_id"] == str(first.invoice.entity_id)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "payload", [{}, {"reason": " "}, {"reason": "x" * 501}, {"reason": "Stop", "enabled": True}, [{}]]
+)
+def test_stop_rejects_invalid_payloads_without_changes(browser, setup, payload):
+    schedule = enroll(setup)
+    assert browser.post(url(setup, "stop", schedule), payload, content_type="application/json").status_code == 400
+    schedule.refresh_from_db()
+    assert schedule.enabled and not AuditEvent.objects.filter(action="invoice.recurring_stopped").exists()
+
+
+@pytest.mark.django_db
+def test_stop_rejects_sibling_and_foreign_tenant_routes(browser, setup):
+    from apps.core.models import Entity, Organization, Tenant
+
+    schedule = enroll(setup)
+    tenant = Tenant.objects.create(name="Foreign stop MSP", slug="foreign-stop-msp")
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name="Foreign client")
+    foreign = Organization.objects.create(tenant=tenant, entity=entity)
+    for client in (setup[2], foreign):
+        assert browser.post(
+            url(setup, "stop", schedule, client), {"reason": "Stop"}, content_type="application/json"
+        ).status_code in {403, 404}
+    schedule.refresh_from_db()
+    assert schedule.enabled and not AuditEvent.objects.filter(action="invoice.recurring_stopped").exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("source_state", ["changed", "archived", "inactive"])
+def test_stopping_does_not_require_a_still_billable_source(browser, setup, source_state):
+    schedule = enroll(setup)
+    if source_state == "changed":
+        update_cost(
+            contract=setup[3], cost_id=setup[4].pk, actor_id=setup[0].owner.pk, values={"amount": Decimal("99.00")}
+        )
+    elif source_state == "archived":
+        from django.utils import timezone
+
+        setup[4].archived_at = timezone.now()
+        setup[4].save(update_fields=("archived_at",))
+    else:
+        setup[3].status = "terminated"
+        setup[3].save(update_fields=("status",))
+    response = browser.post(
+        url(setup, "stop", schedule), {"reason": "Stop further billing"}, content_type="application/json"
+    )
+    assert response.status_code == 200 and response.json()["enabled"] is False
+    assert Invoice.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_stop_rolls_back_if_audit_cannot_be_recorded(browser, setup):
+    schedule = enroll(setup)
+    with patch(
+        "apps.core.recurring_invoices.AuditEvent.objects.create", side_effect=RuntimeError("Injected audit failure")
+    ):
+        with pytest.raises(RuntimeError, match="Injected audit failure"):
+            browser.post(url(setup, "stop", schedule), {"reason": "Stop"}, content_type="application/json")
+    schedule.refresh_from_db()
+    assert schedule.enabled
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("denial", ["read_only", "missing_mfa"])
+def test_stop_requires_current_authoring_permission_and_mfa(browser, setup, denial):
+    schedule = enroll(setup)
+    if denial == "read_only":
+        reader = User.objects.create_user(email="stop-reader@example.invalid")
+        TOTP.activate(reader, generate_totp_secret())
+        TenantMembership.objects.create(tenant=setup[0].tenant, user=reader, role=BuiltInRole.READ_ONLY)
+        browser.force_login(reader)
+    else:
+        setup[0].owner.authenticator_set.all().delete()
+    response = browser.post(url(setup, "stop", schedule), {"reason": "Stop"}, content_type="application/json")
+    assert response.status_code == 403
+    schedule.refresh_from_db()
+    assert schedule.enabled and not AuditEvent.objects.filter(action="invoice.recurring_stopped").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_stop_works_under_the_restricted_runtime_role(browser, setup, django_runtime_role):
+    schedule = enroll(setup)
+    with django_runtime_role():
+        response = browser.post(
+            url(setup, "stop", schedule), {"reason": "Runtime stop"}, content_type="application/json"
+        )
+        assert response.status_code == 200 and response.json()["enabled"] is False
+    assert AuditEvent.objects.get(action="invoice.recurring_stopped").metadata["reason"] == "Runtime stop"

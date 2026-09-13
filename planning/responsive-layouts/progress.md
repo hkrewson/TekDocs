@@ -12,7 +12,7 @@ The Assets summary collection and typed browser API client are implemented under
 |---|---|---|
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
-| 3 — Contracts/Networks | Pending | All planned migrations and shared-pattern validation |
+| 3 — Contracts/Networks | In progress: Contracts collection and full record migration | Networks migration, wider validation and phase acceptance |
 | 4 — Operational records | Pending | All planned migrations |
 | 5 — Documentation/files | Pending | All planned migrations |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
@@ -164,3 +164,54 @@ User-requested #79 follow-up: outside clicks dismiss the drawer and the Close bu
 Verified project/browser evidence: `make check` passes all 480 frontend tests, lint/type/schema checks, production build and unchanged bundle budgets (`/tmp/tekdocs-backdrop-check.log`). All 120 focused browser checks pass across Chromium/Firefox/WebKit and six widths (`/tmp/tekdocs-backdrop-browser.log`), including native backdrop gestures, blocked underlying navigation, internal clicks, drag-out protection, mobile return, failed/pending saves, focus restoration, accessibility and touch/CSS zoom. The repository Wiki contract and diff checks pass. Final isolated live and local-refresh evidence follows.
 
 Verified live evidence: `make test-e2e-live` passes the isolated browser-to-Django-to-PostgreSQL journey and independent fixture assertions (`/tmp/tekdocs-backdrop-live.log`). Outside clicks now exercise both dirty Keep editing and clean dismissal after hardware/network saves. Later document, portal and recurring workflows pass unchanged. Existing user/demo data was preserved. The bounded dismissal follow-up is verified; broader layout rollout and technician/release acceptance remain open. Local refresh is authorized; production and Wiki publication remain separate.
+
+## 2026-09-13 — Contracts visible migration (#80)
+
+Contracts in MSP/client workspaces now replaces the old split panels with a bounded
+collection and shared full record drawer/page. Overview, Costs, permitted Related
+and actual History are URL-addressable. Costs keep currencies/intervals separate;
+summary requests never read cost rows and legacy consumers retain their projection.
+Personal preferences reuse the existing model; no migration or version change.
+See [contracts-layout.md](contracts-layout.md) for the complete implementation and
+handoff boundary. Networks remains the next visible migration, not a completed one.
+
+Browser verification: 120 Assets/Contracts checks passed across Chromium, Firefox
+and WebKit, plus three contract touch/200% CSS zoom checks. Contract coverage includes
+six widths, native-dialog accessibility, focus, outside dismissal, failed-edit guards,
+column persistence/reset, off-page search, denied costs and unavailable direct links.
+Synthetic mobile/desktop screenshots were reviewed locally. Component-focused checks
+passed for Contracts, SoftwareHistory and Assets (28 tests); API-client coverage was
+expanded for the explicit summary and detail requests.
+
+Reproduced harness issues: the first new browser tests sent Escape before drawer
+focus and refreshed before the preference write completed; synchronization now waits
+for those outcomes without removing assertions. The live journey's existing Assets
+site check captured an outstanding pre-refresh response whose body was invalidated by
+navigation. It now consumes the applied filter response before testing refresh. The
+first broad frontend pass had one unrelated SearchResults test exceed its timeout
+under concurrent Docker work (480 others passed); that unchanged test passes isolated
+(4/4). The full gate is being rerun with fewer concurrent jobs; final results follow.
+
+Final broad verification: `make check` passes (102 component files, 481 tests,
+OpenAPI/types, Python lint/type/migration checks and production bundle budgets).
+The unchanged SearchResults test passes in the full rerun. The isolated live
+browser-to-Django-to-PostgreSQL journey passes, including contract creation, cost
+creation, history refresh, subsequent recurring enrollment/stop and retained
+record/audit assertions. Browser checks remain 120 combined plus 3 touch/zoom.
+No domain-data migration or version change was introduced. Final API/local runtime
+completion is recorded below.
+
+API/runtime completion: `make test-commercial` exited successfully, covering
+commercial records, recycle bin, permission/IDOR, runtime RLS and migration
+stabilization (the suite retains its existing skipped case). `make up` completed
+with existing data volumes retained. Local `/api/v1/health/ready` reports status ok,
+database/renderer ready and version 0.8.46; `/services` returns 200. Backend/frontend
+health checks pass. This is the authorized local refresh only; no production
+publication, push or tag occurred. The Wiki Roadmap checkpoint is updated locally.
+
+Verified: this bounded Contracts implementation and the gates above. Inferred:
+the transient unrelated search timeout was resource contention; no test or search
+code was changed to make it pass. Blocked: none for this checkpoint. Still open:
+Networks, later surface migrations, technician/assistive-technology acceptance and
+full pre-1.0 release/recovery obligations. Temporary logs/screenshots are local;
+executable test sources and these notes are the durable evidence.

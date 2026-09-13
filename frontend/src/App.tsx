@@ -60,7 +60,6 @@ import type { DocumentsClient } from './documentation/api'
 import { browserDomainsClient } from './domains/api'
 import type { DomainsClient } from './domains/api'
 import { browserInventoryClient } from './inventory/api'
-import { browserCommercialClient } from './commercial/api'
 import { browserInvoiceClient } from './accounting/api'
 import { browserStockClient } from './stock/api'
 import type { InventoryClient } from './inventory/api'
@@ -444,7 +443,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAssets')}</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'licenses') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingLicenses')}</section>}><Licenses workspace={state.workspace} client={inventoryClient} /></Suspense>
-  if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts key={state.workspace.id} workspace={state.workspace} client={browserCommercialClient} /></Suspense>
+  if (area === 'services') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts key={state.workspace.id} workspace={state.workspace} /></Suspense>
   if (area === 'vendors') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingVendors')}</section>}><Vendors workspace={state.workspace} client={inventoryClient} /></Suspense>
   if (area === 'networks') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingNetworks')}</section>}><Networks workspace={state.workspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>
   if (area === 'integrations') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingIntegrations')}</section>}><Integrations workspace={state.workspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>
@@ -592,7 +591,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/system-status" element={shellContext.permissions?.includes('system_diagnostics.view') ? <SystemStatus /> : <Navigate to="/overview" replace />} />
             <Route path="/assets" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAssets')}</section>}><Assets workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/licenses" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingLicenses')}</section>}><Licenses workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
-            <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts workspace={mspWorkspace} client={browserCommercialClient} /></Suspense>} />
+            <Route path="/services" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingContracts')}</section>}><Contracts workspace={mspWorkspace} /></Suspense>} />
             <Route path="/vendors" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingVendors')}</section>}><Vendors workspace={mspWorkspace} client={inventoryClient} /></Suspense>} />
             <Route path="/networks" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingNetworks')}</section>}><Networks workspace={mspWorkspace} client={networksClient} relationshipsClient={relationshipsClient} /></Suspense>} />
             <Route path="/integrations" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingIntegrations')}</section>}><Integrations workspace={mspWorkspace} client={webhooksClient} documentsClient={documentsClient} /></Suspense>} />

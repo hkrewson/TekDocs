@@ -8660,6 +8660,57 @@ paths:
       operationId: workspaces_msp_contracts_retrieve_list
       parameters:
       - in: query
+        name: kind
+        schema:
+          enum:
+          - service
+          - support
+          - lease
+          - subscription
+          - other
+          type: string
+          x-spec-enum-id: 342a015bdd1b1fd4
+          minLength: 1
+        description: |-
+          * `service` - service
+          * `support` - support
+          * `lease` - lease
+          * `subscription` - subscription
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - provider
+          - -provider
+          - kind
+          - -kind
+          - status
+          - -status
+          - renews_on
+          - -renews_on
+          - ends_on
+          - -ends_on
+          type: string
+          x-spec-enum-id: da3bc190e2262460
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `provider` - provider
+          * `-provider` - -provider
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
+          * `renews_on` - renews_on
+          * `-renews_on` - -renews_on
+          * `ends_on` - ends_on
+          * `-ends_on` - -ends_on
+      - in: query
         name: page
         schema:
           type: integer
@@ -8679,6 +8730,28 @@ paths:
           type: string
           default: ''
           maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - draft
+          - active
+          - expired
+          - terminated
+          type: string
+          x-spec-enum-id: 296afa80c3f9d468
+          minLength: 1
+        description: |-
+          * `draft` - draft
+          * `active` - active
+          * `expired` - expired
+          * `terminated` - terminated
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+        description: Omit cost data from collection rows.
       tags:
       - workspaces
       security:
@@ -16006,6 +16079,57 @@ paths:
     get:
       operationId: workspaces_organizations_contracts_retrieve_list
       parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - service
+          - support
+          - lease
+          - subscription
+          - other
+          type: string
+          x-spec-enum-id: 342a015bdd1b1fd4
+          minLength: 1
+        description: |-
+          * `service` - service
+          * `support` - support
+          * `lease` - lease
+          * `subscription` - subscription
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - provider
+          - -provider
+          - kind
+          - -kind
+          - status
+          - -status
+          - renews_on
+          - -renews_on
+          - ends_on
+          - -ends_on
+          type: string
+          x-spec-enum-id: da3bc190e2262460
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `provider` - provider
+          * `-provider` - -provider
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
+          * `renews_on` - renews_on
+          * `-renews_on` - -renews_on
+          * `ends_on` - ends_on
+          * `-ends_on` - -ends_on
       - in: path
         name: organization_entity_id
         schema:
@@ -16032,6 +16156,28 @@ paths:
           type: string
           default: ''
           maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - draft
+          - active
+          - expired
+          - terminated
+          type: string
+          x-spec-enum-id: 296afa80c3f9d468
+          minLength: 1
+        description: |-
+          * `draft` - draft
+          * `active` - active
+          * `expired` - expired
+          * `terminated` - terminated
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+        description: Omit cost data from collection rows.
       tags:
       - workspaces
       security:
@@ -29896,9 +30042,12 @@ components:
           type: boolean
         can_view_costs:
           type: boolean
+        can_view_relationships:
+          type: boolean
       required:
       - can_manage
       - can_view_costs
+      - can_view_relationships
       - count
       - has_more
       - page

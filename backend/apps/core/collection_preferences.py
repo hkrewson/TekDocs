@@ -24,6 +24,14 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "contracts": CollectionDefinition(
+        PermissionKey.ASSETS_VIEW,
+        tuple(
+            (column, PermissionKey.ASSETS_VIEW)
+            for column in ("name", "provider", "kind", "status", "renews_on", "ends_on")
+        ),
+        ("name", "provider", "kind", "status", "renews_on", "ends_on"),
+    ),
     "assets": CollectionDefinition(
         PermissionKey.ASSETS_VIEW,
         tuple(

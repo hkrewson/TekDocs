@@ -1,0 +1,11 @@
+.contract-editor { margin-block: 1rem; }
+.contract-editor fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.contract-editor .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.contract-editor label { display: grid; gap: .4rem; min-width: 0; }
+.contract-editor input, .contract-editor select { width: 100%; min-width: 0; font: inherit; min-height: 2.5rem; }
+.contract-editor .checkbox-field { display: flex; align-items: center; }
+.contract-editor input[type=checkbox] { width: 1.5rem; min-height: 1.5rem; }
+.contract-costs { list-style: none; margin: 1rem 0; padding: 0; }
+.contract-costs li { border-bottom: 1px solid var(--border); padding-block: 1rem; overflow-wrap: anywhere; }
+.contract-record .archive-confirmation { flex-wrap: wrap; }
+@media (max-width: 767px) { .contract-editor .form-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -44,7 +44,7 @@ def contracts_for_scope(
         records = records.prefetch_related(
             Prefetch("costs", queryset=ContractCost.objects.filter(archived_at__isnull=True))
         )
-    normalized = query.strip()[:100]
+    normalized = query.strip()[:240]
     if normalized:
         records = records.filter(
             Q(entity__display_name__icontains=normalized)
@@ -70,7 +70,7 @@ def provider_choices(tenant: Tenant, *, query: str = "") -> QuerySet[Organizatio
         .distinct()
         .order_by("entity__display_name")
     )
-    normalized = query.strip()[:100]
+    normalized = query.strip()[:240]
     return records.filter(entity__display_name__icontains=normalized) if normalized else records
 
 

@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import { translate } from '../i18n/localization'
 
-export function QuickDrawer({ title, children, onClose, returnFocusId, returnHref }: { title: string; children: ReactNode; onClose: () => void; returnFocusId?: string; returnHref: string }) {
+export function QuickDrawer({ title, children, onClose, returnFocusId, returnHref, returnLabel }: { title: string; children: ReactNode; onClose: () => void; returnFocusId?: string; returnHref: string; returnLabel: string }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const heading = useRef<HTMLHeadingElement>(null)
@@ -31,7 +31,7 @@ export function QuickDrawer({ title, children, onClose, returnFocusId, returnHre
     if (event.shiftKey && (document.activeElement === first || document.activeElement === heading.current)) { event.preventDefault(); last?.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
   }}>
-    <header><h2 ref={heading} tabIndex={-1} id={titleId}>{title}</h2><a className="collection-drawer-return" href={returnHref} onClick={(event) => { event.preventDefault(); onClose() }}>{translate('collections.return')}</a></header>
+    <header><h2 ref={heading} tabIndex={-1} id={titleId}>{title}</h2><a className="collection-drawer-return" href={returnHref} onClick={(event) => { event.preventDefault(); onClose() }}>{returnLabel}</a></header>
     <div className="collection-drawer-body">{title.length > 80 && <details><summary>{translate('collections.fullName')}</summary><p>{title}</p></details>}{children}</div>
   </dialog>
 }

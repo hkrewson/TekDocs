@@ -102,6 +102,8 @@ class ContractSerializer(serializers.Serializer):
             member, PermissionKey.COSTS_VIEW, organization=organization
         ):
             fields.pop("costs", None)
+        if self.context.get("summary"):
+            fields.pop("costs", None)
         return fields
 
     def to_representation(self, instance):  # type: ignore[no-untyped-def]
@@ -122,6 +124,7 @@ class ContractResultSerializer(serializers.Serializer):
     has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     can_view_costs = serializers.BooleanField()
+    can_view_relationships = serializers.BooleanField()
 
 
 class ProviderChoiceSerializer(serializers.Serializer):
@@ -133,7 +136,23 @@ class ProviderChoiceResultSerializer(serializers.Serializer):
     results = ProviderChoiceSerializer(many=True)
 
 
+CONTRACT_ORDERING = {
+    "name": "entity__display_name",
+    "provider": "provider__entity__display_name",
+    "kind": "kind",
+    "status": "status",
+    "renews_on": "renews_on",
+    "ends_on": "ends_on",
+}
+
+
 class ContractQuerySerializer(BoundedCollectionQuerySerializer):
+    summary = serializers.BooleanField(required=False, default=False, help_text="Omit cost data from collection rows.")
+    status = serializers.ChoiceField(choices=CommercialContractStatus.values, required=False)
+    kind = serializers.ChoiceField(choices=CommercialContractKind.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in CONTRACT_ORDERING for key in (field, f"-{field}")], required=False, default="name"
+    )
     q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
 
 
@@ -185,18 +204,37 @@ class CommercialContractListCreateView(APIView):
         records = contracts_for_scope(
             workspace.data_scope,
             query=values["q"],
-            include_costs=can_view_costs,
+            include_costs=can_view_costs and not values["summary"],
+        )
+        for field in ("status", "kind"):
+            if field in values:
+                records = records.filter(**{field: values[field]})
+        ordering = values["ordering"]
+        records = records.order_by(
+            ("-" if ordering.startswith("-") else "") + CONTRACT_ORDERING[ordering.lstrip("-")], "entity_id"
         )
         page = paginate(records, page=values["page"], page_size=values["page_size"])
         return Response(
             {
-                "results": [_serialized(record, workspace) for record in page.records],
+                "results": ContractSerializer(
+                    page.records,
+                    many=True,
+                    context={
+                        "member": workspace.member,
+                        "organization": workspace.organization,
+                        "summary": values["summary"],
+                    },
+                ).data,
                 "page": page.page,
                 "page_size": page.page_size,
                 "count": page.count,
                 "has_more": page.has_more,
                 "can_manage": can_manage,
                 "can_view_costs": can_view_costs,
+                "can_view_relationships": can_view_costs
+                and context_has_permission(
+                    workspace.member, PermissionKey.RELATIONSHIPS_VIEW, organization=workspace.organization
+                ),
             }
         )
 

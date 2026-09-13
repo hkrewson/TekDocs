@@ -8762,6 +8762,7 @@ export interface components {
             readonly has_more: boolean;
             readonly can_manage: boolean;
             readonly can_view_costs: boolean;
+            readonly can_view_relationships: boolean;
         };
         readonly ContractWrite: {
             readonly name?: string;
@@ -21257,9 +21258,41 @@ export interface operations {
     readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `service` - service
+                 *     * `support` - support
+                 *     * `lease` - lease
+                 *     * `subscription` - subscription
+                 *     * `other` - other
+                 */
+                readonly kind?: "service" | "support" | "lease" | "subscription" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `provider` - provider
+                 *     * `-provider` - -provider
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `renews_on` - renews_on
+                 *     * `-renews_on` - -renews_on
+                 *     * `ends_on` - ends_on
+                 *     * `-ends_on` - -ends_on
+                 */
+                readonly ordering?: "name" | "-name" | "provider" | "-provider" | "kind" | "-kind" | "status" | "-status" | "renews_on" | "-renews_on" | "ends_on" | "-ends_on";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
+                /**
+                 * @description * `draft` - draft
+                 *     * `active` - active
+                 *     * `expired` - expired
+                 *     * `terminated` - terminated
+                 */
+                readonly status?: "draft" | "active" | "expired" | "terminated";
+                /** @description Omit cost data from collection rows. */
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -26753,9 +26786,41 @@ export interface operations {
     readonly workspaces_organizations_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `service` - service
+                 *     * `support` - support
+                 *     * `lease` - lease
+                 *     * `subscription` - subscription
+                 *     * `other` - other
+                 */
+                readonly kind?: "service" | "support" | "lease" | "subscription" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `provider` - provider
+                 *     * `-provider` - -provider
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `renews_on` - renews_on
+                 *     * `-renews_on` - -renews_on
+                 *     * `ends_on` - ends_on
+                 *     * `-ends_on` - -ends_on
+                 */
+                readonly ordering?: "name" | "-name" | "provider" | "-provider" | "kind" | "-kind" | "status" | "-status" | "renews_on" | "-renews_on" | "ends_on" | "-ends_on";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
+                /**
+                 * @description * `draft` - draft
+                 *     * `active` - active
+                 *     * `expired` - expired
+                 *     * `terminated` - terminated
+                 */
+                readonly status?: "draft" | "active" | "expired" | "terminated";
+                /** @description Omit cost data from collection rows. */
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {

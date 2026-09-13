@@ -95,9 +95,12 @@ def test_msp_contracts_are_not_an_aggregate_of_client_contracts(owner_client, in
     assert cost.json()["costs"][0]["amount"] == "12.50"
     msp_results = owner_client.get(reverse("msp-commercial-contract-list-create")).json()["results"]
     assert [item["name"] for item in msp_results] == ["MSP support agreement"]
-    assert owner_client.get(
-        reverse("msp-commercial-contract-detail", kwargs={"contract_entity_id": client_contract.json()["id"]})
-    ).status_code == 404
+    assert (
+        owner_client.get(
+            reverse("msp-commercial-contract-detail", kwargs={"contract_entity_id": client_contract.json()["id"]})
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db
@@ -321,3 +324,69 @@ def test_postgres_rejects_commercial_scope_and_currency_forgery(owner_client, in
         installation.tenant.commercial_contracts.filter(pk=contract.pk).update(provider=ineligible_provider)
     with pytest.raises(DatabaseError), transaction.atomic():
         ContractCost.objects.filter(pk=cost.pk).update(currency="usd")
+
+
+@pytest.mark.django_db
+def test_contract_summaries_filter_order_and_never_read_cost_rows(owner_client, installation):
+    from django.test.utils import CaptureQueriesContext
+
+    client = organization(installation, "Summary Client", "client")
+    provider = organization(installation, "Summary Provider", "vendor")
+    collection = reverse(
+        "organization-commercial-contract-list-create", kwargs={"organization_entity_id": client.entity_id}
+    )
+    ids = []
+    for index in range(31):
+        response = owner_client.post(
+            collection,
+            {
+                "name": f"Agreement {index:03}",
+                "provider_id": str(provider.entity_id),
+                "kind": "support" if index == 30 else "service",
+                "status": "active",
+                "reference": f"REF-{index:03}",
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        ids.append(response.json()["id"])
+    cost_url = reverse(
+        "organization-commercial-contract-cost-list-create",
+        kwargs={"organization_entity_id": client.entity_id, "contract_entity_id": ids[0]},
+    )
+    assert (
+        owner_client.post(
+            cost_url,
+            {"label": "Private cost", "amount": "123.45", "currency": "USD", "billing_interval": "monthly"},
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+    with CaptureQueriesContext(connection) as queries:
+        response = owner_client.get(collection, {"summary": "true", "page_size": 25, "ordering": "-name"})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["count"] == 31 and result["has_more"] is True
+    assert result["results"][0]["name"] == "Agreement 030"
+    assert all("costs" not in item for item in result["results"])
+    assert not any(ContractCost._meta.db_table in query["sql"] for query in queries)
+    second = owner_client.get(collection, {"summary": "true", "page_size": 25, "page": 2, "ordering": "-name"}).json()
+    assert len(second["results"]) == 6 and second["has_more"] is False
+    assert {item["id"] for item in result["results"]}.isdisjoint(item["id"] for item in second["results"])
+    filtered = owner_client.get(
+        collection, {"summary": "true", "q": "REF-030", "kind": "support", "status": "active"}
+    ).json()
+    assert filtered["count"] == 1 and filtered["results"][0]["id"] == ids[30]
+    assert owner_client.get(collection, {"ordering": "costs__amount"}).status_code == 400
+    assert owner_client.get(collection, {"status": "invalid"}).status_code == 400
+    assert "costs" in owner_client.get(collection).json()["results"][0]
+    preferences = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": client.entity_id, "feature": "contracts"},
+    )
+    saved = owner_client.put(
+        preferences, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+    )
+    assert saved.status_code == 200
+    assert owner_client.get(preferences).json()["columns"] == ["name", "status"]
+    assert owner_client.delete(preferences).json()["page_size"] == 25

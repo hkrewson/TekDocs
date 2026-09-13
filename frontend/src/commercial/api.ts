@@ -37,9 +37,14 @@ export type CommercialResult = {
   has_more: boolean
   can_manage: boolean
   can_view_costs: boolean
+  can_view_relationships?: boolean
 }
 
+export type ContractCollectionQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; kind?: string }
+
 export interface CommercialClient {
+  collection(workspace: WorkspaceContext, query: ContractCollectionQuery, signal?: AbortSignal): Promise<CommercialResult>
+  detail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<CommercialContract>
   listContracts(workspace: WorkspaceContext, query: string, page: number, signal?: AbortSignal): Promise<CommercialResult>
   providerChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: Array<{ id: string; name: string }> }>
   createContract(workspace: WorkspaceContext, values: object): Promise<CommercialContract>
@@ -91,6 +96,8 @@ async function mutate<T>(path: string, method: string, body?: object): Promise<T
 }
 
 export const browserCommercialClient: CommercialClient = {
+  collection: (workspace, query, signal) => get(`${basePath(workspace)}?${new URLSearchParams({ ...Object.fromEntries(Object.entries(query).map(([key, value]) => [key, String(value)])), summary: 'true' })}`, signal),
+  detail: (workspace, id, signal) => get(`${basePath(workspace)}/${encodeURIComponent(id)}`, signal),
   listContracts: (workspace, query, page, signal) => {
     const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '50' })
     return get(`${basePath(workspace)}?${parameters}`, signal)

@@ -206,7 +206,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
         <CollectionPagination label={translate('assets.heading')} page={page} pageSize={pageSize} count={result.count} hasMore={result.has_more} onPageChange={(next) => browse({ page: String(next) })} />
       </>}
     </>}
-    {previewId && <QuickDrawer returnHref={href(null)} returnFocusId="assets-collection-heading" title={current?.name ?? translate('collections.preview')} onClose={() => { void navigate(href(null), { replace: true, state: { assetListPosition: navigationState?.assetListPosition ?? listPosition.current } }) }}>
+    {previewId && <QuickDrawer returnLabel={translate('collections.return')} returnHref={href(null)} returnFocusId="assets-collection-heading" title={current?.name ?? translate('collections.preview')} onClose={() => { void navigate(href(null), { replace: true, state: { assetListPosition: navigationState?.assetListPosition ?? listPosition.current } }) }}>
       {current ? <><Link className="collection-record-link" to={href(previewId, params.get('section') ?? 'overview')} onClick={(event) => openRecord(event, previewId)}>{translate('collections.openFullPage')}</Link><AssetRecord embedded key={current.id} asset={current} workspace={workspace} client={client} canManage={canManage} access={relationshipAccess} section={params.get('section') ?? 'overview'} href={(section) => href(previewId, section, true)} onChange={update} /></> : detailError === `${workspace.id}:${activeId}` ? <p role="alert">{translate('collections.recordUnavailable')}</p> : <p role="status">{translate('collections.loading')}</p>}
     </QuickDrawer>}
   </>

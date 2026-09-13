@@ -41,6 +41,16 @@ describe('commercial API client', () => {
     )
   })
 
+  it('requests bounded summaries explicitly and fetches only the selected detail', async () => {
+    const workspace = { kind: 'organization', id: 'client/1' } as never
+    await browserCommercialClient.collection(workspace, { q: 'REF-131', page: 2, page_size: 25, ordering: '-renews_on', status: 'active', kind: 'support' })
+    await browserCommercialClient.detail(workspace, 'contract/1')
+    const paths = vi.mocked(fetch).mock.calls.map(([path]) => typeof path === 'string' ? path : path instanceof URL ? path.href : path.url)
+    const query = new URL(paths[0], 'https://example.invalid').searchParams
+    expect(Object.fromEntries(query)).toEqual({ q: 'REF-131', page: '2', page_size: '25', ordering: '-renews_on', status: 'active', kind: 'support', summary: 'true' })
+    expect(paths[1]).toBe('/api/v1/workspaces/organizations/client%2F1/contracts/contract%2F1')
+  })
+
   it('surfaces nested validation responses', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ amount: ['A non-negative amount is required.'] }), { status: 400 }),

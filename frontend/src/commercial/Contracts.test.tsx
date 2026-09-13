@@ -1,10 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
+import { defaultPreferences } from '../collections/preferences'
+import { render as rawRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Contracts } from './Contracts'
 import type { CommercialClient, CommercialContract } from './api'
 
-const workspace = { id: 'client-1', name: 'Contoso', classifications: ['client'] } as never
+const workspace = { kind: 'organization', id: 'client-1', name: 'Contoso', classifications: ['client'] } as never
 const contract: CommercialContract = {
   id: 'contract-1', name: 'Managed endpoint service', provider_id: 'provider-1', provider_name: 'Northwind',
   kind: 'service', status: 'active', description: 'Monitoring and response', reference: 'MSA-204',
@@ -14,6 +17,8 @@ const contract: CommercialContract = {
 
 function commercialClient(overrides: Partial<CommercialClient> = {}): CommercialClient {
   return {
+    collection: overrides.listContracts ? (workspace, query, signal) => overrides.listContracts!(workspace, query.q, query.page, signal) : vi.fn().mockResolvedValue({ results: [contract], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_view_costs: true }),
+    detail: vi.fn().mockImplementation(async () => (overrides.listContracts ? (await overrides.listContracts(workspace, '', 1)).results[0] : contract)),
     listContracts: vi.fn().mockResolvedValue({ results: [contract], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }),
     providerChoices: vi.fn().mockResolvedValue({ results: [{ id: 'provider-1', name: 'Northwind' }] }),
     createContract: vi.fn().mockResolvedValue(contract), updateContract: vi.fn().mockResolvedValue(contract),
@@ -24,13 +29,21 @@ function commercialClient(overrides: Partial<CommercialClient> = {}): Commercial
   }
 }
 
+function render(children: ReactNode, initialPath = '/services?record=contract-1') {
+  return rawRender(<ApplicationRouter initialPath={initialPath}>{children}</ApplicationRouter>)
+}
+const preferenceClient = {
+  load: vi.fn().mockResolvedValue(defaultPreferences(['name', 'provider', 'kind', 'status', 'renews_on', 'ends_on'])),
+  save: vi.fn(), reset: vi.fn(),
+}
+
 describe('Contracts', () => {
   it('creates a provider contract and a permission-controlled cost', async () => {
     const createContract = vi.fn().mockResolvedValue(contract)
     const createCost = vi.fn().mockResolvedValue({ ...contract, costs: [{ id: 'cost-1', label: 'Managed devices', amount: '19.50', currency: 'USD', billing_interval: 'monthly', quantity: '25.000', starts_on: null, ends_on: null, reference: '' }] })
     const updateCost = vi.fn().mockResolvedValue({ ...contract, costs: [{ id: 'cost-1', label: 'Managed devices', amount: '21.00', currency: 'USD', billing_interval: 'monthly', quantity: '25.000', starts_on: null, ends_on: null, reference: '' }] })
     const user = userEvent.setup()
-    render(<Contracts workspace={workspace} client={commercialClient({ createContract, createCost, updateCost })} />)
+    render(<Contracts preferenceClient={preferenceClient} workspace={workspace} client={commercialClient({ createContract, createCost, updateCost })} />)
     await user.click(await screen.findByRole('button', { name: 'New contract' }))
     const form = screen.getByRole('dialog')
     await user.type(within(form).getByLabelText('Contract name'), 'Managed endpoint service')
@@ -38,8 +51,9 @@ describe('Contracts', () => {
     await user.click(within(form).getByRole('button', { name: 'Save contract' }))
     await waitFor(() => expect(createContract).toHaveBeenCalledWith(workspace, expect.objectContaining({ name: 'Managed endpoint service', provider_id: 'provider-1' })))
 
+    await user.click(await screen.findByRole('link', { name: 'Costs' }))
     await user.click(screen.getByRole('button', { name: 'Add cost' }))
-    const costForm = screen.getByRole('dialog')
+    const costForm = screen.getByRole('form', { name: 'Add contract cost' })
     await user.type(within(costForm).getByLabelText('Cost label'), 'Managed devices')
     await user.type(within(costForm).getByLabelText('Amount'), '19.50')
     await user.click(within(costForm).getByRole('button', { name: 'Add cost' }))
@@ -47,7 +61,7 @@ describe('Contracts', () => {
     expect(await screen.findByText(/USD 19.50/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Edit cost Managed devices' }))
-    const editCostForm = screen.getByRole('dialog')
+    const editCostForm = screen.getByRole('form', { name: 'Edit contract cost' })
     await user.clear(within(editCostForm).getByLabelText('Amount'))
     await user.type(within(editCostForm).getByLabelText('Amount'), '21.00')
     await user.click(within(editCostForm).getByRole('button', { name: 'Save cost' }))
@@ -55,7 +69,9 @@ describe('Contracts', () => {
   })
 
   it('does not render cost controls or values when the projection is denied', async () => {
-    render(<Contracts workspace={workspace} client={commercialClient({ listContracts: vi.fn().mockResolvedValue({ results: [{ ...contract, costs: undefined }], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: false }) })} />)
+    const user = userEvent.setup()
+    render(<Contracts preferenceClient={preferenceClient} workspace={workspace} client={commercialClient({ listContracts: vi.fn().mockResolvedValue({ results: [{ ...contract, costs: undefined }], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: false }) })} />)
+    await user.click(await screen.findByRole('link', { name: 'Costs' }))
     expect(await screen.findByText(/Financial terms are hidden/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add cost' })).not.toBeInTheDocument()
     expect(screen.queryByText('19.50')).not.toBeInTheDocument()
@@ -66,14 +82,16 @@ describe('Contracts', () => {
     const archiveContract = vi.fn().mockResolvedValue(undefined)
     const archiveCost = vi.fn().mockResolvedValue({ ...contract, costs: [] })
     const user = userEvent.setup()
-    render(<Contracts workspace={workspace} client={commercialClient({ archiveContract, archiveCost, listContracts: vi.fn().mockResolvedValue({ results: [costed], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }) })} />)
+    render(<Contracts preferenceClient={preferenceClient} workspace={workspace} client={commercialClient({ archiveContract, archiveCost, listContracts: vi.fn().mockResolvedValue({ results: [costed], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_costs: true }) })} />)
 
+    await user.click(await screen.findByRole('link', { name: 'Costs' }))
     await user.click(await screen.findByRole('button', { name: 'Remove cost Managed devices' }))
     expect(archiveCost).not.toHaveBeenCalled()
     const removeConfirmation = screen.getByRole('alertdialog')
     expect(removeConfirmation).toHaveTextContent('The contract itself will remain active.')
     await user.click(within(removeConfirmation).getByRole('button', { name: 'Cancel' }))
 
+    await user.click(screen.getByRole('link', { name: 'Overview' }))
     await user.click(screen.getByRole('button', { name: 'Archive' }))
     expect(archiveContract).not.toHaveBeenCalled()
     const archiveConfirmation = screen.getByRole('alertdialog')
@@ -91,11 +109,12 @@ describe('Contracts', () => {
     ))
     const client = commercialClient({ listContracts })
     const user = userEvent.setup()
-    const { rerender } = render(<Contracts key="client-1" workspace={workspace} client={client} />)
+    const { rerender } = render(<Contracts preferenceClient={preferenceClient} key="client-1" workspace={workspace} client={client} />)
+    await user.click(await screen.findByRole('link', { name: 'Costs' }))
     await user.click(await screen.findByRole('button', { name: 'Edit cost Private rate' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('form', { name: 'Edit contract cost' })).toBeInTheDocument()
 
-    rerender(<Contracts key="client-2" workspace={{ id: 'client-2', name: 'Fabrikam', classifications: ['client'] } as never} client={client} />)
+    rerender(<ApplicationRouter initialPath="/services?record=contract-1"><Contracts preferenceClient={preferenceClient} key="client-2" workspace={{ id: 'client-2', name: 'Fabrikam', classifications: ['client'] } as never} client={client} /></ApplicationRouter>)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByDisplayValue('875.50')).not.toBeInTheDocument()
   })

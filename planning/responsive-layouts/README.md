@@ -33,6 +33,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Assets site filtering](asset-site-filter.md)
+
 - [Assets reference layout](assets-layout.md)
 
 - [Personal collection preferences](personal-preferences.md)

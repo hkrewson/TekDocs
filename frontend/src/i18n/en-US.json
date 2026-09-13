@@ -2185,5 +2185,11 @@
   "collections.assignmentFailed": "The assignment could not be saved. Your choices have been kept.",
   "collections.saveAssignment": "Save assignment",
   "collections.noAssignmentChoice": "None",
-  "collections.person": "Person"
+  "collections.person": "Person",
+  "collections.siteChoicesHelp": "Sites used by assets in this workspace.",
+  "collections.searchSites": "Search sites",
+  "collections.siteChoicesFailed": "Site choices could not be loaded.",
+  "collections.siteUnavailable": "Site unavailable or no longer used by assets",
+  "collections.selectedSite": "Selected site",
+  "collections.noSites": "No matching sites."
 }

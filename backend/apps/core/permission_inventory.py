@@ -688,6 +688,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         ("GET", "PUT", "DELETE"),
         PermissionKey.ASSETS_VIEW,
     ),
+    route("msp-asset-site-choices", ("GET",), PermissionKey.ASSETS_VIEW),
+    route("organization-asset-site-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-collection", ("GET",), PermissionKey.ASSETS_VIEW),
     route("organization-asset-collection", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-list-create", ("GET", "POST"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),

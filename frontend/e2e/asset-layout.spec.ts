@@ -24,6 +24,7 @@ async function fixtures(page: Page) {
     const size = Number(params.get('page_size') ?? 25), pageNumber = Number(params.get('page') ?? 1)
     let found = assets.filter((asset) => `${asset.name} ${asset.hardware.serial_number}`.includes(params.get('search') ?? ''))
     if (params.get('kind') === 'software') found = []
+    if (params.get('site')) found = found.filter((asset) => asset.id === 'asset-131')
     if (params.get('status')) found = found.filter((asset) => asset.hardware.lifecycle_state === params.get('status'))
     if (params.get('ordering')?.startsWith('-')) found = [...found].reverse()
     return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size).map((asset) => ({ id: asset.id, name: asset.name, kind: asset.kind, model_name: asset.model_name, model_number: asset.model_number, status: asset.hardware.lifecycle_state, assignment: 'Technician', site: 'Main office', warranty_ends_on: '2030-01-01' })), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false } })
@@ -44,6 +45,13 @@ async function fixtures(page: Page) {
     const asset = assets.find((item) => route.request().url().includes(`/${item.id}/hardware`))!
     Object.assign(asset.hardware.assignment, route.request().postDataJSON(), { person_name: 'Morgan', site_name: 'Branch', location_name: 'Office' })
     return route.fulfill({ json: asset.hardware })
+  })
+  await page.route('**/assets/site-choices?*', (route) => {
+    const query = new URL(route.request().url()).searchParams
+    const sites = Array.from({ length: 31 }, (_, index) => ({ id: `site-${index + 1}`, name: `Site ${String(index + 1).padStart(3, '0')}${index === 30 ? ` ${'RemoteIdentifier'.repeat(20)}` : ''}` }))
+    const matching = sites.filter((site) => site.name.includes(query.get('search') ?? ''))
+    const pageNumber = Number(query.get('page') ?? 1)
+    return route.fulfill({ json: { results: matching.slice((pageNumber - 1) * 25, pageNumber * 25), selected: sites.find((site) => site.id === query.get('selected')) ?? null, count: matching.length, page: pageNumber, page_size: 25, has_more: pageNumber * 25 < matching.length } })
   })
   return assets
 }
@@ -213,5 +221,34 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await drawer.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(drawer).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Asset 002', exact: true })).toBeFocused()
+  })
+}
+
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`site filter fits ${width}px and finds off-page sites`, async ({ page }) => {
+    await fixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/assets')
+    await page.getByRole('checkbox', { name: 'Select Asset 002', exact: true }).check()
+    await page.getByRole('button', { name: 'Filters', exact: true }).click()
+    const filters = page.getByRole('dialog', { name: 'Filters', exact: true })
+    await filters.locator('summary').filter({ hasText: /^Site/ }).click()
+    await filters.getByRole('button', { name: 'Next' }).click()
+    await expect(filters.getByRole('radio', { name: 'Site 031' })).toBeVisible()
+    await filters.getByLabel('Search sites', { exact: true }).fill('031')
+    await filters.getByRole('button', { name: 'Search', exact: true }).click()
+    await filters.getByRole('radio', { name: 'Site 031' }).click()
+    await expect(filters.getByRole('radio', { name: 'Site 031' })).toBeChecked()
+    await expect(page).toHaveURL(/site=site-31/)
+    await expect(page.getByRole('checkbox', { name: 'Select Asset 131', exact: true })).not.toBeChecked()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', { name: 'Remove site' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Remove site' })).toContainText('Site 031')
+    await page.getByRole('button', { name: 'Remove site' }).click()
+    await expect(page).not.toHaveURL(/site=/)
+    await expect(page.getByRole('button', { name: 'Asset 002', exact: true })).toBeVisible()
   })
 }

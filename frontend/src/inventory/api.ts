@@ -225,3 +225,11 @@ export const browserAssetCollectionClient: AssetCollectionClient = {
   },
   detail: (workspace, assetId, signal) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}`, signal),
 }
+
+export type AssetSiteChoice = { id: string; name: string }
+export type AssetSiteResult = { results: AssetSiteChoice[]; selected: AssetSiteChoice | null; count: number; page: number; page_size: number; has_more: boolean }
+export async function browserAssetSiteChoices(workspace: WorkspaceContext, search: string, page: number, selected: string, signal?: AbortSignal): Promise<AssetSiteResult> {
+  const params = new URLSearchParams({ search, page: String(page), page_size: '25' })
+  if (selected) params.set('selected', selected)
+  return get(`${basePath(workspace)}/assets/site-choices?${params}`, signal)
+}

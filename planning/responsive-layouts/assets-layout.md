@@ -38,7 +38,7 @@ Final gate results are recorded in [progress.md](progress.md). Screenshots and l
 ## Remaining before Assets / foundation closure
 
 - Extract reusable record header/section navigation through Contracts/Networks; those controls currently live in AssetRecord. Validate cost permissions, child records and richer connected-data layouts before wider rollout.
-- Site filtering accepts direct URL/API values, but a curated site picker remains to be designed and integrated. Preview assignment is implemented; see the checkpoint below.
+- Site filtering now has a searchable picker; see [asset-site-filter.md](asset-site-filter.md) for its authorized-use boundary and verification. Preview assignment is implemented; see the checkpoint below.
 - Software History currently explains that no history is available; do not invent history from installation fields. Establish the required software audit presentation against supported history data.
 - Expand tracked nested route/state coverage, stale/conflict and permission-transition scenarios, native browser zoom/screen-reader/mobile-keyboard walkthroughs and technician validation (#39).
 - Full production-image, supported recovery/upgrade and applicable release acceptance remain open. Specialized document tables, code, graph/canvas and artifact viewers retain necessary isolated scrolling and need their own inventory/acceptance in later phases.

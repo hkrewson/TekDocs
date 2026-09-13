@@ -92,7 +92,7 @@ import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/n
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
-import packageMetadata from '../package.json'
+const Overview = lazy(() => import('./workspaces/Overview'))
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
 const AccessControl = lazy(async () => ({ default: (await import('./access-control/AccessControl')).AccessControl }))
@@ -397,15 +397,6 @@ function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotificat
   )
 }
 
-function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return (
-    <header className="page-header">
-      <div><h1>{title}</h1><p>{description}</p></div>
-      {action}
-    </header>
-  )
-}
-
 function UnavailablePage({ organizationOverview }: { organizationOverview?: string }) {
   return (
     <section className="content-section workspace-error" role="alert">
@@ -413,20 +404,6 @@ function UnavailablePage({ organizationOverview }: { organizationOverview?: stri
       <p>{translate('navigation.pageUnavailableHelp')}</p>
       <Link className="secondary-button" to={organizationOverview ?? '/overview'}>{translate('navigation.returnToOverview')}</Link>
     </section>
-  )
-}
-
-function Overview() {
-  return (
-    <>
-      <PageHeader title={translate('overview.heading')} description={`TekDocs ${packageMetadata.version}`} />
-      <section className="content-section">
-        <div className="section-heading"><h2>{translate('overview.areas')}</h2><span>{packageMetadata.version}</span></div>
-        <div className="status-table" role="table" aria-label={translate('overview.areas')}>
-          {workspaceCapabilities.map((capability) => <div className="status-row" role="row" key={capability}><span role="cell">{capabilityRegistry[capability].label}</span><span role="cell">{translate('overview.available')}</span></div>)}
-        </div>
-      </section>
-    </>
   )
 }
 
@@ -598,7 +575,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}><Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
-            <Route path="/overview" element={<Overview />} />
+            <Route path="/overview" element={<Suspense fallback={<section role="status">{translate('collections.loading')}</section>}><Overview /></Suspense>} />
             <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
             <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />

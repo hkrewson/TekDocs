@@ -7,6 +7,8 @@ import { useUnsavedChanges, NavigationGuardContext } from '../navigation/navigat
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserAssetCollectionClient } from './api'
 import type { AssetCollectionClient, AssetCollectionQuery, AssetCollectionResult, ClientAsset, InventoryClient, ModelChoice } from './api'
+import { AssetSiteFilter } from './AssetSiteFilter'
+import { useAssetSiteLabel } from './useAssetSiteLabel'
 import { AssetCsvTransfer } from './AssetCsvTransfer'
 import { AssetQuickStatus } from './AssetQuickStatus'
 import { AssetFacts, AssetRecord } from './AssetRecord'
@@ -33,6 +35,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
   const location = useLocation()
   const navigate = useNavigate()
   const navigationState = location.state as { assetListPosition?: { y: number; focus: string | null }; assetPreview?: boolean } | null
+  const siteLabel = useAssetSiteLabel(workspace, params.get('site') ?? '')
   const recordId = params.get('record')
   const previewId = recordId ? null : params.get('preview')
   const activeId = recordId ?? previewId
@@ -189,11 +192,11 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
     </> : <>
       <div className="collection-toolbar">
         <form key={params.get('search') ?? ''} className="collection-search" onSubmit={(event) => { event.preventDefault(); const search = new FormData(event.currentTarget).get('search'); browse({ search: typeof search === 'string' ? search : '' }) }}><input type="search" name="search" aria-label={translate('collections.search')} defaultValue={params.get('search') ?? ''} /><button className="secondary-button">{translate('collections.searchAction')}</button></form>
-        <FilterMenu groups={filterGroups.map(({ key, label, values }) => ({ kind: 'choices', label, value: params.get(key) ?? '', choices: [{ value: '', label: translate('collections.all') }, ...values.map((value) => ({ value, label: filterLabel(value) }))], onChange: (value) => browse({ [key]: value || null }) }))} activeCount={filterKeys.filter((key) => params.has(key)).length} onClear={() => browse(Object.fromEntries(filterKeys.map((key) => [key, null])))} />
+        <FilterMenu groups={[...filterGroups.map(({ key, label, values }) => ({ kind: 'choices' as const, label, value: params.get(key) ?? '', choices: [{ value: '', label: translate('collections.all') }, ...values.map((value) => ({ value, label: filterLabel(value) }))], onChange: (value: string) => browse({ [key]: value || null }) })), { kind: 'custom', label: translate('collections.site'), valueLabel: siteLabel, content: <AssetSiteFilter workspace={workspace} value={params.get('site') ?? ''} onChange={(site) => browse({ site: site || null })} /> }]} activeCount={filterKeys.filter((key) => params.has(key)).length} onClear={() => browse(Object.fromEntries(filterKeys.map((key) => [key, null])))} />
         {preferences && <ColumnChooser preferences={preferences} labels={labels} onSave={savePreferences} onReset={async () => { const value = await preferenceClient.reset(workspace, 'assets'); pendingPreferenceReset.current = true; setPreferences(value) }} />}
         <label className="collection-page-size">{translate('collections.pageSize')}<select disabled={guarded} value={pageSize} onChange={(event) => { const size = Number(event.target.value) as 25 | 50 | 100; browse({ page_size: String(size) }); void savePreferences([...(preferences?.columns ?? assetColumns)], size).catch(() => setError(translate('collections.preferenceFailed'))) }}>{[25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       </div>
-      <div className="collection-active-filters">{filterKeys.filter((key) => params.has(key)).map((key) => <button type="button" className="row-action" key={key} aria-label={translate('collections.removeFilter', { label: key })} onClick={() => browse({ [key]: null })}>{translate(`collections.${key === 'assigned' ? 'assignment' : key}`)}: {filterLabel(params.get(key) ?? '')} ×</button>)}</div>
+      <div className="collection-active-filters">{filterKeys.filter((key) => params.has(key)).map((key) => <button type="button" className="row-action" key={key} aria-label={translate('collections.removeFilter', { label: key })} onClick={() => browse({ [key]: null })}>{translate(`collections.${key === 'assigned' ? 'assignment' : key}`)}: {key === 'site' ? siteLabel : filterLabel(params.get(key) ?? '')} ×</button>)}</div>
       <label className="collection-mobile-order">{translate('collections.ordering')}<select value={params.get('ordering') ?? 'name'} onChange={(event) => browse({ ordering: event.target.value })}>{assetColumns.flatMap((column) => [<option key={column} value={column}>{labels[column]} ↑</option>, <option key={`-${column}`} value={`-${column}`}>{labels[column]} ↓</option>])}</select></label>
       {(phase === 'loading' || (phase === 'ready' && !listReady)) && <p role="status">{translate('collections.loading')}</p>}
       {phase === 'error' && <p role="alert">{translate('assets.loadFailed', { workspace: ownerLabel })} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p>}

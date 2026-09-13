@@ -7588,6 +7588,62 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/assets/site-choices:
+    get:
+      operationId: workspaces_msp_assets_site_choices_retrieve
+      description: Only site identities already visible through assets in this exact
+        workspace.
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetSiteResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/collection-preferences/{feature}:
     get:
       operationId: workspaces_msp_collection_preferences_retrieve
@@ -13982,6 +14038,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CatalogModelChoiceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/site-choices:
+    get:
+      operationId: workspaces_organizations_assets_site_choices_retrieve
+      description: Only site identities already visible through assets in this exact
+        workspace.
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: search
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetSiteResult'
           description: ''
           headers:
             X-Request-ID:
@@ -27284,6 +27402,48 @@ components:
       - kind
       - media_type
       - size
+    AssetSiteChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AssetSiteResult:
+      type: object
+      description: Canonical metadata shared by offset-paginated public collections.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          maximum: 100
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetSiteChoice'
+        selected:
+          allOf:
+          - $ref: '#/components/schemas/AssetSiteChoice'
+          nullable: true
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+      - selected
     AssignedStaff:
       type: object
       properties:

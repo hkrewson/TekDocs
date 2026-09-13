@@ -61,3 +61,19 @@
 .asset-quick-assignment fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: .75rem; min-width: 0; }
 .asset-quick-assignment label { display: grid; gap: .25rem; min-width: 0; }
 .asset-quick-assignment select { width: 100%; min-width: 0; }
+
+.asset-site-filter { padding: .5rem; overflow-wrap: anywhere; }
+.asset-site-filter form { display: flex; flex-wrap: wrap; gap: .5rem; }
+.asset-site-filter form label { display: grid; min-width: 0; flex: 1; }
+.asset-site-filter input[type="search"] { width: 100%; min-width: 0; }
+.asset-site-choices label { display: flex; gap: .5rem; margin-block: .5rem; }
+.asset-site-choices span { min-width: 0; }
+
+.collection-toolbar .filter-menu { max-height: 50dvh; overflow-y: auto; }
+@media (max-width: 767px) {
+  .collection-toolbar { position: relative; }
+  .collection-toolbar .filter-control { position: static; }
+  .collection-toolbar .filter-menu { left: 0; right: auto; max-width: 100%; }
+}
+
+.collection-active-filters button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }

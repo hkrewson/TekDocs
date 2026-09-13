@@ -121,14 +121,20 @@
       "assignment choices failed",
       "assignment denied/conflict/failed request",
       "assignment canceled navigation",
-      "assignment site/location consistency"
+      "assignment site/location consistency",
+      "site search and paging",
+      "site filter refresh and removal",
+      "unavailable selected site",
+      "failed site choice read"
     ],
     "status": "implemented reference layout; see assets-layout.md for remaining acceptance",
     "evidence": [
       "frontend/e2e/asset-layout.spec.ts",
       "frontend/e2e/asset-edit-navigation.spec.ts",
       "frontend/e2e/live-workspace.spec.ts",
-      "frontend/src/inventory/Assets.test.tsx"
+      "frontend/src/inventory/Assets.test.tsx",
+      "backend/apps/core/tests/test_asset_collections.py",
+      "frontend/src/inventory/AssetSiteFilter.test.tsx"
     ]
   }
 ]

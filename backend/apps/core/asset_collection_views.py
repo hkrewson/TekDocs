@@ -12,7 +12,7 @@ from apps.accounts.policy import PermissionKey, context_has_permission
 
 from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageSerializer, paginate
 from .inventory_views import _workspace
-from .models import ClientAsset, HardwareLifecycleState, SoftwareInstallationStatus
+from .models import ClientAsset, HardwareLifecycleState, Site, SoftwareInstallationStatus
 
 ORDER_FIELDS = {
     "name": "entity__display_name",
@@ -25,6 +25,11 @@ ORDER_FIELDS = {
 }
 
 
+class OptionalQueryBooleanField(serializers.BooleanField):
+    # Query strings are not checkbox forms: omission must not mean False.
+    default_empty_html = serializers.empty
+
+
 class AssetCollectionQuerySerializer(BoundedCollectionQuerySerializer):
     page_size = serializers.ChoiceField(choices=(25, 50, 100), required=False, default=25)
     search = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
@@ -33,7 +38,7 @@ class AssetCollectionQuerySerializer(BoundedCollectionQuerySerializer):
         choices=(*HardwareLifecycleState.values, *SoftwareInstallationStatus.values), required=False
     )
     site = serializers.UUIDField(required=False)
-    assigned = serializers.BooleanField(required=False)
+    assigned = OptionalQueryBooleanField(required=False)
     warranty = serializers.ChoiceField(choices=("expired", "current", "missing"), required=False)
     ordering = serializers.ChoiceField(
         choices=(*ORDER_FIELDS, *(f"-{field}" for field in ORDER_FIELDS)), required=False, default="name"
@@ -140,6 +145,65 @@ class AssetCollectionView(APIView):
                         name: context_has_permission(workspace.member, permission, organization=workspace.organization)
                         for name, permission in permissions.items()
                     },
+                }
+            ).data
+        )
+
+
+class AssetSiteQuerySerializer(BoundedCollectionQuerySerializer):
+    page_size = serializers.ChoiceField(choices=(25, 50, 100), required=False, default=25)
+    search = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
+    selected = serializers.UUIDField(required=False)
+
+
+class AssetSiteChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    name = serializers.CharField(source="entity.display_name")
+
+
+class AssetSiteResultSerializer(OffsetPageSerializer):
+    results = AssetSiteChoiceSerializer(many=True)
+    selected = AssetSiteChoiceSerializer(allow_null=True)
+
+
+class AssetSiteChoicesView(APIView):
+    """Only site identities already visible through assets in this exact workspace."""
+
+    @extend_schema(parameters=[AssetSiteQuerySerializer], responses={200: AssetSiteResultSerializer})
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        query = AssetSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        assets = ClientAsset.scoped.for_scope(workspace.data_scope).filter(
+            archived_at__isnull=True, entity__archived_at__isnull=True
+        )
+        sites = (
+            Site.scoped.for_scope(workspace.data_scope)
+            .filter(archived_at__isnull=True, entity__archived_at__isnull=True)
+            .filter(
+                Q(pk__in=assets.values("hardware__assigned_site_id"))
+                | Q(pk__in=assets.values("software_installation__site_id"))
+            )
+            .select_related("entity")
+            .only("entity__display_name")
+            .order_by("entity__display_name", "entity_id")
+        )
+        selected = sites.filter(entity_id=values["selected"]).first() if "selected" in values else None
+        page = paginate(
+            sites.filter(entity__display_name__icontains=values["search"]),
+            page=values["page"],
+            page_size=values["page_size"],
+        )
+        return Response(
+            AssetSiteResultSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "selected": selected,
                 }
             ).data
         )

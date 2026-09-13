@@ -32,7 +32,7 @@ from apps.accounts.views import (
     ProfileView,
 )
 from apps.core.activity_views import MSPActivityListView, OrganizationActivityListView
-from apps.core.asset_collection_views import AssetCollectionView
+from apps.core.asset_collection_views import AssetCollectionView, AssetSiteChoicesView
 from apps.core.catalog_views import (
     CatalogModelDetailView,
     CatalogModelListCreateView,
@@ -1632,6 +1632,17 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/collection-preferences/<str:feature>",
         CollectionPreferenceView.as_view(),
         name="organization-collection-preferences",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/site-choices",
+        AssetSiteChoicesView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-site-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/site-choices",
+        AssetSiteChoicesView.as_view(),
+        name="organization-asset-site-choices",
     ),
     path(
         "api/v1/workspaces/msp/assets/collection",

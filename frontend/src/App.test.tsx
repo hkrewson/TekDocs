@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, vi } from 'vitest'
 import { App } from './App'
@@ -108,10 +108,10 @@ describe('application shell', () => {
     expect(await screen.findByText(/no documents have been shared/i)).toBeInTheDocument()
   })
 
-  it('renders sectioned navigation and the active route', () => {
+  it('renders sectioned navigation and the active route', async () => {
     render(app('/overview'))
 
-    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Compliance' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files')
@@ -256,7 +256,7 @@ describe('application shell', () => {
     expect(await screen.findByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
     expect(loadOrganization).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000010', expect.any(AbortSignal))
     expect(screen.getAllByText('Client workspace')).toHaveLength(2)
-    expect(document.title).toBe('Acme Dental · Overview · TekDocs')
+    await waitFor(() => expect(document.title).toBe('Acme Dental · Overview · TekDocs'))
   })
 
   it('shows only the selected organization capability union in navigation', async () => {

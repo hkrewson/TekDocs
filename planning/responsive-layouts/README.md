@@ -11,7 +11,7 @@ Quick right overlay drawer (full-screen below 768px), no nested drawer/tabs, bac
 ## Delivery
 
 1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API and navigation/edit-protection foundations implemented.
-2. **Assets** — Complete reference layout, operational overview, focused tabs and concise preview. Status: pending.
+2. **Assets** — Complete reference layout, operational overview, focused tabs and concise preview. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
 3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: pending.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: pending.
@@ -32,6 +32,8 @@ Docker make check plus focused API/component/browser tests per slice. Real backe
 Excluded: named saved views, resizable/reorderable columns, density modes, infinite scrolling and cross-page selection. Existing security/recurring/pilot obligations remain open. User and demo data must be preserved.
 
 ## Implementation records
+
+- [Assets reference layout](assets-layout.md)
 
 - [Personal collection preferences](personal-preferences.md)
 - [Navigation and edit protection](navigation-foundation.md)

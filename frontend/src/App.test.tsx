@@ -7,6 +7,8 @@ import type { AuthClient } from './auth/api'
 import type { WorkspaceClient } from './workspaces/api'
 import type { PeopleClient } from './people/api'
 import type { SitesClient } from './sites/api'
+import { browserAssetCollectionClient } from './inventory/api'
+import { browserCollectionPreferences, assetColumns, defaultPreferences } from './collections/preferences'
 import type { InventoryClient } from './inventory/api'
 import type { StaffAdministrationClient } from './staff/api'
 
@@ -160,13 +162,15 @@ describe('application shell', () => {
   })
 
   it('renders MSP-owned assets instead of an aggregate placeholder', async () => {
+    const list = vi.spyOn(browserAssetCollectionClient, 'list').mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false })
+    vi.spyOn(browserCollectionPreferences, 'load').mockResolvedValue(defaultPreferences(assetColumns))
     render(app('/assets'))
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
-    expect(await screen.findByText('No assets have been created for this MSP workspace.')).toBeInTheDocument()
-    expect(listAssets).toHaveBeenCalledWith(
+    expect(await screen.findByText('No assets match this view.')).toBeInTheDocument()
+    expect(list).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'msp', id: authContext.tenant.id, organization: null }),
-      1,
+      expect.objectContaining({ page: 1, page_size: 25 }),
       expect.any(AbortSignal),
     )
   })

@@ -4,14 +4,14 @@ Updated 2026-09-12. Version 0.8.46. Epic #77; existing delivery obligations rema
 
 ## Completed implementation slices
 
-The Assets summary collection and typed browser API client are implemented under #86. This is a foundation slice, not completion of Phase 1 or the Assets redesign. The navigation slice adds the data router, capability-derived organization routes and registered Assets edit protection under #88; see [navigation-foundation.md](navigation-foundation.md). See [the API contract and integration notes](asset-collection.md). Personal collection preference persistence and its browser client are the next implemented foundation under #87; the chooser remains pending.
+The Assets summary collection and typed browser API client are implemented under #86. This is a foundation slice, not completion of Phase 1 or the Assets redesign. The navigation slice adds the data router, capability-derived organization routes and registered Assets edit protection under #88; see [navigation-foundation.md](navigation-foundation.md). See [the API contract and integration notes](asset-collection.md). Personal collection preference persistence and its browser client are the next implemented foundation under #87; the chooser is now integrated in the Assets reference layout; see [assets-layout.md](assets-layout.md).
 
 ## Phase status
 
 | Phase | Status | Outstanding completion boundary |
 |---|---|---|
-| 1 — Inventory/foundation | In progress | Expand nested states, list/preview/record UI, URL-backed record/list navigation, personal preference chooser integration and full acceptance evidence; data router and registered Assets edit guards implemented |
-| 2 — Assets | Pending | Replace the existing visible layout, wire the collection client, previews/full records, edit guards and responsive verification |
+| 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
+| 2 — Assets | In progress | Visible layout replaced; preview assignment, site picker, expanded state/technician/release acceptance remain |
 | 3 — Contracts/Networks | Pending | All planned migrations and shared-pattern validation |
 | 4 — Operational records | Pending | All planned migrations |
 | 5 — Documentation/files | Pending | All planned migrations |
@@ -19,7 +19,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
 
-No route is marked migrated. The shell route inventory uses actual App.tsx declarations; organization areas now derive from the existing capability registry. Additional auth/portal/shell states are recorded separately; nested record/workflow coverage remains an explicit task.
+No route is marked fully accepted. Assets has an implemented replacement layout with remaining acceptance work. The shell route inventory uses actual App.tsx declarations; organization areas now derive from the existing capability registry. Additional auth/portal/shell states are recorded separately; nested record/workflow coverage remains an explicit task.
 
 ## Verified — Assets collection checkpoint
 
@@ -56,3 +56,15 @@ The sibling Wiki Roadmap has an uncommitted scoped update. Pre-existing Wiki edi
 
 - Evidence logs (ephemeral local artifacts): `/tmp/tekdocs-preferences-make-verified.log`, `/tmp/tekdocs-preferences-verified-api.log`, `/tmp/tekdocs-preferences-tests-complete.log`, `/tmp/tekdocs-preferences-client2.log`, and `/tmp/tekdocs-preferences-live-final.log`. Reproductions and assertions are retained in source.
 - Known limits: last successful preference write wins between devices; there is no chooser UI yet. Full supported backup/recovery, responsive visual acceptance and release gates remain required. No external blocker. The sibling Wiki Roadmap has a scoped, uncommitted update; pre-existing Wiki work is preserved. No push, deployment or Wiki publication.
+
+## Assets visible layout checkpoint — 2026-09-12
+
+Implemented under #79: bounded summary table/mobile rows, persistent column chooser/reset and page size, shared modal preview with bounded status action, record/section URLs, focused tabs and on-demand hardware history, list context/focus restoration, page-only selection and registered relationship editing. The old split layout and lifecycle below the collection are removed. See [assets-layout.md](assets-layout.md) for implementation details, URL compatibility, reproduction notes and remaining scope.
+
+**Verified:** `make check` passes, including 468 frontend tests across 99 files, lint/typecheck, API/schema/type drift and unchanged production bundle budgets. Final focused browser matrix passes 60 tests across Chromium, Firefox and WebKit at 320/390/768/1024/1280/1440px and short heights, plus touch and 200% CSS zoom stress. Final `make test-e2e-live` passes the isolated browser-to-Django-to-PostgreSQL journey and independent database fixture verification. Desktop list and 320px preview screenshots were visually inspected. Final browser-test lint and `git diff --check` pass.
+
+Reproductions retained in source: preference reset previously opened an unintended navigation confirmation; a commit-boundary reset fixes it (five repeated checks). Viewport-unit drawer height exceeded the zoomed viewport; inset sizing fixes the bounds assertions in all engines. A save-button-disabled assertion could mean either pending or completed save, so closing tests now also await the status selector becoming enabled. A deterministic paused-request browser scenario verifies pending saves retain close protection; filtered departure passed five repeat checks before the full matrix.
+
+Evidence logs (ephemeral): `/tmp/tekdocs-assets-layout-check3.log`, `/tmp/tekdocs-assets-layout-browser6.log`, `/tmp/tekdocs-assets-layout-live3.log`, `/tmp/tekdocs-assets-filter-repeat.log` and `/tmp/tekdocs-assets-layout-final-lint.log`. Durable assertions are linked from the implementation record.
+
+**Remaining, not blocked:** preview assignment, site chooser, software history presentation, reusable record header/sections, expanded stale/conflict/permission-state acceptance, manual native zoom/screen-reader/mobile-keyboard and technician walkthroughs, followed by applicable production/recovery/release gates. CSS zoom does not substitute for native browser zoom acceptance. Other surfaces remain pending. No phase/epic closure is claimed. Version remains 0.8.46; no push, deployment or Wiki publication. The sibling Wiki has a scoped local checkpoint alongside preserved earlier edits.

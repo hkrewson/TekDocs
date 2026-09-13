@@ -29,7 +29,7 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
       action()
     }
   }, [dirty, editors])
-  const value = useMemo(() => ({ register, attempt }), [register, attempt])
+  const value = useMemo(() => ({ register, attempt, isGuarded: dirty }), [register, attempt, dirty])
 
   useEffect(() => {
     if (!dirty) return

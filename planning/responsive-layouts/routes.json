@@ -37,9 +37,13 @@
   {
     "route": "/assets",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in progress",
+    "evidence": [
+      "planning/responsive-layouts/assets-layout.md",
+      "frontend/e2e/asset-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Collection, preview, record and section query navigation implemented; detailed state evidence and remaining acceptance in assets-layout.md and additional-surfaces.json."
   },
   {
     "route": "/auth/invitations/accept",
@@ -268,9 +272,13 @@
   {
     "route": "/workspaces/organizations/:organizationId/assets",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in progress",
+    "evidence": [
+      "planning/responsive-layouts/assets-layout.md",
+      "frontend/e2e/asset-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Collection, preview, record and section query navigation implemented; detailed state evidence and remaining acceptance in assets-layout.md and additional-surfaces.json."
   },
   {
     "route": "/workspaces/organizations/:organizationId/certificates",

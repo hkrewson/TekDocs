@@ -25,7 +25,6 @@ import { hardcodedButtonLabels } from './buttonLabels'
 const PENDING_PARAMETERISED_LABELS: Record<string, number> = {
   'src/compliance/Compliance.tsx': 1,
   'src/documentation/Documentation.tsx': 3,
-  'src/inventory/Assets.tsx': 1,
   'src/inventory/Licenses.tsx': 1,
   'src/networks/NetworkAddressing.tsx': 1,
   'src/networks/NetworkEndpoints.tsx': 1,

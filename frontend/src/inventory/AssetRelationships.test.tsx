@@ -1,3 +1,4 @@
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,7 @@ describe('AssetRelationships', () => {
       archive,
     }
     const user = userEvent.setup()
-    render(<AssetRelationships workspace={workspace} assetId="asset-1" assetName="Core switch" canCreate canArchive client={client} />)
+    render(<ApplicationRouter initialPath="/assets"><AssetRelationships workspace={workspace} assetId="asset-1" assetName="Core switch" canCreate canArchive client={client} /></ApplicationRouter>)
     expect(await screen.findByText('No asset relationships have been added.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add relationship' }))
     await user.type(screen.getByLabelText('Find an asset'), 'firewall')

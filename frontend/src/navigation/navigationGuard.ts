@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffe
 
 export type EditState = { dirty: boolean; busy: boolean; active: boolean; discard?: () => void }
 export type NavigationGuard = {
+  isGuarded: boolean
   register: (id: string, state: EditState | null) => void
   attempt: (action: () => void) => void
 }

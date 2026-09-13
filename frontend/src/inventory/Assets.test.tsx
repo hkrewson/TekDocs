@@ -1,4 +1,7 @@
+import { cloneElement, isValidElement, useState } from 'react'
 import type { ReactNode } from 'react'
+import { HardwareLifecycle } from './HardwareLifecycle'
+import { assetColumns, defaultPreferences } from '../collections/preferences'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import { act, render as rawRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,7 +10,28 @@ import { Assets } from './Assets'
 import type { HardwareLifecycleEvent } from './api'
 import type { ClientAsset, InventoryClient } from './api'
 
-function render(children: ReactNode) { return rawRender(<ApplicationRouter initialPath="/assets">{children}</ApplicationRouter>) }
+function render(children: ReactNode, initialPath = '/assets?record=asset-1') {
+  if (isValidElement<React.ComponentProps<typeof Assets>>(children) && children.type === Assets) {
+    const client = children.props.client
+    const collectionClient = {
+      async list() {
+        const value = await client.listAssets(workspace, 1)
+        return { ...value, results: value.results.map((record) => ({ id: record.id, name: record.name, model_name: record.model_name, model_number: record.model_number, kind: record.kind, status: record.hardware?.lifecycle_state ?? record.software_installation?.status ?? null, assignment: null, site: null, warranty_ends_on: record.hardware?.warranty_ends_on ?? null })) }
+      },
+      async detail(_workspace: unknown, id: string) {
+        const value = await client.listAssets(workspace, 1)
+        return value.results.find((record) => record.id === id) ?? asset
+      },
+    }
+    const preferences = defaultPreferences(assetColumns)
+    children = cloneElement(children, { collectionClient: children.props.collectionClient ?? collectionClient, preferenceClient: children.props.preferenceClient ?? { load: vi.fn().mockResolvedValue(preferences), save: vi.fn().mockResolvedValue(preferences), reset: vi.fn().mockResolvedValue(preferences) } })
+  }
+  return rawRender(<ApplicationRouter initialPath={initialPath}>{children}</ApplicationRouter>)
+}
+function HistoryHarness({ client }: { client: InventoryClient }) {
+  const [record, setRecord] = useState(asset)
+  return <HardwareLifecycle asset={record} workspace={workspace} client={client} canManage onChange={(hardware) => setRecord({ ...record, hardware })} />
+}
 
 const workspace = { id: 'client-1', name: 'Contoso', classifications: ['client'] } as never
 const asset: ClientAsset = {
@@ -74,10 +98,57 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
 }
 
 describe('Assets', () => {
+  it('loads bounded summaries before any preview and preserves failed preview status edits', async () => {
+    const user = userEvent.setup()
+    const legacyList = vi.fn()
+    const client = inventoryClient({ listAssets: legacyList, updateHardware: vi.fn().mockRejectedValue(new Error('Permission changed')) })
+    const collectionClient = {
+      list: vi.fn().mockResolvedValue({ results: [{ id: asset.id, name: asset.name, model_name: asset.model_name, kind: 'hardware', status: 'in_service' }], count: 1, page: 1, page_size: 25, has_more: false, can_manage: true }),
+      detail: vi.fn().mockResolvedValue(asset),
+    }
+    render(<Assets workspace={workspace} client={client} collectionClient={collectionClient} />, '/assets')
+    await user.click(await screen.findByRole('button', { name: 'Core switch' }))
+    expect(legacyList).not.toHaveBeenCalled()
+    expect(collectionClient.list).toHaveBeenCalledWith(workspace, expect.objectContaining({ page_size: 25 }), expect.any(AbortSignal))
+    const drawer = screen.getByRole('dialog', { name: 'Core switch' })
+    await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Change status' }), 'repair')
+    await user.click(within(drawer).getByRole('button', { name: 'Save status' }))
+    expect(await within(drawer).findByRole('alert')).toHaveTextContent('could not be saved')
+    await user.click(within(drawer).getByRole('button', { name: 'Close' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(within(drawer).getByRole('combobox', { name: 'Change status' })).toHaveValue('repair')
+    expect(collectionClient.detail).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps denied preferences drafts until canceled and falls back to the collection', async () => {
+    const user = userEvent.setup()
+    const preferences = defaultPreferences(assetColumns)
+    const preferenceClient = { load: vi.fn().mockResolvedValue(preferences), save: vi.fn().mockRejectedValue(new Error('Offline')), reset: vi.fn().mockResolvedValue(preferences) }
+    render(<Assets workspace={workspace} client={inventoryClient()} preferenceClient={preferenceClient} />, '/assets')
+    await user.click(await screen.findByRole('button', { name: 'Columns' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Warranty' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
+    expect(screen.getByRole('checkbox', { name: 'Warranty' })).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Core switch' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('checkbox', { name: 'Warranty' })).not.toBeChecked()
+    expect(screen.queryByRole('dialog', { name: 'Core switch' })).not.toBeInTheDocument()
+  })
+
+  it('reports unavailable direct records without falling back to another asset', async () => {
+    const collectionClient = { list: vi.fn().mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false, can_manage: false }), detail: vi.fn().mockRejectedValue(new Error('Not found')) }
+    render(<Assets workspace={workspace} client={inventoryClient()} collectionClient={collectionClient} />, '/assets?record=missing')
+    expect(await screen.findByRole('alert')).toHaveTextContent('unavailable')
+    expect(screen.queryByRole('heading', { name: 'Core switch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to assets' })).toHaveAttribute('href', '/assets')
+  })
+
   it('closes untouched editors without a discard prompt when opening another section', async () => {
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient()} />)
     await user.click(await screen.findByRole('button', { name: 'Edit details' }))
+    await user.click(screen.getByRole('link', { name: 'Network' }))
     await user.click(screen.getByRole('button', { name: 'Add address' }))
     expect(screen.queryByLabelText('Serial number')).not.toBeInTheDocument()
     expect(screen.getByLabelText('MAC address')).toBeInTheDocument()
@@ -105,7 +176,7 @@ describe('Assets', () => {
   it('keeps a successful hardware write successful when history refresh fails', async () => {
     const user = userEvent.setup()
     const listHardwareLifecycle = vi.fn().mockResolvedValueOnce([]).mockRejectedValue(new Error('History unavailable'))
-    render(<Assets workspace={workspace} client={inventoryClient({ listHardwareLifecycle })} />)
+    render(<HistoryHarness client={inventoryClient({ listHardwareLifecycle })} />)
     await user.click(await screen.findByRole('button', { name: 'Edit details' }))
     await user.type(screen.getByLabelText('Serial number'), '-updated')
     await user.click(screen.getByRole('button', { name: 'Save details' }))
@@ -127,11 +198,13 @@ describe('Assets', () => {
     await user.type(screen.getByLabelText('Serial number'), 'Unsaved serial')
     await user.click(screen.getByRole('button', { name: 'Save details' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Permission changed')
-    await user.click(screen.getByRole('button', { name: /Second switch/ }))
+    await user.click(screen.getByRole('link', { name: 'Back to assets' }))
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(screen.getByLabelText('Serial number')).toHaveValue('Unsaved serial')
-    await user.click(screen.getByRole('button', { name: /Second switch/ }))
+    await user.click(screen.getByRole('link', { name: 'Back to assets' }))
     await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await user.click(await screen.findByRole('button', { name: 'Second switch' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Open record' }))
     expect(await screen.findByRole('heading', { name: 'Second switch' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Serial number')).not.toBeInTheDocument()
   })
@@ -141,10 +214,12 @@ describe('Assets', () => {
     render(<Assets workspace={workspace} client={inventoryClient()} />)
     expect(await screen.findByRole('heading', { name: 'Core switch' })).toBeInTheDocument()
     expect(screen.getByText('Northwind / EdgeSwitch / EdgeSwitch 24')).toBeInTheDocument()
-    expect(screen.getByText('24')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Hardware lifecycle' })).toBeInTheDocument()
     expect(screen.getByText('SN-001')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'History' }))
     expect(await screen.findByText('created')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Specifications' }))
+    expect(screen.getByText('24')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Installation guide/ }))
     expect(await screen.findByText('Approved')).toBeInTheDocument()
   })
@@ -153,7 +228,7 @@ describe('Assets', () => {
     const created = { id: 'mac-1', address: '02:00:00:00:00:01', description: 'Ethernet' }
     const createAssetMACAddress = vi.fn().mockResolvedValue(created)
     const user = userEvent.setup()
-    render(<Assets workspace={workspace} client={inventoryClient({ createAssetMACAddress })} />)
+    render(<Assets workspace={workspace} client={inventoryClient({ createAssetMACAddress })} />, '/assets?record=asset-1&section=network')
     expect(await screen.findByRole('heading', { name: 'MAC addresses' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add address' }))
     await user.type(screen.getByLabelText('MAC address'), created.address)
@@ -202,7 +277,7 @@ describe('Assets', () => {
   it('applies a bounded bulk hardware state change', async () => {
     const bulkAssets = vi.fn().mockResolvedValue({ action: 'set_hardware_state', processed: 1 })
     const user = userEvent.setup()
-    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />)
+    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />, '/assets')
     await user.click(await screen.findByRole('checkbox', { name: 'Select Core switch' }))
     await user.selectOptions(screen.getByLabelText('State'), 'repair')
     await user.click(screen.getByRole('button', { name: 'Apply' }))
@@ -212,7 +287,7 @@ describe('Assets', () => {
   it('requires explicit confirmation before bulk archiving', async () => {
     const bulkAssets = vi.fn().mockResolvedValue({ action: 'archive', processed: 1 })
     const user = userEvent.setup()
-    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />)
+    render(<Assets workspace={workspace} client={inventoryClient({ bulkAssets })} />, '/assets')
     await user.click(await screen.findByRole('checkbox', { name: 'Select Core switch' }))
     await user.selectOptions(screen.getByLabelText('Action'), 'archive')
     await user.click(screen.getByRole('button', { name: 'Review archive' }))
@@ -245,7 +320,7 @@ describe('Assets', () => {
       () => new Promise<HardwareLifecycleEvent[]>((resolve) => { releaseHistory = resolve }),
     )
     const user = userEvent.setup()
-    render(<Assets workspace={workspace} client={inventoryClient({ listHardwareLifecycle })} />)
+    render(<HistoryHarness client={inventoryClient({ listHardwareLifecycle })} />)
 
     await user.click(await screen.findByRole('button', { name: 'Edit details' }))
     await user.clear(screen.getByLabelText('Serial number'))
@@ -268,9 +343,9 @@ describe('Assets', () => {
     render(<Assets workspace={workspace} client={inventoryClient({
       listAssets: vi.fn().mockResolvedValue({ results: [softwareAsset], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false }),
       updateSoftwareInstallation,
-    })} />)
+    })} />, '/assets?record=software-asset-1&section=installation')
     expect(await screen.findByRole('heading', { name: 'Software installation' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Edit installation' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit installation' }))
     await user.selectOptions(screen.getByLabelText('Status'), 'installed')
     await user.type(screen.getByLabelText('Installed version'), '7.4.1')
     await user.type(screen.getByLabelText('Installed on'), '2026-08-10')

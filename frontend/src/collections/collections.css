@@ -1,0 +1,59 @@
+.collection-toolbar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
+.collection-search { display: flex; flex: 1 1 16rem; gap: .5rem; min-width: 0; }
+.collection-search input { min-width: 0; flex: 1; }
+.collection-page-size { display: flex; align-items: center; gap: .5rem; }
+.collection-columns { max-width: 100%; }
+.collection-column-choices { padding: .75rem; border: 1px solid var(--border); margin-block-start: .5rem; max-width: 25rem; }
+.collection-column-choices fieldset { border: 0; padding: 0; display: grid; gap: .5rem; }
+.collection-column-choices label { display: flex; align-items: center; gap: .5rem; }
+.collection-active-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.collection-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.collection-table th, .collection-table td { padding: .65rem .5rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.collection-table th { font-size: .875rem; }
+.collection-table th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.collection-table .collection-identity { width: 25%; }
+.collection-table .collection-selection { width: 2.5rem; }
+.collection-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; font: inherit; font-weight: 600; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; overflow-wrap: anywhere; }
+.collection-record-link { display: inline-block; margin-block-start: .4rem; font-size: .875rem; }
+.collection-cell-label, .collection-mobile-order { display: none; }
+.collection-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(32rem, 100%); height: auto; max-width: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); overflow: hidden; }
+.collection-drawer[open] { display: flex; flex-direction: column; }
+.collection-drawer::backdrop { background: rgb(0 0 0 / 35%); }
+.collection-drawer header { display: flex; align-items: flex-start; gap: 1rem; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--border); }
+.collection-drawer h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 1.25rem; margin: 0; overflow-wrap: anywhere; }
+.collection-drawer-body { padding: 1rem; overflow: auto; min-height: 0; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.record-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); gap: .75rem 1.5rem; }
+.record-facts dt { font-size: .875rem; color: var(--muted); }
+.record-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.asset-record { min-width: 0; overflow-wrap: anywhere; }
+.asset-record-header h1 { font-size: 1.5rem; margin-block: 1rem .5rem; }
+.record-sections { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border); margin-block: 1rem; }
+.record-sections a { padding-block: .65rem; color: inherit; }
+.record-sections a[aria-current] { font-weight: 600; border-bottom: 2px solid currentColor; }
+.record-sections-mobile { display: none; }
+.asset-record .inventory-provenance { border: 0; padding: 0; }
+.asset-record .inventory-documents { margin-block-start: 1rem; }
+.asset-record .lifecycle-history { margin-block-start: 1rem; }
+.asset-record .hardware-lifecycle > .section-heading > div > p { display: none; }
+@media (max-width: 767px) {
+  .collection-drawer { width: 100%; border: 0; }
+  .collection-table, .collection-table tbody { display: block; }
+  .collection-table thead { display: none; }
+  .collection-table tr { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .5rem; padding-block: .75rem; border-bottom: 1px solid var(--border); }
+  .collection-table td { display: block; padding: 0; border: 0; grid-column: 2; }
+  .collection-table .collection-identity { width: auto; }
+  .collection-table td.collection-selection { grid-column: 1; grid-row: 1; width: auto; }
+  .collection-table td[data-column="assignment"], .collection-table td[data-column="warranty"] { display: none; }
+  .collection-cell-label { display: inline; font-size: .875rem; color: var(--muted); margin-inline-end: .5rem; }
+  .collection-mobile-order, .record-sections-mobile { display: flex; align-items: center; gap: .75rem; margin-block: .75rem; }
+  .record-sections { display: none; }
+  .collection-column-choices { max-width: 100%; }
+  .collection-toolbar > * { max-width: 100%; }
+  .record-sections-mobile select { min-width: 0; }
+}
+
+.asset-quick-status { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-block: 1rem; }
+.asset-quick-status label { display: grid; gap: .25rem; }
+
+.collection-table input[type="checkbox"] { width: 1.5rem; height: 1.5rem; margin: 0; }
+@media (max-width: 767px) { .collection-name { min-height: 2.75rem; } }

@@ -10,10 +10,11 @@ async function mockAssets(page: Page) {
     tenant: { id: crypto.randomUUID(), name: 'Layout MSP' }, role: 'owner', permissions: ['assets.view', 'assets.edit'],
     surface: 'msp', organization: null, mfa_enrollment_required: false,
   } }))
-  await page.route('**/api/v1/workspaces/msp/assets?*', (route) => route.fulfill({ json: {
+  await page.route('**/api/v1/workspaces/msp/assets/collection?*', (route) => route.fulfill({ json: {
     results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true,
     can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false,
   } }))
+  await page.route('**/collection-preferences/assets', (route) => route.fulfill({ json: { columns: ['name', 'model', 'status'], available_columns: ['name', 'model', 'status'], default_columns: ['name', 'model', 'status'], page_size: 25 } }))
   await page.route('**/assets/model-choices?*', (route) => route.fulfill({ json: { results: [] } }))
 }
 
@@ -97,7 +98,7 @@ test('hardware save includes fields edited after Keep editing', async ({ page })
     assignment: { person_id: null, person_name: null, site_id: null, site_name: null, location_id: null, location_name: null, assigned_at: null },
     disposed_on: null, disposal_method: '', disposal_reason: '',
   }
-  await page.route('**/api/v1/workspaces/msp/assets?*', (route) => route.fulfill({ json: {
+  await page.route('**/api/v1/workspaces/msp/assets/collection?*', (route) => route.fulfill({ json: {
     results: [{ id: 'asset-1', name: 'Core switch', kind: 'hardware', supplier_name: 'Supplier', product_name: 'Switch', model_name: '24 ports',
       model_number: 'SW-24', model_revision: 1, specification_version: 1, specifications: {}, provenance_checksum: 'a'.repeat(64),
       documents: [], hardware, mac_addresses: [], software_installation: null }],
@@ -106,7 +107,8 @@ test('hardware save includes fields edited after Keep editing', async ({ page })
   } }))
   await page.route('**/assets/asset-1/hardware/lifecycle', (route) => route.fulfill({ json: [] }))
   await page.route('**/assets/asset-1/hardware', (route) => route.fulfill({ json: { ...hardware, ...route.request().postDataJSON() as object } }))
-  await page.goto('/assets')
+  await page.route('**/assets/asset-1', (route) => route.fulfill({ json: { id: 'asset-1', name: 'Core switch', kind: 'hardware', supplier_name: 'Supplier', product_name: 'Switch', model_name: '24 ports', model_number: 'SW-24', model_revision: 1, specification_version: 1, specifications: {}, provenance_checksum: 'a'.repeat(64), documents: [], hardware, mac_addresses: [], software_installation: null } }))
+  await page.goto('/assets?record=asset-1')
   await page.getByRole('button', { name: 'Edit details' }).click()
   await page.getByLabel('Serial number').fill('LIVE-SN-100')
   await page.getByRole('link', { name: 'Vendors', exact: true }).click()

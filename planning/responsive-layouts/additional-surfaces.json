@@ -94,11 +94,36 @@
       "upgrade",
       "restored"
     ],
-    "status": "implemented foundation; API, upgrade/restore, make check and live gates passed; chooser UI pending",
+    "status": "implemented foundation and Assets chooser; expanded acceptance remains open",
     "evidence": [
       "backend/apps/core/tests/test_collection_preferences.py",
       "frontend/src/collections/preferences.test.ts",
       "frontend/e2e/live-workspace.spec.ts"
+    ]
+  },
+  {
+    "surface": "Assets collection, preview and full record",
+    "source": "frontend/src/inventory/Assets.tsx",
+    "entry": "Assets collection routes with preview, record and section query parameters",
+    "states": [
+      "summary collection",
+      "column chooser",
+      "page selection",
+      "quick preview",
+      "failed status save",
+      "dirty close",
+      "record sections",
+      "unavailable direct record",
+      "filtered departure",
+      "touch",
+      "CSS zoom stress"
+    ],
+    "status": "implemented reference layout; see assets-layout.md for remaining acceptance",
+    "evidence": [
+      "frontend/e2e/asset-layout.spec.ts",
+      "frontend/e2e/asset-edit-navigation.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts",
+      "frontend/src/inventory/Assets.test.tsx"
     ]
   }
 ]

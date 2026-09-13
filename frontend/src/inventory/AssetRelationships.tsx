@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { useEffect, useMemo, useState } from 'react'
 import { Link2, Search, Trash2 } from 'lucide-react'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -38,6 +39,8 @@ export function AssetRelationships({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const attempt = useUnsavedChanges(adding && Boolean(query || selectedId || linkType !== 'related_to'), saving, () => { setAdding(false); setQuery(''); setSelectedId(''); setLinkType('related_to') }, adding)
+
   useEffect(() => {
     const controller = new AbortController()
     client.list(scope, assetId, controller.signal)
@@ -76,7 +79,7 @@ export function AssetRelationships({
   }
 
   return <section className="asset-relationships" aria-labelledby="asset-relationships-heading">
-    <div className="section-heading"><div><h3 id="asset-relationships-heading">Asset relationships</h3><p>Typed links and backlinks for {assetName} within this workspace.</p></div>{canCreate && <button className="secondary-button" type="button" onClick={() => { setAdding((current) => !current); setCandidates(null) }}>{adding ? 'Cancel' : 'Add relationship'}</button>}</div>
+    <div className="section-heading"><div><h3 id="asset-relationships-heading">Asset relationships</h3><p>Typed links and backlinks for {assetName} within this workspace.</p></div>{canCreate && <button className="secondary-button" type="button" onClick={() => attempt(() => { setAdding(!adding); setCandidates(null) })}>{adding ? 'Cancel' : 'Add relationship'}</button>}</div>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {adding && <div className="asset-relationship-form">
       <label><span>Relationship</span><select value={linkType} onChange={(event) => setLinkType(event.target.value as EntityLinkType)}>{assetLinkTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -86,6 +89,6 @@ export function AssetRelationships({
     </div>}
     {relationships === null && !error && <p className="relationship-state" role="status">Loading asset relationships…</p>}
     {relationships?.length === 0 && <p className="relationship-state">No asset relationships have been added.</p>}
-    {relationships && relationships.length > 0 && <ul className="asset-relationship-list">{relationships.map((item) => <li key={item.id}><Link2 size={15} aria-hidden="true" /><span><strong>{item.label}</strong> {item.related_entity.display_name}</span><span>{item.direction === 'incoming' ? 'Backlink' : 'Outgoing'}</span>{canArchive && <button className="icon-button" type="button" aria-label={`Archive relationship with ${item.related_entity.display_name}`} disabled={saving} onClick={() => { void archiveRelationship(item) }}><Trash2 size={14} /></button>}</li>)}</ul>}
+    {relationships && relationships.length > 0 && <ul className="asset-relationship-list">{relationships.map((item) => <li key={item.id}><Link2 size={15} aria-hidden="true" /><span><strong>{item.label}</strong> {item.related_entity.display_name}</span><span>{item.direction === 'incoming' ? 'Backlink' : 'Outgoing'}</span>{canArchive && <button className="icon-button" type="button" aria-label={`Archive relationship with ${item.related_entity.display_name}`} disabled={saving} onClick={() => attempt(() => { void archiveRelationship(item) })}><Trash2 size={14} /></button>}</li>)}</ul>}
   </section>
 }

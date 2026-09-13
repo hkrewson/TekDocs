@@ -21,6 +21,7 @@
 .collection-drawer::backdrop { background: rgb(0 0 0 / 35%); }
 .collection-drawer > header { display: flex; align-items: flex-start; gap: 1rem; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--border); }
 .collection-drawer > header h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 1.25rem; margin: 0; overflow-wrap: anywhere; }
+.collection-drawer-return { display: none; }
 .collection-drawer-body { padding: 1rem; overflow: auto; min-height: 0; overscroll-behavior: contain; overflow-wrap: anywhere; }
 .record-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); gap: .75rem 1.5rem; }
 .record-facts dt { font-size: .875rem; color: var(--muted); }
@@ -41,6 +42,8 @@
 .asset-record .hardware-lifecycle > .section-heading > div > p { display: none; }
 @media (max-width: 767px) {
   .collection-drawer { width: 100%; border: 0; }
+  .collection-drawer > header { flex-wrap: wrap; }
+  .collection-drawer-return { display: inline-flex; align-items: center; min-height: 2.75rem; }
   .collection-table, .collection-table tbody { display: block; }
   .collection-table thead { display: none; }
   .collection-table tr { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .5rem; padding-block: .75rem; border-bottom: 1px solid var(--border); }

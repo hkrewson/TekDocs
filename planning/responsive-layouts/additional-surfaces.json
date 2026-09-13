@@ -112,6 +112,8 @@
       "full record drawer",
       "drawer sections and refresh",
       "close after section changes",
+      "backdrop dismissal and interior drag protection",
+      "mobile return link and heading focus",
       "guarded drawer sections and full-page transition",
       "failed status save",
       "dirty close",

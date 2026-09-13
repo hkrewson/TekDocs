@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { HardwareLifecycle } from './HardwareLifecycle'
 import { assetColumns, defaultPreferences } from '../collections/preferences'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
-import { act, render as rawRender, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render as rawRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Assets } from './Assets'
@@ -115,7 +115,7 @@ describe('Assets', () => {
     await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Lifecycle state' }), 'repair')
     await user.click(within(drawer).getByRole('button', { name: 'Save details' }))
     expect(await within(drawer).findByRole('alert')).toHaveTextContent('Permission changed')
-    await user.click(within(drawer).getByRole('button', { name: 'Close' }))
+    fireEvent(drawer, new Event('cancel', { cancelable: true }))
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(within(drawer).getByRole('combobox', { name: 'Lifecycle state' })).toHaveValue('repair')
     expect(collectionClient.detail).toHaveBeenCalledTimes(1)
@@ -373,7 +373,7 @@ describe('preview assignment', () => {
     await user.click(screen.getByRole('button', { name: 'Save assignment' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Your choices have been kept')
     expect(assignHardware).toHaveBeenCalledExactlyOnceWith(workspace, 'asset-1', { person_id: 'person-1', site_id: 'site-1', location_id: 'location-1' })
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent(screen.getByRole('dialog', { name: 'Core switch' }), new Event('cancel', { cancelable: true }))
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(screen.getByLabelText('Person')).toHaveValue('person-1')
     expect(screen.getByLabelText('Location')).toHaveValue('location-1')
@@ -413,7 +413,7 @@ describe('preview assignment', () => {
     await user.selectOptions(await screen.findByLabelText('Person'), 'person-1')
     await user.click(screen.getByRole('button', { name: 'Save assignment' }))
     expect(await screen.findByText('In service', { selector: '.lifecycle-state' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent(screen.getByRole('dialog', { name: 'Core switch' }), new Event('cancel', { cancelable: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

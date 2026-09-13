@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import { defaultPreferences } from '../collections/preferences'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { NetworksClient } from './api'
-import { NetworkWireless } from './NetworkWireless'
+import { NetworkWireless, WirelessWorkspace } from './NetworkWireless'
 
 const workspace: WorkspaceContext = { kind: 'organization', id: 'client-1', name: 'Client', classifications: ['client'], capabilities: [], organization: null }
 const record = { id: 'wifi-1', ssid: 'Office Staff', subnet_id: 'network-1', status: 'active', purpose: 'corporate', security: 'wpa3_enterprise', hidden: false, client_isolation: true, description: '', site_id: 'site-1', site_name: 'Headquarters', vlan_id: 'vlan-1', vlan_name: 'Office', vlan_number: 20, subnet_cidr: '192.0.2.0/24' }
@@ -84,4 +84,71 @@ it('keeps foreign-parent details unavailable and does not offer denied edits', a
   expect(await screen.findByRole('alert')).toHaveTextContent('unavailable')
   expect(screen.queryByText('Headquarters')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'New wireless network' })).not.toBeInTheDocument()
+})
+
+function setupRegister(options: { path?: string; denied?: boolean; failSave?: boolean } = {}) {
+  window.history.replaceState({}, '', options.path ?? '/networks?view=wireless')
+  const unassigned = { ...record, subnet_id: null, subnet_cidr: null }
+  const wirelessCollection = vi.fn().mockResolvedValue({ results: [unassigned], page: 1, page_size: 25, count: 1, has_more: false, can_manage: !options.denied })
+  const wirelessDetail = vi.fn().mockResolvedValue(unassigned)
+  const updateWireless = options.failSave ? vi.fn().mockRejectedValue(new Error('Wireless record changed.')) : vi.fn().mockResolvedValue(unassigned)
+  const createWireless = vi.fn().mockResolvedValue(unassigned)
+  const client = { wirelessCollection, wirelessDetail, updateWireless, createWireless } as unknown as NetworksClient
+  const defaults = defaultPreferences(['name', 'network', 'status', 'security'])
+  const preferenceClient = { load: vi.fn().mockResolvedValue(defaults), save: vi.fn().mockResolvedValue(defaults), reset: vi.fn().mockResolvedValue(defaults) }
+  render(<ApplicationRouter><WirelessWorkspace workspace={workspace} client={client} preferenceClient={preferenceClient} /></ApplicationRouter>)
+  return { wirelessCollection, createWireless, user: userEvent.setup() }
+}
+
+it('opens unassigned workspace records over the list without restricting a parent', async () => {
+  const { user, wirelessCollection } = setupRegister()
+  await user.click(await screen.findByRole('button', { name: 'Office Staff' }))
+  const drawer = await screen.findByRole('dialog', { name: 'Office Staff' })
+  expect(within(drawer).getByText('No parent network')).toBeInTheDocument()
+  expect(within(drawer).getByRole('button', { name: 'Edit wireless network' })).toBeInTheDocument()
+  expect(wirelessCollection).toHaveBeenCalledWith(workspace, expect.not.objectContaining({ subnet_id: expect.anything() as unknown }), expect.any(AbortSignal))
+  expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  fireEvent(drawer, new Event('cancel', { cancelable: true }))
+  expect(await screen.findByRole('button', { name: 'Office Staff' })).toHaveFocus()
+})
+
+it('filters the workspace register by association and keeps a removable summary', async () => {
+  const { user, wirelessCollection } = setupRegister({ path: '/networks?view=wireless&ssid_association=unassigned' })
+  await screen.findByRole('button', { name: 'Office Staff' })
+  expect(wirelessCollection).toHaveBeenCalledWith(workspace, expect.objectContaining({ association: 'unassigned' }), expect.any(AbortSignal))
+  await user.click(screen.getByRole('button', { name: 'Network association: No parent network ×' }))
+  await waitFor(() => expect(wirelessCollection).toHaveBeenLastCalledWith(workspace, expect.not.objectContaining({ association: expect.anything() as unknown }), expect.any(AbortSignal)))
+})
+
+it('keeps failed workspace edits through guarded full-page navigation', async () => {
+  const { user } = setupRegister({ failSave: true })
+  await user.click(await screen.findByRole('button', { name: 'Office Staff' }))
+  const drawer = await screen.findByRole('dialog', { name: 'Office Staff' })
+  await user.click(within(drawer).getByRole('button', { name: 'Edit wireless network' }))
+  await user.type(within(drawer).getByLabelText('SSID'), ' unsaved')
+  await user.click(within(drawer).getByRole('button', { name: 'Save wireless network' }))
+  expect(await within(drawer).findByRole('alert')).toHaveTextContent('Wireless record changed')
+  await user.click(within(drawer).getByRole('link', { name: 'Open in full page' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(within(drawer).getByLabelText('SSID')).toHaveValue('Office Staff unsaved')
+  fireEvent(drawer, new Event('cancel', { cancelable: true }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  expect(await screen.findByRole('button', { name: 'Office Staff' })).toBeInTheDocument()
+})
+
+it('creates an unassigned workspace wireless record and supports read-only detail links', async () => {
+  const { user, createWireless } = setupRegister()
+  await user.click(await screen.findByRole('button', { name: 'New wireless network' }))
+  const drawer = await screen.findByRole('dialog', { name: 'New wireless network' })
+  await user.type(within(drawer).getByLabelText('SSID'), 'Office Staff')
+  await user.click(within(drawer).getByRole('button', { name: 'Save wireless network' }))
+  await screen.findByRole('dialog', { name: 'Office Staff' })
+  expect(createWireless).toHaveBeenCalledWith(workspace, expect.objectContaining({ subnet_id: null }))
+})
+
+it('allows viewing a direct full-page record without offering denied edits', async () => {
+  setupRegister({ path: '/networks?view=wireless&ssid=wifi-1&ssid_full=true', denied: true })
+  expect(await screen.findByRole('heading', { level: 1, name: 'Office Staff' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Edit wireless network' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Back to wireless networks' })).toBeInTheDocument()
 })

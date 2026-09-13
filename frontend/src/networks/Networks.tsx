@@ -1,3 +1,4 @@
+import { WirelessWorkspace } from './NetworkWireless'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
@@ -23,7 +24,24 @@ type NetworkResult = Awaited<ReturnType<NetworksClient['collection']>>
 const networkColumns = ['name', 'location', 'vlan', 'cidr'] as const
 const labels = { name: t('name'), location: t('location'), vlan: t('vlan'), cidr: t('cidr') }
 
-export function Networks({ workspace, client = browserNetworksClient, preferenceClient = browserCollectionPreferences, relationshipsClient }: { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }) {
+type NetworksProps = { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }
+export function Networks(props: NetworksProps) {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const wireless = params.get('view') === 'wireless'
+  function href(view: string) {
+    const next = new URLSearchParams(params)
+    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'history_page']) next.delete(key)
+    if (view === 'wireless') next.set('view', view); else next.delete('view')
+    return `${location.pathname}${next.size ? `?${next}` : ''}`
+  }
+  return <>
+    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!wireless ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link></nav>
+    {wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
+  </>
+}
+
+function NetworkCollection({ workspace, client = browserNetworksClient, preferenceClient = browserCollectionPreferences, relationshipsClient }: { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()

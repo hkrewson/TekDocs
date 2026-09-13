@@ -24335,6 +24335,11 @@ export interface operations {
         readonly parameters: {
             readonly query?: {
                 /**
+                 * @description * `assigned` - assigned
+                 *     * `unassigned` - unassigned
+                 */
+                readonly association?: "assigned" | "unassigned";
+                /**
                  * @description * `name` - name
                  *     * `-name` - -name
                  *     * `status` - status
@@ -24343,8 +24348,10 @@ export interface operations {
                  *     * `-purpose` - -purpose
                  *     * `security` - security
                  *     * `-security` - -security
+                 *     * `network` - network
+                 *     * `-network` - -network
                  */
-                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security";
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security" | "network" | "-network";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -32890,6 +32897,11 @@ export interface operations {
         readonly parameters: {
             readonly query?: {
                 /**
+                 * @description * `assigned` - assigned
+                 *     * `unassigned` - unassigned
+                 */
+                readonly association?: "assigned" | "unassigned";
+                /**
                  * @description * `name` - name
                  *     * `-name` - -name
                  *     * `status` - status
@@ -32898,8 +32910,10 @@ export interface operations {
                  *     * `-purpose` - -purpose
                  *     * `security` - security
                  *     * `-security` - -security
+                 *     * `network` - network
+                 *     * `-network` - -network
                  */
-                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security";
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security" | "network" | "-network";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

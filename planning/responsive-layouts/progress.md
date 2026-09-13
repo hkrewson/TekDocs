@@ -398,3 +398,65 @@ network records; each still requires its own implementation and evidence. Unassi
 wireless browsing, association management, other network surfaces, technician
 acceptance, release gates and broader pre-1.0 obligations remain open. Tracked
 implementation notes and tests are durable; the Wiki update remains local/unpublished.
+
+### 2026-09-13 — Workspace Wireless register (Phase 3 #80)
+
+Bounded slice: discover and edit assigned/unassigned SSIDs across the current
+workspace from Networks → Wireless. Shared complete-record drawer, Overview/History,
+optional page, URL list context, association filter and network column. Server query
+and personal wireless-register preferences are additive; OpenAPI/types updated.
+No schema migration or version change. Association reassignment remains follow-up.
+
+Focused API suite passes (8 tests); focused Networks/Addresses/Wireless components
+pass (18 tests). Initial verification reproduced unsafe-any lint in browser state
+and matcher typing, then corrected explicit unknown boundaries. A fixture edit
+accidentally referenced standalone in the Addresses helper, reproducing a type/build
+failure and browser failure; restored that helper's fixed parent assertion. Component
+Escape simulation did not dispatch the native dialog cancel event in JSDOM; use the
+native cancel event there, with actual keyboard Escape covered in browser tests.
+The new History browser assertion initially omitted “network” from the catalog label;
+updated the assertion to the existing copy after observing the rendered result.
+No production behavior or verification threshold was weakened to resolve these.
+
+Full checks, all maintained browser engines, network/migration validation, live
+Django/PostgreSQL rehearsal and local rebuild results are recorded below when done.
+
+The real browser-to-Django-to-PostgreSQL rehearsal passes, including creation of an
+unassigned SSID from the register, status update and persisted null parent/status
+after refresh. Existing independent database-fixture assertions also pass. Local
+make up completed with retained volumes; readiness reports database/renderer ready
+and version 0.8.46. No production publication or replacement of user/demo data.
+
+The full component run exposed a pre-existing Assets test timing failure: it fired a
+native cancel synchronously after observing saved lifecycle text while the guard's
+React update was still settling. Reproduced the same failure against archived HEAD
+source (20 pass/1 fail) and current source. Wrapped the successful user save in async
+act to settle React updates before the separate cancel event, retaining the original
+no-dialog assertion. All 21 Assets tests then pass. No application guard behavior was
+changed. The complete make check gate is rerunning with this harness correction.
+
+All 102 network browser checks pass across Chromium, Firefox and WebKit. Coverage
+includes prior Networks/Addresses/parent Wireless behavior, six widths, unassigned
+SSID discovery, retained query state, History/refresh, full-page/Back/Forward, focus
+return, inaccessible records, association filters, failed saves and dirty dismissal,
+touch/short heights and 200% CSS zoom. Synthetic mobile screenshots were visually
+inspected. No page or drawer horizontal overflow or accessibility violations in the
+checked record states. Broader technician/release acceptance remains open.
+
+Final make check passes: backend lint/types, schema/migration drift checks, frontend
+lint/types, all 495 tests in 104 files, coverage enforcement, production build and
+bundle budgets. The long network gate has completed its main API/IDOR/RLS/migration
+suite and moved to network stabilization; final completion is recorded below.
+
+Final make test-network-validation exited successfully: main network API, service,
+transfer/reconciliation, permission/IDOR, runtime RLS and migration stabilization
+suite; network stabilization; then all 495 frontend tests and coverage. The existing
+suite skip remains unchanged. This completes the bounded workspace Wireless slice.
+
+Verified: implementation/API contracts, focused tests, all maintained browser
+engines, full checks, isolated live workflow, and healthy local 0.8.46 runtime.
+No blocker remains for this checkpoint. Inferred: the shared standalone/parent
+collection pattern can support later network records; each needs its own evidence.
+Wireless association editing, remaining network surfaces, technician acceptance,
+release gates and broader pre-1.0 obligations remain open. Wiki changes remain local
+and unpublished. No production push, release, version bump or data replacement.

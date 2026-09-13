@@ -2347,5 +2347,14 @@
   "networkLayout.wpa2_enterprise": "WPA2 Enterprise",
   "networkLayout.wpa3_enterprise": "WPA3 Enterprise",
   "networkLayout.mixed_personal": "WPA2/WPA3 Personal",
-  "networkLayout.mixed_enterprise": "WPA2/WPA3 Enterprise"
+  "networkLayout.mixed_enterprise": "WPA2/WPA3 Enterprise",
+  "networkLayout.views": "Network views",
+  "networkLayout.networkAssociation": "Network association",
+  "networkLayout.assignedNetwork": "Assigned to a network",
+  "networkLayout.unassignedNetwork": "No parent network",
+  "networkLayout.networkColumn": "Network",
+  "networkLayout.wirelessRegisterEmpty": "No wireless networks match this workspace and search.",
+  "networkLayout.wirelessHistoryHelp": "Changes recorded for this wireless network.",
+  "networkLayout.wirelessHistoryEmpty": "No wireless network history is available.",
+  "networkLayout.wirelessHistoryDenied": "Your role cannot view wireless network history."
 }

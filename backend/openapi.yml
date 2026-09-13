@@ -12610,6 +12610,18 @@ paths:
       operationId: workspaces_msp_networks_wireless_retrieve_list
       parameters:
       - in: query
+        name: association
+        schema:
+          enum:
+          - assigned
+          - unassigned
+          type: string
+          x-spec-enum-id: 135a4e0e47505309
+          minLength: 1
+        description: |-
+          * `assigned` - assigned
+          * `unassigned` - unassigned
+      - in: query
         name: ordering
         schema:
           enum:
@@ -12621,8 +12633,10 @@ paths:
           - -purpose
           - security
           - -security
+          - network
+          - -network
           type: string
-          x-spec-enum-id: db68728c9c859605
+          x-spec-enum-id: fb8a6496156838e4
           default: name
           minLength: 1
         description: |-
@@ -12634,6 +12648,8 @@ paths:
           * `-purpose` - -purpose
           * `security` - security
           * `-security` - -security
+          * `network` - network
+          * `-network` - -network
       - in: query
         name: page
         schema:
@@ -24987,6 +25003,18 @@ paths:
       operationId: workspaces_organizations_networks_wireless_retrieve_list
       parameters:
       - in: query
+        name: association
+        schema:
+          enum:
+          - assigned
+          - unassigned
+          type: string
+          x-spec-enum-id: 135a4e0e47505309
+          minLength: 1
+        description: |-
+          * `assigned` - assigned
+          * `unassigned` - unassigned
+      - in: query
         name: ordering
         schema:
           enum:
@@ -24998,8 +25026,10 @@ paths:
           - -purpose
           - security
           - -security
+          - network
+          - -network
           type: string
-          x-spec-enum-id: db68728c9c859605
+          x-spec-enum-id: fb8a6496156838e4
           default: name
           minLength: 1
         description: |-
@@ -25011,6 +25041,8 @@ paths:
           * `-purpose` - -purpose
           * `security` - security
           * `-security` - -security
+          * `network` - network
+          * `-network` - -network
       - in: path
         name: organization_entity_id
         schema:

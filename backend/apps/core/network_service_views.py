@@ -171,10 +171,17 @@ def _error(exc: Exception) -> serializers.ValidationError:
     return serializers.ValidationError({"detail": detail})
 
 
-WIRELESS_ORDERING = {"name": "ssid", "status": "status", "purpose": "purpose", "security": "security"}
+WIRELESS_ORDERING = {
+    "name": "ssid",
+    "status": "status",
+    "purpose": "purpose",
+    "security": "security",
+    "network": "subnet__cidr",
+}
 
 
 class WirelessCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    association = serializers.ChoiceField(choices=("assigned", "unassigned"), required=False)
     subnet_id = serializers.UUIDField(required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
     status = serializers.ChoiceField(choices=WirelessNetworkStatus.values, required=False)
@@ -201,7 +208,13 @@ class WirelessListCreateView(APIView):
                 raise PermissionDenied("The selected network is unavailable.")
             records = records.filter(subnet__entity_id=values["subnet_id"])
         if values["q"]:
-            records = records.filter(Q(ssid__icontains=values["q"]) | Q(description__icontains=values["q"]))
+            records = records.filter(
+                Q(ssid__icontains=values["q"])
+                | Q(description__icontains=values["q"])
+                | Q(subnet__cidr__icontains=values["q"])
+            )
+        if "association" in values:
+            records = records.filter(subnet__isnull=values["association"] == "unassigned")
         if "status" in values:
             records = records.filter(status=values["status"])
         if "ordering" in request.query_params:

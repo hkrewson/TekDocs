@@ -137,9 +137,10 @@
       "networks-layout.md",
       "network-addresses.md",
       "network-wireless.md",
+      "wireless-register.md",
       "../../frontend/e2e/network-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/notification-delivery",
@@ -373,9 +374,10 @@
       "networks-layout.md",
       "network-addresses.md",
       "network-wireless.md",
+      "wireless-register.md",
       "../../frontend/e2e/network-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/overview",

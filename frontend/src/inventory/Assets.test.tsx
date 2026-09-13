@@ -411,7 +411,7 @@ describe('preview assignment', () => {
     await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await user.click(screen.getByRole('button', { name: 'Assign hardware' }))
     await user.selectOptions(await screen.findByLabelText('Person'), 'person-1')
-    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+    await act(async () => { await user.click(screen.getByRole('button', { name: 'Save assignment' })) })
     expect(await screen.findByText('In service', { selector: '.lifecycle-state' })).toBeInTheDocument()
     fireEvent(screen.getByRole('dialog', { name: 'Core switch' }), new Event('cancel', { cancelable: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

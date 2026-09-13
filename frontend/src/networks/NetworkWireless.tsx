@@ -1,3 +1,6 @@
+import { useLocation, useSearchParams } from 'react-router'
+import { RecordHeader, RecordSections } from '../records/RecordNavigation'
+import { RecordActivity } from '../records/RecordActivity'
 import { useEffect, useRef, useState } from 'react'
 import { translate } from '../i18n/localization'
 import { browserCollectionPreferences } from '../collections/preferences'
@@ -26,7 +29,7 @@ export function NetworkWireless({ workspace, subnetId, client, preferenceClient 
 }
 
 type WirelessForm = Pick<WirelessNetwork, 'ssid' | 'status' | 'purpose' | 'security' | 'hidden' | 'client_isolation' | 'description'>
-function WirelessRecord({ record, subnetId, workspace, client, canManage, onSaved, onReturn }: ChildRecordProps<WirelessNetwork> & { subnetId: string; workspace: WorkspaceContext; client: NetworksClient }) {
+function WirelessRecord({ record, subnetId, workspace, client, canManage, onSaved, onReturn, showHeading = true }: ChildRecordProps<WirelessNetwork> & { showHeading?: boolean; subnetId: string; workspace: WorkspaceContext; client: NetworksClient }) {
   const initial: WirelessForm = record ? { ssid: record.ssid, status: record.status, purpose: record.purpose, security: record.security, hidden: record.hidden, client_isolation: record.client_isolation, description: record.description } : { ssid: '', status: 'active', purpose: 'corporate', security: 'wpa3_personal', hidden: false, client_isolation: false, description: '' }
   const [form, setForm] = useState(initial)
   const [editing, setEditing] = useState(!record)
@@ -40,13 +43,13 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
     try {
       // Existing associations are omitted from ordinary edits, so hidden or legacy
       // site/VLAN relationships are preserved by the partial update contract.
-      const value = record ? await client.updateWireless(workspace, record.id, form) : await client.createWireless(workspace, { ...form, subnet_id: subnetId, site_id: null, vlan_id: null })
+      const value = record ? await client.updateWireless(workspace, record.id, form) : await client.createWireless(workspace, { ...form, subnet_id: subnetId || null, site_id: null, vlan_id: null })
       setEditing(false); onSaved(value)
     } catch (caught) { setError(caught instanceof Error ? caught.message : t('wirelessSaveFailed')) } finally { setBusy(false) }
   }
   return <>
-    <button className="secondary-button" type="button" onClick={onReturn}>{t('backWireless')}</button>
-    <h2 ref={heading} tabIndex={-1}>{record?.ssid ?? t('newWireless')}</h2>
+    {showHeading && <button className="secondary-button" type="button" onClick={onReturn}>{t('backWireless')}</button>}
+    {showHeading && <h2 ref={heading} tabIndex={-1}>{record?.ssid ?? t('newWireless')}</h2>}
     {error && <p role="alert">{error}</p>}
     {editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
       <label>{t('ssid')}<input required maxLength={128} value={form.ssid} onChange={(event) => setForm({ ...form, ssid: event.target.value })} /></label>
@@ -58,9 +61,30 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
       <label>{t('description')}<textarea rows={4} maxLength={4000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
       <div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('common.saving') : t('saveWireless')}</button><button type="button" className="secondary-button" onClick={() => { if (record) attempt(() => setEditing(false)); else onReturn() }}>{translate('common.cancel')}</button></div>
     </fieldset></form> : record ? <>
-      <dl className="record-facts">{[[t('addressStatus'), t(record.status)], [t('purpose'), t(record.purpose)], [t('security'), t(record.security)], [t('hidden'), t(record.hidden ? 'yes' : 'no')], [t('clientIsolation'), t(record.client_isolation ? 'yes' : 'no')], [translate('collections.site'), record.site_name || translate('collections.missing')], [t('vlan'), record.vlan_number === null ? translate('collections.missing') : String(record.vlan_number)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <dl className="record-facts">{[[t('networkColumn'), record.subnet_cidr || t('unassignedNetwork')], [t('addressStatus'), t(record.status)], [t('purpose'), t(record.purpose)], [t('security'), t(record.security)], [t('hidden'), t(record.hidden ? 'yes' : 'no')], [t('clientIsolation'), t(record.client_isolation ? 'yes' : 'no')], [translate('collections.site'), record.site_name || translate('collections.missing')], [t('vlan'), record.vlan_number === null ? translate('collections.missing') : String(record.vlan_number)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <p className="network-notes">{record.description || t('noDescription')}</p>
       {canManage && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setEditing(true) }}>{t('editWireless')}</button>}
     </> : <p>{t('wirelessDenied')}</p>}
   </>
+}
+
+const registerConfig: typeof config = {
+  ...config, key: 'ssid', feature: 'wireless-register', columns: ['name', 'network', 'status', 'security'],
+  labels: { ...config.labels, network: t('networkColumn') }, empty: t('wirelessRegisterEmpty'),
+  association: { label: t('networkAssociation'), choices: [{ value: 'assigned', label: t('assignedNetwork') }, { value: 'unassigned', label: t('unassignedNetwork') }] },
+  value: (row, column) => column === 'network' ? row.subnet_cidr || t('unassignedNetwork') : config.value(row, column),
+}
+export function WirelessWorkspace({ workspace, client, preferenceClient = browserCollectionPreferences }: { workspace: WorkspaceContext; client: NetworksClient; preferenceClient?: typeof browserCollectionPreferences }) {
+  return <NetworkChildCollection standalone workspace={workspace} subnetId="" client={client} config={registerConfig} RecordComponent={WorkspaceWirelessRecord} preferenceClient={preferenceClient} />
+}
+function WorkspaceWirelessRecord(props: ChildRecordProps<WirelessNetwork> & { subnetId: string; workspace: WorkspaceContext; client: NetworksClient }) {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const section = params.get('ssid_section') === 'history' ? 'history' : 'overview'
+  function href(value: string) { const next = new URLSearchParams(params); next.set('ssid_section', value); return `${location.pathname}?${next}` }
+  return <article className="record-page">
+    {params.get('ssid_full') === 'true' && <RecordHeader title={props.record?.ssid ?? t('newWireless')} recordId={props.record?.id ?? 'new'} section={section} />}
+    {props.record && <RecordSections current={section} sections={['overview', 'history'].map((id) => ({ id, label: translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />}
+    {section === 'history' && props.record ? <RecordActivity entityId={props.record.id} workspace={props.workspace} description={t('wirelessHistoryHelp')} emptyLabel={t('wirelessHistoryEmpty')} deniedLabel={t('wirelessHistoryDenied')} /> : <WirelessRecord {...props} showHeading={false} />}
+  </article>
 }

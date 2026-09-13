@@ -421,3 +421,57 @@ def test_wireless_parent_collection_search_paging_and_preferences(owner_client, 
     )
     assert owner_client.get(prefs).json()["columns"] == ["name", "security"]
     assert owner_client.delete(prefs).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+def test_wireless_workspace_register_includes_unassigned_records(owner_client, installation):
+    organization = _organization(installation, "Wireless register")
+    sibling = _organization(installation, "Other wireless register")
+    subnet = create_subnet(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Staff",
+        cidr="192.0.2.0/24",
+        vrf_entity_id=None,
+        vlan_entity_id=None,
+        description="",
+    )
+    linked = _post(
+        owner_client,
+        "organization-network-wireless",
+        organization,
+        {"ssid": "Linked SSID", "subnet_id": str(subnet.entity_id)},
+    )
+    unlinked = _post(owner_client, "organization-network-wireless", organization, {"ssid": "Unassigned SSID"})
+    other = _post(owner_client, "organization-network-wireless", sibling, {"ssid": "Private sibling SSID"})
+    assert linked.status_code == unlinked.status_code == other.status_code == 201
+    url = reverse("organization-network-wireless", kwargs={"organization_entity_id": organization.entity_id})
+    query = {"summary": "true", "ordering": "network", "page_size": 25}
+    result = owner_client.get(url, query).json()
+    assert result["count"] == 2
+    assert {row["id"] for row in result["results"]} == {linked.json()["id"], unlinked.json()["id"]}
+    assert owner_client.get(url, {**query, "association": "assigned"}).json()["results"][0]["id"] == linked.json()["id"]
+    unassigned = owner_client.get(url, {**query, "association": "unassigned"}).json()
+    assert unassigned["count"] == 1 and unassigned["results"][0]["id"] == unlinked.json()["id"]
+    assert owner_client.get(url, {**query, "q": "192.0.2"}).json()["results"][0]["id"] == linked.json()["id"]
+    assert (
+        owner_client.get(url, {**query, "subnet_id": str(subnet.entity_id), "association": "unassigned"}).json()[
+            "count"
+        ]
+        == 0
+    )
+    assert owner_client.get(url, {**query, "association": "invalid"}).status_code == 400
+    prefs = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": organization.entity_id, "feature": "wireless-register"},
+    )
+    assert owner_client.get(prefs).json()["columns"] == ["name", "network", "status", "security"]
+    assert (
+        owner_client.put(
+            prefs, {"columns": ["name", "network"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(prefs).json()["page_size"] == 50
+    assert owner_client.delete(prefs).json()["columns"] == ["name", "network", "status", "security"]

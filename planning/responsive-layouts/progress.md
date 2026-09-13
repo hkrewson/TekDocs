@@ -12,7 +12,7 @@ The Assets summary collection and typed browser API client are implemented under
 |---|---|---|
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
-| 3 — Contracts/Networks | In progress: Contracts collection and full record migration | Networks migration, wider validation and phase acceptance |
+| 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
 | 4 — Operational records | Pending | All planned migrations |
 | 5 — Documentation/files | Pending | All planned migrations |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
@@ -215,3 +215,57 @@ code was changed to make it pass. Blocked: none for this checkpoint. Still open:
 Networks, later surface migrations, technician/assistive-technology acceptance and
 full pre-1.0 release/recovery obligations. Temporary logs/screenshots are local;
 executable test sources and these notes are the durable evidence.
+
+
+## 2026-09-13 — Simplified Networks visible migration (#80)
+
+The supported Networks page now uses bounded responsive rows and full record
+drawers/pages. Curated personal columns, global search/VLAN filter/order, on-demand
+detail/history, protected inline editing and an optional relationship map replace
+the original wide scrolling table and always-loaded topology. Calculated gateways,
+range/overlap validation and existing network permissions remain authoritative.
+Existing APIs remain compatible; selected GET details and summary query options are
+additive. No model/migration/recovery-format/version change. See
+[networks-layout.md](networks-layout.md) for the exact scope and follow-up inventory.
+
+Focused component tests pass. All 24 six-width browser checks pass across Chromium,
+Firefox and WebKit. Initial mocked-browser failures were reproduced: an overly broad
+API mock intercepted page refresh URLs; after narrowing it, the conflict test lacked
+the random CSRF cookie required by the real client. The tests retain the assertions
+and now exercise their intended request boundaries. Touch/zoom and full gates follow.
+
+Do not mark Phase 3 complete: legacy device/rack/addressing/interface/wireless/DNS/
+circuit/NetBox interfaces are not mounted by the current shell and still require
+explicit disposition, parent/child layout work and acceptance. Technician walkthroughs
+and the existing pre-1.0 security/recovery/release obligations remain open.
+
+The full project gate passes: 102 component files / 481 tests, backend lint/type
+and migration checks, OpenAPI/generated types, and production bundle budgets.
+All 24 network browser scenarios pass, plus 3 touch/200% CSS zoom scenarios.
+Mobile editor screenshots were reviewed locally. The touch test initially used a
+DOM-test-only required-field matcher; the browser test now asserts the same native
+required property with Playwright's supported matcher. No application assertion was
+removed. The final summary/detail TypeScript boundary also passes focused lint and
+type checks; summaries cannot be treated as loaded descriptions/notes.
+
+The isolated live browser-to-Django-to-PostgreSQL journey passes, including network
+creation, calculated range/gateway and DNS in the drawer, refresh, collection search,
+and independently retained database records. The authorized local rebuild completed
+with existing volumes retained. Local readiness reports database/renderer ready,
+status ok and version 0.8.46; `/networks` returns 200. No production push/publication
+or version change. The broader network-validation gate remains in progress; final
+completion is recorded below.
+
+Final network validation passed: `make test-network-validation` exited successfully,
+covering network inventory/addressing/endpoints/services/circuits, reconciliation,
+transfer, relationships, permission/IDOR, runtime RLS, migration stabilization,
+network stabilization and a second complete 481-test frontend pass. The existing
+suite skip remains unchanged. Final focused type/lint checks pass after tightening
+the summary type. Wiki manifest and whitespace checks pass.
+
+Verified: this bounded simplified Networks migration, all checks above, the isolated
+live journey and healthy local 0.8.46 runtime. No blocker remains for this checkpoint.
+No broader advanced-network or whole-phase acceptance is inferred from those results.
+The tracked implementation notes and executable tests are durable; temporary logs and
+synthetic screenshots remain local. Production deployment, publication and all
+remaining pre-1.0 delivery obligations are separate and remain open.

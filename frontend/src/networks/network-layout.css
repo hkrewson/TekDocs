@@ -1,0 +1,8 @@
+.network-inline-editor fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.network-inline-editor .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.network-inline-editor label { display: grid; gap: .4rem; margin-block: .5rem; min-width: 0; }
+.network-inline-editor input, .network-inline-editor select, .network-inline-editor textarea { font: inherit; width: 100%; min-width: 0; min-height: 2.5rem; }
+.network-inline-editor .network-range-toggle { display: flex; align-items: center; }
+.network-inline-editor input[type=checkbox] { width: 1.5rem; min-height: 1.5rem; }
+.network-notes { white-space: pre-wrap; }
+@media (max-width: 767px) { .network-inline-editor .field-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -708,7 +708,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-asset-mac-address-detail", ("PATCH",), mutations=(PermissionKey.ASSETS_EDIT,)),
     route("msp-networks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
-    route("msp-network-detail", ("PATCH",), mutations=(PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, mutations=(PermissionKey.NETWORKS_EDIT,)
+    ),
     route("msp-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-search", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-export", ("GET",), PermissionKey.NETWORKS_VIEW),
@@ -985,7 +987,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-network-detail",
-        ("PATCH",),
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
         mutations=(PermissionKey.NETWORKS_EDIT,),
         organization_scoped=True,
     ),

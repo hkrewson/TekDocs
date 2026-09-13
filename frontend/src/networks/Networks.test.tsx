@@ -1,4 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
+import { defaultPreferences } from '../collections/preferences'
+import { render as rawRender, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { RelationshipsClient } from '../relationships/api'
@@ -17,6 +20,8 @@ const network: NetworkRecord = {
 
 function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient {
   return {
+    detail: vi.fn().mockResolvedValue(network),
+    collection: overrides.listNetworks ?? vi.fn().mockResolvedValue({ results: [network], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true }),
     listNetworks: vi.fn().mockResolvedValue({ results: [network], page: 1, page_size: 100, count: 1, has_more: false, can_manage: true }),
     createNetwork: vi.fn().mockResolvedValue(network), updateNetwork: vi.fn().mockResolvedValue(network),
     choices: vi.fn().mockResolvedValue({ sites: [{ id: 'site-1', name: 'Headquarters' }], locations: [{ id: 'location-1', name: 'Server room', site_id: 'site-1' }], racks: [], hardware_assets: [] }),
@@ -28,13 +33,16 @@ const relationshipsClient = {
   list: vi.fn(), search: vi.fn(), create: vi.fn(), archive: vi.fn(), linkTypes: vi.fn(),
 } as RelationshipsClient
 
+const preferenceClient = { load: vi.fn().mockResolvedValue(defaultPreferences(['name', 'location', 'vlan', 'cidr'])), save: vi.fn(), reset: vi.fn() }
+function render(children: ReactNode) { return rawRender(<ApplicationRouter>{children}</ApplicationRouter>) }
+
 describe('Networks', () => {
   it('shows one simple network list without NetBox-style object tabs', async () => {
-    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
+    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
     expect(await screen.findByText('Office LAN')).toBeInTheDocument()
     expect(screen.getByText('Headquarters · Server room')).toBeInTheDocument()
     expect(screen.getByText('192.0.2.0/24')).toBeInTheDocument()
-    expect(screen.getByText('192.0.2.1–192.0.2.254')).toBeInTheDocument()
+    expect(screen.queryByText('192.0.2.1–192.0.2.254')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'NetBox' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Racks' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'IP addresses' })).not.toBeInTheDocument()
@@ -44,7 +52,7 @@ describe('Networks', () => {
   it('creates one network and lets the server calculate gateway and range', async () => {
     const createNetwork = vi.fn().mockResolvedValue({ ...network, id: 'network-2', name: 'Guest Wi-Fi', vlan: 30, cidr: '198.51.100.0/24' })
     const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient({ createNetwork })} relationshipsClient={relationshipsClient} />)
+    render(<Networks workspace={workspace} client={networkClient({ createNetwork })} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
     await screen.findByText('Office LAN')
     await user.click(screen.getByRole('button', { name: 'New network' }))
     await user.type(screen.getByLabelText('Name'), 'Guest Wi-Fi')
@@ -62,7 +70,7 @@ describe('Networks', () => {
 
   it('reveals a bounded manual assignable range only when requested', async () => {
     const user = userEvent.setup()
-    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
+    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
     await screen.findByText('Office LAN')
     await user.click(screen.getByRole('button', { name: 'New network' }))
     expect(screen.queryByLabelText('Assignable range start')).not.toBeInTheDocument()
@@ -73,13 +81,13 @@ describe('Networks', () => {
 
   it('searches only the simple network records and reports request failures', async () => {
     const user = userEvent.setup()
-    const { rerender } = render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} />)
+    const { rerender } = render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
     await screen.findByText('Office LAN')
     await user.type(screen.getByLabelText('Search networks'), 'missing')
-    expect(screen.getByText('No networks match this search.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Search' }))
 
     const failed = networkClient({ listNetworks: vi.fn().mockRejectedValue(new Error('Networks unavailable.')) })
-    rerender(<Networks workspace={{ ...workspace, id: 'client-2' }} client={failed} relationshipsClient={relationshipsClient} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Networks unavailable.')
+    rerender(<ApplicationRouter><Networks workspace={{ ...workspace, id: 'client-2' }} client={failed} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} /></ApplicationRouter>)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Networks could not be loaded.')
   })
 })

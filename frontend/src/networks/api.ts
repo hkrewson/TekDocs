@@ -37,6 +37,8 @@ export type NetworkChoices = {
   hardware_assets: Array<{ id: string; name: string }>
 }
 
+export type NetworkQuery = { q: string; page: number; page_size: number; ordering: string; vlan?: string }
+
 export type NetworkRecord = {
   id: string
   name: string
@@ -54,6 +56,8 @@ export type NetworkRecord = {
   secondary_dns: string | null
   notes: string
 }
+export type NetworkSummary = Omit<NetworkRecord, 'notes' | 'description'>
+
 export type NetworkRecordWrite = Pick<NetworkRecord, 'name' | 'description' | 'cidr' | 'use_full_range' | 'primary_dns' | 'secondary_dns' | 'notes'> & {
   location_id: string | null
   vlan: number | null
@@ -108,6 +112,8 @@ type ListResult<T> = { results: T[]; page: number; page_size: number; count: num
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export interface NetworksClient {
+  collection(workspace: WorkspaceContext, query: NetworkQuery, signal?: AbortSignal): Promise<ListResult<NetworkSummary>>
+  detail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkRecord>
   listNetworks(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkRecord>>
   createNetwork(workspace: WorkspaceContext, values: NetworkRecordWrite): Promise<NetworkRecord>
   updateNetwork(workspace: WorkspaceContext, id: string, values: NetworkRecordWrite): Promise<NetworkRecord>
@@ -204,6 +210,13 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async collection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async detail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
   async listNetworks(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}?page=1&page_size=100`, { credentials: 'same-origin', signal }))
   },

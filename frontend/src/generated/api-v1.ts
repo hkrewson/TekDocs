@@ -3244,7 +3244,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["workspaces_msp_networks_retrieve_2"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -6509,7 +6509,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["workspaces_organizations_networks_retrieve_2"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -11709,7 +11709,7 @@ export interface components {
             readonly location_id: string | null;
             readonly location_name: string | null;
             readonly site_name: string | null;
-            readonly description: string;
+            readonly description?: string;
             readonly vlan: number | null;
             readonly cidr: string;
             readonly gateway: string;
@@ -11718,7 +11718,7 @@ export interface components {
             readonly range_end: string;
             readonly primary_dns: string | null;
             readonly secondary_dns: string | null;
-            readonly notes: string;
+            readonly notes?: string;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
         readonly NetworkRecordResult: {
@@ -22770,8 +22770,22 @@ export interface operations {
     readonly workspaces_msp_networks_retrieve: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `location` - location
+                 *     * `-location` - -location
+                 *     * `vlan` - vlan
+                 *     * `-vlan` - -vlan
+                 *     * `cidr` - cidr
+                 *     * `-cidr` - -cidr
+                 */
+                readonly ordering?: "name" | "-name" | "location" | "-location" | "vlan" | "-vlan" | "cidr" | "-cidr";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
+                readonly vlan?: number;
             };
             readonly header?: never;
             readonly path?: never;
@@ -22807,6 +22821,29 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetworkRecord"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_networks_retrieve_2: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly network_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;
@@ -31156,8 +31193,22 @@ export interface operations {
     readonly workspaces_organizations_networks_retrieve: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `location` - location
+                 *     * `-location` - -location
+                 *     * `vlan` - vlan
+                 *     * `-vlan` - -vlan
+                 *     * `cidr` - cidr
+                 *     * `-cidr` - -cidr
+                 */
+                readonly ordering?: "name" | "-name" | "location" | "-location" | "vlan" | "-vlan" | "cidr" | "-cidr";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
+                readonly vlan?: number;
             };
             readonly header?: never;
             readonly path: {
@@ -31197,6 +31248,30 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetworkRecord"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_networks_retrieve_2: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly network_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

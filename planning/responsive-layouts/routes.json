@@ -132,9 +132,12 @@
   {
     "route": "/networks",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "networks-layout.md",
+      "../../frontend/e2e/network-layout.spec.ts"
+    ],
+    "states": "Simplified collection, full drawer/page, Overview/History, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/notification-delivery",
@@ -363,9 +366,12 @@
   {
     "route": "/workspaces/organizations/:organizationId/networks",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "networks-layout.md",
+      "../../frontend/e2e/network-layout.spec.ts"
+    ],
+    "states": "Simplified collection, full drawer/page, Overview/History, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/overview",

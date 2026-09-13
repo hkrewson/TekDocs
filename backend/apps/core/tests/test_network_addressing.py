@@ -352,3 +352,46 @@ def test_postgres_guard_rejects_noncanonical_and_overlapping_direct_subnet_write
             cidr="192.0.2.128/25",
             address_family=4,
         )
+
+
+@pytest.mark.django_db
+def test_network_collection_search_order_summary_and_selected_detail(owner_client, installation):
+    organization = _organization(installation, "Collection networks")
+    sibling = _organization(installation, "Sibling networks")
+    url = reverse("organization-networks", kwargs={"organization_entity_id": organization.entity_id})
+    ids = []
+    for index in range(31):
+        response = owner_client.post(
+            url,
+            {
+                "name": f"LAN {index:03}",
+                "cidr": f"10.55.{index}.0/24",
+                "vlan": 20 if index == 30 else 10,
+                "notes": "Detail only notes",
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        ids.append(response.json()["id"])
+    first = owner_client.get(url, {"summary": "true", "page_size": 25, "ordering": "-name"}).json()
+    second = owner_client.get(url, {"summary": "true", "page_size": 25, "ordering": "-name", "page": 2}).json()
+    assert first["count"] == 31 and first["has_more"]
+    assert first["results"][0]["id"] == ids[30]
+    assert len(second["results"]) == 6 and not second["has_more"]
+    assert all("notes" not in row and "description" not in row for row in first["results"])
+    assert {row["id"] for row in first["results"]}.isdisjoint(row["id"] for row in second["results"])
+    found = owner_client.get(url, {"q": "10.55.30.", "vlan": 20, "summary": "true"}).json()
+    assert found["count"] == 1 and found["results"][0]["id"] == ids[30]
+    assert owner_client.get(url, {"vlan": 4095}).status_code == 400
+    assert owner_client.get(url, {"ordering": "notes"}).status_code == 400
+    assert owner_client.get(url).json()["results"][0]["notes"] == "Detail only notes"
+    detail = reverse(
+        "organization-network-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "network_entity_id": ids[30]},
+    )
+    assert owner_client.get(detail).json()["notes"] == "Detail only notes"
+    wrong = reverse(
+        "organization-network-detail",
+        kwargs={"organization_entity_id": sibling.entity_id, "network_entity_id": ids[30]},
+    )
+    assert owner_client.get(wrong).status_code == 403

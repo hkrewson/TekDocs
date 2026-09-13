@@ -24,6 +24,11 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "networks": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "location", "vlan", "cidr")),
+        ("name", "location", "vlan", "cidr"),
+    ),
     "contracts": CollectionDefinition(
         PermissionKey.ASSETS_VIEW,
         tuple(

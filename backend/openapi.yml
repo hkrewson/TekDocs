@@ -10559,6 +10559,31 @@ paths:
       operationId: workspaces_msp_networks_retrieve
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - location
+          - -location
+          - vlan
+          - -vlan
+          - cidr
+          - -cidr
+          type: string
+          x-spec-enum-id: 135fdd105add927b
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `location` - location
+          * `-location` - -location
+          * `vlan` - vlan
+          * `-vlan` - -vlan
+          * `cidr` - cidr
+          * `-cidr` - -cidr
+      - in: query
         name: page
         schema:
           type: integer
@@ -10572,6 +10597,23 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: vlan
+        schema:
+          type: integer
+          maximum: 4094
+          minimum: 1
       tags:
       - workspaces
       security:
@@ -10623,6 +10665,33 @@ paths:
                 type: string
                 format: uuid
   /api/v1/workspaces/msp/networks/{network_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_retrieve_2
+      parameters:
+      - in: path
+        name: network_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
     patch:
       operationId: workspaces_msp_networks_partial_update
       parameters:
@@ -22377,6 +22446,31 @@ paths:
     get:
       operationId: workspaces_organizations_networks_retrieve
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - location
+          - -location
+          - vlan
+          - -vlan
+          - cidr
+          - -cidr
+          type: string
+          x-spec-enum-id: 135fdd105add927b
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `location` - location
+          * `-location` - -location
+          * `vlan` - vlan
+          * `-vlan` - -vlan
+          * `cidr` - cidr
+          * `-cidr` - -cidr
       - in: path
         name: organization_entity_id
         schema:
@@ -22397,6 +22491,23 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: vlan
+        schema:
+          type: integer
+          maximum: 4094
+          minimum: 1
       tags:
       - workspaces
       security:
@@ -22455,6 +22566,39 @@ paths:
                 type: string
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/{network_entity_id}:
+    get:
+      operationId: workspaces_organizations_networks_retrieve_2
+      parameters:
+      - in: path
+        name: network_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkRecord'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
     patch:
       operationId: workspaces_organizations_networks_partial_update
       parameters:
@@ -36979,13 +37123,11 @@ components:
           type: string
       required:
       - cidr
-      - description
       - gateway
       - id
       - location_id
       - location_name
       - name
-      - notes
       - primary_dns
       - range_end
       - range_start

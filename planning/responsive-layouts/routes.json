@@ -135,9 +135,10 @@
     "status": "in_progress",
     "evidence": [
       "networks-layout.md",
+      "network-addresses.md",
       "../../frontend/e2e/network-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/History, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/History, parent-scoped address collection and child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/notification-delivery",
@@ -369,9 +370,10 @@
     "status": "in_progress",
     "evidence": [
       "networks-layout.md",
+      "network-addresses.md",
       "../../frontend/e2e/network-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/History, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/History, parent-scoped address collection and child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/overview",

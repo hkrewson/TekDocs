@@ -11578,6 +11578,27 @@ paths:
       operationId: workspaces_msp_networks_ip_addresses_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - status
+          - -status
+          - dns_name
+          - -dns_name
+          type: string
+          x-spec-enum-id: a37dc390fc613b22
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `status` - status
+          * `-status` - -status
+          * `dns_name` - dns_name
+          * `-dns_name` - -dns_name
+      - in: query
         name: page
         schema:
           type: integer
@@ -11591,6 +11612,38 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - reserved
+          - dhcp
+          - deprecated
+          type: string
+          x-spec-enum-id: 31948ed0ed6806be
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `reserved` - reserved
+          * `dhcp` - dhcp
+          * `deprecated` - deprecated
+      - in: query
+        name: subnet_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -23654,6 +23707,27 @@ paths:
     get:
       operationId: workspaces_organizations_networks_ip_addresses_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - status
+          - -status
+          - dns_name
+          - -dns_name
+          type: string
+          x-spec-enum-id: a37dc390fc613b22
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `status` - status
+          * `-status` - -status
+          * `dns_name` - dns_name
+          * `-dns_name` - -dns_name
       - in: path
         name: organization_entity_id
         schema:
@@ -23674,6 +23748,38 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - reserved
+          - dhcp
+          - deprecated
+          type: string
+          x-spec-enum-id: 31948ed0ed6806be
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `reserved` - reserved
+          * `dhcp` - dhcp
+          * `deprecated` - deprecated
+      - in: query
+        name: subnet_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -34229,7 +34335,6 @@ components:
       required:
       - address
       - address_family
-      - description
       - device_name
       - dns_name
       - hardware_asset_id

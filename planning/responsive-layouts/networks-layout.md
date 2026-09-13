@@ -67,3 +67,9 @@ wireless/DNS/circuit/NetBox surfaces and child records; record relationships bey
 the optional existing map; technician/assistive-technology acceptance; complete
 pre-1.0 release/recovery gates. The visible simplified page is not evidence that
 these other surfaces are complete. Detailed gate results follow in progress.md.
+
+## Child address follow-up
+
+The [Addresses section](network-addresses.md) now brings the IP-address collection
+and focused editing into the supported parent drawer/page. Other advanced network
+objects remain pending; see that record for query compatibility and evidence.

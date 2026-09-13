@@ -269,3 +269,76 @@ No broader advanced-network or whole-phase acceptance is inferred from those res
 The tracked implementation notes and executable tests are durable; temporary logs and
 synthetic screenshots remain local. Production deployment, publication and all
 remaining pre-1.0 delivery obligations are separate and remain open.
+
+### 2026-09-13 — Parent network address collection (Phase 3 #80)
+
+Implemented the next bounded slice: IP addresses inside the supported Networks
+record drawer/page. Addresses loads only on its section; bounded search, status
+filtering, numeric IP ordering, personal columns and paging operate within the
+selected parent. Child selection is URL-addressable and stays in the existing
+record surface. Create/edit retains failed values and uses the shared dirty guard.
+Updates omit assignment/interface/parent keys, preserving those existing links.
+No version change, data migration, production publication or fixture writes to user
+data. The API adds explicit query parameters while preserving legacy payload and
+ordering defaults. OpenAPI/types and the route inventory are updated.
+
+Type checking and focused lint pass. Initial new browser assertions used labels
+that differed from the localized UI; corrected those labels after reproducing the
+failures. A preference refresh test and live edit refresh test initially navigated
+before the asynchronous save completed; both now require visible completion before
+refresh, preserving their persistence assertions. Two baseline Firefox cases timed
+out during concurrent heavy suites; final browser verification runs with one worker.
+The initial general check exited 137 during frontend lint while other suites were
+running; it must pass in a lower-contention rerun before this checkpoint is closed.
+Mobile screenshots were inspected: the focused address editor fits the parent
+full-screen drawer without horizontal overflow. Full final evidence follows below.
+
+The strengthened live save assertion exposed a real backend defect rather than
+only test timing: IP-address PATCH returned 500. A separate PostgreSQL regression
+reproduced `FOR UPDATE cannot be applied to the nullable side of an outer join`.
+`update_ip_address` now explicitly locks the address and entity, leaving the existing
+namespace lock in place. All nine endpoint tests pass, including a new status/DNS
+update that asserts parent and hardware assignment preservation. No schema change.
+
+The first coverage run fell below the existing function threshold. Added four
+behavioral component tests for bounded parent reads/search, page preferences, selected
+facts, assignment-preserving saves, failed creation, navigation protection and
+unavailable records. They also reproduced a double confirmation on cancelling a new
+address: the local guard action immediately initiated a second router-blocked move.
+Child return/new-form cancellation now delegates directly to the router guard;
+local cancellation of an existing edit still uses the explicit guard. The component
+suite passes without reducing coverage thresholds or weakening assertions.
+
+Final live evidence: the isolated browser-to-Django-to-PostgreSQL journey passes
+with address create, successful status update, and refresh of the saved DNS/status.
+The existing independent database-fixture assertions also pass. All 54 layout
+browser checks passed before the cancellation follow-up; all 27 affected child
+address checks pass again after that fix across Chromium, Firefox and WebKit.
+New component tests pass (4), and the complete endpoint regression set passes (9).
+The final broader network gate and general check are being completed below.
+
+Final `make check` passes: backend lint/type/migration checks, schema synchronization,
+frontend lint/types, all 485 component tests in 103 files, coverage enforcement
+(functions 70.44%, existing 70% minimum unchanged), production build and bundle
+budgets. The application changes require no migration. Wiki manifest and whitespace
+checks pass. The local rebuild is underway with existing volumes retained.
+
+The authorized local `make up` completed without removing volumes. Readiness reports
+status ok, database/renderer ready and version 0.8.46; `/networks` returns 200. Test
+locally through Networks → network name → Addresses. No production push, publication,
+version change or replacement of existing user/demo data occurred.
+
+Final `make test-network-validation` exited successfully after the fixes: network
+inventory/addressing/endpoints/services/circuits, reconciliation/transfer,
+relationships, permission/IDOR, runtime RLS, migration stabilization and network
+stabilization all pass, followed by all 485 frontend tests and coverage. The existing
+suite skip remains unchanged. The earlier failed gate ran before the new component
+harness corrections; this final complete rerun supersedes it.
+
+Verified: this bounded Addresses implementation, all gates above, the live workflow,
+and healthy local 0.8.46 runtime. No blocker remains for this checkpoint. Inferred:
+the shared pattern is suitable for further network child surfaces; those still need
+their own implementation and evidence. Phase 3, technician acceptance, production
+publication and the broader pre-1.0 obligations remain open. Durable architecture,
+query/navigation contracts, tests and route-state inventory are tracked here; the
+Wiki Roadmap follow-up remains local and unpublished.

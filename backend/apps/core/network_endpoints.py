@@ -288,16 +288,20 @@ def create_ip_address(
 
 @transaction.atomic
 def update_ip_address(*, record: NetworkIPAddress, actor_id: UUID, values: dict[str, object]) -> NetworkIPAddress:
-    locked = NetworkIPAddress.objects.select_for_update().select_related("entity", "subnet__vrf").get(pk=record.pk)
+    # The routing namespace is optional; PostgreSQL cannot lock its outer join.
+    # Lock the address and its entity here; namespace serialization happens below.
+    locked = (
+        NetworkIPAddress.objects.select_for_update(of=("self", "entity"))
+        .select_related("entity", "subnet__vrf")
+        .get(pk=record.pk)
+    )
     scope = DataScope.owner(locked.tenant, locked.organization)
     host = canonical_host(str(values.get("address", locked.address)))
     subnet = _subnet(scope, cast(UUID, values.get("subnet_entity_id", locked.subnet.entity_id)))
     current_interface_id = cast(NetworkInterface, locked.interface).entity_id if locked.interface_id else None
     interface = _interface(scope, cast(UUID | None, values.get("interface_entity_id", current_interface_id)))
     current_asset_id = cast(ClientAsset, locked.hardware_asset).entity_id if locked.hardware_asset_id else None
-    hardware_asset = _hardware_asset(
-        scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id))
-    )
+    hardware_asset = _hardware_asset(scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id)))
     if "hardware_asset_entity_id" in values:
         interface = None
     _validate_host_in_subnet(host, subnet)
@@ -370,9 +374,7 @@ def update_mac_address(*, record: NetworkMACAddress, actor_id: UUID, values: dic
     current_interface_id = cast(NetworkInterface, locked.interface).entity_id if locked.interface_id else None
     interface = _interface(scope, cast(UUID | None, values.get("interface_entity_id", current_interface_id)))
     current_asset_id = cast(ClientAsset, locked.hardware_asset).entity_id if locked.hardware_asset_id else None
-    hardware_asset = _hardware_asset(
-        scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id))
-    )
+    hardware_asset = _hardware_asset(scope, cast(UUID | None, values.get("hardware_asset_entity_id", current_asset_id)))
     if "hardware_asset_entity_id" in values:
         interface = None
     locked.entity.display_name = clean_address

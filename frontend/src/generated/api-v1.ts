@@ -10463,7 +10463,7 @@ export interface components {
             readonly device_name: string | null;
             readonly status: string;
             readonly dns_name: string;
-            readonly description: string;
+            readonly description?: string;
         };
         readonly IPAddressResult: {
             readonly page: number;
@@ -23546,8 +23546,27 @@ export interface operations {
     readonly workspaces_msp_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `dns_name` - dns_name
+                 *     * `-dns_name` - -dns_name
+                 */
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "dns_name" | "-dns_name";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `active` - active
+                 *     * `reserved` - reserved
+                 *     * `dhcp` - dhcp
+                 *     * `deprecated` - deprecated
+                 */
+                readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
+                readonly subnet_id?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -32014,8 +32033,27 @@ export interface operations {
     readonly workspaces_organizations_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `dns_name` - dns_name
+                 *     * `-dns_name` - -dns_name
+                 */
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "dns_name" | "-dns_name";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `active` - active
+                 *     * `reserved` - reserved
+                 *     * `dhcp` - dhcp
+                 *     * `deprecated` - deprecated
+                 */
+                readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
+                readonly subnet_id?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {

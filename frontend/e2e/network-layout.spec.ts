@@ -135,3 +135,111 @@ test('Network editing fits touch screens and 200 percent CSS zoom', async ({ bro
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   } finally { await context.close() }
 })
+
+async function addressFixtures(page: Page) {
+  await fixtures(page)
+  const columns = ['name', 'status', 'dns_name']
+  let preferences = { columns, default_columns: columns, available_columns: columns, page_size: 25 }
+  await page.route('**/collection-preferences/network-addresses', (route) => {
+    if (route.request().method() === 'PUT') preferences = { ...preferences, ...route.request().postDataJSON() as { columns: string[]; page_size: number } }
+    if (route.request().method() === 'DELETE') preferences = { columns, default_columns: columns, available_columns: columns, page_size: 25 }
+    return route.fulfill({ json: preferences })
+  })
+  const addresses = Array.from({ length: 31 }, (_, index) => ({ id: `ip-${index + 1}`, address: `10.55.1.${index + 1}`, subnet_id: 'network-2', status: 'active', dns_name: `host-${index + 1}.example.invalid`, description: 'Operational address', hardware_asset_id: 'asset-1', hardware_asset_name: 'Firewall', interface_id: 'interface-1', interface_name: 'eth0' }))
+  await page.route('**/api/v1/workspaces/**/networks/ip-addresses?*', (route) => {
+    const query = new URL(route.request().url()).searchParams
+    expect(query.get('subnet_id')).toBe('network-2')
+    expect(query.get('summary')).toBe('true')
+    const found = addresses.filter((item) => item.dns_name.includes(query.get('q') ?? ''))
+    const pageNumber = Number(query.get('page')), size = Number(query.get('page_size'))
+    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: true } })
+  })
+  await page.route(/\/ip-addresses\/ip-\d+$/, (route) => {
+    const record = addresses.find((item) => route.request().url().endsWith(`/${item.id}`))
+    if (route.request().method() === 'PATCH') {
+      const values = route.request().postDataJSON() as Record<string, unknown>
+      expect(values).not.toHaveProperty('hardware_asset_id')
+      expect(values).not.toHaveProperty('interface_id')
+      expect(values).not.toHaveProperty('subnet_id')
+      return route.fulfill({ status: 409, json: { detail: 'Address changed. Your entries have been kept.' } })
+    }
+    return route.fulfill(record ? { json: record } : { status: 404, json: {} })
+  })
+}
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`Network child addresses fit ${width}px and retain direct navigation`, async ({ page }) => {
+    await addressFixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/networks?preview=network-2&section=addresses')
+    const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+    await expect(drawer.getByText('31 addresses', { exact: true })).toBeVisible()
+    await drawer.getByRole('button', { name: 'Next', exact: true }).click()
+    await drawer.getByRole('button', { name: '10.55.1.26', exact: true }).click()
+    await expect(drawer).toContainText('host-26.example.invalid')
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    await page.reload()
+    await expect(drawer).toContainText('host-26.example.invalid')
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+    await drawer.getByRole('button', { name: 'Back to addresses' }).click()
+    await expect(drawer.getByRole('button', { name: '10.55.1.26', exact: true })).toBeFocused()
+    await drawer.getByRole('searchbox', { name: 'Search addresses' }).fill('host-31.')
+    await drawer.locator('.address-search').getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(drawer.getByRole('button', { name: '10.55.1.31', exact: true })).toBeVisible()
+    await expect(page).not.toHaveURL(/address_page=2/)
+  })
+}
+
+test('Address conflicts retain edits and guard drawer dismissal without clearing assignments', async ({ page }) => {
+  await addressFixtures(page)
+  await page.goto('/networks?preview=network-2&section=addresses&address=ip-1')
+  const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+  await drawer.getByRole('button', { name: 'Edit address', exact: true }).click()
+  await drawer.getByRole('textbox', { name: 'DNS name', exact: true }).fill('unsaved.example.invalid')
+  await drawer.getByRole('button', { name: 'Save address', exact: true }).click()
+  await expect(drawer.getByRole('alert')).toContainText('Your entries have been kept')
+  await page.mouse.click(10, 100)
+  await page.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(drawer.getByRole('textbox', { name: 'DNS name', exact: true })).toHaveValue('unsaved.example.invalid')
+  await drawer.getByRole('link', { name: 'Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Discard changes' }).click()
+  await expect(drawer).toContainText('10.55.1.1–10.55.1.254')
+})
+
+test('Address columns persist and foreign-parent details stay unavailable', async ({ page }) => {
+  await addressFixtures(page)
+  await page.goto('/networks?preview=network-2&section=addresses')
+  const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+  await drawer.getByRole('button', { name: 'Columns', exact: true }).click()
+  await drawer.getByRole('checkbox', { name: 'DNS name', exact: true }).uncheck()
+  await drawer.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(drawer.getByRole('columnheader', { name: 'DNS name' })).toHaveCount(0)
+  await page.reload()
+  await expect(drawer.getByText('31 addresses', { exact: true })).toBeVisible()
+  await expect(drawer.getByRole('columnheader', { name: 'DNS name' })).toHaveCount(0)
+  await page.route('**/ip-addresses/ip-1', (route) => route.fulfill({ json: { id: 'ip-1', address: '10.0.0.1', subnet_id: 'another-parent', status: 'active', dns_name: 'foreign-parent.invalid', description: '' } }))
+  await drawer.getByRole('button', { name: '10.55.1.1', exact: true }).click()
+  await expect(drawer.getByRole('alert')).toContainText('unavailable')
+  await expect(drawer).not.toContainText('foreign-parent.invalid')
+  await drawer.getByRole('button', { name: 'Back to addresses' }).click()
+  await expect(drawer.getByText('31 addresses', { exact: true })).toBeVisible()
+})
+
+test('Address editor supports touch and 200 percent zoom', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 600 }, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    await addressFixtures(page)
+    await page.goto('/networks?preview=network-2&section=addresses&address=ip-1')
+    const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+    await drawer.getByRole('button', { name: 'Edit address', exact: true }).tap()
+    await expect(drawer.getByRole('textbox', { name: 'IP address', exact: true })).toHaveJSProperty('required', true)
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/address-mobile-${test.info().project.name}.png` })
+    await page.setViewportSize({ width: 1280, height: 600 })
+    await page.evaluate(() => { document.documentElement.style.zoom = '2' })
+    await expect(drawer.getByRole('button', { name: 'Save address', exact: true })).toBeVisible()
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  } finally { await context.close() }
+})

@@ -354,3 +354,81 @@ def test_canonical_host_property(address):  # type: ignore[no-untyped-def]
 def test_canonical_mac_property(raw):  # type: ignore[no-untyped-def]
     value = ":".join(f"{part:02x}" for part in raw)
     assert canonical_mac(value) == value
+
+
+@pytest.mark.django_db
+def test_parent_address_collection_is_bounded_searchable_and_scope_checked(owner_client, installation):
+    organization = _organization(installation, "Address collection")
+    sibling = _organization(installation, "Other address workspace")
+    subnet = _subnet(installation, organization)
+    other = _subnet(installation, sibling, cidr="198.51.100.0/24")
+    for index in range(1, 32):
+        create_ip_address(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            address=f"192.0.2.{index}",
+            subnet_entity_id=subnet.entity_id,
+            interface_entity_id=None,
+            status="reserved" if index == 31 else "active",
+            dns_name=f"host-{index}.example.invalid",
+            description="Selected detail only",
+        )
+    url = reverse("organization-network-ip-addresses", kwargs={"organization_entity_id": organization.entity_id})
+    query = {"subnet_id": str(subnet.entity_id), "page_size": 25, "ordering": "name", "summary": "true"}
+    first = owner_client.get(url, query)
+    assert first.status_code == 200, first.content
+    payload = first.json()
+    assert payload["count"] == 31 and payload["has_more"]
+    assert [item["address"] for item in payload["results"][:3]] == ["192.0.2.1", "192.0.2.2", "192.0.2.3"]
+    assert all("description" not in item for item in payload["results"])
+    second = owner_client.get(url, {**query, "page": 2}).json()
+    assert len(second["results"]) == 6 and not second["has_more"]
+    found = owner_client.get(url, {**query, "q": "host-31", "status": "reserved"}).json()
+    assert found["count"] == 1 and found["results"][0]["address"] == "192.0.2.31"
+    assert owner_client.get(url, {**query, "subnet_id": str(other.entity_id)}).status_code == 403
+    assert owner_client.get(url, {**query, "status": "invalid"}).status_code == 400
+    assert owner_client.get(url, {**query, "ordering": "hardware_asset_name"}).status_code == 400
+    assert "description" in owner_client.get(url).json()["results"][0]
+    preferences = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": organization.entity_id, "feature": "network-addresses"},
+    )
+    assert (
+        owner_client.put(
+            preferences, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(preferences).json()["columns"] == ["name", "status"]
+    assert owner_client.delete(preferences).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+def test_address_status_edit_preserves_parent_and_assignment(owner_client, installation):
+    organization = _organization(installation, "Address edit")
+    subnet = _subnet(installation, organization)
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name="Address hardware")
+    record = create_ip_address(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        address="192.0.2.10",
+        subnet_entity_id=subnet.entity_id,
+        interface_entity_id=None,
+        hardware_asset_entity_id=asset.entity_id,
+        status="active",
+        dns_name="original.example.invalid",
+        description="",
+    )
+    url = reverse(
+        "organization-network-ip-address-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "ip_address_entity_id": record.entity_id},
+    )
+    response = owner_client.patch(
+        url, {"status": "reserved", "dns_name": "updated.example.invalid"}, content_type="application/json"
+    )
+    assert response.status_code == 200, response.content
+    record.refresh_from_db()
+    assert record.status == "reserved" and record.dns_name == "updated.example.invalid"
+    assert record.hardware_asset_id == asset.pk and record.subnet_id == subnet.pk

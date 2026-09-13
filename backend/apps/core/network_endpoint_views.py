@@ -5,7 +5,8 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
-from django.db.models import QuerySet
+from django.db.models import GenericIPAddressField, Q, QuerySet
+from django.db.models.functions import Cast
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -30,6 +31,7 @@ from .network_endpoints import (
     update_mac_address,
 )
 from .network_inventory_views import StrictSerializer
+from .network_records import network_records_for_scope
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -88,7 +90,7 @@ class IPAddressSerializer(serializers.Serializer):
     device_name = serializers.SerializerMethodField()
     status = serializers.CharField()
     dns_name = serializers.CharField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_hardware_asset_id(self, record: NetworkIPAddress) -> UUID | None:
@@ -260,11 +262,72 @@ class InterfaceDetailView(APIView):
         return Response(InterfaceSerializer(record).data)
 
 
+IP_ORDERING = {"name": "ordered_ip", "status": "status", "dns_name": "dns_name"}
+
+
+class IPAddressCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    subnet_id = serializers.UUIDField(required=False)
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    status = serializers.ChoiceField(choices=("active", "reserved", "dhcp", "deprecated"), required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in IP_ORDERING for key in (field, f"-{field}")], required=False, default="name"
+    )
+    summary = serializers.BooleanField(required=False, default=False)
+
+
 class IPAddressListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: IPAddressResultSerializer})
+    @extend_schema(parameters=[IPAddressCollectionQuerySerializer], responses={200: IPAddressResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(ip_addresses_for_scope(workspace.data_scope), request, workspace, IPAddressResultSerializer)
+        query = IPAddressCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = ip_addresses_for_scope(workspace.data_scope).annotate(
+            ordered_ip=Cast("address", GenericIPAddressField())
+        )
+        if "subnet_id" in values:
+            if not network_records_for_scope(workspace.data_scope).filter(entity_id=values["subnet_id"]).exists():
+                raise PermissionDenied("The selected network is unavailable.")
+            records = records.filter(subnet__entity_id=values["subnet_id"])
+        if values["q"]:
+            records = records.filter(
+                Q(address__icontains=values["q"])
+                | Q(dns_name__icontains=values["q"])
+                | Q(description__icontains=values["q"])
+            )
+        if "status" in values:
+            records = records.filter(status=values["status"])
+        order = values["ordering"]
+        records = records.order_by(
+            ("-" if order.startswith("-") else "")
+            + (IP_ORDERING[order.lstrip("-")] if "ordering" in request.query_params else "address"),
+            "entity_id",
+        )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        rows = IPAddressSerializer(
+            page.records,
+            many=True,
+            context={
+                "can_view_assets": context_has_permission(
+                    workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+                )
+            },
+        ).data
+        if values["summary"]:
+            for row in rows:
+                row.pop("description")
+        return Response(
+            {
+                "results": rows,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        )
 
     @extend_schema(request=IPAddressWriteSerializer, responses={201: IPAddressSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

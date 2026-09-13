@@ -33,6 +33,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Refresh routing and public addresses](frontend-routing.md)
+
 - [Full asset record drawer](asset-record-drawer.md)
 
 - [Software asset audit history](software-history.md)

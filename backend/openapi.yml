@@ -12342,6 +12342,23 @@ paths:
       operationId: workspaces_msp_networks_vlans_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - vlan_id
+          - -vlan_id
+          type: string
+          x-spec-enum-id: 4fb99f3879ee1e17
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `vlan_id` - vlan_id
+          * `-vlan_id` - -vlan_id
+      - in: query
         name: page
         schema:
           type: integer
@@ -12355,6 +12372,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -12476,6 +12504,23 @@ paths:
       operationId: workspaces_msp_networks_vrfs_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - route_distinguisher
+          - -route_distinguisher
+          type: string
+          x-spec-enum-id: 8817441ad4934830
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `route_distinguisher` - route_distinguisher
+          * `-route_distinguisher` - -route_distinguisher
+      - in: query
         name: page
         schema:
           type: integer
@@ -12489,6 +12534,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24684,6 +24740,23 @@ paths:
     get:
       operationId: workspaces_organizations_networks_vlans_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - vlan_id
+          - -vlan_id
+          type: string
+          x-spec-enum-id: 4fb99f3879ee1e17
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `vlan_id` - vlan_id
+          * `-vlan_id` - -vlan_id
       - in: path
         name: organization_entity_id
         schema:
@@ -24704,6 +24777,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24843,6 +24927,23 @@ paths:
     get:
       operationId: workspaces_organizations_networks_vrfs_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - route_distinguisher
+          - -route_distinguisher
+          type: string
+          x-spec-enum-id: 8817441ad4934830
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `route_distinguisher` - route_distinguisher
+          * `-route_distinguisher` - -route_distinguisher
       - in: path
         name: organization_entity_id
         schema:
@@ -24863,6 +24964,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -42895,7 +43007,6 @@ components:
         description:
           type: string
       required:
-      - description
       - id
       - name
       - vlan_id
@@ -42958,7 +43069,6 @@ components:
         description:
           type: string
       required:
-      - description
       - id
       - name
       - route_distinguisher

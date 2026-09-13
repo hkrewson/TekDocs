@@ -13,7 +13,7 @@ import { NavigationGuardContext } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { AddressQuery, ListResult, NetworksClient } from './api'
 
-type ChildRecord = { id: string; subnet_id: string | null }
+type ChildRecord = { id: string; subnet_id?: string | null }
 export type ChildRecordProps<D> = { record: D | null; canManage: boolean; onSaved: (record: D) => void; onReturn: () => void }
 export type ChildCollectionConfig<S extends ChildRecord, D extends S> = {
   key: string; feature: string; columns: readonly string[]; labels: Record<string, string>
@@ -51,7 +51,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   const page = Number.isSafeInteger(requested) && requested > 0 ? requested : 1
   const size = Number(params.get(`${config.key}_size`))
   const pageSize = [25, 50, 100].includes(size) ? size : preferences?.page_size ?? 25
-  const queryText = JSON.stringify({ ...(!standalone ? { subnet_id: subnetId } : {}), ...(association ? { association } : {}), q: params.get(`${config.key}_q`) ?? '', page, page_size: pageSize, ordering: params.get(`${config.key}_order`) ?? 'name', ...(params.get(`${config.key}_status`) ? { status: params.get(`${config.key}_status`) } : {}) })
+  const queryText = JSON.stringify({ ...(!standalone ? { subnet_id: subnetId } : {}), ...(association ? { association } : {}), q: params.get(`${config.key}_q`) ?? '', page, page_size: pageSize, ordering: params.get(`${config.key}_order`) ?? 'name', ...(config.statuses.length && params.get(`${config.key}_status`) ? { status: params.get(`${config.key}_status`) } : {}) })
   const query = useMemo(() => JSON.parse(queryText) as AddressQuery, [queryText])
   const key = `${config.feature}:${workspace.kind}:${workspace.id}:${queryText}`
   const detailKey = `${config.feature}:${workspace.kind}:${workspace.id}:${subnetId}:${selected}`
@@ -87,7 +87,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
       {result?.can_manage && <button type="button" className="primary-button" onClick={() => browse({ [config.key]: 'new' })}>{config.create}</button>}
       <div className="collection-toolbar">
         <form key={query.q} className="address-search collection-search" onSubmit={(event) => { event.preventDefault(); const value = new FormData(event.currentTarget).get('q'); browse({ [`${config.key}_q`]: typeof value === 'string' ? value : '' }) }}><input type="search" name="q" defaultValue={query.q} aria-label={config.search} /><button type="submit" className="secondary-button">{translate('collections.searchAction')}</button></form>
-        <FilterMenu groups={[{ kind: 'choices', label: translate('collections.status'), value: query.status ?? '', choices: [{ value: '', label: translate('collections.all') }, ...config.statuses], onChange: (value) => browse({ [`${config.key}_status`]: value || null }) }, ...(config.association ? [{ kind: 'choices' as const, label: config.association.label, value: association, choices: [{ value: '', label: translate('collections.all') }, ...config.association.choices], onChange: (value: string) => browse({ [`${config.key}_association`]: value || null }) }] : [])]} activeCount={Number(Boolean(query.status)) + Number(Boolean(association))} onClear={() => browse({ [`${config.key}_status`]: null, [`${config.key}_association`]: null })} />
+        {(config.statuses.length > 0 || config.association) && <FilterMenu groups={[{ kind: 'choices', label: translate('collections.status'), value: query.status ?? '', choices: [{ value: '', label: translate('collections.all') }, ...config.statuses], onChange: (value) => browse({ [`${config.key}_status`]: value || null }) }, ...(config.association ? [{ kind: 'choices' as const, label: config.association.label, value: association, choices: [{ value: '', label: translate('collections.all') }, ...config.association.choices], onChange: (value: string) => browse({ [`${config.key}_association`]: value || null }) }] : [])]} activeCount={Number(Boolean(query.status)) + Number(Boolean(association))} onClear={() => browse({ [`${config.key}_status`]: null, [`${config.key}_association`]: null })} />}
         {preferences && <ColumnChooser preferences={preferences} labels={config.labels} onSave={async (selectedColumns) => setPreferences(await preferenceClient.save(workspace, config.feature, { columns: selectedColumns, page_size: pageSize as 25 | 50 | 100 }))} onReset={async () => { setPreferences(await preferenceClient.reset(workspace, config.feature)); setPending(next({ [`${config.key}_size`]: null, [`${config.key}_page`]: null })) }} />}
         <label>{translate('collections.pageSize')}<select value={pageSize} onChange={(event) => { const value = Number(event.target.value) as 25 | 50 | 100; browse({ [`${config.key}_size`]: String(value) }); void preferenceClient.save(workspace, config.feature, { columns: preferences?.columns ?? [...config.columns], page_size: value }).then(setPreferences).catch(() => setNotice(translate('collections.preferenceFailed'))) }}>{[25, 50, 100].map((value) => <option key={value}>{value}</option>)}</select></label>
       </div>

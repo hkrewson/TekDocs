@@ -14160,7 +14160,7 @@ export interface components {
             readonly id: string;
             readonly name: string;
             readonly vlan_id: number;
-            readonly description: string;
+            readonly description?: string;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
         readonly VLANResult: {
@@ -14182,7 +14182,7 @@ export interface components {
             readonly id: string;
             readonly name: string;
             readonly route_distinguisher: string;
-            readonly description: string;
+            readonly description?: string;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
         readonly VRFResult: {
@@ -24128,8 +24128,17 @@ export interface operations {
     readonly workspaces_msp_networks_vlans_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `vlan_id` - vlan_id
+                 *     * `-vlan_id` - -vlan_id
+                 */
+                readonly ordering?: "name" | "-name" | "vlan_id" | "-vlan_id";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -24231,8 +24240,17 @@ export interface operations {
     readonly workspaces_msp_networks_vrfs_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `route_distinguisher` - route_distinguisher
+                 *     * `-route_distinguisher` - -route_distinguisher
+                 */
+                readonly ordering?: "name" | "-name" | "route_distinguisher" | "-route_distinguisher";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -32678,8 +32696,17 @@ export interface operations {
     readonly workspaces_organizations_networks_vlans_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `vlan_id` - vlan_id
+                 *     * `-vlan_id` - -vlan_id
+                 */
+                readonly ordering?: "name" | "-name" | "vlan_id" | "-vlan_id";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -32787,8 +32814,17 @@ export interface operations {
     readonly workspaces_organizations_networks_vrfs_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `route_distinguisher` - route_distinguisher
+                 *     * `-route_distinguisher` - -route_distinguisher
+                 */
+                readonly ordering?: "name" | "-name" | "route_distinguisher" | "-route_distinguisher";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {

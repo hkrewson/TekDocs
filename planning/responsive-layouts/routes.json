@@ -139,9 +139,11 @@
       "network-wireless.md",
       "wireless-register.md",
       "wireless-parent-assignment.md",
-      "../../frontend/e2e/network-layout.spec.ts"
+      "../../frontend/e2e/network-layout.spec.ts",
+      "addressing-registers.md",
+      "../../frontend/e2e/addressing-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent assignment with bounded lookup and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent assignment with bounded lookup and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. VLAN/VRF bounded registers, full record drawers/pages, Overview/History and guarded editing. Related subnet navigation and remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/notification-delivery",
@@ -377,9 +379,11 @@
       "network-wireless.md",
       "wireless-register.md",
       "wireless-parent-assignment.md",
-      "../../frontend/e2e/network-layout.spec.ts"
+      "../../frontend/e2e/network-layout.spec.ts",
+      "addressing-registers.md",
+      "../../frontend/e2e/addressing-layout.spec.ts"
     ],
-    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent assignment with bounded lookup and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. Remaining network object surfaces and phase acceptance open."
+    "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent assignment with bounded lookup and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. VLAN/VRF bounded registers, full record drawers/pages, Overview/History and guarded editing. Related subnet navigation and remaining network object surfaces and phase acceptance open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/overview",

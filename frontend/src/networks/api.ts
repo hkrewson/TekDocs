@@ -65,6 +65,8 @@ export type NetworkRecordWrite = Pick<NetworkRecord, 'name' | 'description' | 'c
   range_end: string | null
 }
 
+export type AddressingSummary = { id: string; name: string; vlan_id?: number; route_distinguisher?: string }
+export type AddressingRecord = AddressingSummary & { description: string }
 export type NetworkVRF = { id: string; name: string; route_distinguisher: string; description: string }
 export type NetworkVLAN = { id: string; name: string; vlan_id: number; description: string }
 export type NetworkSubnet = { id: string; name: string; cidr: string; address_family: 4 | 6; vrf_id: string | null; vrf_name: string | null; vlan_id: string | null; vlan_name: string | null; vlan_number: number | null; description: string }
@@ -114,6 +116,8 @@ export type ListResult<T> = { results: T[]; page: number; page_size: number; cou
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export interface NetworksClient {
+  addressingCollection(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', query: AddressQuery, signal?: AbortSignal): Promise<ListResult<AddressingSummary>>
+  addressingDetail(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', id: string, signal?: AbortSignal): Promise<AddressingRecord>
   collection(workspace: WorkspaceContext, query: NetworkQuery, signal?: AbortSignal): Promise<ListResult<NetworkSummary>>
   detail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkRecord>
   listNetworks(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkRecord>>
@@ -240,6 +244,13 @@ export const browserNetworksClient: NetworksClient = {
   updateDevice: (workspace, deviceId, values) => write(`${basePath(workspace)}/devices/${encodeURIComponent(deviceId)}`, 'PATCH', values),
   async choices(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/choices`, { credentials: 'same-origin', signal }))
+  },
+  async addressingCollection(workspace, kind, query, signal) {
+    const params = new URLSearchParams({ q: query.q, page: String(query.page), page_size: String(query.page_size), ordering: query.ordering, summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/${kind}?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async addressingDetail(workspace, kind, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/${kind}/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
   },
   async listVRFs(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/vrfs?page=1&page_size=100`, { credentials: 'same-origin', signal }))

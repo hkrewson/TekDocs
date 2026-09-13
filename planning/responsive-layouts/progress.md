@@ -532,3 +532,52 @@ No blocker remains for this checkpoint. Inferred: bounded parent lookup can info
 later association editors, but each still needs its own rules and validation. Site/VLAN
 editing, other network records, technician/release acceptance and existing pre-1.0
 security/recovery/recurring obligations remain open. Wiki changes remain local/unpublished.
+
+### 2026-09-13 — VLAN and VRF registers (Phase 3 #80)
+
+Bounded slice: Networks VLAN/VRF collection views, complete record drawers/pages,
+Overview/History, personal columns, bounded search/sorting/paging and guarded editing.
+Existing APIs gain additive summary/query parameters; schema/types updated. Shared
+collection supports records without a parent subnet and omits meaningless status
+filters. Related subnet navigation and remaining network work stay open. No migration,
+permission-model change or version bump.
+
+Focused type/lint and 21 components pass, including prior Address/Wireless behavior.
+The first production/live build reproduced a browser fixture type error: a VLAN/VRF
+union was accessed without narrowing its kind-specific field. Used property narrowing,
+retaining identical record/search assertions. Full check/live runs restarted with that
+correction. Browser coverage also includes added column/reset and failed/empty-list
+checks. Final verification and local readiness results follow below.
+
+Final make check passes: 506 component tests in 106 files, coverage enforcement,
+backend/frontend lint/types, migration/schema drift checks, production build and bundle
+budgets. The live browser-to-Django-to-PostgreSQL journey passes: create VLAN and VRF,
+edit their descriptions and refresh persisted records. Independent database fixture
+assertions pass. All six additional column/reset/retry/empty browser checks pass.
+The authorized local rebuild is underway with existing volumes/data preserved.
+
+Local rebuild completed with retained volumes. Docker readiness reports database and
+diagram renderer ready, version 0.8.46. VLAN Chromium and VRF WebKit short-screen
+screenshots were visually inspected; retained form values and section navigation are
+readable in the single scrolling drawer. Wiki contract passes (37 pages, 25 topics).
+
+The first broad browser run passed 173/174 cases. The existing WebKit wireless parent
+reassignment test at 1280px intermittently opened a dirty confirmation after a saved
+edit when Escape was pressed. Ten unchanged focused repeats passed. No test or guard
+was weakened; the cause remains unconfirmed. A full WebKit network/addressing rerun
+is in progress. This observation remains a navigation acceptance follow-up rather than
+a claim that the intermittent failure was fixed.
+
+WebKit confirmation completed: all 60 network/addressing cases pass, including the
+original wireless scenario. Across the executed runs all 180 distinct network and
+addressing browser cases passed at least once (54 new addressing cases); the original
+173/174 result remains recorded above. Ten additional unchanged focused repeats pass.
+No browser test or application code was changed to retire that intermittent result.
+
+Final `make test-network-validation` exits 0: network APIs, permission/IDOR/RLS and
+migration stabilization, high-volume network stabilization, and the full 506-test
+frontend coverage suite pass. Verified: local Docker readiness and both new routes,
+API/schema compatibility, full check, live persistence and browser scenarios.
+Unconfirmed: intermittent existing WebKit post-save guard cause. Still open: related
+subnet navigation, remaining network surfaces and technician/release acceptance.
+This bounded VLAN/VRF register checkpoint is complete; Phase 3 remains open.

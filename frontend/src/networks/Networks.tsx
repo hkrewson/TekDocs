@@ -1,3 +1,4 @@
+import { AddressingRegister } from './AddressingRegister'
 import { WirelessWorkspace } from './NetworkWireless'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
@@ -31,13 +32,13 @@ export function Networks(props: NetworksProps) {
   const wireless = params.get('view') === 'wireless'
   function href(view: string) {
     const next = new URLSearchParams(params)
-    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'history_page']) next.delete(key)
-    if (view === 'wireless') next.set('view', view); else next.delete('view')
+    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'vlans', 'vlans_full', 'vlans_section', 'vrfs', 'vrfs_full', 'vrfs_section', 'history_page']) next.delete(key)
+    if (view !== 'networks') next.set('view', view); else next.delete('view')
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }
   return <>
-    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!wireless ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link></nav>
-    {wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
+    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!['wireless', 'vlans', 'vrfs'].includes(params.get('view') ?? '') ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link>{(['vlans', 'vrfs'] as const).map((kind) => <Link key={kind} to={href(kind)} aria-current={params.get('view') === kind ? 'page' : undefined}>{t(kind)}</Link>)}</nav>
+    {params.get('view') === 'vlans' || params.get('view') === 'vrfs' ? <AddressingRegister kind={params.get('view') as 'vlans' | 'vrfs'} workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
   </>
 }
 

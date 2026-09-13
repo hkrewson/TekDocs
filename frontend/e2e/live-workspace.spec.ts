@@ -575,6 +575,24 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.locator('.collection-search').getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.getByRole('row').filter({ hasText: 'Live management LAN' })).toBeVisible()
 
+  for (const [label, field, value] of [['VLAN', 'VLAN ID', '321'], ['VRF', 'Route distinguisher', '64512:321']]) {
+    await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: `${label}s`, exact: true }).click()
+    await page.getByRole('button', { name: `New ${label}`, exact: true }).click()
+    const addressingDrawer = page.getByRole('dialog')
+    await addressingDrawer.getByRole('textbox', { name: 'Name', exact: true }).fill(`Live ${label}`)
+    await addressingDrawer.getByLabel(field, { exact: true }).fill(value)
+    await addressingDrawer.getByRole('button', { name: `Save ${label}`, exact: true }).click()
+    await expect(addressingDrawer.getByRole('button', { name: `Edit ${label}`, exact: true })).toBeVisible()
+    await addressingDrawer.getByRole('button', { name: `Edit ${label}`, exact: true }).click()
+    await addressingDrawer.getByLabel('Description', { exact: true }).fill('Verified addressing scope')
+    await addressingDrawer.getByRole('button', { name: `Save ${label}`, exact: true }).click()
+    await expect(addressingDrawer.getByRole('button', { name: `Edit ${label}`, exact: true })).toBeVisible()
+    await page.reload()
+    await expect(addressingDrawer).toContainText('Verified addressing scope')
+    await page.mouse.click(10, 100)
+    await expect(addressingDrawer).toHaveCount(0)
+  }
+
   await page.getByRole('link', { name: 'People' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/people$/)
   await page.getByRole('button', { name: 'New person' }).click()

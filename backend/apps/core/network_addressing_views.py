@@ -6,7 +6,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -58,14 +58,14 @@ class VRFSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
     route_distinguisher = serializers.CharField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
 
 class VLANSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
     vlan_id = serializers.IntegerField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
 
 class SubnetSerializer(serializers.Serializer):
@@ -148,11 +148,68 @@ def _error(exc: Exception) -> serializers.ValidationError:
     return serializers.ValidationError({"detail": detail})
 
 
+class AddressingCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    summary = serializers.BooleanField(required=False, default=False)
+
+
+class VRFCollectionQuerySerializer(AddressingCollectionQuerySerializer):
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "route_distinguisher", "-route_distinguisher"), required=False, default="name"
+    )
+
+
+class VLANCollectionQuerySerializer(AddressingCollectionQuerySerializer):
+    ordering = serializers.ChoiceField(choices=("name", "-name", "vlan_id", "-vlan_id"), required=False, default="name")
+
+
+def _addressing_page(
+    queryset: QuerySet[Any],
+    request: Any,
+    workspace: ResolvedWorkspace,
+    serializer: type[serializers.Serializer],
+    kind: str,
+) -> Response:
+    query_class = VRFCollectionQuerySerializer if kind == "vrfs" else VLANCollectionQuerySerializer
+    query = query_class(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    if values["q"]:
+        term = values["q"]
+        condition = Q(entity__display_name__icontains=term) | Q(description__icontains=term)
+        if kind == "vrfs":
+            condition |= Q(route_distinguisher__icontains=term)
+        elif term.isascii() and term.isdigit() and len(term) <= 4:
+            condition |= Q(vlan_id=int(term))
+        queryset = queryset.filter(condition)
+    if "ordering" in request.query_params:
+        order = values["ordering"]
+        field = "entity__display_name" if order.lstrip("-") == "name" else order.lstrip("-")
+        queryset = queryset.order_by(("-" if order.startswith("-") else "") + field, "entity_id")
+    page = paginate(queryset, page=values["page"], page_size=values["page_size"])
+    body = serializer(
+        {
+            "results": page.records,
+            "page": page.page,
+            "page_size": page.page_size,
+            "count": page.count,
+            "has_more": page.has_more,
+            "can_manage": context_has_permission(
+                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+            ),
+        }
+    ).data
+    if values["summary"]:
+        for row in body["results"]:
+            row.pop("description")
+    return Response(body)
+
+
 class VRFListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: VRFResultSerializer})
+    @extend_schema(parameters=[VRFCollectionQuerySerializer], responses={200: VRFResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(vrfs_for_scope(workspace.data_scope), request, workspace, VRFResultSerializer)
+        return _addressing_page(vrfs_for_scope(workspace.data_scope), request, workspace, VRFResultSerializer, "vrfs")
 
     @extend_schema(request=VRFWriteSerializer, responses={201: VRFSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -200,10 +257,12 @@ class VRFDetailView(APIView):
 
 
 class VLANListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: VLANResultSerializer})
+    @extend_schema(parameters=[VLANCollectionQuerySerializer], responses={200: VLANResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(vlans_for_scope(workspace.data_scope), request, workspace, VLANResultSerializer)
+        return _addressing_page(
+            vlans_for_scope(workspace.data_scope), request, workspace, VLANResultSerializer, "vlans"
+        )
 
     @extend_schema(request=VLANWriteSerializer, responses={201: VLANSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

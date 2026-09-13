@@ -395,3 +395,58 @@ def test_network_collection_search_order_summary_and_selected_detail(owner_clien
         kwargs={"organization_entity_id": sibling.entity_id, "network_entity_id": ids[30]},
     )
     assert owner_client.get(wrong).status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind,field", [("vlans", "vlan_id"), ("vrfs", "route_distinguisher")])
+def test_addressing_register_queries_and_preferences(owner_client, installation, kind, field):
+    organization = _organization(installation, "Register")
+    sibling = _organization(installation, "Private register")
+    route = f"organization-network-{kind}"
+    created = []
+    for index in range(1, 32):
+        values = {
+            "name": f"Record {index:02}",
+            "description": f"Retained {index}",
+            field: index if kind == "vlans" else f"64512:{index:02}",
+        }
+        response = _post(owner_client, route, organization, values)
+        assert response.status_code == 201
+        created.append(response.json())
+    assert (
+        _post(
+            owner_client, route, sibling, {"name": "Private record", field: 100 if kind == "vlans" else "64512:100"}
+        ).status_code
+        == 201
+    )
+    url = reverse(route, kwargs={"organization_entity_id": organization.entity_id})
+    page = owner_client.get(url, {"summary": "true", "ordering": "name", "page_size": 25}).json()
+    assert page["count"] == 31 and len(page["results"]) == 25 and page["has_more"]
+    assert "description" not in page["results"][0]
+    assert owner_client.get(url).json()["results"][0]["description"]
+    second = owner_client.get(url, {"ordering": "name", "page": 2, "page_size": 25}).json()
+    assert len(second["results"]) == 6 and not second["has_more"]
+    found = owner_client.get(url, {"q": "31", "ordering": field}).json()
+    assert found["count"] == 1 and found["results"][0]["id"] == created[-1]["id"]
+    descending = owner_client.get(url, {"ordering": f"-{field}"}).json()
+    assert descending["results"][0]["id"] == created[-1]["id"]
+    for query in ({"ordering": "invalid"}, {"unknown": "value"}, {"page_size": 101}):
+        assert owner_client.get(url, query).status_code == 400
+    detail = reverse(
+        f"organization-network-{kind[:-1]}-detail",
+        kwargs={"organization_entity_id": organization.entity_id, f"{kind[:-1]}_entity_id": created[0]["id"]},
+    )
+    assert owner_client.get(detail).json()["description"] == "Retained 1"
+    foreign = reverse(
+        f"organization-network-{kind[:-1]}-detail",
+        kwargs={"organization_entity_id": sibling.entity_id, f"{kind[:-1]}_entity_id": created[0]["id"]},
+    )
+    assert owner_client.get(foreign).status_code == 403
+    prefs = f"/api/v1/workspaces/organizations/{organization.entity_id}/collection-preferences/network-{kind}"
+    assert owner_client.get(prefs).json()["columns"] == ["name", field]
+    assert (
+        owner_client.put(prefs, {"columns": ["name"], "page_size": 50}, content_type="application/json").status_code
+        == 200
+    )
+    assert owner_client.get(prefs).json()["columns"] == ["name"]
+    assert owner_client.delete(prefs).json()["page_size"] == 25

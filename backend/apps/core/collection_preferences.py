@@ -24,6 +24,16 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "network-vlans": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "vlan_id")),
+        ("name", "vlan_id"),
+    ),
+    "network-vrfs": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "route_distinguisher")),
+        ("name", "route_distinguisher"),
+    ),
     "wireless-register": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "network", "status", "purpose", "security")),

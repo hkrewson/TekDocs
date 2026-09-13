@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { RecordHeader, RecordSections } from '../records/RecordNavigation'
 import { translate } from '../i18n/localization'
 import type { ClientAsset, HardwareLifecycleEvent, InventoryClient } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -27,18 +27,13 @@ export function AssetRecord({ asset, workspace, client, canManage, access, secti
   access: { view: boolean; create: boolean; archive: boolean }; section: string
   href: (section: string) => string; onChange: (asset: ClientAsset) => void
 }) {
-  const navigate = useNavigate()
-  const location = useLocation()
   const tabs: Array<'overview' | 'specifications' | 'network' | 'installation' | 'related' | 'history'> = ['overview', 'specifications', asset.kind === 'hardware' ? 'network' : 'installation', ...(access.view ? ['related' as const] : []), 'history']
   const current = tabs.find((tab) => tab === section) ?? 'overview'
-  const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => { heading.current?.focus({ preventScroll: true }) }, [asset.id, current])
   const expired = asset.hardware?.warranty_ends_on && asset.hardware.warranty_ends_on < new Date().toISOString().slice(0, 10)
   const [graph, setGraph] = useState(false)
-  return <article className="asset-record">
-    <header className="asset-record-header"><h1 ref={heading} tabIndex={-1}>{asset.name}</h1><p>{asset.supplier_name} / {asset.product_name} / {asset.model_name}</p></header>
-    <nav className="record-sections" aria-label={translate('collections.sections')}>{tabs.map((tab) => <Link key={tab} to={href(tab)} state={location.state as unknown} aria-current={current === tab ? 'page' : undefined}>{translate(`collections.${tab}`)}</Link>)}</nav>
-    <label className="record-sections-mobile">{translate('collections.sections')}<select aria-label={translate('collections.sections')} value={current} onChange={(event) => { void navigate(href(event.target.value), { state: location.state as unknown }) }}>{tabs.map((tab) => <option key={tab} value={tab}>{translate(`collections.${tab}`)}</option>)}</select></label>
+  return <article className="record-page asset-record">
+    <RecordHeader recordId={asset.id} section={current} title={asset.name} description={`${asset.supplier_name} / ${asset.product_name} / ${asset.model_name}`} />
+    <RecordSections current={current} sections={tabs.map((tab) => ({ id: tab, label: translate(`collections.${tab}`), href: href(tab) }))} />
     <section aria-label={translate(`collections.${current}`)}>
       {current === 'overview' && <>
         {expired && <p role="status">{translate('collections.warrantyWarning')}</p>}

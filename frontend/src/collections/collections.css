@@ -25,8 +25,8 @@
 .record-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); gap: .75rem 1.5rem; }
 .record-facts dt { font-size: .875rem; color: var(--muted); }
 .record-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
-.asset-record { min-width: 0; overflow-wrap: anywhere; }
-.asset-record-header h1 { font-size: 1.5rem; margin-block: 1rem .5rem; }
+.record-page { min-width: 0; overflow-wrap: anywhere; }
+.record-header h1 { font-size: 1.5rem; margin-block: 1rem .5rem; }
 .record-sections { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border); margin-block: 1rem; }
 .record-sections a { padding-block: .65rem; color: inherit; }
 .record-sections a[aria-current] { font-weight: 600; border-bottom: 2px solid currentColor; }

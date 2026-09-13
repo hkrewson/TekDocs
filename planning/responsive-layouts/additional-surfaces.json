@@ -125,7 +125,10 @@
       "site search and paging",
       "site filter refresh and removal",
       "unavailable selected site",
-      "failed site choice read"
+      "failed site choice read",
+      "shared record navigation",
+      "section Back/Forward and heading focus",
+      "dirty mobile section selection"
     ],
     "status": "implemented reference layout; see assets-layout.md for remaining acceptance",
     "evidence": [
@@ -134,7 +137,8 @@
       "frontend/e2e/live-workspace.spec.ts",
       "frontend/src/inventory/Assets.test.tsx",
       "backend/apps/core/tests/test_asset_collections.py",
-      "frontend/src/inventory/AssetSiteFilter.test.tsx"
+      "frontend/src/inventory/AssetSiteFilter.test.tsx",
+      "frontend/src/records/RecordNavigation.test.tsx"
     ]
   }
 ]

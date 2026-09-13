@@ -110,7 +110,7 @@ export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack
   rack_unit: number | null
 }
 
-type ListResult<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
+export type ListResult<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export interface NetworksClient {
@@ -146,9 +146,11 @@ export interface NetworksClient {
   listMACAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkMACAddress>>
   createMACAddress(workspace: WorkspaceContext, values: MACAddressWrite): Promise<NetworkMACAddress>
   updateMACAddress(workspace: WorkspaceContext, id: string, values: MACAddressWrite): Promise<NetworkMACAddress>
+  wirelessCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<WirelessNetwork, 'description'>>>
+  wirelessDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<WirelessNetwork>
   listWireless(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<WirelessNetwork>>
   createWireless(workspace: WorkspaceContext, values: WirelessWrite): Promise<WirelessNetwork>
-  updateWireless(workspace: WorkspaceContext, id: string, values: WirelessWrite): Promise<WirelessNetwork>
+  updateWireless(workspace: WorkspaceContext, id: string, values: Partial<WirelessWrite>): Promise<WirelessNetwork>
   listDNSZones(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<DNSZone>>
   createDNSZone(workspace: WorkspaceContext, values: DNSZoneWrite): Promise<DNSZone>
   updateDNSZone(workspace: WorkspaceContext, id: string, values: DNSZoneWrite): Promise<DNSZone>
@@ -276,6 +278,14 @@ export const browserNetworksClient: NetworksClient = {
   },
   createMACAddress: (workspace, values) => write(`${basePath(workspace)}/mac-addresses`, 'POST', values),
   updateMACAddress: (workspace, id, values) => write(`${basePath(workspace)}/mac-addresses/${encodeURIComponent(id)}`, 'PATCH', values),
+  async wirelessCollection(workspace, query, signal) {
+    const parameters = new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))
+    parameters.set('summary', 'true')
+    return json(await fetch(`${basePath(workspace)}/wireless?${parameters}`, { credentials: 'same-origin', signal }))
+  },
+  async wirelessDetail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/wireless/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
   async listWireless(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/wireless?page=1&page_size=100`, { credentials: 'same-origin', signal }))
   },

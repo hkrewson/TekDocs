@@ -140,7 +140,9 @@ def create_wireless_network(
 @transaction.atomic
 def update_wireless_network(*, record: WirelessNetwork, actor_id: UUID, values: dict[str, object]) -> WirelessNetwork:
     locked = (
-        WirelessNetwork.objects.select_for_update().select_related("entity", "site", "vlan", "subnet").get(pk=record.pk)
+        WirelessNetwork.objects.select_for_update(of=("self", "entity"))
+        .select_related("entity", "site", "vlan", "subnet")
+        .get(pk=record.pk)
     )
     scope = DataScope.owner(locked.tenant, locked.organization)
     site_id = cast(Site, locked.site).entity_id if locked.site_id else None

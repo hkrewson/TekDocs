@@ -84,7 +84,7 @@ export function Networks({ workspace, client = browserNetworksClient, preference
   }, [recordId, result, navigationState])
   function href(id: string | null, nextSection = 'overview', preview = false) {
     const next = new URLSearchParams(params); next.delete('record'); next.delete('preview'); next.delete('section'); next.delete('create')
-    if (id !== activeId) { next.delete('history_page'); for (const key of ['address', 'address_page', 'address_size', 'address_q', 'address_status', 'address_order']) next.delete(key) }
+    if (id !== activeId) { next.delete('history_page'); for (const key of ['address', 'address_page', 'address_size', 'address_q', 'address_status', 'address_order', 'wireless', 'wireless_page', 'wireless_size', 'wireless_q', 'wireless_status', 'wireless_order']) next.delete(key) }
     if (id) { next.set(preview ? 'preview' : 'record', id); if (nextSection !== 'overview') next.set('section', nextSection) }
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }

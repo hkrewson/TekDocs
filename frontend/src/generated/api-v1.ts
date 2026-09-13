@@ -14290,7 +14290,15 @@ export interface components {
             /** Format: uuid */
             readonly subnet_id: string | null;
             readonly subnet_cidr: string | null;
-            readonly description: string;
+            readonly description?: string;
+        };
+        readonly WirelessCollection: {
+            readonly results: readonly components["schemas"]["Wireless"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
         };
         readonly WirelessWrite: {
             readonly ssid: string;
@@ -24326,8 +24334,29 @@ export interface operations {
     readonly workspaces_msp_networks_wireless_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `purpose` - purpose
+                 *     * `-purpose` - -purpose
+                 *     * `security` - security
+                 *     * `-security` - -security
+                 */
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `disabled` - disabled
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "disabled" | "retired";
+                readonly subnet_id?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -24342,7 +24371,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["WirelessCollection"];
                 };
             };
         };
@@ -32860,8 +32889,29 @@ export interface operations {
     readonly workspaces_organizations_networks_wireless_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `purpose` - purpose
+                 *     * `-purpose` - -purpose
+                 *     * `security` - security
+                 *     * `-security` - -security
+                 */
+                readonly ordering?: "name" | "-name" | "status" | "-status" | "purpose" | "-purpose" | "security" | "-security";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `disabled` - disabled
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "disabled" | "retired";
+                readonly subnet_id?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -32878,7 +32928,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["WirelessCollection"];
                 };
             };
         };

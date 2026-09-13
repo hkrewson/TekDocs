@@ -24,6 +24,11 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "network-wireless": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "status", "purpose", "security")),
+        ("name", "status", "purpose", "security"),
+    ),
     "network-addresses": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "status", "dns_name")),

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -26,6 +26,7 @@ from .models import (
     WirelessNetworkStatus,
 )
 from .network_inventory_views import StrictSerializer
+from .network_records import network_records_for_scope
 from .network_services import (
     NetworkServiceError,
     create_dns_record,
@@ -71,7 +72,7 @@ class WirelessSerializer(serializers.Serializer):
     vlan_number = serializers.IntegerField(source="vlan.vlan_id", allow_null=True)
     subnet_id = serializers.UUIDField(source="subnet.entity_id", allow_null=True)
     subnet_cidr = serializers.CharField(source="subnet.cidr", allow_null=True)
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
 
 class ZoneWriteSerializer(StrictSerializer):
@@ -170,11 +171,61 @@ def _error(exc: Exception) -> serializers.ValidationError:
     return serializers.ValidationError({"detail": detail})
 
 
+WIRELESS_ORDERING = {"name": "ssid", "status": "status", "purpose": "purpose", "security": "security"}
+
+
+class WirelessCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    subnet_id = serializers.UUIDField(required=False)
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    status = serializers.ChoiceField(choices=WirelessNetworkStatus.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in WIRELESS_ORDERING for key in (field, f"-{field}")], required=False, default="name"
+    )
+    summary = serializers.BooleanField(required=False, default=False)
+
+
+class WirelessCollectionSerializer(CollectionSerializer):
+    results = WirelessSerializer(many=True)
+
+
 class WirelessListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: CollectionSerializer})
+    @extend_schema(parameters=[WirelessCollectionQuerySerializer], responses={200: WirelessCollectionSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(wireless_networks_for_scope(workspace.data_scope), request, workspace, WirelessSerializer)
+        query = WirelessCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = wireless_networks_for_scope(workspace.data_scope)
+        if "subnet_id" in values:
+            if not network_records_for_scope(workspace.data_scope).filter(entity_id=values["subnet_id"]).exists():
+                raise PermissionDenied("The selected network is unavailable.")
+            records = records.filter(subnet__entity_id=values["subnet_id"])
+        if values["q"]:
+            records = records.filter(Q(ssid__icontains=values["q"]) | Q(description__icontains=values["q"]))
+        if "status" in values:
+            records = records.filter(status=values["status"])
+        if "ordering" in request.query_params:
+            order = values["ordering"]
+            records = records.order_by(
+                ("-" if order.startswith("-") else "") + WIRELESS_ORDERING[order.lstrip("-")], "entity_id"
+            )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        rows = WirelessSerializer(page.records, many=True).data
+        if values["summary"]:
+            for row in rows:
+                row.pop("description")
+        return Response(
+            {
+                "results": rows,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        )
 
     @extend_schema(request=WirelessWriteSerializer, responses={201: WirelessSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

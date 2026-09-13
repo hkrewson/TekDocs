@@ -342,3 +342,59 @@ their own implementation and evidence. Phase 3, technician acceptance, productio
 publication and the broader pre-1.0 obligations remain open. Durable architecture,
 query/navigation contracts, tests and route-state inventory are tracked here; the
 Wiki Roadmap follow-up remains local and unpublished.
+
+### 2026-09-13 — Parent Wireless records (Phase 3 #80)
+
+Bounded slice: parent-associated wireless SSID collections and selected record
+editing within the existing network drawer/full page. Added server parent/search/
+status/order/summary query support, personal network-wireless preferences, generated
+API contracts, mobile sections and URL state. Extracted NetworkChildCollection from
+Addresses to keep both child collections consistent. No version or schema change.
+
+Reproduced an existing wireless PATCH failure in PostgreSQL before fixing it:
+FOR UPDATE rejected nullable site/VLAN/subnet joins. Restricted locks to the wireless
+record and its entity, preserving the existing workspace lock. The focused API suite
+passes (7 tests), including status edits retaining site/VLAN/subnet IDs, 31 records,
+bounded counts, off-page search, deterministic ordering, summary/legacy compatibility,
+invalid queries, cross-parent denial and preference save/reset.
+
+Focused type/lint and 9 child component tests pass. Initial verification caught an
+unused extraction import, React's prohibition on passing a ref-mutating callback to
+a directly invoked render function, and a Playwright-only matcher in a component
+test. Used a static record component and the supported component focus matcher;
+assertions remain intact. Browser, live and full gates are in progress below.
+
+All 78 browser checks pass across Chromium, Firefox and WebKit, including the
+existing Networks/Addresses scenarios after the shared component extraction. New
+Wireless coverage exercises six widths, long descriptions, off-page SSID search,
+URL selection/full-page/Back/refresh, focus return, columns, removable status filters,
+failed PATCH/dirty dismissal, touch, short screens and 200% zoom. Mobile screenshots
+were inspected: readable facts within one drawer body and no horizontal overflow.
+
+`make check` passes: backend lint/types, migration drift, schema synchronization,
+frontend lint/types, all 490 tests in 104 files, coverage enforcement, production
+build and bundle budgets. No thresholds were loosened. The live browser-to-Django-
+to-PostgreSQL journey passes, including wireless creation, a successful status edit,
+and refresh retaining status/security mode. Existing independent database-fixture
+assertions also pass. The local rebuild is underway with existing volumes preserved;
+the full network gate remains in its migration/recovery stage.
+
+The authorized local `make up` completed with volumes retained. Readiness reports
+status ok, database/renderer ready and version 0.8.46; `/networks` returns 200. Local
+test path: Networks → network name → Wireless. No production push/publication,
+version change, or replacement of existing user/demo data occurred. Wiki manifest
+and whitespace checks pass. Full network validation completion is recorded below.
+
+Final `make test-network-validation` exited successfully: network inventory,
+addressing, endpoints, services, circuits, reconciliation/transfer, relationships,
+permission/IDOR, runtime RLS, migration stabilization and network stabilization,
+followed by all 490 frontend tests and coverage. The existing suite skip remains
+unchanged. This completes the bounded parent Wireless checkpoint.
+
+Verified: the implementation, shared Addresses regression coverage, full checks,
+isolated live workflow and healthy local 0.8.46 runtime. No blocker remains for this
+checkpoint. Inferred: the shared child-list pattern is suitable for additional
+network records; each still requires its own implementation and evidence. Unassigned
+wireless browsing, association management, other network surfaces, technician
+acceptance, release gates and broader pre-1.0 obligations remain open. Tracked
+implementation notes and tests are durable; the Wiki update remains local/unpublished.

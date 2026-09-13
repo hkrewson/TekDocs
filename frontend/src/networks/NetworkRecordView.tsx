@@ -1,3 +1,4 @@
+import { NetworkWireless } from './NetworkWireless'
 import { NetworkAddresses } from './NetworkAddresses'
 import type { NetworkChoices, NetworkRecord, NetworkRecordWrite, NetworksClient } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -43,12 +44,12 @@ export function NetworkRecordView({ record, workspace, client, section, href, em
   const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial) }, editing)
   useEffect(() => { if (!editing) return; const controller = new AbortController(); client.choices(workspace, controller.signal).then((value) => { if (!controller.signal.aborted) { setChoices(value); setChoiceError(false) } }).catch(() => { if (!controller.signal.aborted) setChoiceError(true) }); return () => controller.abort() }, [workspace, client, editing, reload])
   async function save() { if (!choices) return; setBusy(true); setError(''); try { const values = form.use_full_range ? { ...form, range_start: null, range_end: null } : form; const saved = record ? await client.updateNetwork(workspace, record.id, values) : await client.createNetwork(workspace, values); setEditing(false); onSaved(saved) } catch (caught) { setError(caught instanceof Error ? caught.message : t('saveFailed')) } finally { setBusy(false) } }
-  const current = ['history', 'addresses'].includes(section) ? section : 'overview'
+  const current = ['history', 'addresses', 'wireless'].includes(section) ? section : 'overview'
   return <article className="record-page">
     {record && !embedded && <RecordHeader recordId={record.id} section={current} title={record.name} description={record.cidr} />}
-    {record && <RecordSections current={current} sections={['overview', 'addresses', 'history'].map((id) => ({ id, label: id === 'addresses' ? t('addresses') : translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />}
+    {record && <RecordSections current={current} sections={['overview', 'addresses', 'wireless', 'history'].map((id) => ({ id, label: id === 'wireless' ? t('wireless') : id === 'addresses' ? t('addresses') : translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />}
     {error && <p role="alert">{error}</p>}
-    {current === 'addresses' && record ? <NetworkAddresses workspace={workspace} subnetId={record.id} client={client} /> : current === 'history' && record ? <RecordActivity entityId={record.id} workspace={workspace} description={t('historyHelp')} emptyLabel={t('historyEmpty')} deniedLabel={t('historyDenied')} /> : editing ? <>
+    {current === 'wireless' && record ? <NetworkWireless workspace={workspace} subnetId={record.id} client={client} /> : current === 'addresses' && record ? <NetworkAddresses workspace={workspace} subnetId={record.id} client={client} /> : current === 'history' && record ? <RecordActivity entityId={record.id} workspace={workspace} description={t('historyHelp')} emptyLabel={t('historyEmpty')} deniedLabel={t('historyDenied')} /> : editing ? <>
       <h2>{t(record ? 'edit' : 'new')}</h2><p>{t('gatewayHelp')}</p>
       {choiceError && <p role="alert">{t('choicesFailed')} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p>}
       <NetworkEditor value={form} setValue={setForm} choices={choices} busy={busy} ready={Boolean(choices)} cancel={() => attempt(() => { if (record) setEditing(false); else onCancel() })} save={() => void save()} />

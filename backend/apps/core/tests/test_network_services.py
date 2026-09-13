@@ -118,6 +118,20 @@ def test_wireless_dns_crud_and_sibling_isolation(owner_client, installation):
     )
     assert wireless.status_code == 201
     assert wireless.json()["subnet_cidr"] == "192.0.2.0/24"
+    updated = owner_client.patch(
+        reverse(
+            "organization-network-wireless-detail",
+            kwargs={"organization_entity_id": organization.entity_id, "wireless_entity_id": wireless.json()["id"]},
+        ),
+        {"status": "disabled", "description": "Temporarily unavailable"},
+        content_type="application/json",
+    )
+    assert updated.status_code == 200, updated.content
+    assert updated.json()["site_id"] == str(site.entity_id)
+    assert updated.json()["vlan_id"] == str(vlan.entity_id)
+    assert updated.json()["subnet_id"] == str(subnet.entity_id)
+    assert updated.json()["status"] == "disabled"
+
     assert (
         owner_client.get(
             reverse("organization-network-wireless", kwargs={"organization_entity_id": sibling.entity_id})
@@ -343,3 +357,67 @@ def test_wireless_response_never_accepts_or_returns_password_fields(owner_client
     )
     assert response.status_code == 400
     assert WirelessNetwork.objects.filter(organization=organization).count() == 0
+
+
+@pytest.mark.django_db
+def test_wireless_parent_collection_search_paging_and_preferences(owner_client, installation):
+    organization = _organization(installation, "Wireless collection")
+    sibling = _organization(installation, "Wireless sibling")
+
+    def parent(owner, cidr):
+        return create_subnet(
+            tenant=installation.tenant,
+            organization=owner,
+            actor_id=installation.owner.id,
+            name="Office LAN",
+            cidr=cidr,
+            vrf_entity_id=None,
+            vlan_entity_id=None,
+            description="",
+        )
+
+    subnet = parent(organization, "192.0.2.0/24")
+    other = parent(sibling, "198.51.100.0/24")
+    url = reverse("organization-network-wireless", kwargs={"organization_entity_id": organization.entity_id})
+    for index in range(31):
+        response = owner_client.post(
+            url,
+            {
+                "ssid": f"Office {index:02}",
+                "subnet_id": str(subnet.entity_id),
+                "status": "disabled" if index == 30 else "active",
+                "description": f"Wireless purpose {index:02}",
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201, response.content
+    query = {"subnet_id": str(subnet.entity_id), "page_size": 25, "summary": "true", "ordering": "name"}
+    first = owner_client.get(url, query).json()
+    assert first["count"] == 31 and first["has_more"]
+    assert len(first["results"]) == 25 and first["results"][0]["ssid"] == "Office 00"
+    assert all("description" not in row for row in first["results"])
+    second = owner_client.get(url, {**query, "page": 2}).json()
+    assert len(second["results"]) == 6 and not second["has_more"]
+    found = owner_client.get(url, {**query, "q": "purpose 30", "status": "disabled"}).json()
+    assert found["count"] == 1 and found["results"][0]["ssid"] == "Office 30"
+    # Repeated equal-status ordering uses entity IDs to keep pages stable.
+    ordered = owner_client.get(url, {**query, "ordering": "status"}).json()["results"]
+    assert ordered == owner_client.get(url, {**query, "ordering": "status"}).json()["results"]
+    assert len({row["id"] for row in ordered}) == 25
+    assert owner_client.get(url, {**query, "subnet_id": str(other.entity_id)}).status_code == 403
+    assert owner_client.get(url, {**query, "status": "invalid"}).status_code == 400
+    assert owner_client.get(url, {**query, "ordering": "description"}).status_code == 400
+    assert owner_client.get(url, {**query, "unknown": "x"}).status_code == 400
+    assert "description" in owner_client.get(url).json()["results"][0]
+    prefs = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": organization.entity_id, "feature": "network-wireless"},
+    )
+    assert (
+        owner_client.put(
+            prefs, {"columns": ["name", "security"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(prefs).json()["columns"] == ["name", "security"]
+    assert owner_client.delete(prefs).json()["page_size"] == 25

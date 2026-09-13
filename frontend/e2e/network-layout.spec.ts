@@ -243,3 +243,118 @@ test('Address editor supports touch and 200 percent zoom', async ({ browser }) =
     expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   } finally { await context.close() }
 })
+
+async function wirelessFixtures(page: Page, failSave = false) {
+  await fixtures(page)
+  const columns = ['name', 'status', 'purpose', 'security']
+  let preferences = { columns, default_columns: columns, available_columns: columns, page_size: 25 }
+  await page.route('**/collection-preferences/network-wireless', (route) => {
+    if (route.request().method() === 'PUT') preferences = { ...preferences, ...route.request().postDataJSON() as { columns: string[]; page_size: number } }
+    if (route.request().method() === 'DELETE') preferences = { columns, default_columns: columns, available_columns: columns, page_size: 25 }
+    return route.fulfill({ json: preferences })
+  })
+  const records = Array.from({ length: 31 }, (_, index) => ({ id: `wifi-${index + 1}`, ssid: `Office ${String(index + 1).padStart(2, '0')}`, subnet_id: 'network-2', subnet_cidr: '10.55.1.0/24', status: index === 30 ? 'disabled' : 'active', purpose: 'corporate', security: 'wpa3_enterprise', hidden: false, client_isolation: true, description: 'Wireless documentation '.repeat(50), site_id: 'site-1', site_name: 'Headquarters', vlan_id: 'vlan-1', vlan_name: 'Office VLAN', vlan_number: 20 }))
+  await page.route('**/api/v1/workspaces/**/networks/wireless?*', (route) => {
+    const query = new URL(route.request().url()).searchParams
+    expect(query.get('subnet_id')).toBe('network-2')
+    expect(query.get('summary')).toBe('true')
+    let found = records.filter((item) => item.ssid.includes(query.get('q') ?? '') && (!query.get('status') || query.get('status') === item.status))
+    if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
+    const size = Number(query.get('page_size')), number = Number(query.get('page'))
+    return route.fulfill({ json: { results: found.slice((number - 1) * size, number * size).map((item) => ({ ...item, description: undefined })), count: found.length, page: number, page_size: size, has_more: number * size < found.length, can_manage: true } })
+  })
+  await page.route(/\/wireless\/wifi-\d+$/, (route) => {
+    const record = records.find((item) => route.request().url().endsWith(`/${item.id}`))
+    if (!record) return route.fulfill({ status: 404, json: {} })
+    if (route.request().method() === 'PATCH') {
+      const values = route.request().postDataJSON() as Record<string, unknown>
+      for (const key of ['site_id', 'vlan_id', 'subnet_id']) expect(values).not.toHaveProperty(key)
+      if (failSave) return route.fulfill({ status: 409, json: { detail: 'Wireless record changed. Your entries have been kept.' } })
+      Object.assign(record, values)
+    }
+    return route.fulfill({ json: record })
+  })
+}
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`Wireless child records fit ${width}px and preserve full-page links`, async ({ page }) => {
+    await wirelessFixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/networks?preview=network-2')
+    const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+    if (width < 768) await drawer.getByRole('combobox', { name: 'Sections', exact: true }).selectOption('wireless')
+    else await drawer.getByRole('link', { name: 'Wireless', exact: true }).click()
+    await expect(drawer.getByText('31 wireless networks', { exact: true })).toBeVisible()
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await drawer.getByRole('button', { name: 'Next', exact: true }).click()
+    await drawer.getByRole('button', { name: 'Office 26', exact: true }).click()
+    await expect(drawer).toContainText('Headquarters')
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await page.reload()
+    await expect(drawer.getByRole('heading', { name: 'Office 26', exact: true })).toBeVisible()
+    await drawer.getByRole('link', { name: 'Open in full page' }).click()
+    await expect(page).toHaveURL(/record=network-2/)
+    await expect(page).toHaveURL(/wireless=wifi-26/)
+    await expect(page.getByRole('heading', { name: 'Office 26', exact: true })).toBeVisible()
+    await page.goBack()
+    await expect(drawer).toBeVisible()
+    await drawer.getByRole('button', { name: 'Back to wireless networks' }).click()
+    await expect(drawer.getByRole('button', { name: 'Office 26', exact: true })).toBeFocused()
+    await drawer.getByRole('searchbox', { name: 'Search wireless networks' }).fill('Office 31')
+    await drawer.locator('.collection-search').getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(drawer.getByRole('button', { name: 'Office 31', exact: true })).toBeVisible()
+    await expect(page).not.toHaveURL(/wireless_page=2/)
+  })
+}
+
+test('Wireless columns persist, filters clear, and failed edits retain values', async ({ page }) => {
+  await wirelessFixtures(page, true)
+  await page.goto('/networks?preview=network-2&section=wireless&wireless_status=disabled')
+  const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+  await expect(drawer.getByText('1 wireless networks', { exact: true })).toBeVisible()
+  await drawer.getByRole('button', { name: 'Status: Disabled ×', exact: true }).click()
+  await expect(drawer.getByText('31 wireless networks', { exact: true })).toBeVisible()
+  await drawer.getByRole('button', { name: 'Columns', exact: true }).click()
+  await drawer.getByRole('checkbox', { name: 'Purpose', exact: true }).uncheck()
+  await drawer.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(drawer.getByRole('columnheader', { name: 'Purpose' })).toHaveCount(0)
+  await page.reload()
+  await expect(drawer.getByText('31 wireless networks', { exact: true })).toBeVisible()
+  await expect(drawer.getByRole('columnheader', { name: 'Purpose' })).toHaveCount(0)
+  await drawer.getByRole('button', { name: 'Office 01', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Edit wireless network', exact: true }).click()
+  await drawer.getByRole('textbox', { name: 'SSID', exact: true }).fill('Unsaved SSID')
+  await drawer.getByRole('button', { name: 'Save wireless network', exact: true }).click()
+  await expect(drawer.getByRole('alert')).toContainText('Your entries have been kept')
+  await page.mouse.click(10, 100)
+  await page.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(drawer.getByRole('textbox', { name: 'SSID', exact: true })).toHaveValue('Unsaved SSID')
+  await drawer.getByRole('link', { name: 'Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Discard changes' }).click()
+  await expect(drawer).toContainText('10.55.1.1–10.55.1.254')
+})
+
+test('Wireless editing supports touch, short screens and zoom', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 600 }, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    await wirelessFixtures(page)
+    await page.goto('/networks?preview=network-2&section=wireless&wireless=wifi-1')
+    const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+    await drawer.getByRole('button', { name: 'Edit wireless network', exact: true }).tap()
+    await drawer.getByRole('combobox', { name: 'Status', exact: true }).selectOption('disabled')
+    await drawer.getByRole('button', { name: 'Save wireless network', exact: true }).tap()
+    await expect(drawer.getByRole('button', { name: 'Edit wireless network', exact: true })).toBeVisible()
+    await page.reload()
+    await expect(drawer.locator('dd').filter({ hasText: /^Disabled$/ })).toBeVisible()
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/wireless-mobile-${test.info().project.name}.png` })
+    await page.setViewportSize({ width: 1280, height: 500 })
+    await page.evaluate(() => { document.documentElement.style.zoom = '2' })
+    await drawer.getByRole('button', { name: 'Edit wireless network', exact: true }).click()
+    await expect(drawer.getByRole('button', { name: 'Save wireless network', exact: true })).toBeVisible()
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } finally { await context.close() }
+})

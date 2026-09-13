@@ -12610,6 +12610,31 @@ paths:
       operationId: workspaces_msp_networks_wireless_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - status
+          - -status
+          - purpose
+          - -purpose
+          - security
+          - -security
+          type: string
+          x-spec-enum-id: db68728c9c859605
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `status` - status
+          * `-status` - -status
+          * `purpose` - purpose
+          * `-purpose` - -purpose
+          * `security` - security
+          * `-security` - -security
+      - in: query
         name: page
         schema:
           type: integer
@@ -12623,6 +12648,38 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - disabled
+          - retired
+          type: string
+          x-spec-enum-id: 679e33115e1844e2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `disabled` - disabled
+          * `retired` - retired
+      - in: query
+        name: subnet_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -12633,7 +12690,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/WirelessCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -24929,6 +24986,31 @@ paths:
     get:
       operationId: workspaces_organizations_networks_wireless_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - status
+          - -status
+          - purpose
+          - -purpose
+          - security
+          - -security
+          type: string
+          x-spec-enum-id: db68728c9c859605
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `status` - status
+          * `-status` - -status
+          * `purpose` - purpose
+          * `-purpose` - -purpose
+          * `security` - security
+          * `-security` - -security
       - in: path
         name: organization_entity_id
         schema:
@@ -24949,6 +25031,38 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - disabled
+          - retired
+          type: string
+          x-spec-enum-id: 679e33115e1844e2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `disabled` - disabled
+          * `retired` - retired
+      - in: query
+        name: subnet_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24959,7 +25073,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/WirelessCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -43084,7 +43198,6 @@ components:
           type: string
       required:
       - client_isolation
-      - description
       - hidden
       - id
       - purpose
@@ -43098,6 +43211,30 @@ components:
       - vlan_id
       - vlan_name
       - vlan_number
+    WirelessCollection:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Wireless'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     WirelessWrite:
       type: object
       properties:

@@ -73,3 +73,6 @@ these other surfaces are complete. Detailed gate results follow in progress.md.
 The [Addresses section](network-addresses.md) now brings the IP-address collection
 and focused editing into the supported parent drawer/page. Other advanced network
 objects remain pending; see that record for query compatibility and evidence.
+
+The [Wireless section](network-wireless.md) adds parent-associated SSIDs using the
+shared child collection. Workspace-wide/unassigned wireless discovery remains open.

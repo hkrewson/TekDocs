@@ -57,3 +57,7 @@
 
 .collection-table input[type="checkbox"] { width: 1.5rem; height: 1.5rem; margin: 0; }
 @media (max-width: 767px) { .collection-name { min-height: 2.75rem; } }
+
+.asset-quick-assignment fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: .75rem; min-width: 0; }
+.asset-quick-assignment label { display: grid; gap: .25rem; min-width: 0; }
+.asset-quick-assignment select { width: 100%; min-width: 0; }

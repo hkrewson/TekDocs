@@ -6,7 +6,7 @@ Scope: #79, with shared foundation work under #78/#87/#88. Required pre-1.0 unde
 
 The collection is a balanced table with curated name, model/type, status, assignment, site and warranty columns. Below 768 CSS pixels, rows become labeled compact records. Identity remains visible; a column chooser saves personal choices through the existing preferences API. Reset restores curated columns and default page size. Search/filter/order/paging use the existing additive summary API across the authorized collection, with 25/50/100 rows. Bulk selection clears when collection context changes and remains limited to the loaded page; existing server validation remains authoritative.
 
-Names open a native modal preview, a right overlay on larger screens and full screen below 768px. The background is locked; only the drawer body scrolls. The preview shows identity, serial/tag, status, assignment, location and warranty, and allows ordinary hardware status changes. Disposal is excluded from this action. Long names have a short heading and explicit Full name disclosure. Separate full-record links support new tabs and bookmarks.
+Names open a native modal preview, a right overlay on larger screens and full screen below 768px. The background is locked; only the drawer body scrolls. The preview shows identity, serial/tag, status, assignment, location and warranty, and allows ordinary hardware status changes or a focused assignment action. Disposal is excluded from this action. Long names have a short heading and explicit Full name disclosure. Separate full-record links support new tabs and bookmarks.
 
 The full record owns lifecycle information; no record panel remains below the collection. Overview retains urgent warranty/disposal warnings. Specifications retains the existing Markdown reader and published product documents. Network owns hardware addresses; Installation owns the software editor. Related is permission-filtered and opens the optional graph on demand. Hardware history is fetched only when History opens. Existing lifecycle, assignment, installation, address, relationship, CSV and bulk business workflows remain in use. Related editing now registers with shared dirty/busy navigation protection.
 
@@ -38,9 +38,20 @@ Final gate results are recorded in [progress.md](progress.md). Screenshots and l
 ## Remaining before Assets / foundation closure
 
 - Extract reusable record header/section navigation through Contracts/Networks; those controls currently live in AssetRecord. Validate cost permissions, child records and richer connected-data layouts before wider rollout.
-- Preview assignment remains in the focused full-record workflow. Add a bounded preview assignment action with equivalent denial/dirty-state coverage. Site filtering accepts direct URL/API values, but a curated site picker remains to be designed and integrated.
+- Site filtering accepts direct URL/API values, but a curated site picker remains to be designed and integrated. Preview assignment is implemented; see the checkpoint below.
 - Software History currently explains that no history is available; do not invent history from installation fields. Establish the required software audit presentation against supported history data.
 - Expand tracked nested route/state coverage, stale/conflict and permission-transition scenarios, native browser zoom/screen-reader/mobile-keyboard walkthroughs and technician validation (#39).
 - Full production-image, supported recovery/upgrade and applicable release acceptance remain open. Specialized document tables, code, graph/canvas and artifact viewers retain necessary isolated scrolling and need their own inventory/acceptance in later phases.
 
 No version bump, deployment, push or Wiki publication is part of this checkpoint.
+
+
+## Preview assignment checkpoint — 0.8.46
+
+The drawer now offers Assign hardware for manageable, non-disposed hardware. It replaces the status form while open, using the same authorized assignment choices and mutation endpoint as the full record. Switching from a dirty status action requires Keep editing or Discard changes. No nested drawer or extra record tabs are introduced.
+
+The assignment form explicitly explains that saving replaces the existing person, site and location. At least one target is required. Selecting a location selects its owning site; changing sites clears an incompatible location. Empty selections become null values in the existing API payload. The server still validates workspace ownership, target availability and disposal state. Choices load only when the action opens, with a retry for failed reads. Late reads from closed forms are ignored. This slice reuses the existing choice response; it does not add bounded choice-search endpoints.
+
+Failed writes retain all choices, including permission denial, conflict and failed-request cases, without automatically retrying. Cancel, drawer close and full-record navigation use the shared guard. Only one preview action is editable at a time. The returned hardware profile becomes authoritative, including the server's in-stock-to-in-service transition after assignment, so a completed assignment does not leave a spurious dirty status form.
+
+Verification is recorded in progress.md. Component coverage includes three failed-write outcomes, canceled navigation, explicit discard, failed choice-read retry, site/location consistency and server lifecycle reconciliation. Browser coverage exercises assignment at all six maintained widths across three engines, accessibility scans, canceled close and focus restoration. The live journey now assigns hardware through the preview and verifies the resulting person/site/location in the full record and PostgreSQL. No schema, API contract, version or production deployment changes are required.

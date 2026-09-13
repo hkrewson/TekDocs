@@ -11,7 +11,7 @@ The Assets summary collection and typed browser API client are implemented under
 | Phase | Status | Outstanding completion boundary |
 |---|---|---|
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
-| 2 — Assets | In progress | Visible layout replaced; preview assignment, site picker, expanded state/technician/release acceptance remain |
+| 2 — Assets | In progress | Visible layout and preview assignment implemented; site picker, expanded state/technician/release acceptance remain |
 | 3 — Contracts/Networks | Pending | All planned migrations and shared-pattern validation |
 | 4 — Operational records | Pending | All planned migrations |
 | 5 — Documentation/files | Pending | All planned migrations |
@@ -68,3 +68,21 @@ Reproductions retained in source: preference reset previously opened an unintend
 Evidence logs (ephemeral): `/tmp/tekdocs-assets-layout-check3.log`, `/tmp/tekdocs-assets-layout-browser6.log`, `/tmp/tekdocs-assets-layout-live3.log`, `/tmp/tekdocs-assets-filter-repeat.log` and `/tmp/tekdocs-assets-layout-final-lint.log`. Durable assertions are linked from the implementation record.
 
 **Remaining, not blocked:** preview assignment, site chooser, software history presentation, reusable record header/sections, expanded stale/conflict/permission-state acceptance, manual native zoom/screen-reader/mobile-keyboard and technician walkthroughs, followed by applicable production/recovery/release gates. CSS zoom does not substitute for native browser zoom acceptance. Other surfaces remain pending. No phase/epic closure is claimed. Version remains 0.8.46; no push, deployment or Wiki publication. The sibling Wiki has a scoped local checkpoint alongside preserved earlier edits.
+
+## Preview assignment implementation — 2026-09-12
+
+Implemented under #79: a focused Assign hardware action inside the existing preview, using the established assignment choices and write endpoint. Status and assignment editors are mutually exclusive. Choice loading can be retried; failed mutations retain selected person/site/location without automatic retry. Site changes clear incompatible locations, and selecting a location supplies its owning site. Server-returned lifecycle state is accepted after save, including automatic in-stock-to-in-service transitions.
+
+Durable coverage: `Assets.test.tsx` adds denial/conflict/request-failure retention, canceled navigation/discard, failed choice-read retry, site/location consistency and server lifecycle reconciliation. `asset-layout.spec.ts` adds six responsive assignment scenarios per browser with accessibility scans and focus restoration. `live-workspace.spec.ts` now performs assignment in the preview and verifies the result in the full record; its independent database assertions are retained.
+
+During verification, the new browser scenario reproduced exact-label lookup failures for implicit select labels containing options; selectors now have explicit accessible labels, while the named-dialog and exact-label assertions remain. An initial production build failed on unsupported Testing Library `exact` options in new tests; string role names already match exactly, and correcting the test options restores type checking. No production logic or permission assertion was removed to pass either check.
+
+This remains required pre-1.0, at 0.8.46. Site picker, software history, reusable record header/sections, expanded stale/permission-state acceptance, technician/native zoom/screen-reader validation and later surface migrations remain open. No external blocker is known. No schema or API contract changes, migration, push, deployment or publication are part of this slice.
+
+The live assignment rehearsal also reproduced an ambiguous broad Site lookup matching the collection sort selector behind the drawer. Its assignment fields now use exact labels scoped to the named preview; save/full-record/database verification remains unchanged.
+
+The full component gate reproduced an existing MAC-editor timing assumption: its heading arrived before the separate collection permission metadata, so an immediate Add address lookup failed. The test now awaits that authorized control, preserving its mutation and rendered-address assertions. No authorization was bypassed.
+
+Verified runtime and browser evidence: the final focused browser matrix passes 78 tests across Chromium, Firefox and WebKit; the final `make test-e2e-live` passes the isolated Django/PostgreSQL journey and independent database fixture verification. The final live-test lint passes. Logs: `/tmp/tekdocs-preview-assignment-browser2.log`, `/tmp/tekdocs-preview-assignment-live3.log`, `/tmp/tekdocs-preview-assignment-live-lint.log`. Earlier focused component checks passed 21 Assets tests. These logs are ephemeral; source assertions are the durable evidence.
+
+Final project gate: `make check` passes, including 473 frontend tests across 99 files, lint/typecheck, API/schema/generated-type drift, production build and unchanged bundle budgets. Evidence: `/tmp/tekdocs-preview-assignment-check3.log`. Wiki/product contracts and diff checks pass. This checkpoint is implemented and verified within its stated scope; Phase 1/2 and the overall layout epic remain open.

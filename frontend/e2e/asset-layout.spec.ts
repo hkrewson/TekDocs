@@ -37,6 +37,14 @@ async function fixtures(page: Page) {
     Object.assign(asset.hardware, route.request().postDataJSON() as object)
     return route.fulfill({ json: asset.hardware })
   })
+  await page.route('**/assets/*/hardware/assignment-choices', (route) => route.fulfill({ json: {
+    people: [{ id: 'person-2', name: 'Morgan' }], sites: [{ id: 'site-2', name: 'Branch' }], locations: [{ id: 'location-2', name: 'Office', site_id: 'site-2' }],
+  } }))
+  await page.route('**/assets/*/hardware/assignment', (route) => {
+    const asset = assets.find((item) => route.request().url().includes(`/${item.id}/hardware`))!
+    Object.assign(asset.hardware.assignment, route.request().postDataJSON(), { person_name: 'Morgan', site_name: 'Branch', location_name: 'Office' })
+    return route.fulfill({ json: asset.hardware })
+  })
   return assets
 }
 
@@ -180,3 +188,30 @@ test('touch preview and 200 percent CSS zoom retain usable actions', async ({ br
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   } finally { await context.close() }
 })
+
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`preview assignment fits ${width}px and preserves choices through canceled close`, async ({ page }) => {
+    await fixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/assets')
+    await page.getByRole('button', { name: 'Asset 002', exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'Asset 002' })
+    await drawer.getByRole('button', { name: 'Assign hardware' }).click()
+    await drawer.getByLabel('Person', { exact: true }).selectOption('person-2')
+    await drawer.getByLabel('Location', { exact: true }).selectOption('location-2')
+    await expect(drawer.getByLabel('Site', { exact: true })).toHaveValue('site-2')
+    await drawer.getByRole('button', { name: 'Close', exact: true }).click()
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(drawer.getByLabel('Location', { exact: true })).toHaveValue('location-2')
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    const accessibility = await new AxeBuilder({ page }).include('.collection-drawer').analyze()
+    expect(accessibility.violations).toEqual([])
+    await drawer.getByRole('button', { name: 'Save assignment' }).click()
+    await expect(drawer.getByLabel('Change status')).toBeVisible()
+    await expect(drawer.getByRole('definition').filter({ hasText: 'Morgan' })).toBeVisible()
+    await drawer.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(drawer).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Asset 002', exact: true })).toBeFocused()
+  })
+}

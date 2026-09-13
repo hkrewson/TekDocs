@@ -149,7 +149,8 @@ describe('Assets', () => {
     render(<Assets workspace={workspace} client={inventoryClient()} />)
     await user.click(await screen.findByRole('button', { name: 'Edit details' }))
     await user.click(screen.getByRole('link', { name: 'Network' }))
-    await user.click(screen.getByRole('button', { name: 'Add address' }))
+    // Record details can arrive before the collection's authorization metadata.
+    await user.click(await screen.findByRole('button', { name: 'Add address' }))
     expect(screen.queryByLabelText('Serial number')).not.toBeInTheDocument()
     expect(screen.getByLabelText('MAC address')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -230,7 +231,8 @@ describe('Assets', () => {
     const user = userEvent.setup()
     render(<Assets workspace={workspace} client={inventoryClient({ createAssetMACAddress })} />, '/assets?record=asset-1&section=network')
     expect(await screen.findByRole('heading', { name: 'MAC addresses' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Add address' }))
+    // Record details can arrive before the collection's authorization metadata.
+    await user.click(await screen.findByRole('button', { name: 'Add address' }))
     await user.type(screen.getByLabelText('MAC address'), created.address)
     await user.type(screen.getByLabelText('Description'), created.description)
     await user.click(screen.getByRole('button', { name: 'Save address' }))
@@ -352,5 +354,63 @@ describe('Assets', () => {
     await user.click(screen.getByRole('button', { name: 'Save installation' }))
     await waitFor(() => expect(updateSoftwareInstallation).toHaveBeenCalledWith(workspace, 'software-asset-1', expect.objectContaining({ status: 'installed', installed_version: '7.4.1', installed_on: '2026-08-10' })))
     expect(await screen.findByText('7.4.1')).toBeInTheDocument()
+  })
+})
+
+
+describe('preview assignment', () => {
+  const choices = { people: [{ id: 'person-1', name: 'Morgan' }], sites: [{ id: 'site-1', name: 'Main' }, { id: 'site-2', name: 'Branch' }], locations: [{ id: 'location-1', name: 'Office', site_id: 'site-1' }] }
+
+  it.each(['permission denied', 'conflict', 'request failed'])('retains assignment choices after %s and guards leaving', async (reason) => {
+    const assignHardware = vi.fn().mockRejectedValue(new Error(reason))
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ assignmentChoices: vi.fn().mockResolvedValue(choices), assignHardware })} />, '/assets?preview=asset-1')
+    await user.click(await screen.findByRole('button', { name: 'Assign hardware' }))
+    await user.selectOptions(await screen.findByLabelText('Person'), 'person-1')
+    await user.selectOptions(screen.getByLabelText('Location'), 'location-1')
+    expect(screen.getByLabelText('Site')).toHaveValue('site-1')
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your choices have been kept')
+    expect(assignHardware).toHaveBeenCalledExactlyOnceWith(workspace, 'asset-1', { person_id: 'person-1', site_id: 'site-1', location_id: 'location-1' })
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByLabelText('Person')).toHaveValue('person-1')
+    expect(screen.getByLabelText('Location')).toHaveValue('location-1')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    expect(screen.queryByLabelText('Person')).not.toBeInTheDocument()
+    expect(assignHardware).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries choice loading and clears incompatible locations on site changes', async () => {
+    const assignmentChoices = vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue(choices)
+    const user = userEvent.setup()
+    render(<Assets workspace={workspace} client={inventoryClient({ assignmentChoices })} />, '/assets?preview=asset-1')
+    await user.click(await screen.findByRole('button', { name: 'Assign hardware' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Assignment choices could not be loaded')
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.selectOptions(await screen.findByLabelText('Location'), 'location-1')
+    await user.selectOptions(screen.getByLabelText('Site'), 'site-2')
+    expect(screen.getByLabelText('Location')).toHaveValue('')
+    expect(within(screen.getByLabelText('Location')).queryByRole('option', { name: 'Office' })).not.toBeInTheDocument()
+  })
+
+  it('guards switching from a dirty status and accepts the server lifecycle after assignment', async () => {
+    const assignHardware = vi.fn().mockResolvedValue({ ...asset.hardware!, lifecycle_state: 'in_service', assignment: { ...asset.hardware!.assignment, person_id: 'person-1', person_name: 'Morgan' } })
+    const user = userEvent.setup()
+    const stock = { ...asset, hardware: { ...asset.hardware!, lifecycle_state: 'in_stock' as const } }
+    const client = inventoryClient({ assignmentChoices: vi.fn().mockResolvedValue(choices), assignHardware, listAssets: vi.fn().mockResolvedValue({ results: [stock], can_manage: true }) })
+    render(<Assets workspace={workspace} client={client} />, '/assets?preview=asset-1')
+    await user.selectOptions(await screen.findByLabelText('Change status'), 'repair')
+    await user.click(screen.getByRole('button', { name: 'Assign hardware' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByLabelText('Change status')).toHaveValue('repair')
+    await user.click(screen.getByRole('button', { name: 'Assign hardware' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await user.selectOptions(await screen.findByLabelText('Person'), 'person-1')
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+    expect(await screen.findByLabelText('Change status')).toHaveValue('in_service')
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

@@ -116,7 +116,12 @@
       "unavailable direct record",
       "filtered departure",
       "touch",
-      "CSS zoom stress"
+      "CSS zoom stress",
+      "preview assignment",
+      "assignment choices failed",
+      "assignment denied/conflict/failed request",
+      "assignment canceled navigation",
+      "assignment site/location consistency"
     ],
     "status": "implemented reference layout; see assets-layout.md for remaining acceptance",
     "evidence": [

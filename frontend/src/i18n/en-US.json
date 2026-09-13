@@ -2177,5 +2177,13 @@
   "collections.saveStatus": "Save status",
   "collections.statusFailed": "The status could not be saved. Your selection is still here.",
   "collections.publishedDocument": "{category} · published {date}",
-  "collections.fullName": "Full name"
+  "collections.fullName": "Full name",
+  "collections.assignHardware": "Assign hardware",
+  "collections.assignmentHelp": "Choose the new assignment. Saving replaces the current person, site, and location.",
+  "collections.assignmentLoading": "Loading assignment choices…",
+  "collections.assignmentLoadFailed": "Assignment choices could not be loaded.",
+  "collections.assignmentFailed": "The assignment could not be saved. Your choices have been kept.",
+  "collections.saveAssignment": "Save assignment",
+  "collections.noAssignmentChoice": "None",
+  "collections.person": "Person"
 }

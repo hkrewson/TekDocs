@@ -2126,6 +2126,7 @@
   "collections.searchAction": "Search",
   "collections.ordering": "Sort by",
   "collections.openRecord": "Open record",
+  "collections.openFullPage": "Open in full page",
   "collections.preview": "Asset preview",
   "collections.return": "Back to assets",
   "collections.sections": "Sections",

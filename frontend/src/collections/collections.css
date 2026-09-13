@@ -16,11 +16,11 @@
 .collection-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; font: inherit; font-weight: 600; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; overflow-wrap: anywhere; }
 .collection-record-link { display: inline-block; margin-block-start: .4rem; font-size: .875rem; }
 .collection-cell-label, .collection-mobile-order { display: none; }
-.collection-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(32rem, 100%); height: auto; max-width: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); overflow: hidden; }
+.collection-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(64rem, 90%); height: auto; max-width: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); overflow: hidden; }
 .collection-drawer[open] { display: flex; flex-direction: column; }
 .collection-drawer::backdrop { background: rgb(0 0 0 / 35%); }
-.collection-drawer header { display: flex; align-items: flex-start; gap: 1rem; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--border); }
-.collection-drawer h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 1.25rem; margin: 0; overflow-wrap: anywhere; }
+.collection-drawer > header { display: flex; align-items: flex-start; gap: 1rem; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--border); }
+.collection-drawer > header h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 1.25rem; margin: 0; overflow-wrap: anywhere; }
 .collection-drawer-body { padding: 1rem; overflow: auto; min-height: 0; overscroll-behavior: contain; overflow-wrap: anywhere; }
 .record-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); gap: .75rem 1.5rem; }
 .record-facts dt { font-size: .875rem; color: var(--muted); }
@@ -31,7 +31,11 @@
 .record-sections a { padding-block: .65rem; color: inherit; }
 .record-sections a[aria-current] { font-weight: 600; border-bottom: 2px solid currentColor; }
 .record-sections-mobile { display: none; }
-.asset-record .inventory-provenance { border: 0; padding: 0; }
+.asset-record .inventory-provenance { border: 0; padding: 0; background: none; gap: 1rem; }
+.asset-record .inventory-provenance dt { font-size: .875rem; text-transform: none; letter-spacing: normal; }
+.asset-record .inventory-provenance dd, .asset-record .hardware-form label { font-size: 1rem; }
+.asset-record .hardware-lifecycle > .section-heading { margin: 0; }
+.asset-record .hardware-lifecycle h3 { margin-block: .5rem; }
 .asset-record .inventory-documents { margin-block-start: 1rem; }
 .asset-record .lifecycle-history { margin-block-start: 1rem; }
 .asset-record .hardware-lifecycle > .section-heading > div > p { display: none; }
@@ -52,15 +56,13 @@
   .record-sections-mobile select { min-width: 0; }
 }
 
-.asset-quick-status { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-block: 1rem; }
-.asset-quick-status label { display: grid; gap: .25rem; }
 
 .collection-table input[type="checkbox"] { width: 1.5rem; height: 1.5rem; margin: 0; }
 @media (max-width: 767px) { .collection-name { min-height: 2.75rem; } }
 
-.asset-quick-assignment fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: .75rem; min-width: 0; }
-.asset-quick-assignment label { display: grid; gap: .25rem; min-width: 0; }
-.asset-quick-assignment select { width: 100%; min-width: 0; }
+.hardware-assignment fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: .75rem; min-width: 0; }
+.hardware-assignment label { display: grid; gap: .25rem; min-width: 0; }
+.hardware-assignment select { width: 100%; min-width: 0; }
 
 .asset-site-filter { padding: .5rem; overflow-wrap: anywhere; }
 .asset-site-filter form { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -77,3 +79,5 @@
 }
 
 .collection-active-filters button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+
+.hardware-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }

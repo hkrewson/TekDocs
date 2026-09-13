@@ -6,12 +6,12 @@ Required 1.0 acceptance under #60; coordinates with #40 and #39 and preserves #7
 
 Balanced lists; personal feature-specific column choices in curated order; immutable identity column; 25/50/100 rows, default 25. Whole-collection authorized search/filter/sort with deterministic ties. Current-page bulk selection only; query/order/page changes clear it. Shared filter menu plus active-condition summary. URL-addressed query, preview, record and section state, with list scroll/focus restoration.
 
-Quick right overlay drawer (full-screen below 768px), no nested drawer/tabs, background locked and one scrolling body. Concise operational facts and bounded explicit actions only. Full record tabs: Overview first, active section editor with Save/Cancel; mobile Sections menu. Dirty navigation offers Keep editing/Discard. Preserve failed writes and never blindly retry uncertain mutations. Major actions keep existing review/confirmation workflows. Urgent issues remain on Overview. Existing permission and data-integrity policy remains authoritative.
+Record names open a full record workspace in a right overlay drawer (full-screen below 768px), with background locked and one scrolling body. This explicitly supersedes the original short-preview/no-tabs rule following user validation. Assets implements this revised contract first. Remove the duplicate row-level Open record link; retain an optional Open in full page link within the drawer for bookmarks/new tabs. Drawer and full-page views share record content and section editing; do not open nested record drawers. Record tabs: Overview first, active section editor with Save/Cancel; mobile Sections menu. Dirty navigation offers Keep editing/Discard. Preserve failed writes and never blindly retry uncertain mutations. Major actions keep existing review/confirmation workflows. Urgent issues remain on Overview. Existing permission and data-integrity policy remains authoritative.
 
 ## Delivery
 
 1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API and navigation/edit-protection foundations implemented.
-2. **Assets** — Complete reference layout, operational overview, focused tabs and concise preview. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
+2. **Assets** — Complete reference layout, operational overview, focused sections in a full record drawer and optional full page. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
 3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: pending.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: pending.
@@ -32,6 +32,8 @@ Docker make check plus focused API/component/browser tests per slice. Real backe
 Excluded: named saved views, resizable/reorderable columns, density modes, infinite scrolling and cross-page selection. Existing security/recurring/pilot obligations remain open. User and demo data must be preserved.
 
 ## Implementation records
+
+- [Full asset record drawer](asset-record-drawer.md)
 
 - [Software asset audit history](software-history.md)
 

@@ -6,13 +6,13 @@ Scope: #79, with shared foundation work under #78/#87/#88. Required pre-1.0 unde
 
 The collection is a balanced table with curated name, model/type, status, assignment, site and warranty columns. Below 768 CSS pixels, rows become labeled compact records. Identity remains visible; a column chooser saves personal choices through the existing preferences API. Reset restores curated columns and default page size. Search/filter/order/paging use the existing additive summary API across the authorized collection, with 25/50/100 rows. Bulk selection clears when collection context changes and remains limited to the loaded page; existing server validation remains authoritative.
 
-Names open a native modal preview, a right overlay on larger screens and full screen below 768px. The background is locked; only the drawer body scrolls. The preview shows identity, serial/tag, status, assignment, location and warranty, and allows ordinary hardware status changes or a focused assignment action. Disposal is excluded from this action. Long names have a short heading and explicit Full name disclosure. Separate full-record links support new tabs and bookmarks.
+Names open a native modal full record drawer, a broad right overlay on larger screens and full screen below 768px. The background is locked; only the drawer body scrolls. Overview, Specifications, Network/Installation, authorized Related, and History use the same record components as the optional full page. Editing includes hardware details/status, assignment, and existing focused disposal confirmation. Long names retain an explicit Full name disclosure. The row-level Open record link is removed; Open in full page inside the drawer preserves the section and supports new tabs and bookmarks. This replaces the former short preview; see [asset-record-drawer.md](asset-record-drawer.md).
 
 The full record owns lifecycle information; no record panel remains below the collection. Overview retains urgent warranty/disposal warnings. Specifications retains the existing Markdown reader and published product documents. Network owns hardware addresses; Installation owns the software editor. Related is permission-filtered and opens the optional graph on demand. Hardware history is fetched only when History opens. Existing lifecycle, assignment, installation, address, relationship, CSV and bulk business workflows remain in use. Related editing now registers with shared dirty/busy navigation protection.
 
 ## URLs and loading
 
-Existing collection paths remain unchanged. Query parameters encode `search`, `kind`, `status`, `assigned`, `warranty`, `site`, `ordering`, `page` and `page_size`. A preview adds `preview=<asset-id>`; a record adds `record=<asset-id>` and optional `section=specifications|network|installation|related|history`. Omitted section means Overview. Record and preview are mutually exclusive in generated links. Invalid/unavailable sections display Overview; unavailable record requests show an explicit error rather than selecting a different row.
+Existing collection paths remain unchanged. Query parameters encode `search`, `kind`, `status`, `assigned`, `warranty`, `site`, `ordering`, `page` and `page_size`. A preview adds `preview=<asset-id>`; a full page adds `record=<asset-id>`. Either presentation supports optional `section=specifications|network|installation|related|history`. Omitted section means Overview. Record and preview are mutually exclusive in generated links. Invalid/unavailable sections display Overview; unavailable record requests show an explicit error rather than selecting a different row.
 
 List rendering requests bounded summaries and permission metadata. Selected record details use the existing detail API. That response still includes the selected record's specifications, document references and addresses; this slice does not introduce new tab endpoints. Histories and relationship graph reads are deferred. Legacy public list behavior is unchanged. No domain schema, API contract, generated types or migration changes are needed for this presentation slice.
 
@@ -46,7 +46,9 @@ Final gate results are recorded in [progress.md](progress.md). Screenshots and l
 No version bump, deployment, push or Wiki publication is part of this checkpoint.
 
 
-## Preview assignment checkpoint — 0.8.46
+## Historical preview assignment checkpoint — 0.8.46
+
+Superseded presentation: assignment is now part of shared Overview editing in the full record drawer. The retained validation and mutation behavior below still applies; the former status/assignment-only navigation does not.
 
 The drawer now offers Assign hardware for manageable, non-disposed hardware. It replaces the status form while open, using the same authorized assignment choices and mutation endpoint as the full record. Switching from a dirty status action requires Keep editing or Discard changes. No nested drawer or extra record tabs are introduced.
 

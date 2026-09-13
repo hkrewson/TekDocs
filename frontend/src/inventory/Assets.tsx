@@ -10,8 +10,7 @@ import type { AssetCollectionClient, AssetCollectionQuery, AssetCollectionResult
 import { AssetSiteFilter } from './AssetSiteFilter'
 import { useAssetSiteLabel } from './useAssetSiteLabel'
 import { AssetCsvTransfer } from './AssetCsvTransfer'
-import { AssetQuickStatus } from './AssetQuickStatus'
-import { AssetFacts, AssetRecord } from './AssetRecord'
+import { AssetRecord } from './AssetRecord'
 import { CollectionTable } from '../collections/CollectionTable'
 import { ColumnChooser } from '../collections/ColumnChooser'
 import { QuickDrawer } from '../collections/QuickDrawer'
@@ -34,7 +33,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
 
   const location = useLocation()
   const navigate = useNavigate()
-  const navigationState = location.state as { assetListPosition?: { y: number; focus: string | null }; assetPreview?: boolean } | null
+  const navigationState = location.state as { assetListPosition?: { y: number; focus: string | null } } | null
   const siteLabel = useAssetSiteLabel(workspace, params.get('site') ?? '')
   const recordId = params.get('record')
   const previewId = recordId ? null : params.get('preview')
@@ -73,7 +72,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
   const [selection, setSelection] = useState({ key: '', ids: new Set<string>() })
   const [notice, setNotice] = useState('')
   const changedId = useRef<string | null>(null)
-    const listPosition = useRef<{ y: number; focus: string | null }>({ y: 0, focus: null })
+  const listPosition = useRef<{ y: number; focus: string | null }>({ y: 0, focus: null })
   const wasRecord = useRef(false)
   const pageSize = [25, 50, 100].includes(Number(params.get('page_size'))) ? Number(params.get('page_size')) as 25 | 50 | 100 : preferences?.page_size ?? 25
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1)
@@ -132,8 +131,8 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
   function href(id: string | null, section = 'overview', preview = false) {
     const next = new URLSearchParams(params)
     next.delete('record'); next.delete('preview'); next.delete('section')
-    if (id !== params.get('record')) next.delete('history_page')
-    if (id) { next.set(preview ? 'preview' : 'record', id); if (!preview && section !== 'overview') next.set('section', section) }
+    if (id !== activeId) next.delete('history_page')
+    if (id) { next.set(preview ? 'preview' : 'record', id); if (section !== 'overview') next.set('section', section) }
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }
   function remember(id: string) { listPosition.current = { y: window.scrollY, focus: `asset-name-${id}` } }
@@ -141,7 +140,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
     event.preventDefault()
     const position = navigationState?.assetListPosition ?? listPosition.current
-    void navigate(href(id), { state: { assetListPosition: position } })
+    void navigate(href(id, params.get('section') ?? 'overview'), { state: { assetListPosition: position } })
   }
   function browse(values: Record<string, string | null>) {
     const next = new URLSearchParams(params)
@@ -203,12 +202,12 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
       {phase === 'error' && <p role="alert">{translate('assets.loadFailed', { workspace: ownerLabel })} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p>}
       {listReady && <>
         <p>{translate('collections.count', { count: result.count })}</p>
-        {result.results.length === 0 ? <p>{translate('collections.empty')}</p> : <CollectionTable<AssetCollectionResult['results'][number]> label={translate('assets.heading')} rows={result.results} selectable={canManage} selected={selectedIds} onSelection={setSelectedIds} ordering={query.ordering} onOrder={(ordering) => browse({ ordering })} columns={(preferences?.columns ?? assetColumns).map((column) => ({ id: column, label: labels[column], render: (row) => column === 'name' ? <><button id={`asset-name-${row.id}`} type="button" className="collection-name" onClick={() => { remember(row.id); setDetailError(null); void navigate(href(row.id, 'overview', true), { state: { assetListPosition: listPosition.current, assetPreview: true } }) }}>{row.name}</button><Link className="collection-record-link" to={href(row.id)} onClick={(event) => { remember(row.id); openRecord(event, row.id) }}>{translate('collections.openRecord')}</Link></> : column === 'model' ? `${row.model_name} · ${row.kind}` : column === 'warranty' ? row.warranty_ends_on || translate('collections.missing') : (row[column as 'status' | 'assignment' | 'site'] || translate('collections.missing')).replaceAll('_', ' ') }))} />}
+        {result.results.length === 0 ? <p>{translate('collections.empty')}</p> : <CollectionTable<AssetCollectionResult['results'][number]> label={translate('assets.heading')} rows={result.results} selectable={canManage} selected={selectedIds} onSelection={setSelectedIds} ordering={query.ordering} onOrder={(ordering) => browse({ ordering })} columns={(preferences?.columns ?? assetColumns).map((column) => ({ id: column, label: labels[column], render: (row) => column === 'name' ? <><button id={`asset-name-${row.id}`} type="button" className="collection-name" onClick={() => { remember(row.id); setDetailError(null); void navigate(href(row.id, 'overview', true), { state: { assetListPosition: listPosition.current } }) }}>{row.name}</button></> : column === 'model' ? `${row.model_name} · ${row.kind}` : column === 'warranty' ? row.warranty_ends_on || translate('collections.missing') : (row[column as 'status' | 'assignment' | 'site'] || translate('collections.missing')).replaceAll('_', ' ') }))} />}
         <CollectionPagination label={translate('assets.heading')} page={page} pageSize={pageSize} count={result.count} hasMore={result.has_more} onPageChange={(next) => browse({ page: String(next) })} />
       </>}
     </>}
-    {previewId && <QuickDrawer returnFocusId="assets-collection-heading" title={current?.name ?? translate('collections.preview')} onClose={() => { if (navigationState?.assetPreview) void navigate(-1); else void navigate(href(null), { replace: true, state: navigationState }) }}>
-      {current ? <><p>{current.model_name} · {current.kind}</p><AssetFacts asset={current} />{canManage && <AssetQuickStatus key={current.id} asset={current} workspace={workspace} client={client} onChange={update} />}<p>{translate('collections.quickHelp')}</p><Link className="secondary-button" to={href(previewId)} onClick={(event) => openRecord(event, previewId)}>{translate('collections.openRecord')}</Link></> : detailError === `${workspace.id}:${activeId}` ? <p role="alert">{translate('collections.recordUnavailable')}</p> : <p role="status">{translate('collections.loading')}</p>}
+    {previewId && <QuickDrawer returnFocusId="assets-collection-heading" title={current?.name ?? translate('collections.preview')} onClose={() => { void navigate(href(null), { replace: true, state: { assetListPosition: navigationState?.assetListPosition ?? listPosition.current } }) }}>
+      {current ? <><Link className="collection-record-link" to={href(previewId, params.get('section') ?? 'overview')} onClick={(event) => openRecord(event, previewId)}>{translate('collections.openFullPage')}</Link><AssetRecord embedded key={current.id} asset={current} workspace={workspace} client={client} canManage={canManage} access={relationshipAccess} section={params.get('section') ?? 'overview'} href={(section) => href(previewId, section, true)} onChange={update} /></> : detailError === `${workspace.id}:${activeId}` ? <p role="alert">{translate('collections.recordUnavailable')}</p> : <p role="status">{translate('collections.loading')}</p>}
     </QuickDrawer>}
   </>
 }

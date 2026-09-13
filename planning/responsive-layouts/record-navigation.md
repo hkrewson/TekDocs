@@ -6,6 +6,7 @@ Scope: #78/#79 under #77, coordinated with #40. Extract the header and section c
 
 `frontend/src/records/RecordNavigation.tsx` exports `RecordHeader`, `RecordSections`, and the `RecordSection` type. Assets is the production consumer; there is no demonstration route or second competing implementation.
 
+- A drawer supplies its own named dialog heading and initial Close focus, so an embedded AssetRecord omits the duplicate RecordHeader. It still uses RecordSections and the same guarded section content. See [asset-record-drawer.md](asset-record-drawer.md).
 - The header takes a stable record identity, current section, title, and optional description. It focuses its heading when the record or section changes, without scrolling the page. Draft updates do not repeatedly steal focus.
 - Section entries contain a stable identifier, translated label, and complete destination URL. Consumers supply only authorized entries and resolve an unknown or unavailable section to Overview before rendering. The component does not infer permissions, construct domain routes, or fetch content.
 - Desktop section controls are ordinary links with `aria-current="page"`, retaining copy-link, bookmark, and new-tab behavior. Below 768 CSS pixels, the same destinations are available through the labeled Sections selector.

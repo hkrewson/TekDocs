@@ -102,14 +102,17 @@
     ]
   },
   {
-    "surface": "Assets collection, preview and full record",
+    "surface": "Assets collection, full record drawer and full page",
     "source": "frontend/src/inventory/Assets.tsx",
     "entry": "Assets collection routes with preview, record and section query parameters",
     "states": [
       "summary collection",
       "column chooser",
       "page selection",
-      "quick preview",
+      "full record drawer",
+      "drawer sections and refresh",
+      "close after section changes",
+      "guarded drawer sections and full-page transition",
       "failed status save",
       "dirty close",
       "record sections",
@@ -117,7 +120,7 @@
       "filtered departure",
       "touch",
       "CSS zoom stress",
-      "preview assignment",
+      "drawer assignment",
       "assignment choices failed",
       "assignment denied/conflict/failed request",
       "assignment canceled navigation",

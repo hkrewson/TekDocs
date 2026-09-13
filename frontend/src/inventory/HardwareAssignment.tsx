@@ -4,7 +4,7 @@ import { useUnsavedChanges } from '../navigation/navigationGuard'
 import type { ClientAsset, HardwareAssignmentChoices, InventoryClient } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
 
-export function AssetQuickAssignment({ asset, workspace, client, onChange, onCancel }: {
+export function HardwareAssignment({ asset, workspace, client, onChange, onCancel }: {
   asset: ClientAsset; workspace: WorkspaceContext; client: InventoryClient
   onChange: (asset: ClientAsset) => void; onCancel: () => void
 }) {
@@ -32,7 +32,7 @@ export function AssetQuickAssignment({ asset, workspace, client, onChange, onCan
     } catch { setError(true) }
     finally { setBusy(false) }
   }
-  return <form className="asset-quick-assignment" aria-label={translate('collections.assignHardware')} onSubmit={(event) => { event.preventDefault(); void save() }}>
+  return <form className="hardware-assignment" aria-label={translate('collections.assignHardware')} onSubmit={(event) => { event.preventDefault(); void save() }}>
     <h3>{translate('collections.assignHardware')}</h3>
     <p>{translate('collections.assignmentHelp')}</p>
     {!choices && !loadFailed && <p role="status">{translate('collections.assignmentLoading')}</p>}

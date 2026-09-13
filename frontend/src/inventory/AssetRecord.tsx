@@ -23,8 +23,8 @@ export function AssetFacts({ asset }: { asset: ClientAsset }) {
   return <dl className="record-facts">{fields.filter(([key]) => asset.kind === 'hardware' || ['status', 'site'].includes(key ?? '')).map(([key, value]) => <div key={key}><dt>{translate(`collections.${key}`)}</dt><dd>{value || translate('collections.missing')}</dd></div>)}</dl>
 }
 
-export function AssetRecord({ asset, workspace, client, canManage, access, section, href, onChange }: {
-  asset: ClientAsset; workspace: WorkspaceContext; client: InventoryClient; canManage: boolean
+export function AssetRecord({ asset, workspace, client, canManage, access, section, href, onChange, embedded = false }: {
+  embedded?: boolean; asset: ClientAsset; workspace: WorkspaceContext; client: InventoryClient; canManage: boolean
   access: { view: boolean; create: boolean; archive: boolean }; section: string
   href: (section: string) => string; onChange: (asset: ClientAsset) => void
 }) {
@@ -33,7 +33,7 @@ export function AssetRecord({ asset, workspace, client, canManage, access, secti
   const expired = asset.hardware?.warranty_ends_on && asset.hardware.warranty_ends_on < new Date().toISOString().slice(0, 10)
   const [graph, setGraph] = useState(false)
   return <article className="record-page asset-record">
-    <RecordHeader recordId={asset.id} section={current} title={asset.name} description={`${asset.supplier_name} / ${asset.product_name} / ${asset.model_name}`} />
+    {embedded ? <p>{asset.supplier_name} / {asset.product_name} / {asset.model_name}</p> : <RecordHeader recordId={asset.id} section={current} title={asset.name} description={`${asset.supplier_name} / ${asset.product_name} / ${asset.model_name}`} />}
     <RecordSections current={current} sections={tabs.map((tab) => ({ id: tab, label: translate(`collections.${tab}`), href: href(tab) }))} />
     <section aria-label={translate(`collections.${current}`)}>
       {current === 'overview' && <>

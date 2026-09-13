@@ -39,7 +39,7 @@ Final gate results are recorded in [progress.md](progress.md). Screenshots and l
 
 - Shared record header/section navigation is extracted and used by Assets; see [record-navigation.md](record-navigation.md). Validate reuse through Contracts/Networks, including cost permissions, child records and richer connected-data layouts before wider rollout.
 - Site filtering now has a searchable picker; see [asset-site-filter.md](asset-site-filter.md) for its authorized-use boundary and verification. Preview assignment is implemented; see the checkpoint below.
-- Software History currently explains that no history is available; do not invent history from installation fields. Establish the required software audit presentation against supported history data.
+- Software History now presents bounded, record-specific audit events with the existing Activity permission; see [software-history.md](software-history.md). Historical installation-field values are not available and are not inferred.
 - Expand tracked nested route/state coverage, stale/conflict and permission-transition scenarios, native browser zoom/screen-reader/mobile-keyboard walkthroughs and technician validation (#39).
 - Full production-image, supported recovery/upgrade and applicable release acceptance remain open. Specialized document tables, code, graph/canvas and artifact viewers retain necessary isolated scrolling and need their own inventory/acceptance in later phases.
 

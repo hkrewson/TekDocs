@@ -24,4 +24,4 @@ Final results are recorded in progress.md. No API, OpenAPI, model, migration, ow
 
 ## Remaining work
 
-Validate reuse through Contracts (including cost permissions and separate currencies/intervals) and Networks (including parent/child detail navigation). Software audit-history presentation, broader route/state coverage, technician/native zoom/screen-reader/mobile-keyboard walkthroughs, and applicable production/recovery/release gates remain open. This extraction does not make an unmigrated surface complete.
+Validate reuse through Contracts (including cost permissions and separate currencies/intervals) and Networks (including parent/child detail navigation). Software audit history is implemented; see [software-history.md](software-history.md). Broader route/state coverage, technician/native zoom/screen-reader/mobile-keyboard walkthroughs, and applicable production/recovery/release gates remain open. This extraction does not make an unmigrated surface complete.

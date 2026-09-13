@@ -259,3 +259,39 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole('button', { name: 'Asset 002', exact: true })).toBeVisible()
   })
 }
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`software history loads on demand and pages at ${width}px`, async ({ page }) => {
+    const assets = await fixtures(page)
+    await page.route('**/assets/asset-1', (route) => route.fulfill({ json: { ...assets[0], kind: 'software', hardware: null, software_installation: { status: 'installed', installed_version: '7.4.1', site_name: null } } }))
+    const reads: string[] = []
+    await page.route('**/api/v1/activity?*', (route) => {
+      reads.push(route.request().url())
+      const query = new URL(route.request().url()).searchParams
+      expect(query.get('entity_id')).toBe('asset-1')
+      expect(query.get('page_size')).toBe('25')
+      const pageNumber = Number(query.get('page'))
+      return route.fulfill({ json: { results: Array.from({ length: pageNumber === 1 ? 25 : 6 }, (_, index) => ({ id: `event-${pageNumber}-${index}`, action: pageNumber === 1 ? 'asset.software.updated' : 'asset.created_from_catalog', actor_name: `Technician ${'LongName'.repeat(30)}`, occurred_at: '2026-09-12T12:00:00Z' })), count: 31, page: pageNumber, page_size: 25, has_more: pageNumber === 1, actions: [] } })
+    })
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/assets?record=asset-1')
+    await expect(page.getByRole('heading', { name: assets[0].name })).toBeVisible()
+    expect(reads).toHaveLength(0)
+    if (width < 768) await page.getByRole('combobox', { name: 'Sections', exact: true }).selectOption('history')
+    else await page.getByRole('link', { name: 'History', exact: true }).click()
+    await expect(page.getByText('Installation updated', { exact: true })).toHaveCount(25)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect((await new AxeBuilder({ page }).include('.asset-record').analyze()).violations).toEqual([])
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(page).toHaveURL(/history_page=2/)
+    await expect(page.getByText('Created from catalog', { exact: true })).toHaveCount(6)
+    await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeFocused()
+    await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeInViewport()
+    await page.reload()
+    await expect(page.getByText('Created from catalog', { exact: true })).toHaveCount(6)
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    await page.goBack()
+    await expect(page.getByText('Installation updated', { exact: true })).toHaveCount(25)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}

@@ -6,6 +6,7 @@ import type { WorkspaceContext } from '../workspaces/api'
 import { HardwareLifecycle } from './HardwareLifecycle'
 import { HardwareAddresses } from './HardwareAddresses'
 import { SoftwareInstallation } from './SoftwareInstallation'
+import { SoftwareHistory } from './SoftwareHistory'
 import { AssetSpecifications } from './AssetSpecifications'
 import { AssetRelationships } from './AssetRelationships'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
@@ -58,7 +59,7 @@ function AssetHistory({ asset, workspace, client }: { asset: ClientAsset; worksp
     if (asset.hardware) client.listHardwareLifecycle(workspace, asset.id).then((events) => { if (active) { setHistory(events); setError(false) } }).catch(() => { if (active) setError(true) })
     return () => { active = false }
   }, [asset.id, asset.hardware, client, workspace, reload])
-  if (!asset.hardware) return <p>{translate('collections.historySoftware')}</p>
+  if (!asset.hardware) return <SoftwareHistory assetId={asset.id} workspace={workspace} />
   if (error) return <p role="alert">{translate('inventory.historyLoadFailed')} <button type="button" onClick={() => { setError(false); setReload(reload + 1) }}>{translate('inventory.retryHistory')}</button></p>
   if (!history) return <p role="status">{translate('collections.historyLoading')}</p>
   return history.length ? <ol>{history.map((item) => <li key={item.id}><strong>{item.event_type.replaceAll('_', ' ')}</strong> {[item.person_name, item.location_name, item.site_name].filter(Boolean).join(' · ')} <time dateTime={item.occurred_at}>{new Date(item.occurred_at).toLocaleString()}</time></li>)}</ol> : <p>{translate('collections.historyEmpty')}</p>

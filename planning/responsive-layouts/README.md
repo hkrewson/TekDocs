@@ -33,6 +33,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Software asset audit history](software-history.md)
+
 - [Shared record navigation](record-navigation.md)
 
 - [Assets site filtering](asset-site-filter.md)

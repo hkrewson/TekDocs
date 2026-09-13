@@ -12,7 +12,14 @@ from .models import AuditEvent, Entity
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
+class ActivityEntityFilter(serializers.UUIDField):
+    def get_value(self, dictionary: Any) -> Any:
+        # A supplied blank filter must not be treated as an omitted HTML form field.
+        return dictionary.get(self.field_name, serializers.empty)
+
+
 class ActivityQuerySerializer(serializers.Serializer):
+    entity_id = ActivityEntityFilter(required=False)
     q = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
     actor_id = serializers.UUIDField(required=False, allow_null=True, default=None)
     occurred_after = serializers.DateTimeField(required=False, allow_null=True, default=None)
@@ -62,9 +69,9 @@ def _activity(workspace: ResolvedWorkspace, request: Any) -> Response:
     if workspace.organization is None:
         events = events.filter(Q(entity_id__in=entity_ids) | Q(entity_id__isnull=True))
     else:
-        events = events.filter(
-            Q(entity_id__in=entity_ids) | Q(entity_id=workspace.organization.entity_id)
-        )
+        events = events.filter(Q(entity_id__in=entity_ids) | Q(entity_id=workspace.organization.entity_id))
+    if "entity_id" in values:
+        events = events.filter(entity_id=values["entity_id"])
     if values["q"]:
         events = events.filter(action__icontains=values["q"])
     if values["actor_id"]:
@@ -115,13 +122,23 @@ class ActivityListView(APIView):
         return _activity(_workspace(request, organization_entity_id), request)
 
 
-@extend_schema_view(get=extend_schema(operation_id="activity_msp_list", responses={200: ActivityResultSerializer}))
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="activity_msp_list",
+        parameters=[ActivityQuerySerializer],
+        responses={200: ActivityResultSerializer},
+    )
+)
 class MSPActivityListView(ActivityListView):
     pass
 
 
 @extend_schema_view(
-    get=extend_schema(operation_id="activity_organization_list", responses={200: ActivityResultSerializer})
+    get=extend_schema(
+        operation_id="activity_organization_list",
+        parameters=[ActivityQuerySerializer],
+        responses={200: ActivityResultSerializer},
+    )
 )
 class OrganizationActivityListView(ActivityListView):
     pass

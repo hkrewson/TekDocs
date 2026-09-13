@@ -132,6 +132,7 @@ export function Assets({ workspace, client, collectionClient = browserAssetColle
   function href(id: string | null, section = 'overview', preview = false) {
     const next = new URLSearchParams(params)
     next.delete('record'); next.delete('preview'); next.delete('section')
+    if (id !== params.get('record')) next.delete('history_page')
     if (id) { next.set(preview ? 'preview' : 'record', id); if (!preview && section !== 'overview') next.set('section', section) }
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }

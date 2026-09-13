@@ -128,7 +128,10 @@
       "failed site choice read",
       "shared record navigation",
       "section Back/Forward and heading focus",
-      "dirty mobile section selection"
+      "dirty mobile section selection",
+      "software audit history paging",
+      "software history denied and retry",
+      "software history stale read cancellation"
     ],
     "status": "implemented reference layout; see assets-layout.md for remaining acceptance",
     "evidence": [
@@ -138,7 +141,9 @@
       "frontend/src/inventory/Assets.test.tsx",
       "backend/apps/core/tests/test_asset_collections.py",
       "frontend/src/inventory/AssetSiteFilter.test.tsx",
-      "frontend/src/records/RecordNavigation.test.tsx"
+      "frontend/src/records/RecordNavigation.test.tsx",
+      "frontend/src/inventory/SoftwareHistory.test.tsx",
+      "backend/apps/core/tests/test_document_operations.py"
     ]
   }
 ]

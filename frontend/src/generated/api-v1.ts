@@ -15040,7 +15040,15 @@ export interface operations {
     };
     readonly activity_msp_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly actor_id?: string | null;
+                readonly entity_id?: string;
+                readonly occurred_after?: string | null;
+                readonly occurred_before?: string | null;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -24758,7 +24766,15 @@ export interface operations {
     };
     readonly activity_organization_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly actor_id?: string | null;
+                readonly entity_id?: string;
+                readonly occurred_after?: string | null;
+                readonly occurred_before?: string | null;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

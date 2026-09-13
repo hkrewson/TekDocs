@@ -197,6 +197,14 @@ def test_organization_activity_is_exactly_workspace_and_tenant_scoped(owner_clie
 
     assert response.status_code == 200
     assert [item["action"] for item in response.json()["results"]] == ["first.visible"]
+    for hidden in (second_entity.id, foreign_entity.id):
+        filtered = owner_client.get(
+            reverse("organization-activity-list", kwargs={"organization_entity_id": first.entity_id}),
+            {"entity_id": str(hidden)},
+        ).json()
+        assert filtered["results"] == []
+        assert filtered["actions"] == []
+        assert filtered["count"] == 0
     assert (
         owner_client.get(
             reverse("organization-activity-list", kwargs={"organization_entity_id": foreign_entity.id})
@@ -223,7 +231,7 @@ def test_read_only_member_cannot_mutate_document_operations(owner_client, instal
         content_type="application/json",
     )
     assert denied.status_code == 403
-    assert client.get(reverse("msp-activity-list")).status_code == 403
+    assert client.get(reverse("msp-activity-list"), {"entity_id": document["id"]}).status_code == 403
 
 
 @pytest.mark.django_db(transaction=True)
@@ -238,3 +246,38 @@ def test_database_rejects_document_people_outside_exact_workspace(owner_client):
 
     with pytest.raises(DatabaseError, match="authorized workspace"), transaction.atomic():
         Document.objects.filter(pk=record.pk).update(owner=outsider)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_record_activity_is_bounded_and_exact_under_runtime_role(owner_client, installation, django_runtime_role):
+    document = create_document(owner_client)
+    sibling = create_document(owner_client, "Other record")
+    events = [
+        AuditEvent.objects.create(
+            tenant=installation.tenant,
+            actor=installation.owner,
+            action="asset.software.updated",
+            entity_id=document["id"],
+            metadata={"private_detail": "must not be returned"},
+        )
+        for _ in range(31)
+    ]
+    with django_runtime_role():
+        first = owner_client.get(reverse("msp-activity-list"), {"entity_id": document["id"], "page_size": 25}).json()
+        second = owner_client.get(
+            reverse("msp-activity-list"), {"entity_id": document["id"], "page_size": 25, "page": 2}
+        ).json()
+        repeated = owner_client.get(reverse("msp-activity-list"), {"entity_id": document["id"], "page_size": 25}).json()
+        legacy = owner_client.get(reverse("msp-activity-list")).json()
+        invalid = owner_client.get(reverse("msp-activity-list"), {"entity_id": "invalid"})
+        blank = owner_client.get(reverse("msp-activity-list"), {"entity_id": ""})
+    assert first["count"] >= 32
+    assert len(first["results"]) == 25 and first["has_more"]
+    assert first == repeated
+    assert first["results"][0]["id"] == str(events[-1].id)
+    assert {row["entity_id"] for row in first["results"] + second["results"]} == {document["id"]}
+    assert not {row["id"] for row in first["results"]} & {row["id"] for row in second["results"]}
+    assert all("metadata" not in row for row in first["results"])
+    assert any(row["entity_id"] == sibling["id"] for row in legacy["results"])
+    assert invalid.status_code == 400
+    assert blank.status_code == 400

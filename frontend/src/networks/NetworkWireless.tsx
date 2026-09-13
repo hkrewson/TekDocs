@@ -1,3 +1,4 @@
+import { WirelessParent } from './WirelessParent'
 import { useLocation, useSearchParams } from 'react-router'
 import { RecordHeader, RecordSections } from '../records/RecordNavigation'
 import { RecordActivity } from '../records/RecordActivity'
@@ -33,6 +34,7 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
   const initial: WirelessForm = record ? { ssid: record.ssid, status: record.status, purpose: record.purpose, security: record.security, hidden: record.hidden, client_isolation: record.client_isolation, description: record.description } : { ssid: '', status: 'active', purpose: 'corporate', security: 'wpa3_personal', hidden: false, client_isolation: false, description: '' }
   const [form, setForm] = useState(initial)
   const [editing, setEditing] = useState(!record)
+  const [changingParent, setChangingParent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -63,7 +65,8 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
     </fieldset></form> : record ? <>
       <dl className="record-facts">{[[t('networkColumn'), record.subnet_cidr || t('unassignedNetwork')], [t('addressStatus'), t(record.status)], [t('purpose'), t(record.purpose)], [t('security'), t(record.security)], [t('hidden'), t(record.hidden ? 'yes' : 'no')], [t('clientIsolation'), t(record.client_isolation ? 'yes' : 'no')], [translate('collections.site'), record.site_name || translate('collections.missing')], [t('vlan'), record.vlan_number === null ? translate('collections.missing') : String(record.vlan_number)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <p className="network-notes">{record.description || t('noDescription')}</p>
-      {canManage && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setEditing(true) }}>{t('editWireless')}</button>}
+      {canManage && !changingParent && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setEditing(true) }}>{t('editWireless')}</button>}
+      {changingParent ? <WirelessParent record={record} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setChangingParent(false)} /> : canManage && <button className="secondary-button" type="button" onClick={() => setChangingParent(true)}>{t('changeParent')}</button>}
     </> : <p>{t('wirelessDenied')}</p>}
   </>
 }

@@ -150,5 +150,23 @@ it('allows viewing a direct full-page record without offering denied edits', asy
   setupRegister({ path: '/networks?view=wireless&ssid=wifi-1&ssid_full=true', denied: true })
   expect(await screen.findByRole('heading', { level: 1, name: 'Office Staff' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Edit wireless network' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Change parent network' })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Back to wireless networks' })).toBeInTheDocument()
+})
+
+it('moves a parent-scoped SSID out of its collection without keeping a foreign detail open', async () => {
+  const moved = { ...record, subnet_id: 'network-2', subnet_cidr: '198.51.100.0/24' }
+  const collection = vi.fn().mockResolvedValue({ results: [{ id: 'network-2', name: 'Branch', cidr: '198.51.100.0/24' }], count: 1, page: 1, page_size: 25, has_more: false })
+  const updateWireless = vi.fn().mockResolvedValue(moved)
+  const wirelessCollection = vi.fn().mockResolvedValueOnce({ results: [record], count: 1, page: 1, page_size: 25, has_more: false, can_manage: true }).mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false, can_manage: true })
+  const { user } = setup({ collection, updateWireless, wirelessCollection })
+  await user.click(await screen.findByRole('button', { name: 'Office Staff' }))
+  await user.click(screen.getByRole('button', { name: 'Change parent network' }))
+  expect(screen.queryByRole('button', { name: 'Edit wireless network' })).not.toBeInTheDocument()
+  await user.selectOptions(await screen.findByLabelText('Matching parent networks'), 'network-2')
+  await user.click(screen.getByRole('button', { name: 'Save parent network' }))
+  expect(updateWireless).toHaveBeenCalledWith(workspace, 'wifi-1', { subnet_id: 'network-2' })
+  await waitFor(() => expect(window.location.search).not.toContain('wireless=wifi-1'))
+  expect(screen.queryByRole('button', { name: 'Change parent network' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('status')).toHaveTextContent('updated')
 })

@@ -2356,5 +2356,17 @@
   "networkLayout.wirelessRegisterEmpty": "No wireless networks match this workspace and search.",
   "networkLayout.wirelessHistoryHelp": "Changes recorded for this wireless network.",
   "networkLayout.wirelessHistoryEmpty": "No wireless network history is available.",
-  "networkLayout.wirelessHistoryDenied": "Your role cannot view wireless network history."
+  "networkLayout.wirelessHistoryDenied": "Your role cannot view wireless network history.",
+  "networkLayout.changeParent": "Change parent network",
+  "networkLayout.parentHelp": "Choose the network documented for this SSID. Site and VLAN assignments are kept.",
+  "networkLayout.selectedParent": "Selected network:",
+  "networkLayout.removeParent": "Use no parent network",
+  "networkLayout.searchParent": "Search parent networks",
+  "networkLayout.parentChoicesFailed": "Parent networks could not be loaded.",
+  "networkLayout.parentResults": "Matching parent networks",
+  "networkLayout.chooseParent": "Choose a network",
+  "networkLayout.parentChoicesEmpty": "No parent networks match this search.",
+  "networkLayout.saveParent": "Save parent network",
+  "networkLayout.updatedOutside": "The updated record no longer appears on this page. It may no longer match your filters or its sort position may have changed.",
+  "networkLayout.recordUpdated": "Record updated."
 }

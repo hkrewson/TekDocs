@@ -33,6 +33,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Wireless parent-network assignment](wireless-parent-assignment.md)
+
 - [Workspace Wireless register](wireless-register.md)
 
 - [Wireless records within network drawers](network-wireless.md)

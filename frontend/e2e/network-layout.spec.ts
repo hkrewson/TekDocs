@@ -244,8 +244,8 @@ test('Address editor supports touch and 200 percent zoom', async ({ browser }) =
   } finally { await context.close() }
 })
 
-async function wirelessFixtures(page: Page, failSave = false, standalone = false) {
-  await fixtures(page)
+async function wirelessFixtures(page: Page, failSave = false, standalone = false, allowParent = false) {
+  const parents = await fixtures(page)
   const columns = standalone ? ['name', 'network', 'status', 'security'] : ['name', 'status', 'purpose', 'security']
   let preferences = { columns, default_columns: columns, available_columns: columns, page_size: 25 }
   await page.route(`**/collection-preferences/${standalone ? 'wireless-register' : 'network-wireless'}`, (route) => {
@@ -258,7 +258,7 @@ async function wirelessFixtures(page: Page, failSave = false, standalone = false
     const query = new URL(route.request().url()).searchParams
     expect(query.get('subnet_id')).toBe(standalone ? null : 'network-2')
     expect(query.get('summary')).toBe('true')
-    let found = records.filter((item) => `${item.ssid} ${item.subnet_cidr ?? ''}`.includes(query.get('q') ?? '') && (!query.get('status') || query.get('status') === item.status) && (!query.get('association') || (query.get('association') === 'unassigned' ? !item.subnet_id : Boolean(item.subnet_id))))
+    let found = records.filter((item) => (!query.get('subnet_id') || item.subnet_id === query.get('subnet_id')) && `${item.ssid} ${item.subnet_cidr ?? ''}`.includes(query.get('q') ?? '') && (!query.get('status') || query.get('status') === item.status) && (!query.get('association') || (query.get('association') === 'unassigned' ? !item.subnet_id : Boolean(item.subnet_id))))
     if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
     const size = Number(query.get('page_size')), number = Number(query.get('page'))
     return route.fulfill({ json: { results: found.slice((number - 1) * size, number * size).map((item) => ({ ...item, description: undefined })), count: found.length, page: number, page_size: size, has_more: number * size < found.length, can_manage: true } })
@@ -268,9 +268,10 @@ async function wirelessFixtures(page: Page, failSave = false, standalone = false
     if (!record) return route.fulfill({ status: 404, json: {} })
     if (route.request().method() === 'PATCH') {
       const values = route.request().postDataJSON() as Record<string, unknown>
-      for (const key of ['site_id', 'vlan_id', 'subnet_id']) expect(values).not.toHaveProperty(key)
+      for (const key of ['site_id', 'vlan_id', ...(!allowParent ? ['subnet_id'] : [])]) expect(values).not.toHaveProperty(key)
       if (failSave) return route.fulfill({ status: 409, json: { detail: 'Wireless record changed. Your entries have been kept.' } })
       Object.assign(record, values)
+      if ('subnet_id' in values) record.subnet_cidr = parents.find((item) => item.id === values.subnet_id)?.cidr ?? null
     }
     return route.fulfill({ json: record })
   })
@@ -422,6 +423,74 @@ test('Workspace Wireless guards failed edits on touch and zoomed screens', async
     await page.setViewportSize({ width: 1280, height: 600 })
     await page.evaluate(() => { document.documentElement.style.zoom = '2' })
     await expect(drawer.getByRole('button', { name: 'Save wireless network' })).toBeVisible()
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  } finally { await context.close() }
+})
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`Wireless parent assignment fits ${width}px and explains leaving the active filter`, async ({ page }) => {
+    await wirelessFixtures(page, false, true, true)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/networks?view=wireless&ssid_association=unassigned&ssid=wifi-31')
+    const drawer = page.getByRole('dialog', { name: 'Office 31', exact: true })
+    await drawer.getByRole('button', { name: 'Change parent network' }).click()
+    await expect(drawer.getByRole('heading', { name: 'Change parent network' })).toBeFocused()
+    await drawer.getByRole('searchbox', { name: 'Search parent networks' }).fill('LAN 131')
+    await drawer.getByRole('button', { name: 'Search', exact: true }).click()
+    await drawer.getByRole('combobox', { name: 'Matching parent networks', exact: true }).selectOption('network-131')
+    await expect(drawer.getByRole('button', { name: 'Edit wireless network' })).toHaveCount(0)
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await drawer.getByRole('button', { name: 'Save parent network' }).click()
+    await expect(drawer.getByRole('button', { name: 'Change parent network' })).toBeVisible()
+    await expect(drawer).toContainText('10.55.130.0/24')
+    await expect(drawer.getByRole('status')).toContainText('no longer appears on this page')
+    await page.reload()
+    await expect(drawer).toContainText('10.55.130.0/24')
+    await drawer.getByRole('button', { name: 'Change parent network' }).click()
+    await drawer.getByRole('button', { name: 'Use no parent network' }).click()
+    await drawer.getByRole('button', { name: 'Save parent network' }).click()
+    await expect(drawer.getByRole('button', { name: 'Change parent network' })).toBeVisible()
+    await expect(drawer).toContainText('No parent network')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByText('1 wireless networks', { exact: true })).toBeVisible()
+  })
+}
+
+test('Parent-scoped wireless reassignment returns to its owning collection', async ({ page }) => {
+  await wirelessFixtures(page, false, false, true)
+  await page.goto('/networks?preview=network-2&section=wireless&wireless=wifi-1')
+  const drawer = page.getByRole('dialog', { name: 'LAN 002', exact: true })
+  await drawer.getByRole('button', { name: 'Change parent network' }).click()
+  await drawer.getByRole('button', { name: 'Use no parent network' }).click()
+  await drawer.getByRole('button', { name: 'Save parent network' }).click()
+  await expect(drawer.getByText('30 wireless networks', { exact: true })).toBeVisible()
+  await expect(drawer).toContainText('no longer appears on this page')
+  await expect(drawer.getByRole('button', { name: 'Office 01', exact: true })).toHaveCount(0)
+  await expect(page).not.toHaveURL(/wireless=wifi-1/)
+})
+
+test('Wireless parent failures preserve selection and guard touch navigation', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 500 }, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    await wirelessFixtures(page, true, true, true)
+    await page.goto('/networks?view=wireless&ssid=wifi-31')
+    const drawer = page.getByRole('dialog', { name: 'Office 31', exact: true })
+    await drawer.getByRole('button', { name: 'Change parent network' }).tap()
+    await drawer.getByRole('combobox', { name: 'Matching parent networks', exact: true }).selectOption('network-2')
+    await drawer.getByRole('button', { name: 'Save parent network' }).tap()
+    await expect(drawer.getByRole('alert')).toContainText('Wireless record changed')
+    await drawer.getByRole('combobox', { name: 'Sections', exact: true }).selectOption('history')
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(drawer.getByRole('combobox', { name: 'Matching parent networks', exact: true })).toHaveValue('network-2')
+    if (process.env.LAYOUT_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/wireless-parent-${test.info().project.name}.png` })
+    await page.setViewportSize({ width: 1280, height: 600 })
+    await page.evaluate(() => { document.documentElement.style.zoom = '2' })
     expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Discard changes' }).click()

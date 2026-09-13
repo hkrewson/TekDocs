@@ -475,3 +475,64 @@ def test_wireless_workspace_register_includes_unassigned_records(owner_client, i
     )
     assert owner_client.get(prefs).json()["page_size"] == 50
     assert owner_client.delete(prefs).json()["columns"] == ["name", "network", "status", "security"]
+
+
+@pytest.mark.django_db
+def test_wireless_parent_assignment_preserves_facts_and_rejects_foreign_parent(owner_client, installation):
+    organization = _organization(installation, "Parent assignment")
+    sibling = _organization(installation, "Foreign parent")
+    vlan = create_vlan(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Staff",
+        vlan_id=20,
+        description="",
+    )
+
+    def parent(owner, cidr):
+        return create_subnet(
+            tenant=installation.tenant,
+            organization=owner,
+            actor_id=installation.owner.id,
+            name="Parent",
+            cidr=cidr,
+            vrf_entity_id=None,
+            vlan_entity_id=vlan.entity_id if owner == organization else None,
+            description="",
+        )
+
+    first = parent(organization, "192.0.2.0/24")
+    second = parent(organization, "198.51.100.0/24")
+    foreign = parent(sibling, "203.0.113.0/24")
+    created = _post(
+        owner_client,
+        "organization-network-wireless",
+        organization,
+        {
+            "ssid": "Staff Wi-Fi",
+            "vlan_id": str(vlan.entity_id),
+            "description": "Retained facts",
+        },
+    )
+    assert created.status_code == 201
+    url = reverse(
+        "organization-network-wireless-detail",
+        kwargs={
+            "organization_entity_id": organization.entity_id,
+            "wireless_entity_id": created.json()["id"],
+        },
+    )
+    for selected in (first, second, None):
+        response = owner_client.patch(
+            url, {"subnet_id": str(selected.entity_id) if selected else None}, content_type="application/json"
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["subnet_id"] == (str(selected.entity_id) if selected else None)
+        assert body["vlan_id"] == str(vlan.entity_id)
+        assert body["description"] == "Retained facts" and body["ssid"] == "Staff Wi-Fi"
+    denied = owner_client.patch(url, {"subnet_id": str(foreign.entity_id)}, content_type="application/json")
+    assert denied.status_code == 400
+    assert owner_client.get(url).json()["subnet_id"] is None
+    assert owner_client.get(url).json()["vlan_id"] == str(vlan.entity_id)

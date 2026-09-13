@@ -58,7 +58,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   const result = response?.key === key ? response.result : null
   const record = detail?.key === detailKey ? detail.record : null
   useEffect(() => { const controller = new AbortController(); preferenceClient.load(workspace, config.feature, config.columns, controller.signal).then((value) => { if (!controller.signal.aborted) setPreferences(value) }).catch(() => { if (!controller.signal.aborted) setPreferences(defaultPreferences(config.columns)) }); return () => controller.abort() }, [workspace, preferenceClient, config])
-  useEffect(() => { if (!preferences) return; const controller = new AbortController(); config.load(client, workspace, query, controller.signal).then((value) => { if (controller.signal.aborted) return; setResponse({ key, result: value }); if (changed.current) { setNotice(translate(value.results.some((row) => row.id === changed.current) ? 'collections.updated' : 'collections.updatedOutside')); changed.current = null } }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) }); return () => controller.abort() }, [workspace, client, key, query, preferences, reload, config])
+  useEffect(() => { if (!preferences) return; const controller = new AbortController(); config.load(client, workspace, query, controller.signal).then((value) => { if (controller.signal.aborted) return; setResponse({ key, result: value }); if (changed.current) { setNotice(translate(value.results.some((row) => row.id === changed.current) ? 'networkLayout.recordUpdated' : 'networkLayout.updatedOutside')); changed.current = null } }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) }); return () => controller.abort() }, [workspace, client, key, query, preferences, reload, config])
   useEffect(() => { if (!selected || selected === 'new') return; const controller = new AbortController(); config.read(client, workspace, selected, controller.signal).then((value) => { if (!controller.signal.aborted) setDetail({ key: detailKey, ...((standalone || value.subnet_id === subnetId) ? { record: value } : {}) }) }).catch(() => { if (!controller.signal.aborted) setDetail({ key: detailKey }) }); return () => controller.abort() }, [workspace, client, selected, detailKey, subnetId, config, standalone])
   useEffect(() => { if (!pending || guarded) return; const frame = requestAnimationFrame(() => { setParams(pending, { replace: true, state: location.state as unknown }); setPending(null) }); return () => cancelAnimationFrame(frame) }, [pending, guarded, setParams, location.state])
   useEffect(() => { if (selected) previousAddress.current = selected; else if (result && previousAddress.current) { if (standalone) window.scrollTo({ top: (location.state as { childListY?: number } | null)?.childListY ?? 0 }); (document.getElementById(`${config.key}-${previousAddress.current}`) ?? heading.current)?.focus({ preventScroll: standalone }); previousAddress.current = null } }, [selected, result, config.key, standalone, location.state])
@@ -69,8 +69,17 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
     setParams(updated, { state: standalone && values[config.key] ? { childListY: window.scrollY } : location.state as unknown })
   }
   function href(values: Record<string, string | null>) { return `${location.pathname}?${next(values)}` }
-  function saved(value: D) { changed.current = value.id; setDetail({ key: `${config.feature}:${workspace.kind}:${workspace.id}:${subnetId}:${value.id}`, record: value }); setPending(next({ [config.key]: value.id })); setReload(reload + 1) }
+  function saved(value: D) {
+    changed.current = value.id
+    setDetail({ key: `${config.feature}:${workspace.kind}:${workspace.id}:${subnetId}:${value.id}`, record: value })
+    const destination = !standalone && value.subnet_id !== subnetId ? null : value.id
+    // Only creation or a move out of this parent changes selection. Queuing the
+    // same URL after an ordinary save can race a subsequent drawer dismissal.
+    if (destination !== selected) setPending(next({ [config.key]: destination }))
+    setReload(reload + 1)
+  }
   const recordContent = <>
+      {standalone && notice && <p role="status">{notice}</p>}
       {selected === 'new' || record ? <RecordComponent key={selected} record={record ?? null} workspace={workspace} subnetId={subnetId} client={client} canManage={Boolean(result?.can_manage)} onSaved={saved} onReturn={() => browse({ [config.key]: null })} /> : <><button type="button" className="secondary-button" onClick={() => browse({ [config.key]: null })}>{config.back}</button><p role={detail?.key === detailKey ? 'alert' : 'status'}>{translate(detail?.key === detailKey ? 'collections.recordUnavailable' : 'collections.loading')}</p></>}
   </>
   const collectionContent = <>
@@ -92,7 +101,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
       </>}
   </>
   return <section aria-label={config.title}>
-    {notice && <p role="status">{notice}</p>}
+    {notice && !(standalone && selected) && <p role="status">{notice}</p>}
     {standalone ? <>
       {fullPage ? <><Link to={href({ [config.key]: null, [`${config.key}_full`]: null, [`${config.key}_section`]: null, history_page: null })} state={location.state as unknown}>{config.back}</Link>{recordContent}</> : collectionContent}
       {selected && !fullPage && <QuickDrawer title={record ? config.identity(record) : selected === 'new' ? config.create : config.title} onClose={() => browse({ [config.key]: null })} returnHref={href({ [config.key]: null })} returnLabel={config.back} returnFocusId={selected === 'new' ? `network-child-${config.key}` : `${config.key}-${selected}`}>

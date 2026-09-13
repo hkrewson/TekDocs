@@ -460,3 +460,75 @@ collection pattern can support later network records; each needs its own evidenc
 Wireless association editing, remaining network surfaces, technician acceptance,
 release gates and broader pre-1.0 obligations remain open. Wiki changes remain local
 and unpublished. No production push, release, version bump or data replacement.
+
+### 2026-09-13 — Wireless parent-network assignment (Phase 3 #80)
+
+Bounded slice: attach, move or remove a wireless record's parent network in a focused
+section in either parent Wireless or the workspace register. Searches existing bounded
+network summaries, PATCHes only subnet_id, preserves site/VLAN/facts, and uses the
+shared dirty guard. Moving out of a parent list returns to that list; workspace
+filtered-list departure is explained within the open drawer. Corrected shared child
+record notices that previously said “asset.” No API/migration/version change.
+
+Initial focused verification reproduced a component test passing the Playwright-only
+exact option to Testing Library; removed that unsupported option while retaining the
+exact string name match. Type/lint and 14 focused tests then passed. Added lookup
+failure/retry/empty and read-only assertions before the full gate. Full browser, live,
+network validation and make check results follow below.
+
+Browser verification reproduced an exact getByLabel lookup failure on the native
+parent select: the wrapped label includes option text, while its accessible combobox
+name is correctly “Matching parent networks.” Switched browser/live queries to that
+exact role and accessible name, retaining the selected ID/value assertions. Stopped
+the obsolete live/browser run and reran with the corrected harness; UI copy and
+behavior were unchanged by this correction.
+
+The full initial make check passed (500 tests/105 files and production budgets).
+Browser runs then reproduced a real post-save dismissal race at 1024/1280px: the
+ordinary-save callback queued the same record URL for a later animation frame,
+which could reopen a drawer just dismissed by Escape. NetworkChildCollection now
+queues selection navigation only for creation or a move out of the parent collection.
+Kept the immediate post-save Escape assertion unchanged and reran the full checks
+and browser suite; creation and parent-departure navigation remain covered.
+
+The live assignment workflow passed: create an unassigned SSID, attach it to the
+management network, refresh and verify its parent/status, then remove the parent
+and refresh again. Existing database fixture assertions pass. A final live run includes
+the later post-save navigation-race correction. Synthetic mobile assignment screenshots
+were inspected: bounded native results, selected parent, errors and actions remain
+in the single drawer body; no nested drawer or separate scrolling panel is introduced.
+
+Final make check passes with the navigation-race fix: all 500 component tests in
+105 files, coverage enforcement, backend/frontend lint/types, schema/migration drift
+checks, production build and bundle budgets. Chromium and Firefox assignment checks
+pass at all six widths, including immediate post-save dismissal without reopening.
+Remaining browser/live/network gate results and local runtime readiness follow below.
+
+The final live browser-to-Django-to-PostgreSQL journey passes with the navigation
+fix included, including persisted attach/remove and retained status after refresh.
+Independent database fixture assertions pass. Authorized local make up completed with
+volumes preserved; readiness reports database/renderer ready at version 0.8.46 and
+the Wireless route returns 200. Test locally: Networks → Wireless → SSID → Change
+parent network (also available in a parent network's Wireless section). No production
+push, publication, version change or replacement of user/demo data occurred.
+
+All 126 network browser checks pass across Chromium, Firefox and WebKit, including
+the six widths, attach/remove, parent-list departure, active-filter notices, bounded
+off-page parent lookup, read/edit navigation, dirty/failed saves, touch/short screens,
+200% CSS zoom and accessibility. The immediate post-save Escape regression passes
+without changing its assertion. Mobile screenshots from Chromium/WebKit were inspected.
+The final broad network gate remains in migration/recovery validation below.
+
+Final make test-network-validation exited successfully: network inventory/addressing/
+endpoints/services/circuits, reconciliation/transfer, relationships, permission/IDOR,
+runtime RLS and migration stabilization; network stabilization; then all 500 frontend
+tests and coverage. Existing suite skip remains unchanged. This completes the bounded
+wireless parent-network assignment checkpoint.
+
+Verified: attach/move/remove, partial-update preservation and foreign-parent rejection;
+shared drawer/list navigation including the reproduced post-save race fix; full checks,
+126 maintained-browser checks, isolated live workflow and healthy local 0.8.46 runtime.
+No blocker remains for this checkpoint. Inferred: bounded parent lookup can inform
+later association editors, but each still needs its own rules and validation. Site/VLAN
+editing, other network records, technician/release acceptance and existing pre-1.0
+security/recovery/recurring obligations remain open. Wiki changes remain local/unpublished.

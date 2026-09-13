@@ -47,7 +47,7 @@ points. No credential/password input is introduced. Existing updates omit site,
 VLAN and subnet identifiers so those associations remain intact, including legacy
 values. Creation sets the current parent, leaving optional site/VLAN associations
 unset. Workspace-wide discovery is covered by [the Wireless register](wireless-register.md).
-Reassignment remains follow-up work; existing data is not silently reassigned.
+[Parent reassignment](wireless-parent-assignment.md) now uses a focused section; existing data is not silently reassigned.
 
 The existing bounded wireless API accepts additive subnet_id, q, status, ordering
 and summary parameters. Summary=true omits description. Legacy calls retain fields,
@@ -75,7 +75,7 @@ accessibility, touch, short screens and 200% CSS zoom. Synthetic fixtures stay i
 The live journey creates a guest SSID, changes its status and reloads the persisted
 security mode and status through Django/PostgreSQL.
 
-Phase 3 remains open for wireless association management, devices,
+Phase 3 remains open for wireless site/VLAN editing, devices,
 racks, VLANs/VRFs, interfaces, DNS, circuits and related parent/child workflows.
 Technician acceptance, release gates and existing security/recovery/invoice work
 remain open. Local rebuild is separate from production publication; no version bump.

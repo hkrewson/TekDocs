@@ -40,8 +40,9 @@ network-wireless preferences. No new data model, migration or RLS classification
 Defaults work when preferences fail. Existing networks.edit authorization controls
 mutations; UI permissions never replace server checks.
 
-Creating from the register leaves subnet_id null. Editing deliberately omits parent,
-site and VLAN IDs, preserving current associations. Association editing/reassignment
-is still open, as are other network object surfaces and Phase 3 acceptance. This
+Creating from the register leaves subnet_id null. Ordinary edits omit parent, site
+and VLAN IDs. [Parent assignment](wireless-parent-assignment.md) now supports explicit
+attach/move/remove operations in a focused section. Site/VLAN editing, other network
+object surfaces and Phase 3 acceptance remain open. This
 checkpoint does not close technician, production/release, security, recovery or
 recurring-invoice obligations. See progress.md for executed verification evidence.

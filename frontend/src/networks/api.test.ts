@@ -7,6 +7,19 @@ describe('network inventory API client', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200 }))))
   })
 
+  it('requests bounded inventory pages and independent details without changing legacy helpers', async () => {
+    const workspace = { kind: 'organization', id: 'client/1' } as never
+    const signal = new AbortController().signal
+    await browserNetworksClient.rackCollection(workspace, { q: 'rack / 31', page: 2, page_size: 25, ordering: '-name', status: 'active', site_id: 'site-1' }, signal)
+    await browserNetworksClient.deviceCollection(workspace, { q: '', page: 1, page_size: 50, ordering: 'rack_unit', role: 'switch', rack_id: 'rack-1' }, signal)
+    await browserNetworksClient.rackDetail(workspace, 'rack/1', signal)
+    await browserNetworksClient.deviceDetail(workspace, 'device/1', signal)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks?q=rack+%2F+31&page=2&page_size=25&ordering=-name&status=active&site_id=site-1', { credentials: 'same-origin', signal })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/devices?q=&page=1&page_size=50&ordering=rack_unit&role=switch&rack_id=rack-1', { credentials: 'same-origin', signal })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks/rack%2F1', { credentials: 'same-origin', signal })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/devices/device%2F1', { credentials: 'same-origin', signal })
+  })
+
   it('uses exact client workspace routes and CSRF-protected writes', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserNetworksClient.listNetworks(workspace)

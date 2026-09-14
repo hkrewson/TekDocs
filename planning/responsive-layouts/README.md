@@ -65,3 +65,5 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Assets collection API and next integration dependencies](asset-collection.md)
 - [Implementation issues](issues.json)
 - [Progress and verification](progress.md)
+
+- [Devices and racks collection prerequisite](inventory-collections.md)

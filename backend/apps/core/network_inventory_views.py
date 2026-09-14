@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
-from .collection_pagination import BoundedCollectionQuerySerializer, paginate
+from .collection_pagination import BoundedCollectionQuerySerializer, CollectionPage, paginate
 from .inventory import InventoryError, assets_for_scope, require_operational_owner
 from .models import NetworkDevice, NetworkDeviceRole, NetworkDeviceStatus, NetworkRack, NetworkRackStatus, NetworkVLAN
 from .network_inventory import (
@@ -73,7 +73,8 @@ class NetworkRackSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.IntegerField())
     def get_device_count(self, rack: NetworkRack) -> int:
-        return len(rack.network_devices.all())
+        count = getattr(rack, "collection_device_count", None)
+        return int(count) if count is not None else len(rack.network_devices.all())
 
 
 class NetworkDeviceSerializer(serializers.Serializer):
@@ -178,13 +179,94 @@ def _device_data(device: NetworkDevice, workspace: ResolvedWorkspace) -> dict[st
     return cast(dict[str, object], NetworkDeviceSerializer(device, context={"can_view_assets": can_view_assets}).data)
 
 
+RACK_ORDERING = {
+    "name": "entity__display_name",
+    "site": "site__entity__display_name",
+    "location": "location__entity__display_name",
+    "status": "status",
+    "unit_count": "unit_count",
+    "device_count": "collection_device_count",
+}
+DEVICE_ORDERING = {
+    "name": "entity__display_name",
+    "site": "site__entity__display_name",
+    "location": "location__entity__display_name",
+    "status": "status",
+    "role": "role",
+    "rack": "rack__entity__display_name",
+    "rack_unit": "rack_unit",
+}
+
+
+class RackCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    # Preserve the existing API default; responsive clients explicitly request 25.
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
+    status = serializers.ChoiceField(choices=NetworkRackStatus.values, required=False)
+    site_id = serializers.UUIDField(required=False)
+    ordering = serializers.ChoiceField(
+        choices=[*RACK_ORDERING, *[f"-{key}" for key in RACK_ORDERING]], required=False, default="name"
+    )
+
+
+class DeviceCollectionQuerySerializer(RackCollectionQuerySerializer):
+    status = serializers.ChoiceField(choices=NetworkDeviceStatus.values, required=False)
+    role = serializers.ChoiceField(choices=NetworkDeviceRole.values, required=False)
+    rack_id = serializers.UUIDField(required=False)
+    ordering = serializers.ChoiceField(
+        choices=[*DEVICE_ORDERING, *[f"-{key}" for key in DEVICE_ORDERING]], required=False, default="name"
+    )
+
+
+def _inventory_collection(
+    workspace: ResolvedWorkspace, values: dict[str, Any], *, devices: bool, can_view_assets: bool = False
+) -> CollectionPage[Any]:
+    records: QuerySet[Any]
+    if devices:
+        records = cast(QuerySet[Any], devices_for_scope(workspace.data_scope))
+    else:
+        # A register needs a count, not every installed device's full row.
+        records = cast(
+            QuerySet[Any],
+            racks_for_scope(workspace.data_scope).prefetch_related(None).annotate(
+                collection_device_count=Count("network_devices")
+            ),
+        )
+    if site_id := values.get("site_id"):
+        if not sites_for_scope(workspace.data_scope).filter(entity_id=site_id).exists():
+            raise PermissionDenied("The selected site is unavailable.")
+        records = records.filter(site__entity_id=site_id)
+    if rack_id := values.get("rack_id"):
+        _rack(workspace, rack_id)
+        records = records.filter(rack__entity_id=rack_id)
+    for field in ("status", "role"):
+        if field in values:
+            records = records.filter(**{field: values[field]})
+    if text := values["q"]:
+        search = (
+            Q(entity__display_name__icontains=text)
+            | Q(site__entity__display_name__icontains=text)
+            | Q(site__code__icontains=text)
+            | Q(location__entity__display_name__icontains=text)
+        )
+        if devices:
+            search |= Q(rack__entity__display_name__icontains=text)
+            # Hidden asset names must not become a search/count side channel.
+            if can_view_assets:
+                search |= Q(hardware_asset__entity__display_name__icontains=text)
+        records = records.filter(search)
+    ordering = values["ordering"]
+    fields = DEVICE_ORDERING if devices else RACK_ORDERING
+    ordered = ("-" if ordering.startswith("-") else "") + fields[ordering.lstrip("-")]
+    return paginate(records.order_by(ordered, "entity_id"), page=values["page"], page_size=values["page_size"])
+
+
 class NetworkRackListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: NetworkRackResultSerializer})
+    @extend_schema(parameters=[RackCollectionQuerySerializer], responses={200: NetworkRackResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = RackCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(racks_for_scope(workspace.data_scope), **query.validated_data)
+        page = _inventory_collection(workspace, query.validated_data, devices=False)
         return Response(NetworkRackResultSerializer({
             "results": page.records,
             "page": page.page,
@@ -234,15 +316,15 @@ class NetworkRackDetailView(APIView):
 
 
 class NetworkDeviceListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: NetworkDeviceResultSerializer})
+    @extend_schema(parameters=[DeviceCollectionQuerySerializer], responses={200: NetworkDeviceResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = DeviceCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(devices_for_scope(workspace.data_scope), **query.validated_data)
         can_view_assets = context_has_permission(
             workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
         )
+        page = _inventory_collection(workspace, query.validated_data, devices=True, can_view_assets=can_view_assets)
         response = NetworkDeviceResultSerializer({
             "results": page.records,
             "page": page.page,

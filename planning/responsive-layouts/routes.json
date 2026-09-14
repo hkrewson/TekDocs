@@ -141,7 +141,8 @@
       "wireless-parent-assignment.md",
       "../../frontend/e2e/network-layout.spec.ts",
       "addressing-registers.md",
-      "../../frontend/e2e/addressing-layout.spec.ts"
+      "../../frontend/e2e/addressing-layout.spec.ts",
+      "inventory-collections.md"
     ],
     "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent, site and VLAN assignment with bounded lookup, partial updates and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. VLAN/VRF bounded registers, full record drawers/pages, Overview/History and guarded editing. VLAN/VRF Networks sections include bounded associated subnet navigation and browser return context. Remaining network object surfaces and phase acceptance open."
   },
@@ -381,7 +382,8 @@
       "wireless-parent-assignment.md",
       "../../frontend/e2e/network-layout.spec.ts",
       "addressing-registers.md",
-      "../../frontend/e2e/addressing-layout.spec.ts"
+      "../../frontend/e2e/addressing-layout.spec.ts",
+      "inventory-collections.md"
     ],
     "states": "Simplified collection, full drawer/page, Overview/Addresses/Wireless/History, workspace-wide assigned/unassigned Wireless register with Overview/History drawer and full-page URLs, focused wireless parent, site and VLAN assignment with bounded lookup, partial updates and return after reassignment, parent-scoped address and wireless collections with child selection/editing, create/edit, failed and denied operations, direct unavailable links, personal columns, paging/search, optional map. VLAN/VRF bounded registers, full record drawers/pages, Overview/History and guarded editing. VLAN/VRF Networks sections include bounded associated subnet navigation and browser return context. Remaining network object surfaces and phase acceptance open."
   },

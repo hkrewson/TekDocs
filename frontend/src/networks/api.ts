@@ -115,7 +115,13 @@ export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack
 export type ListResult<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
+export type InventoryQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; site_id?: string; rack_id?: string; role?: string }
+
 export interface NetworksClient {
+  rackCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<ListResult<NetworkRack>>
+  deviceCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<DeviceListResult>
+  rackDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkRack>
+  deviceDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkDevice>
   assignmentChoices(workspace: WorkspaceContext, kind: 'site' | 'vlan', q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   addressingCollection(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', query: AddressQuery, signal?: AbortSignal): Promise<ListResult<AddressingSummary>>
   addressingDetail(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', id: string, signal?: AbortSignal): Promise<AddressingRecord>
@@ -221,6 +227,20 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async rackCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size) })
+    return json(await fetch(`${basePath(workspace)}/racks?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async deviceCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size) })
+    return json(await fetch(`${basePath(workspace)}/devices?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async rackDetail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/racks/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
+  async deviceDetail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/devices/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
   async assignmentChoices(workspace, kind, q, page, signal) {
     const params = new URLSearchParams({ kind, q, page: String(page), page_size: '25' })
     return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))

@@ -23200,8 +23200,45 @@ export interface operations {
     readonly workspaces_msp_networks_devices_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `status` - status
+                 *     * `role` - role
+                 *     * `rack` - rack
+                 *     * `rack_unit` - rack_unit
+                 *     * `-name` - -name
+                 *     * `-site` - -site
+                 *     * `-location` - -location
+                 *     * `-status` - -status
+                 *     * `-role` - -role
+                 *     * `-rack` - -rack
+                 *     * `-rack_unit` - -rack_unit
+                 */
+                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly rack_id?: string;
+                /**
+                 * @description * `router` - router
+                 *     * `switch` - switch
+                 *     * `firewall` - firewall
+                 *     * `wireless_controller` - wireless_controller
+                 *     * `access_point` - access_point
+                 *     * `load_balancer` - load_balancer
+                 *     * `other` - other
+                 */
+                readonly role?: "router" | "switch" | "firewall" | "wireless_controller" | "access_point" | "load_balancer" | "other";
+                readonly site_id?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `offline` - offline
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "offline" | "retired";
             };
             readonly header?: never;
             readonly path?: never;
@@ -23975,8 +24012,31 @@ export interface operations {
     readonly workspaces_msp_networks_racks_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `status` - status
+                 *     * `unit_count` - unit_count
+                 *     * `device_count` - device_count
+                 *     * `-name` - -name
+                 *     * `-site` - -site
+                 *     * `-location` - -location
+                 *     * `-status` - -status
+                 *     * `-unit_count` - -unit_count
+                 *     * `-device_count` - -device_count
+                 */
+                readonly ordering?: "name" | "site" | "location" | "status" | "unit_count" | "device_count" | "-name" | "-site" | "-location" | "-status" | "-unit_count" | "-device_count";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly site_id?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "retired";
             };
             readonly header?: never;
             readonly path?: never;
@@ -31741,8 +31801,45 @@ export interface operations {
     readonly workspaces_organizations_networks_devices_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `status` - status
+                 *     * `role` - role
+                 *     * `rack` - rack
+                 *     * `rack_unit` - rack_unit
+                 *     * `-name` - -name
+                 *     * `-site` - -site
+                 *     * `-location` - -location
+                 *     * `-status` - -status
+                 *     * `-role` - -role
+                 *     * `-rack` - -rack
+                 *     * `-rack_unit` - -rack_unit
+                 */
+                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly rack_id?: string;
+                /**
+                 * @description * `router` - router
+                 *     * `switch` - switch
+                 *     * `firewall` - firewall
+                 *     * `wireless_controller` - wireless_controller
+                 *     * `access_point` - access_point
+                 *     * `load_balancer` - load_balancer
+                 *     * `other` - other
+                 */
+                readonly role?: "router" | "switch" | "firewall" | "wireless_controller" | "access_point" | "load_balancer" | "other";
+                readonly site_id?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `offline` - offline
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "offline" | "retired";
             };
             readonly header?: never;
             readonly path: {
@@ -32563,8 +32660,31 @@ export interface operations {
     readonly workspaces_organizations_networks_racks_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `site` - site
+                 *     * `location` - location
+                 *     * `status` - status
+                 *     * `unit_count` - unit_count
+                 *     * `device_count` - device_count
+                 *     * `-name` - -name
+                 *     * `-site` - -site
+                 *     * `-location` - -location
+                 *     * `-status` - -status
+                 *     * `-unit_count` - -unit_count
+                 *     * `-device_count` - -device_count
+                 */
+                readonly ordering?: "name" | "site" | "location" | "status" | "unit_count" | "device_count" | "-name" | "-site" | "-location" | "-status" | "-unit_count" | "-device_count";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly site_id?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "retired";
             };
             readonly header?: never;
             readonly path: {

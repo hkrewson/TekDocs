@@ -11090,6 +11090,43 @@ paths:
       operationId: workspaces_msp_networks_devices_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - site
+          - location
+          - status
+          - role
+          - rack
+          - rack_unit
+          - -name
+          - -site
+          - -location
+          - -status
+          - -role
+          - -rack
+          - -rack_unit
+          type: string
+          x-spec-enum-id: 147a7e1c6fbe9b7c
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `site` - site
+          * `location` - location
+          * `status` - status
+          * `role` - role
+          * `rack` - rack
+          * `rack_unit` - rack_unit
+          * `-name` - -name
+          * `-site` - -site
+          * `-location` - -location
+          * `-status` - -status
+          * `-role` - -role
+          * `-rack` - -rack
+          * `-rack_unit` - -rack_unit
+      - in: query
         name: page
         schema:
           type: integer
@@ -11103,6 +11140,60 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: rack_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: role
+        schema:
+          enum:
+          - router
+          - switch
+          - firewall
+          - wireless_controller
+          - access_point
+          - load_balancer
+          - other
+          type: string
+          x-spec-enum-id: 035b100821571214
+          minLength: 1
+        description: |-
+          * `router` - router
+          * `switch` - switch
+          * `firewall` - firewall
+          * `wireless_controller` - wireless_controller
+          * `access_point` - access_point
+          * `load_balancer` - load_balancer
+          * `other` - other
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - offline
+          - retired
+          type: string
+          x-spec-enum-id: 3ee38851ac21ba93
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `offline` - offline
+          * `retired` - retired
       tags:
       - workspaces
       security:
@@ -12097,6 +12188,39 @@ paths:
       operationId: workspaces_msp_networks_racks_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - site
+          - location
+          - status
+          - unit_count
+          - device_count
+          - -name
+          - -site
+          - -location
+          - -status
+          - -unit_count
+          - -device_count
+          type: string
+          x-spec-enum-id: b5ed6bd01ae5750f
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `site` - site
+          * `location` - location
+          * `status` - status
+          * `unit_count` - unit_count
+          * `device_count` - device_count
+          * `-name` - -name
+          * `-site` - -site
+          * `-location` - -location
+          * `-status` - -status
+          * `-unit_count` - -unit_count
+          * `-device_count` - -device_count
+      - in: query
         name: page
         schema:
           type: integer
@@ -12110,6 +12234,31 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - retired
+          type: string
+          x-spec-enum-id: 5761b434c9a5aca2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `retired` - retired
       tags:
       - workspaces
       security:
@@ -23312,6 +23461,43 @@ paths:
     get:
       operationId: workspaces_organizations_networks_devices_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - site
+          - location
+          - status
+          - role
+          - rack
+          - rack_unit
+          - -name
+          - -site
+          - -location
+          - -status
+          - -role
+          - -rack
+          - -rack_unit
+          type: string
+          x-spec-enum-id: 147a7e1c6fbe9b7c
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `site` - site
+          * `location` - location
+          * `status` - status
+          * `role` - role
+          * `rack` - rack
+          * `rack_unit` - rack_unit
+          * `-name` - -name
+          * `-site` - -site
+          * `-location` - -location
+          * `-status` - -status
+          * `-role` - -role
+          * `-rack` - -rack
+          * `-rack_unit` - -rack_unit
       - in: path
         name: organization_entity_id
         schema:
@@ -23332,6 +23518,60 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: rack_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: role
+        schema:
+          enum:
+          - router
+          - switch
+          - firewall
+          - wireless_controller
+          - access_point
+          - load_balancer
+          - other
+          type: string
+          x-spec-enum-id: 035b100821571214
+          minLength: 1
+        description: |-
+          * `router` - router
+          * `switch` - switch
+          * `firewall` - firewall
+          * `wireless_controller` - wireless_controller
+          * `access_point` - access_point
+          * `load_balancer` - load_balancer
+          * `other` - other
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - offline
+          - retired
+          type: string
+          x-spec-enum-id: 3ee38851ac21ba93
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `offline` - offline
+          * `retired` - retired
       tags:
       - workspaces
       security:
@@ -24510,6 +24750,39 @@ paths:
     get:
       operationId: workspaces_organizations_networks_racks_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - site
+          - location
+          - status
+          - unit_count
+          - device_count
+          - -name
+          - -site
+          - -location
+          - -status
+          - -unit_count
+          - -device_count
+          type: string
+          x-spec-enum-id: b5ed6bd01ae5750f
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `site` - site
+          * `location` - location
+          * `status` - status
+          * `unit_count` - unit_count
+          * `device_count` - device_count
+          * `-name` - -name
+          * `-site` - -site
+          * `-location` - -location
+          * `-status` - -status
+          * `-unit_count` - -unit_count
+          * `-device_count` - -device_count
       - in: path
         name: organization_entity_id
         schema:
@@ -24530,6 +24803,31 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - retired
+          type: string
+          x-spec-enum-id: 5761b434c9a5aca2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `retired` - retired
       tags:
       - workspaces
       security:

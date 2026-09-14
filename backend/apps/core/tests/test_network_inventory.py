@@ -344,3 +344,79 @@ def test_network_device_serializer_does_not_disclose_linked_asset_without_asset_
     assert hidden.get_hardware_asset_name(device) is None
     assert str(visible.get_hardware_asset_id(device)) == linked_asset.entity_id
     assert visible.get_hardware_asset_name(device) == "Private firewall asset"
+
+
+@pytest.mark.django_db
+def test_inventory_collections_search_paging_order_and_parent_boundaries(owner_client, installation):
+    organization = _organization(installation, "Collection workspace")
+    sibling = _organization(installation, "Collection sibling")
+    site = _site(owner_client, organization, "Collection site")
+    other_site = _site(owner_client, sibling, "Other site")
+    other_rack = _rack(owner_client, sibling, other_site, "Outside rack")
+    racks = [_rack(owner_client, organization, site, f"Rack {index:02}") for index in range(31)]
+    for index, rack in enumerate(racks):
+        response = _device(owner_client, installation, organization, rack, f"Device {index:02}", 1)
+        assert response.status_code == 201, response.content
+    kwargs = {"organization_entity_id": organization.entity_id}
+    for kind in ("racks", "devices"):
+        url = reverse(f"organization-network-{kind}", kwargs=kwargs)
+        first = owner_client.get(url, {"page_size": 25}).json()
+        second = owner_client.get(url, {"page_size": 25, "page": 2}).json()
+        assert first["count"] == 31 and first["has_more"] and len(first["results"]) == 25
+        assert len(second["results"]) == 6 and not second["has_more"]
+        assert not ({r["id"] for r in first["results"]} & {r["id"] for r in second["results"]})
+        found = owner_client.get(url, {"q": "30", "status": "active"}).json()
+        assert found["count"] == 1 and found["results"][0]["name"].endswith("30")
+        assert owner_client.get(url).json()["page_size"] == 50  # Existing public default.
+        assert owner_client.get(url, {"q": "COLLECTION-SITE"}).json()["count"] == 31
+        assert owner_client.get(url, {"status": "retired"}).json()["count"] == 0
+        assert owner_client.get(url, {"site_id": site["id"]}).json()["count"] == 31
+        assert owner_client.get(url, {"site_id": other_site["id"]}).status_code == 403
+        assert owner_client.get(reverse(f"msp-network-{kind}"), {"q": "30"}).json()["count"] == 0
+        for invalid in ({"status": "invalid"}, {"ordering": "hardware_asset_name"}, {"page_size": 101}, {"typo": "x"}):
+            assert owner_client.get(url, invalid).status_code == 400
+        # Equal status values use entity identity as a deterministic tie-breaker.
+        ordered = owner_client.get(url, {"ordering": "-status", "page_size": 100}).json()["results"]
+        assert [r["id"] for r in ordered] == sorted(r["id"] for r in ordered)
+        reverse_names = owner_client.get(url, {"ordering": "-name"}).json()["results"]
+        assert reverse_names[0]["name"].endswith("30")
+    rack_rows = owner_client.get(
+        reverse("organization-network-racks", kwargs=kwargs), {"ordering": "device_count"}
+    ).json()["results"]
+    assert all(row["device_count"] == 1 for row in rack_rows)
+    devices_url = reverse("organization-network-devices", kwargs=kwargs)
+    selected = owner_client.get(devices_url, {"rack_id": racks[-1]["id"], "role": "switch"}).json()
+    assert selected["count"] == 1 and selected["results"][0]["name"] == "Device 30"
+    assert owner_client.get(devices_url, {"role": "router"}).json()["count"] == 0
+    assert owner_client.get(devices_url, {"role": "invalid"}).status_code == 400
+    assert owner_client.get(devices_url, {"rack_id": other_rack["id"]}).status_code == 403
+    owner_client.logout()
+    assert owner_client.get(devices_url, {"q": "30"}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_device_collection_asset_search_respects_asset_permission(owner_client, installation, monkeypatch):
+    from apps.accounts.policy import PermissionKey
+    from apps.core import network_inventory_views
+
+    organization = _organization(installation, "Permission workspace")
+    site = _site(owner_client, organization, "Permission site")
+    rack = _rack(owner_client, organization, site)
+    response = _device(owner_client, installation, organization, rack, "Visible device", 1)
+    assert response.status_code == 201
+    device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity_id=response.json()["id"])
+    entity = device.hardware_asset.entity
+    entity.display_name = "Restricted asset identifier"
+    entity.save(update_fields=["display_name"])
+    url = reverse("organization-network-devices", kwargs={"organization_entity_id": organization.entity_id})
+    assert owner_client.get(url, {"q": "Restricted asset"}).json()["count"] == 1
+    original = network_inventory_views.context_has_permission
+    monkeypatch.setattr(
+        network_inventory_views,
+        "context_has_permission",
+        lambda member, permission, **kwargs: permission != PermissionKey.ASSETS_VIEW
+        and original(member, permission, **kwargs),
+    )
+    assert owner_client.get(url, {"q": "Restricted asset"}).json()["count"] == 0
+    result = owner_client.get(url, {"q": "Visible device"}).json()["results"][0]
+    assert result["hardware_asset_name"] is None and result["hardware_asset_id"] is None

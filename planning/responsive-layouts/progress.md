@@ -713,3 +713,48 @@ reproduced, corrected and covered by the unchanged browser assertions.
 This bounded checkpoint is complete. Devices, racks, interfaces, DNS, circuits,
 remaining network surfaces, technician walkthroughs and release acceptance stay open.
 No production publication, domain-data migration or version bump was performed.
+
+## Devices/racks collection prerequisite — 2026-09-13
+
+Bounded Phase 3 (#80) API checkpoint, not a visible-surface migration. Added
+strict full-collection search/status/site filters, role/rack device filters,
+curated bidirectional ordering with entity-ID ties, SQL rack occupant counts,
+and independent bounded browser collection/detail clients. Existing API routes,
+response shapes, page default 50, legacy frontend helpers, writes and policies
+remain compatible. Responsive clients explicitly request page size 25. No new
+route permission inventory entry or database migration is necessary.
+
+Verified so far: two focused Docker/Django/PostgreSQL collection tests pass with
+31 real synthetic racks and 31 asset-backed devices, independent organizations,
+off-page identifiers, paging, count/order/filter assertions and asset redaction.
+Browser-client contract tests pass (3), including exact escaped URLs and abort
+signals; frontend TypeScript passes. Backend type checks pass on 192 source files.
+Two initial type-check failures identified Django's model narrowing in a shared
+query helper; explicit QuerySet typing/casts corrected them without changing
+query behavior or weakening tests. OpenAPI/generated types include only the
+new supported query parameters. Wiki contract passes (37 pages/25 topics).
+
+Full make check and network-validation outcomes follow below. No browser visual
+acceptance is claimed: this checkpoint changes APIs/client methods only, and the
+rack/device drawers, preferences, bounded assignment editors, interfaces and
+technician walkthroughs remain open. See inventory-collections.md for the next
+implementation contract.
+
+Final verification: `make check` exits 0, including API schema/type agreement,
+backend lint/types/migration drift, all 514 frontend tests in 108 files, coverage,
+production build and bundle budgets. `make test-network-validation` exits 0 as
+a complete invocation: network APIs, relationships, permission/IDOR, runtime RLS,
+migration stabilization, high-volume network checks, then all 514 frontend tests.
+The broad API invocation began before the final typing-only casts were added;
+its runtime query behavior is identical, and the final rebuilt source passes
+make check. Focused API and browser-client checks also pass as recorded above.
+Logs: `/tmp/inventory-collections-focused.log`, `inventory-collections-client.log`,
+`inventory-collections-check-passed.log`, `inventory-collections-network-gate.log`
+and `inventory-collections-up.log` (all under `/tmp`).
+
+Local `make up` exits 0 without removing data or volumes; readiness confirms
+healthy database/renderer and version 0.8.46. Wiki and whitespace checks pass.
+Verified: API prerequisite and local runtime. Not claimed: visible rack/device
+migration, browser layout acceptance, technician validation or production release.
+No known new runtime regression remains. The next slice is the rack register,
+complete drawer and lazy Devices section described in inventory-collections.md.

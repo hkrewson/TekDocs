@@ -93,3 +93,5 @@ IP/MAC children need their own bounded retrieval and binding checks; do not prel
 all addresses or expand the new section into the old stacked workspace. Existing
 IP assignment, MAC uniqueness, permissions and audit services remain authoritative.
 Rack placement and hardware-binding replacement stay separate from interface edits.
+
+Interface collection/core editing is now implemented in [device-interfaces.md](device-interfaces.md). The handoff above records the prior starting point; IP/MAC children and reassignment remain open.

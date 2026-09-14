@@ -93,7 +93,7 @@ export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
 export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
-export type AddressQuery = { subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
+export type AddressQuery = { device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
 export type AddressSummary = Omit<NetworkIPAddress, 'description'>
 export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'>
 export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'>
@@ -148,9 +148,11 @@ export interface NetworksClient {
   listSubnets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkSubnet>>
   createSubnet(workspace: WorkspaceContext, values: SubnetWrite): Promise<NetworkSubnet>
   updateSubnet(workspace: WorkspaceContext, id: string, values: SubnetWrite): Promise<NetworkSubnet>
+  interfaceCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<NetworkInterface, 'description'>>>
+  interfaceDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkInterface>
   listInterfaces(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkInterface>>
   createInterface(workspace: WorkspaceContext, values: InterfaceWrite): Promise<NetworkInterface>
-  updateInterface(workspace: WorkspaceContext, id: string, values: InterfaceWrite): Promise<NetworkInterface>
+  updateInterface(workspace: WorkspaceContext, id: string, values: Partial<InterfaceWrite>): Promise<NetworkInterface>
   addressCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<AddressSummary>>
   addressDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkIPAddress>
   listIPAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkIPAddress>>
@@ -302,6 +304,13 @@ export const browserNetworksClient: NetworksClient = {
   },
   createSubnet: (workspace, values) => write(`${basePath(workspace)}/subnets`, 'POST', values),
   updateSubnet: (workspace, id, values) => write(`${basePath(workspace)}/subnets/${encodeURIComponent(id)}`, 'PATCH', values),
+  async interfaceCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/interfaces?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async interfaceDetail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/interfaces/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
   async listInterfaces(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/interfaces?page=1&page_size=100`, { credentials: 'same-origin', signal }))
   },

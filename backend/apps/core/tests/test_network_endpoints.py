@@ -432,3 +432,77 @@ def test_address_status_edit_preserves_parent_and_assignment(owner_client, insta
     record.refresh_from_db()
     assert record.status == "reserved" and record.dns_name == "updated.example.invalid"
     assert record.hardware_asset_id == asset.pk and record.subnet_id == subnet.pk
+
+
+@pytest.mark.django_db
+def test_interface_collection_search_paging_parent_scope_and_partial_edit(owner_client, installation):
+    from apps.core.network_endpoints import create_interface
+
+    organization = _organization(installation, "Interface client")
+    sibling = _organization(installation, "Other interface client")
+    device = _device(installation, organization)
+    other = _device(installation, organization, "Other switch")
+    outside = _device(installation, sibling, "Outside switch")
+    interfaces = []
+    for index in range(31):
+        interfaces.append(
+            create_interface(
+                tenant=installation.tenant,
+                organization=organization,
+                actor_id=installation.owner.id,
+                name=f"Port {index:02}",
+                device_entity_id=device.entity_id,
+                kind="physical",
+                status="active",
+                description=f"Cable destination {index:02}",
+            )
+        )
+    create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Other port",
+        device_entity_id=other.entity_id,
+        kind="virtual",
+        status="disabled",
+        description="",
+    )
+    kwargs = {"organization_entity_id": organization.entity_id}
+    url = reverse("organization-network-interfaces", kwargs=kwargs)
+    first = owner_client.get(url, {"device_id": device.entity_id, "page_size": 25, "summary": "true"}).json()
+    assert first["count"] == 31 and len(first["results"]) == 25 and first["has_more"]
+    assert "description" not in first["results"][0]
+    second = owner_client.get(url, {"device_id": device.entity_id, "page_size": 25, "page": 2}).json()
+    assert len(second["results"]) == 6 and not second["has_more"]
+    assert second["results"][-1]["description"] == "Cable destination 30"
+    found = owner_client.get(url, {"device_id": device.entity_id, "q": "destination 30"}).json()
+    assert found["count"] == 1 and found["results"][0]["id"] == str(interfaces[-1].entity_id)
+    descending = owner_client.get(url, {"device_id": device.entity_id, "ordering": "-name"}).json()
+    assert descending["results"][0]["name"] == "Port 30"
+    assert owner_client.get(url, {"device_id": device.entity_id, "kind": "virtual"}).json()["count"] == 0
+    assert owner_client.get(url, {"device_id": device.entity_id, "status": "disabled"}).json()["count"] == 0
+    assert owner_client.get(url, {"device_id": outside.entity_id}).status_code == 403
+    assert owner_client.get(url, {"ordering": "description"}).status_code == 400
+    assert owner_client.get(url, {"unknown": "filter"}).status_code == 400
+    legacy = owner_client.get(url).json()
+    assert legacy["count"] == 32 and legacy["page_size"] == 50
+    assert "description" in legacy["results"][0]
+    detail = reverse(
+        "organization-network-interface-detail", kwargs={**kwargs, "interface_entity_id": interfaces[-1].entity_id}
+    )
+    assert owner_client.get(detail).json()["description"] == "Cable destination 30"
+    edited = owner_client.patch(
+        detail, {"status": "disabled", "description": "Updated cable"}, content_type="application/json"
+    )
+    assert edited.status_code == 200, edited.content
+    assert edited.json()["device_id"] == str(device.entity_id)
+    pref = reverse("organization-collection-preferences", kwargs={**kwargs, "feature": "network-interfaces"})
+    assert owner_client.get(pref).json()["columns"] == ["name", "kind", "status"]
+    assert (
+        owner_client.put(
+            pref, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(pref).json()["columns"] == ["name", "status"]
+    assert owner_client.delete(pref).json()["page_size"] == 25

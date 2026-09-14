@@ -320,6 +320,13 @@ assert device.rack_unit == 5 and device.rack_units == 2 and device.status == "of
 assert device.hardware_asset.entity.display_name == "Live core switch"
 assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 2
 print("Live device retained hardware identity, ordinary edits and rack-derived placement.")
+from apps.core.models import NetworkInterface
+interface = NetworkInterface.objects.get(entity__display_name="Live uplink")
+assert interface.organization == organization and interface.device_id == device.pk
+assert interface.status == "disabled" and interface.kind == "physical"
+assert interface.description == "Uplink to the core rack"
+assert AuditEvent.objects.filter(entity_id=interface.entity_id, action="network_interface.updated").count() == 1
+print("Live interface retained its device binding, description, status and update audit.")
 
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization

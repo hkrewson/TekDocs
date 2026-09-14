@@ -877,3 +877,64 @@ The separate incomplete Wiki checkout remains the documentation limitation above
 no Wiki publication, production deployment or version change was performed.
 This closes the bounded Devices/core-editing checkpoint, not Phase 3 or pre-1.0
 acceptance. The next interface/API work is documented in device-register.md.
+
+## Device interfaces — September 14, 2026
+
+Phase 3 (#80), required pre-1.0 under #60/#75. The bounded scope is the Interfaces
+section within Devices, parent-scoped collection APIs/preferences and focused
+creation/ordinary editing. See device-interfaces.md for URL contracts, API
+compatibility, accepted boundaries and IP/MAC/reassignment follow-ups. There is
+no new model, migration, permission grant, dependency or version change.
+
+Initial verification: 14 component cases across interfaces/devices/addresses pass,
+including unchanged parent bindings, rejected mismatched children, permission
+failures, draft protection and focus restoration. The new Django/PostgreSQL API
+case passes with 31 parent interfaces, another device, sibling-workspace denial,
+search/filter/sorting, summary versus legacy responses and preferences/reset.
+Schema generation has no errors (the two existing operation-ID warnings remain);
+generated client types are updated. Ten initial Chromium interface cases pass
+across all six widths and the mobile screenshot was visually inspected.
+
+The first new-creation guard assertion failed and was reproduced independently in
+`/tmp/interface-layout-guard-repro.log`. The editor retained its values while the
+lazy confirmation dialog had not rendered yet. The test now awaits the same Keep
+editing control and retains the draft assertion; the final browser scenario also
+checks creation-return protection. No application guard change or weakened
+assertion. Initial type checking also rejected a Playwright-only selector option
+in the component test, and lint caught one unused fixture binding; both were
+corrected before final checks.
+
+The repository Wiki manifest/help contract passes (37 pages/25 topics); the scoped
+local Wiki Roadmap update remains unpublished. Its previously recorded missing-page
+checkout limitation is unchanged. Main, live, final maintained-browser and full
+network-gate outcomes follow below. Version remains 0.8.46 throughout.
+
+Main `make check` exits 0: 529 frontend tests across 111 files, lint/type checks,
+OpenAPI/generated agreement, migration drift, production build and bundle budgets.
+The isolated live browser→Django→PostgreSQL journey exits 0, including interface
+creation, partial status editing, refresh and child return focus. Independent
+assertions confirm device/organization, kind/status, description and exactly one
+interface update event. Final browser, local rebuild and network-gate results follow.
+
+Local `make up` exits 0 and readiness reports healthy database/renderer at 0.8.46.
+Existing user/demo data and volumes are retained. Networks → Devices → Interfaces
+is available in the rebuilt local application; no production publication occurred.
+
+Final maintained-browser run exits 0: all 87 interface/device/address cases pass
+across Chromium, Firefox and WebKit. This includes the added new-creation return
+guard, six widths, one-drawer behavior, direct/full-page navigation, saved columns,
+read-only/foreign-parent handling, touch/short height, 200% zoom and address
+regressions through the generalized parent handling. Chromium and WebKit mobile
+screenshots were visually inspected. No application code changed after the successful
+main/live runs. Logs are under `/tmp/interface-layout-`: components-final, api,
+schema, check, live, browser-final, network-gate and up. Final network gate follows.
+
+Final closeout: full `make test-network-validation` exits 0, including network/API,
+permission/IDOR, runtime RLS, migration reversal/reapplication, high-volume
+stabilization and all 529 frontend tests. Main checks, all 87 maintained-browser
+cases, live database assertions and the local rebuild are verified. Whitespace and
+route-inventory JSON checks pass. No known new application regression remains.
+The pre-existing incomplete separate Wiki checkout remains the documented limitation;
+its Roadmap update is saved locally and unpublished. No production deployment or
+version change. This closes the interface collection/core-editing checkpoint, not
+IP/MAC assignment, Phase 3, technician sign-off or pre-1.0 release acceptance.

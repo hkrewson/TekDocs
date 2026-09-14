@@ -10641,7 +10641,7 @@ export interface components {
             readonly device_name: string;
             readonly kind: string;
             readonly status: string;
-            readonly description: string;
+            readonly description?: string;
         };
         readonly InterfaceResult: {
             readonly page: number;
@@ -23570,8 +23570,37 @@ export interface operations {
     readonly workspaces_msp_networks_interfaces_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly device_id?: string;
+                /**
+                 * @description * `physical` - physical
+                 *     * `virtual` - virtual
+                 *     * `lag` - lag
+                 *     * `loopback` - loopback
+                 *     * `tunnel` - tunnel
+                 *     * `wireless` - wireless
+                 *     * `other` - other
+                 */
+                readonly kind?: "physical" | "virtual" | "lag" | "loopback" | "tunnel" | "wireless" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 */
+                readonly ordering?: "name" | "-name" | "kind" | "-kind" | "status" | "-status";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `disabled` - disabled
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "disabled" | "retired";
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -32194,8 +32223,37 @@ export interface operations {
     readonly workspaces_organizations_networks_interfaces_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly device_id?: string;
+                /**
+                 * @description * `physical` - physical
+                 *     * `virtual` - virtual
+                 *     * `lag` - lag
+                 *     * `loopback` - loopback
+                 *     * `tunnel` - tunnel
+                 *     * `wireless` - wireless
+                 *     * `other` - other
+                 */
+                readonly kind?: "physical" | "virtual" | "lag" | "loopback" | "tunnel" | "wireless" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 */
+                readonly ordering?: "name" | "-name" | "kind" | "-kind" | "status" | "-status";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `planned` - planned
+                 *     * `active` - active
+                 *     * `disabled` - disabled
+                 *     * `retired` - retired
+                 */
+                readonly status?: "planned" | "active" | "disabled" | "retired";
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {

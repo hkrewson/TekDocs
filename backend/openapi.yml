@@ -11609,6 +11609,54 @@ paths:
       operationId: workspaces_msp_networks_interfaces_retrieve_list
       parameters:
       - in: query
+        name: device_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - physical
+          - virtual
+          - lag
+          - loopback
+          - tunnel
+          - wireless
+          - other
+          type: string
+          x-spec-enum-id: a35ed105a884d7bc
+          minLength: 1
+        description: |-
+          * `physical` - physical
+          * `virtual` - virtual
+          * `lag` - lag
+          * `loopback` - loopback
+          * `tunnel` - tunnel
+          * `wireless` - wireless
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - kind
+          - -kind
+          - status
+          - -status
+          type: string
+          x-spec-enum-id: c98a3f8ed0739d1f
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
+      - in: query
         name: page
         schema:
           type: integer
@@ -11622,6 +11670,33 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - disabled
+          - retired
+          type: string
+          x-spec-enum-id: 679e33115e1844e2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `disabled` - disabled
+          * `retired` - retired
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24071,6 +24146,54 @@ paths:
     get:
       operationId: workspaces_organizations_networks_interfaces_retrieve_list
       parameters:
+      - in: query
+        name: device_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - physical
+          - virtual
+          - lag
+          - loopback
+          - tunnel
+          - wireless
+          - other
+          type: string
+          x-spec-enum-id: a35ed105a884d7bc
+          minLength: 1
+        description: |-
+          * `physical` - physical
+          * `virtual` - virtual
+          * `lag` - lag
+          * `loopback` - loopback
+          * `tunnel` - tunnel
+          * `wireless` - wireless
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - kind
+          - -kind
+          - status
+          - -status
+          type: string
+          x-spec-enum-id: c98a3f8ed0739d1f
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
       - in: path
         name: organization_entity_id
         schema:
@@ -24091,6 +24214,33 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - planned
+          - active
+          - disabled
+          - retired
+          type: string
+          x-spec-enum-id: 679e33115e1844e2
+          minLength: 1
+        description: |-
+          * `planned` - planned
+          * `active` - active
+          * `disabled` - disabled
+          * `retired` - retired
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -35394,7 +35544,6 @@ components:
         description:
           type: string
       required:
-      - description
       - device_id
       - device_name
       - id

@@ -30,6 +30,7 @@ from .network_endpoints import (
     update_ip_address,
     update_mac_address,
 )
+from .network_inventory import devices_for_scope
 from .network_inventory_views import StrictSerializer
 from .network_records import network_records_for_scope
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
@@ -72,7 +73,7 @@ class InterfaceSerializer(serializers.Serializer):
     device_name = serializers.CharField(source="device.entity.display_name")
     kind = serializers.CharField()
     status = serializers.CharField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
 
 class IPAddressSerializer(serializers.Serializer):
@@ -211,11 +212,65 @@ def _error(exc: Exception) -> serializers.ValidationError:
     return serializers.ValidationError({"detail": detail})
 
 
+INTERFACE_ORDERING = {"name": "entity__display_name", "kind": "kind", "status": "status"}
+
+
+class InterfaceCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    device_id = serializers.UUIDField(required=False)
+    q = serializers.CharField(required=False, allow_blank=True, max_length=240, default="")
+    kind = serializers.ChoiceField(
+        choices=("physical", "virtual", "lag", "loopback", "tunnel", "wireless", "other"), required=False
+    )
+    status = serializers.ChoiceField(choices=("planned", "active", "disabled", "retired"), required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in INTERFACE_ORDERING for key in (field, f"-{field}")],
+        required=False,
+        default="name",
+    )
+    summary = serializers.BooleanField(required=False, default=False)
+
+
 class InterfaceListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: InterfaceResultSerializer})
+    @extend_schema(parameters=[InterfaceCollectionQuerySerializer], responses={200: InterfaceResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(interfaces_for_scope(workspace.data_scope), request, workspace, InterfaceResultSerializer)
+        query = InterfaceCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = interfaces_for_scope(workspace.data_scope)
+        if "device_id" in values:
+            if not devices_for_scope(workspace.data_scope).filter(entity_id=values["device_id"]).exists():
+                raise PermissionDenied("The selected device is unavailable.")
+            records = records.filter(device__entity_id=values["device_id"])
+        if values["q"]:
+            records = records.filter(
+                Q(entity__display_name__icontains=values["q"]) | Q(description__icontains=values["q"])
+            )
+        for field in ("kind", "status"):
+            if field in values:
+                records = records.filter(**{field: values[field]})
+        order = values["ordering"]
+        records = records.order_by(
+            ("-" if order.startswith("-") else "") + INTERFACE_ORDERING[order.lstrip("-")], "entity_id"
+        )
+        if values["summary"]:
+            records = records.defer("description")
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        serializer = InterfaceSerializer(page.records, many=True)
+        if values["summary"]:
+            serializer.child.fields.pop("description")
+        return Response(
+            {
+                "results": serializer.data,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        )
 
     @extend_schema(request=InterfaceWriteSerializer, responses={201: InterfaceSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

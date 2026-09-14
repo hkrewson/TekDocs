@@ -9,6 +9,7 @@ import type { WorkspaceContext } from '../workspaces/api'
 import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig, ChildRecordProps } from './NetworkChildCollection'
 import type { DeviceWrite, NetworkDevice, NetworksClient } from './api'
+import { DeviceInterfaces } from './DeviceInterfaces'
 import { DeviceChoice } from './DeviceChoice'
 import { RackPlaceChoice } from './RackPlaceChoice'
 import { networkText as t } from './networkText'
@@ -19,7 +20,7 @@ const statuses = [{ value: 'planned', label: t('rackStatusPlanned') }, { value: 
 const columns = ['name', 'role', 'status', 'site', 'rack', 'rack_unit'] as const
 const labels = { name: t('name'), role: t('rackDeviceRole'), status: translate('collections.status'), site: t('site'), rack: t('deviceRack'), rack_unit: t('rackDeviceUnit') }
 const config: ChildCollectionConfig<NetworkDevice, NetworkDevice> = {
-  key: 'devices', feature: 'network-devices', columns, labels, title: t('devices'), back: t('devicesBack'), create: t('devicesNew'), search: t('devicesSearch'), order: t('devicesOrder'), failed: t('devicesFailed'), empty: t('devicesEmpty'), count: (count) => t('devicesCount', { count }), association: { label: t('rackDeviceRole'), choices: roles }, statuses, identity: (row) => row.name,
+  key: 'devices', childSelectionKeys: ['interface'], feature: 'network-devices', columns, labels, title: t('devices'), back: t('devicesBack'), create: t('devicesNew'), search: t('devicesSearch'), order: t('devicesOrder'), failed: t('devicesFailed'), empty: t('devicesEmpty'), count: (count) => t('devicesCount', { count }), association: { label: t('rackDeviceRole'), choices: roles }, statuses, identity: (row) => row.name,
   value: (row, column) => column === 'role' ? roles.find((item) => item.value === row.role)?.label : column === 'status' ? statuses.find((item) => item.value === row.status)?.label : column === 'site' ? row.site_name || t('unassigned') : column === 'rack' ? row.rack_name || t('deviceUnracked') : row.rack_unit ?? translate('collections.missing'),
   load: (client, workspace, query, signal) => { const { association, ...rest } = query; return client.deviceCollection(workspace, { ...rest, ...(association ? { role: association } : {}) }, signal) }, read: (client, workspace, id, signal) => client.deviceDetail(workspace, id, signal),
 }
@@ -30,12 +31,12 @@ type Props = ChildRecordProps<NetworkDevice> & { workspace: WorkspaceContext; cl
 function DeviceRecord({ record, workspace, client, canManage, onSaved, onReturn }: Props) {
   const [params] = useSearchParams(), location = useLocation()
   const requested = params.get('devices_section')
-  const section = record && (requested === 'placement' || requested === 'history') ? requested : 'overview'
+  const section = record && (requested === 'placement' || requested === 'history' || requested === 'interfaces') ? requested : 'overview'
   function href(id: string) { const next = new URLSearchParams(params); next.set('devices_section', id); return `${location.pathname}?${next}` }
   return <article className="record-page">
     {params.get('devices_full') === 'true' && <RecordHeader title={record?.name ?? t('devicesNew')} recordId={record?.id ?? 'new'} section={section} />}
-    {record && <RecordSections current={section} sections={['overview', 'placement', 'history'].map((id) => ({ id, label: id === 'placement' ? t('devicePlacement') : translate(id === 'history' ? 'collections.history' : 'collections.overview'), href: href(id) }))} />}
-    {section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t('devicesHistoryHelp')} emptyLabel={t('devicesHistoryEmpty')} deniedLabel={t('devicesHistoryDenied')} /> : section === 'placement' && record ? <DevicePlacement key={record.id} record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} /> : <DeviceOverview record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} />}
+    {record && <RecordSections current={section} sections={['overview', 'placement', 'interfaces', 'history'].map((id) => ({ id, label: id === 'interfaces' ? t('interfaces') : id === 'placement' ? t('devicePlacement') : translate(id === 'history' ? 'collections.history' : 'collections.overview'), href: href(id) }))} />}
+    {section === 'interfaces' && record ? <DeviceInterfaces key={record.id} workspace={workspace} deviceId={record.id} client={client} /> : section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t('devicesHistoryHelp')} emptyLabel={t('devicesHistoryEmpty')} deniedLabel={t('devicesHistoryDenied')} /> : section === 'placement' && record ? <DevicePlacement key={record.id} record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} /> : <DeviceOverview record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} />}
   </article>
 }
 function DeviceOverview({ record, workspace, client, canManage, onSaved, onReturn }: Props) {

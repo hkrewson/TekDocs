@@ -420,7 +420,15 @@ class NetworkChoiceListView(APIView):
 
 class NetworkAssignmentQuerySerializer(BoundedCollectionQuerySerializer):
     page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
-    kind = serializers.ChoiceField(choices=("site", "vlan"))
+    kind = serializers.ChoiceField(choices=("site", "vlan", "location"))
+    site_id = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs["kind"] == "location" and "site_id" not in attrs:
+            raise serializers.ValidationError({"site_id": "A site is required for location choices."})
+        if attrs["kind"] != "location" and "site_id" in attrs:
+            raise serializers.ValidationError({"site_id": "Only location choices accept a site."})
+        return attrs
     q = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
 
 
@@ -447,14 +455,18 @@ class NetworkAssignmentChoiceListView(APIView):
         query.is_valid(raise_exception=True)
         values = query.validated_data
         records: QuerySet[Any] = (
-            sites_for_scope(workspace.data_scope)
+            sites_for_scope(workspace.data_scope).prefetch_related(None)
             if values["kind"] == "site"
             else NetworkVLAN.scoped.for_scope(workspace.data_scope).select_related("entity")
         )
+        if values["kind"] == "location":
+            if not sites_for_scope(workspace.data_scope).filter(entity_id=values["site_id"]).exists():
+                raise PermissionDenied("The selected site is unavailable.")
+            records = locations_for_scope(workspace.data_scope).filter(site__entity_id=values["site_id"])
         if values["q"]:
             term = values["q"]
             condition = Q(entity__display_name__icontains=term)
-            if values["kind"] == "site":
+            if values["kind"] in ("site", "location"):
                 condition |= Q(code__icontains=term)
             elif term.isascii() and term.isdigit() and len(term) <= 4:
                 condition |= Q(vlan_id=int(term))
@@ -467,7 +479,7 @@ class NetworkAssignmentChoiceListView(APIView):
                     {
                         "id": str(item.entity_id),
                         "name": item.entity.display_name,
-                        "identifier": str(item.code if values["kind"] == "site" else item.vlan_id),
+                        "identifier": str(item.code if values["kind"] in ("site", "location") else item.vlan_id),
                     }
                     for item in page.records
                 ],

@@ -22946,11 +22946,13 @@ export interface operations {
                 /**
                  * @description * `site` - site
                  *     * `vlan` - vlan
+                 *     * `location` - location
                  */
-                readonly kind: "site" | "vlan";
+                readonly kind: "site" | "vlan" | "location";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
+                readonly site_id?: string;
             };
             readonly header?: never;
             readonly path?: never;
@@ -31532,11 +31534,13 @@ export interface operations {
                 /**
                  * @description * `site` - site
                  *     * `vlan` - vlan
+                 *     * `location` - location
                  */
-                readonly kind: "site" | "vlan";
+                readonly kind: "site" | "vlan" | "location";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
+                readonly site_id?: string;
             };
             readonly header?: never;
             readonly path: {

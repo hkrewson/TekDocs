@@ -6,3 +6,8 @@
 .network-inline-editor input[type=checkbox] { width: 1.5rem; min-height: 1.5rem; }
 .network-notes { white-space: pre-wrap; }
 @media (max-width: 767px) { .network-inline-editor .field-grid { grid-template-columns: minmax(0, 1fr); } }
+
+@media (max-width: 767px) {
+  .rack-register .collection-table td[data-column="location"],
+  .rack-register .collection-table td[data-column="unit_count"] { display: none; }
+}

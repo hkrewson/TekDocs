@@ -118,6 +118,7 @@ export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationsh
 export type InventoryQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; site_id?: string; rack_id?: string; role?: string }
 
 export interface NetworksClient {
+  locationChoices(workspace: WorkspaceContext, siteId: string, q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   rackCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<ListResult<NetworkRack>>
   deviceCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<DeviceListResult>
   rackDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkRack>
@@ -227,6 +228,10 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async locationChoices(workspace, siteId, q, page, signal) {
+    const params = new URLSearchParams({ kind: 'location', site_id: siteId, q, page: String(page), page_size: '25' })
+    return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))
+  },
   async rackCollection(workspace, query, signal) {
     const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size) })
     return json(await fetch(`${basePath(workspace)}/racks?${params}`, { credentials: 'same-origin', signal }))

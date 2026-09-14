@@ -758,3 +758,65 @@ Verified: API prerequisite and local runtime. Not claimed: visible rack/device
 migration, browser layout acceptance, technician validation or production release.
 No known new runtime regression remains. The next slice is the rack register,
 complete drawer and lazy Devices section described in inventory-collections.md.
+
+## Rack register and complete drawer — 2026-09-13
+
+Bounded Phase 3 (#80) visible checkpoint: Racks view, shared register/preferences,
+full Overview/Devices/History drawer and optional direct full-page route. Added
+required-site/optional-location editing with bounded name/code choices and explicit
+location clearing on site change. Installed devices load only in their section;
+selected-device facts reuse the current drawer and revalidate rack membership.
+Existing mutation authorization, occupied-unit and placement constraints are retained.
+No domain-data migration, new route, dependency or version change. Device editing,
+standalone device registers/interfaces and other remaining surfaces stay open.
+
+Initial validation: 22 focused component tests pass (rack/addressing/wireless),
+including dirty failed drafts and unchanged assignments; one new test initially
+matched both the Site results region and its select and was corrected to target
+the combobox explicitly. Type checking identified a missing Site message and lint
+identified untyped Playwright fixture payloads; both were corrected without changing
+assertions or weakening gates. Backend location/personal-preference API test passes
+with 31 synthetic locations, off-page code search, invalid/sibling parent rejection,
+preference save/read/reset. Initial Chromium browser pass: 9 cases passed, including
+all six widths, axe checks, record/history refresh, Back/Forward, touch, failed-save
+guards, 200% zoom and outside-click dismissal. Additional child focus and preference
+coverage is included in the final maintained-browser run.
+
+Full check, network gate, live PostgreSQL journey and final browser outcomes follow.
+
+Verified on September 14: final make check exits 0 (519 tests across 109 frontend
+files, lint/types/schema agreement/migration drift, production build and bundle
+budgets). The live isolated browser→Django→PostgreSQL journey exits 0, including
+new rack create/edit/refresh and independent site/location/status/audit assertions.
+Local make up succeeds with existing volumes/data retained; readiness reports
+database/renderer healthy and version 0.8.46. Initial Chromium mobile screenshot
+was visually inspected with long values and reachable save/cancel controls.
+Final three-browser and broad network-gate outcomes follow below.
+
+All 120 maintained-browser rack/addressing cases passed before the final mobile
+density refinement. The review then limited mobile rack rows to name, site, status
+and device count, retaining location/capacity in the drawer. This change is scoped
+to the rack register; make check and all 30 rack browser cases are rerunning with
+explicit mobile visibility assertions. The previously passed 90 addressing cases
+are unaffected. No backend/live workflow code changed after its successful run.
+
+Final mobile verification passes: make check exits 0 again, including all 519
+frontend tests, production build and bundle limits. All 30 rack cases pass in
+Chromium/Firefox/WebKit with the final mobile column priorities. Together with
+the unaffected 90 addressing cases, all 120 scenarios pass; the additional full
+rack rerun is recorded separately. Chromium and WebKit mobile screenshots were
+visually inspected. Logs are under `/tmp/rack-layout-`: components-final, api,
+check-mobile, browser-final, browser-mobile, live, network-gate and up-final.
+
+Final closeout: full `make test-network-validation` exits 0, including network/API,
+permission/IDOR, runtime RLS, migration stabilization, high-volume checks and all
+519 frontend tests. Final local `make up` exits 0 after the mobile refinement;
+readiness confirms healthy database/renderer at 0.8.46. Wiki (37 pages/25 topics)
+and whitespace checks pass. Existing user/demo data and volumes were retained.
+
+Verified: complete rack register/drawer, bounded assignment API/preferences,
+maintained-browser scenarios, live save persistence and local rebuild. No known
+new regression remains. Not claimed: standalone device editing, interface/DNS/
+circuit migration, technician sign-off or full Phase 3/pre-1.0 release acceptance.
+No production push/publication or version change. This bounded checkpoint closes
+with the next device/interface work described in rack-register.md.

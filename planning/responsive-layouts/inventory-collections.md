@@ -56,3 +56,11 @@ with bounded choices, preserving failed drafts and guarding dismissal. Then exte
 the device register with permission-aware asset presentation and parent-scoped
 interfaces. These UI, preferences, assignment and browser/live acceptance steps
 remain open; this API prerequisite is not evidence that those surfaces are treated.
+
+## Follow-up: rack surface
+
+The rack register and complete drawer are implemented in rack-register.md, with
+Overview, lazy Devices/History, bounded placement editing and personal preferences.
+See progress.md for executed verification. The next implementation boundary is
+the standalone Devices register and its interface/placement workflows; this note
+supersedes the earlier rack prerequisite handoff without closing Phase 3.

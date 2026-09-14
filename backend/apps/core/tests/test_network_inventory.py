@@ -420,3 +420,45 @@ def test_device_collection_asset_search_respects_asset_permission(owner_client, 
     assert owner_client.get(url, {"q": "Restricted asset"}).json()["count"] == 0
     result = owner_client.get(url, {"q": "Visible device"}).json()["results"][0]
     assert result["hardware_asset_name"] is None and result["hardware_asset_id"] is None
+
+
+@pytest.mark.django_db
+def test_rack_location_choices_and_preferences_are_bounded_and_scoped(owner_client, installation):
+    organization = _organization(installation, "Rack editor")
+    other = _organization(installation, "Other rack editor")
+    site = _site(owner_client, organization, "Rack campus")
+    other_site = _site(owner_client, other, "Other campus")
+    location_url = reverse(
+        "organization-location-list-create",
+        kwargs={"organization_entity_id": organization.entity_id, "site_entity_id": site["id"]},
+    )
+    for index in range(31):
+        response = owner_client.post(
+            location_url,
+            {"name": f"Room {index:02}", "kind": "room", "code": f"R{index:02}", "parent_id": None},
+            content_type="application/json",
+        )
+        assert response.status_code == 201, response.content
+    url = reverse("organization-network-assignment-choices", kwargs={"organization_entity_id": organization.entity_id})
+    query = {"kind": "location", "site_id": site["id"]}
+    first = owner_client.get(url, query).json()
+    assert first["page_size"] == 25 and first["count"] == 31 and first["has_more"]
+    assert len(owner_client.get(url, {**query, "page": 2}).json()["results"]) == 6
+    assert owner_client.get(url, {**query, "q": "R30"}).json()["results"][0]["name"] == "Room 30"
+    assert owner_client.get(url, {"kind": "location"}).status_code == 400
+    assert owner_client.get(url, {"kind": "site", "site_id": site["id"]}).status_code == 400
+    assert owner_client.get(url, {**query, "site_id": other_site["id"]}).status_code == 403
+    pref = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": organization.entity_id, "feature": "network-racks"},
+    )
+    defaults = owner_client.get(pref).json()
+    assert defaults["columns"] == ["name", "site", "location", "status", "unit_count", "device_count"]
+    assert (
+        owner_client.put(
+            pref, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(pref).json()["columns"] == ["name", "status"]
+    assert owner_client.delete(pref).json()["page_size"] == 25

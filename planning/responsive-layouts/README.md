@@ -67,3 +67,5 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Progress and verification](progress.md)
 
 - [Devices and racks collection prerequisite](inventory-collections.md)
+
+- [Rack register and complete drawer](rack-register.md)

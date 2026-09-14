@@ -10750,12 +10750,14 @@ paths:
           enum:
           - site
           - vlan
+          - location
           type: string
-          x-spec-enum-id: d94f7d4d62b69f86
+          x-spec-enum-id: 0b5a08f5eae7b50c
           minLength: 1
         description: |-
           * `site` - site
           * `vlan` - vlan
+          * `location` - location
         required: true
       - in: query
         name: page
@@ -10777,6 +10779,11 @@ paths:
           type: string
           default: ''
           maxLength: 240
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -23059,12 +23066,14 @@ paths:
           enum:
           - site
           - vlan
+          - location
           type: string
-          x-spec-enum-id: d94f7d4d62b69f86
+          x-spec-enum-id: 0b5a08f5eae7b50c
           minLength: 1
         description: |-
           * `site` - site
           * `vlan` - vlan
+          * `location` - location
         required: true
       - in: path
         name: organization_entity_id
@@ -23092,6 +23101,11 @@ paths:
           type: string
           default: ''
           maxLength: 240
+      - in: query
+        name: site_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:

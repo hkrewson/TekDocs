@@ -65,7 +65,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   function next(values: Record<string, string | null>) { const changedParams = new URLSearchParams(params); for (const [name, value] of Object.entries(values)) { if (value) changedParams.set(name, value); else changedParams.delete(name) } return changedParams }
   function browse(values: Record<string, string | null>) {
     const updated = next({ ...(!(`${config.key}_page` in values) && !(config.key in values) ? { [`${config.key}_page`]: null } : {}), ...values })
-    if (standalone && config.key in values) { updated.delete(`${config.key}_full`); updated.delete(`${config.key}_section`); updated.delete('history_page') }
+    if (standalone && config.key in values) { updated.delete(`${config.key}_full`); updated.delete(`${config.key}_section`); updated.delete(`${config.key}_device`); updated.delete('history_page') }
     setParams(updated, { state: standalone && values[config.key] ? { childListY: window.scrollY } : location.state as unknown })
   }
   function href(values: Record<string, string | null>) { return `${location.pathname}?${next(values)}` }

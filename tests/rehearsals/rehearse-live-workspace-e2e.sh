@@ -304,6 +304,15 @@ assert not InvoiceArtifact.objects.filter(invoice=invoice).exists()
 assert not InvoiceLifecycleEvent.objects.filter(invoice=invoice).exists()
 print("Live recurring stop retained its audit reason, approved schedule, period claim, and unissued draft.")
 
+from apps.core.models import NetworkRack
+rack = NetworkRack.objects.select_related("site__entity", "location__entity").get(entity__display_name="Live layout rack")
+assert rack.organization == organization
+assert rack.status == "planned" and rack.unit_count == 42
+assert rack.site.entity.display_name == "Live Main Campus"
+assert rack.location.entity.display_name == "Building A"
+assert AuditEvent.objects.filter(entity_id=rack.entity_id, action="network_rack.updated").exists()
+print("Live rack creation and update retained its exact site, location and audit history.")
+
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization
 client_block = client_document.placements.get(parent__isnull=True, position=0).block

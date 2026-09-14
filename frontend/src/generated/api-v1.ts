@@ -11664,6 +11664,7 @@ export interface components {
             readonly rack_units: number;
         };
         readonly NetworkDeviceResult: {
+            readonly can_create: boolean;
             readonly results: readonly components["schemas"]["NetworkDevice"][];
             readonly page: number;
             readonly page_size: number;
@@ -22947,8 +22948,9 @@ export interface operations {
                  * @description * `site` - site
                  *     * `vlan` - vlan
                  *     * `location` - location
+                 *     * `hardware_asset` - hardware_asset
                  */
-                readonly kind: "site" | "vlan" | "location";
+                readonly kind: "site" | "vlan" | "location" | "hardware_asset";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -31535,8 +31537,9 @@ export interface operations {
                  * @description * `site` - site
                  *     * `vlan` - vlan
                  *     * `location` - location
+                 *     * `hardware_asset` - hardware_asset
                  */
-                readonly kind: "site" | "vlan" | "location";
+                readonly kind: "site" | "vlan" | "location" | "hardware_asset";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

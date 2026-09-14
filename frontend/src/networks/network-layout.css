@@ -11,3 +11,8 @@
   .rack-register .collection-table td[data-column="location"],
   .rack-register .collection-table td[data-column="unit_count"] { display: none; }
 }
+
+@media (max-width: 767px) {
+  .device-register .collection-table td[data-column="site"],
+  .device-register .collection-table td[data-column="rack_unit"] { display: none; }
+}

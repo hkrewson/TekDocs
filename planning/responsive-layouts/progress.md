@@ -820,3 +820,60 @@ new regression remains. Not claimed: standalone device editing, interface/DNS/
 circuit migration, technician sign-off or full Phase 3/pre-1.0 release acceptance.
 No production push/publication or version change. This bounded checkpoint closes
 with the next device/interface work described in rack-register.md.
+
+## Devices register and core editing — September 14, 2026
+
+Phase 3 (#80), required pre-1.0 under #60/#75. The implemented boundary is
+documented in device-register.md: Devices register, full Overview/Placement/History
+drawer, bounded hardware selection for creation, independent ordinary/placement
+edits, and rack-child navigation. Mobile rows prioritize name/role/status/rack.
+Interfaces, device relationships, hardware rebinding, DNS/circuits and final
+technician/release acceptance remain open. Version remains 0.8.46.
+
+The additive hardware-choice API and device creation capability honor existing
+asset permissions and exact workspace scope. Hidden asset bindings are neither
+returned nor resent by ordinary editing. Preferences reuse existing ownership/RLS;
+there is no migration, new permission grant, dependency or domain-data conversion.
+OpenAPI and generated types are aligned. Failed mutations retain drafts and are
+not automatically retried.
+
+Verified: 10 focused component cases, two new Django/PostgreSQL API cases, and
+10 initial Chromium browser cases pass. The API cases exercise 31 hardware choices,
+off-page search, workspace isolation, claimed-asset removal, asset-denied editing
+and preference persistence/reset. Main `make check` exits 0: 524 frontend tests
+across 110 files, lint/types, schema agreement, migration drift, production build
+and bundle budgets. No gate or assertion was weakened.
+
+The isolated live browser→Django→PostgreSQL journey exits 0. It creates a device,
+changes status, places it in a rack, reloads it and follows rack-to-device navigation
+with Back restoration. Independent database assertions verify the hardware binding,
+derived site/location, occupied units and exactly two update audit events. Chromium
+mobile placement screenshot was visually inspected with reachable save/cancel.
+
+Final maintained-browser, network-gate and local rebuild outcomes follow below.
+
+Local `make up` exits 0; the rebuilt application readiness endpoint confirms
+database/renderer healthy at 0.8.46, with existing data and volumes retained.
+The repository Wiki manifest/help contract passes (37 pages/25 contextual topics).
+The additional full-checkout check against `../TekDocs.wiki` fails because that
+pre-existing checkout lacks 31 manifest pages. This is a documentation checkout
+limitation, not an application test failure; the scoped Roadmap update is saved
+there without publishing or committing its unrelated changes. Full Wiki checkout
+validation remains unverified until the missing pages are restored/synchronized.
+
+Final maintained-browser run exits 0: all 60 device/rack cases pass across
+Chromium, Firefox and WebKit, including all six widths, touch/short heights,
+200% zoom, accessibility scans, saved columns, navigation and dirty/failed saves.
+Chromium and WebKit mobile placement screenshots were visually inspected.
+Logs are under `/tmp/device-layout-`: components, api, check, live, browser-final,
+network-gate and up. The network gate outcome follows at final closeout.
+
+Final closeout: full `make test-network-validation` exits 0, including network/API,
+permission/IDOR, runtime RLS, migration reversal/reapplication, high-volume
+stabilization and all 524 frontend tests. No known new application regression
+remains. Main checks, all 60 maintained-browser cases, live database assertions
+and local rebuild are verified. Whitespace and route-inventory JSON checks pass.
+The separate incomplete Wiki checkout remains the documentation limitation above;
+no Wiki publication, production deployment or version change was performed.
+This closes the bounded Devices/core-editing checkpoint, not Phase 3 or pre-1.0
+acceptance. The next interface/API work is documented in device-register.md.

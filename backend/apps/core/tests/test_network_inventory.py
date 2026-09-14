@@ -462,3 +462,83 @@ def test_rack_location_choices_and_preferences_are_bounded_and_scoped(owner_clie
     )
     assert owner_client.get(pref).json()["columns"] == ["name", "status"]
     assert owner_client.delete(pref).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+def test_device_creation_choices_and_preferences_are_scoped(owner_client, installation):
+    organization = _organization(installation, "Device choices")
+    sibling = _organization(installation, "Other device choices")
+    for index in range(31):
+        create_network_hardware_asset(
+            installation=installation, organization=organization, name=f"Available {index:02}"
+        )
+    create_network_hardware_asset(installation=installation, organization=sibling, name="Outside asset")
+    kwargs = {"organization_entity_id": organization.entity_id}
+    url = reverse("organization-network-assignment-choices", kwargs=kwargs)
+    first = owner_client.get(url, {"kind": "hardware_asset"}).json()
+    assert first["count"] == 31 and first["page_size"] == 25 and first["has_more"]
+    second = owner_client.get(url, {"kind": "hardware_asset", "page": 2}).json()
+    assert len(second["results"]) == 6 and not second["has_more"]
+    found = owner_client.get(url, {"kind": "hardware_asset", "q": "Available 30"}).json()
+    assert found["count"] == 1
+    assert owner_client.get(url, {"kind": "hardware_asset", "q": "Outside"}).json()["count"] == 0
+    device_url = reverse("organization-network-devices", kwargs=kwargs)
+    assert owner_client.get(device_url).json()["can_create"] is True
+    created = owner_client.post(
+        device_url,
+        {"name": "New device", "role": "switch", "hardware_asset_id": found["results"][0]["id"]},
+        content_type="application/json",
+    )
+    assert created.status_code == 201, created.content
+    assert owner_client.get(url, {"kind": "hardware_asset", "q": "Available 30"}).json()["count"] == 0
+    pref = reverse("organization-collection-preferences", kwargs={**kwargs, "feature": "network-devices"})
+    assert owner_client.get(pref).json()["columns"] == ["name", "role", "status", "site", "rack", "rack_unit"]
+    assert (
+        owner_client.put(
+            pref, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+        ).status_code
+        == 200
+    )
+    assert owner_client.get(pref).json()["columns"] == ["name", "status"]
+    assert owner_client.delete(pref).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+def test_asset_denial_blocks_device_creation_choices_but_not_ordinary_edits(owner_client, installation, monkeypatch):
+    from rest_framework.exceptions import PermissionDenied
+
+    from apps.accounts.policy import PermissionKey
+    from apps.core import network_inventory_views
+
+    organization = _organization(installation, "Restricted devices")
+    site = _site(owner_client, organization, "Restricted campus")
+    rack = _rack(owner_client, organization, site)
+    created = _device(owner_client, installation, organization, rack, "Existing device", 1)
+    assert created.status_code == 201
+    original_context = network_inventory_views.context_has_permission
+    original_require = network_inventory_views.require_permission
+    monkeypatch.setattr(
+        network_inventory_views,
+        "context_has_permission",
+        lambda member, permission, **kwargs: permission != PermissionKey.ASSETS_VIEW
+        and original_context(member, permission, **kwargs),
+    )
+
+    def require(user, permission, **kwargs):
+        if permission == PermissionKey.ASSETS_VIEW:
+            raise PermissionDenied("Asset access denied.")
+        return original_require(user, permission, **kwargs)
+
+    monkeypatch.setattr(network_inventory_views, "require_permission", require)
+    kwargs = {"organization_entity_id": organization.entity_id}
+    url = reverse("organization-network-assignment-choices", kwargs=kwargs)
+    assert owner_client.get(url, {"kind": "hardware_asset"}).status_code == 403
+    listing = owner_client.get(reverse("organization-network-devices", kwargs=kwargs)).json()
+    assert listing["can_create"] is False and listing["can_manage"] is True
+    assert listing["results"][0]["hardware_asset_name"] is None
+    detail = reverse("organization-network-device-detail", kwargs={**kwargs, "device_entity_id": created.json()["id"]})
+    updated = owner_client.patch(
+        detail, {"name": "Renamed", "role": "router", "status": "offline"}, content_type="application/json"
+    )
+    assert updated.status_code == 200, updated.content
+    assert updated.json()["rack_id"] == rack["id"] and updated.json()["rack_unit"] == 1

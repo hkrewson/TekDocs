@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { CollectionPagination } from '../CollectionPagination'
 import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -7,6 +7,7 @@ import type { InventoryQuery, NetworkDevice, NetworksClient } from './api'
 import { networkText as t } from './networkText'
 
 export function RackDevices({ rackId, workspace, client }: { rackId: string; workspace: WorkspaceContext; client: NetworksClient }) {
+  const location = useLocation()
   const [params, setParams] = useSearchParams()
   const requested = Number(params.get('racks_devices_page'))
   const page = Number.isSafeInteger(requested) && requested > 0 ? requested : 1
@@ -34,6 +35,7 @@ export function RackDevices({ rackId, workspace, client }: { rackId: string; wor
   if (selected) return <section aria-label={t('rackDevices')}>
     <button type="button" className="secondary-button" onClick={() => browse({ racks_device: null })}>{t('rackDeviceBack')}</button>
     {!record ? <p role="status">{translate('collections.loading')}</p> : !record.value ? <p role="alert">{t('rackDeviceUnavailable')}</p> : <>
+      <Link to={`${location.pathname}?${new URLSearchParams({ ...Object.fromEntries(params), view: 'devices', devices: selected, devices_full: 'true', devices_section: 'overview' })}`} state={location.state as unknown}>{t('deviceOpen')}</Link>
       <h3 tabIndex={-1} ref={(element) => element?.focus()}>{record.value.name}</h3>
       <dl className="record-facts">{[
         [t('rackDeviceRole'), record.value.role], [translate('collections.status'), record.value.status], [t('rackDeviceUnit'), record.value.rack_unit], [t('rackDeviceUnits'), record.value.rack_units], [t('site'), record.value.site_name], [t('location'), record.value.location_name], [t('rackDeviceAsset'), record.value.hardware_asset_name || t('rackDeviceAssetUnavailable')],

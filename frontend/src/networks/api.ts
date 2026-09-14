@@ -112,12 +112,13 @@ export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack
   rack_unit: number | null
 }
 
-export type ListResult<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
+export type ListResult<T> = { can_create?: boolean; results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export type InventoryQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; site_id?: string; rack_id?: string; role?: string }
 
 export interface NetworksClient {
+  hardwareAssetChoices(workspace: WorkspaceContext, q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   locationChoices(workspace: WorkspaceContext, siteId: string, q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   rackCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<ListResult<NetworkRack>>
   deviceCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<DeviceListResult>
@@ -136,7 +137,7 @@ export interface NetworksClient {
   updateRack(workspace: WorkspaceContext, rackId: string, values: RackWrite): Promise<NetworkRack>
   listDevices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<DeviceListResult>
   createDevice(workspace: WorkspaceContext, values: DeviceWrite): Promise<NetworkDevice>
-  updateDevice(workspace: WorkspaceContext, deviceId: string, values: DeviceWrite): Promise<NetworkDevice>
+  updateDevice(workspace: WorkspaceContext, deviceId: string, values: Partial<DeviceWrite>): Promise<NetworkDevice>
   choices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetworkChoices>
   listVRFs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkVRF>>
   createVRF(workspace: WorkspaceContext, values: VRFWrite): Promise<NetworkVRF>
@@ -228,6 +229,10 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async hardwareAssetChoices(workspace, q, page, signal) {
+    const params = new URLSearchParams({ kind: 'hardware_asset', q, page: String(page), page_size: '25' })
+    return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))
+  },
   async locationChoices(workspace, siteId, q, page, signal) {
     const params = new URLSearchParams({ kind: 'location', site_id: siteId, q, page: String(page), page_size: '25' })
     return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))

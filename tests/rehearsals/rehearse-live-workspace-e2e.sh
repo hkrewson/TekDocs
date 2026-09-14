@@ -312,6 +312,14 @@ assert rack.site.entity.display_name == "Live Main Campus"
 assert rack.location.entity.display_name == "Building A"
 assert AuditEvent.objects.filter(entity_id=rack.entity_id, action="network_rack.updated").exists()
 print("Live rack creation and update retained its exact site, location and audit history.")
+from apps.core.models import NetworkDevice
+device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity__display_name="Live network switch")
+assert device.organization == organization and device.rack == rack
+assert device.site_id == rack.site_id and device.location_id == rack.location_id
+assert device.rack_unit == 5 and device.rack_units == 2 and device.status == "offline"
+assert device.hardware_asset.entity.display_name == "Live core switch"
+assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 2
+print("Live device retained hardware identity, ordinary edits and rack-derived placement.")
 
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization

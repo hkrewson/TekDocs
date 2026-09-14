@@ -24,6 +24,13 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "network-devices": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple(
+            (column, PermissionKey.NETWORKS_VIEW) for column in ("name", "role", "status", "site", "rack", "rack_unit")
+        ),
+        ("name", "role", "status", "site", "rack", "rack_unit"),
+    ),
     "network-racks": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple(

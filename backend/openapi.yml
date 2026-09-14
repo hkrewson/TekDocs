@@ -10751,13 +10751,15 @@ paths:
           - site
           - vlan
           - location
+          - hardware_asset
           type: string
-          x-spec-enum-id: 0b5a08f5eae7b50c
+          x-spec-enum-id: f9ca7cf3db454efe
           minLength: 1
         description: |-
           * `site` - site
           * `vlan` - vlan
           * `location` - location
+          * `hardware_asset` - hardware_asset
         required: true
       - in: query
         name: page
@@ -23067,13 +23069,15 @@ paths:
           - site
           - vlan
           - location
+          - hardware_asset
           type: string
-          x-spec-enum-id: 0b5a08f5eae7b50c
+          x-spec-enum-id: f9ca7cf3db454efe
           minLength: 1
         description: |-
           * `site` - site
           * `vlan` - vlan
           * `location` - location
+          * `hardware_asset` - hardware_asset
         required: true
       - in: path
         name: organization_entity_id
@@ -37737,6 +37741,8 @@ components:
     NetworkDeviceResult:
       type: object
       properties:
+        can_create:
+          type: boolean
         results:
           type: array
           items:
@@ -37759,6 +37765,7 @@ components:
           type: boolean
       required:
       - can_archive_relationships
+      - can_create
       - can_create_relationships
       - can_manage
       - can_view_relationships

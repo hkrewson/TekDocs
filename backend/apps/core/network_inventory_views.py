@@ -116,6 +116,7 @@ class NetworkRackResultSerializer(serializers.Serializer):
 
 
 class NetworkDeviceResultSerializer(serializers.Serializer):
+    can_create = serializers.BooleanField()
     results = NetworkDeviceSerializer(many=True)
     page = serializers.IntegerField()
     page_size = serializers.IntegerField()
@@ -326,6 +327,9 @@ class NetworkDeviceListCreateView(APIView):
         )
         page = _inventory_collection(workspace, query.validated_data, devices=True, can_view_assets=can_view_assets)
         response = NetworkDeviceResultSerializer({
+            "can_create": can_view_assets and context_has_permission(
+                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+            ),
             "results": page.records,
             "page": page.page,
             "page_size": page.page_size,
@@ -420,7 +424,7 @@ class NetworkChoiceListView(APIView):
 
 class NetworkAssignmentQuerySerializer(BoundedCollectionQuerySerializer):
     page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
-    kind = serializers.ChoiceField(choices=("site", "vlan", "location"))
+    kind = serializers.ChoiceField(choices=("site", "vlan", "location", "hardware_asset"))
     site_id = serializers.UUIDField(required=False)
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
@@ -429,6 +433,7 @@ class NetworkAssignmentQuerySerializer(BoundedCollectionQuerySerializer):
         if attrs["kind"] != "location" and "site_id" in attrs:
             raise serializers.ValidationError({"site_id": "Only location choices accept a site."})
         return attrs
+
     q = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
 
 
@@ -463,12 +468,19 @@ class NetworkAssignmentChoiceListView(APIView):
             if not sites_for_scope(workspace.data_scope).filter(entity_id=values["site_id"]).exists():
                 raise PermissionDenied("The selected site is unavailable.")
             records = locations_for_scope(workspace.data_scope).filter(site__entity_id=values["site_id"])
+        if values["kind"] == "hardware_asset":
+            require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
+            records = (
+                assets_for_scope(workspace.data_scope)
+                .filter(product__kind="hardware", network_device__isnull=True)
+                .prefetch_related(None)
+            )
         if values["q"]:
             term = values["q"]
             condition = Q(entity__display_name__icontains=term)
             if values["kind"] in ("site", "location"):
                 condition |= Q(code__icontains=term)
-            elif term.isascii() and term.isdigit() and len(term) <= 4:
+            elif values["kind"] == "vlan" and term.isascii() and term.isdigit() and len(term) <= 4:
                 condition |= Q(vlan_id=int(term))
             records = records.filter(condition)
         records = records.order_by("entity__display_name", "entity_id")
@@ -479,7 +491,13 @@ class NetworkAssignmentChoiceListView(APIView):
                     {
                         "id": str(item.entity_id),
                         "name": item.entity.display_name,
-                        "identifier": str(item.code if values["kind"] in ("site", "location") else item.vlan_id),
+                        "identifier": str(
+                            item.code
+                            if values["kind"] in ("site", "location")
+                            else item.vlan_id
+                            if values["kind"] == "vlan"
+                            else ""
+                        ),
                     }
                     for item in page.records
                 ],

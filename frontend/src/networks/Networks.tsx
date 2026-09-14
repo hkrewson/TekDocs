@@ -1,3 +1,4 @@
+import { DeviceRegister } from './DeviceRegister'
 import { RackRegister } from './RackRegister'
 import { AddressingRegister } from './AddressingRegister'
 import { WirelessWorkspace } from './NetworkWireless'
@@ -33,13 +34,13 @@ export function Networks(props: NetworksProps) {
   const wireless = params.get('view') === 'wireless'
   function href(view: string) {
     const next = new URLSearchParams(params)
-    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'vlans', 'vlans_full', 'vlans_section', 'vrfs', 'vrfs_full', 'vrfs_section', 'racks', 'racks_full', 'racks_section', 'racks_device', 'history_page']) next.delete(key)
+    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'vlans', 'vlans_full', 'vlans_section', 'vrfs', 'vrfs_full', 'vrfs_section', 'racks', 'racks_full', 'racks_section', 'racks_device', 'devices', 'devices_full', 'devices_section', 'history_page']) next.delete(key)
     if (view !== 'networks') next.set('view', view); else next.delete('view')
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }
   return <>
-    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!['wireless', 'vlans', 'vrfs', 'racks'].includes(params.get('view') ?? '') ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link>{(['vlans', 'vrfs', 'racks'] as const).map((kind) => <Link key={kind} to={href(kind)} aria-current={params.get('view') === kind ? 'page' : undefined}>{t(kind)}</Link>)}</nav>
-    {params.get('view') === 'racks' ? <RackRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'vlans' || params.get('view') === 'vrfs' ? <AddressingRegister kind={params.get('view') as 'vlans' | 'vrfs'} workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
+    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!['wireless', 'vlans', 'vrfs', 'racks', 'devices'].includes(params.get('view') ?? '') ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link>{(['vlans', 'vrfs', 'racks', 'devices'] as const).map((kind) => <Link key={kind} to={href(kind)} aria-current={params.get('view') === kind ? 'page' : undefined}>{t(kind)}</Link>)}</nav>
+    {params.get('view') === 'devices' ? <DeviceRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'racks' ? <RackRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'vlans' || params.get('view') === 'vrfs' ? <AddressingRegister kind={params.get('view') as 'vlans' | 'vrfs'} workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
   </>
 }
 

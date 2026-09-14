@@ -55,3 +55,10 @@ Executed results and any fixes are recorded in progress.md.
 
 Devices, interfaces, DNS, circuits, remaining network surfaces, technician walkthroughs
 and final pre-1.0 acceptance remain open. No production publication or version bump.
+
+## Device-register follow-up
+
+The standalone Devices register now supports Overview/Placement/History, asset-backed
+creation and guarded detail/placement edits; see device-register.md. Rack child details
+link to that full record with browser return context. Interfaces and other follow-ups
+remain open rather than inferred from the device register checkpoint.

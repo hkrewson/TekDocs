@@ -2400,5 +2400,9 @@
   "networkLayout.vrfsHistoryDenied": "Your role cannot view VRF history.",
   "networkLayout.vrfsSave": "Save VRF",
   "networkLayout.vrfsEdit": "Edit VRF",
-  "networkLayout.vrfsDenied": "Your role cannot edit VRFs."
+  "networkLayout.vrfsDenied": "Your role cannot edit VRFs.",
+  "networkLayout.relatedSearch": "Search associated networks",
+  "networkLayout.relatedEmpty": "No associated networks match this search.",
+  "networkLayout.relatedFailed": "Associated networks could not be loaded.",
+  "networkLayout.relatedHelp": "Networks assigned to this record. Open a network to view its details; use browser Back to return here."
 }

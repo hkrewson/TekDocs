@@ -37,7 +37,7 @@ export type NetworkChoices = {
   hardware_assets: Array<{ id: string; name: string }>
 }
 
-export type NetworkQuery = { q: string; page: number; page_size: number; ordering: string; vlan?: string }
+export type NetworkQuery = { q: string; page: number; page_size: number; ordering: string; vlan?: string; vlan_id?: string; vrf_id?: string }
 
 export type NetworkRecord = {
   id: string

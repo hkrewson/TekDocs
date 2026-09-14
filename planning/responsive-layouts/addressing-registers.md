@@ -1,8 +1,8 @@
 # VLAN and VRF registers — Phase 3 #80
 
 This bounded checkpoint adds VLAN and VRF browsing/editing to Networks under #60/#75,
-remaining pre-1.0 at 0.8.46. Related subnet navigation, wireless site/VLAN association
-editing and other network surfaces remain separate follow-up work.
+remaining pre-1.0 at 0.8.46. Associated subnet navigation is included in the next checkpoint below. Wireless
+site/VLAN association editing and other network surfaces remain follow-up work.
 
 ## Layout and navigation
 
@@ -11,7 +11,7 @@ overlay drawer. Defaults are Name + VLAN ID or Name + Route distinguisher. Colum
 retain curated order, identity is mandatory, reset restores defaults, and page sizes
 are 25/50/100. There is no bulk action or artificial status filter for these records.
 
-Names open the drawer, with Overview and History. Full-page links, record/tab direct
+Names open the drawer, with Overview, Networks and History. Full-page links, record/tab direct
 URLs, refresh and browser Back/Forward retain collection context. Below 768px the
 shared Sections menu replaces desktop section links. Drawer dismissal is outside
 click/Escape, with Back on mobile. Editing is one Overview form with Save/Cancel and
@@ -21,7 +21,7 @@ route distinguishers and descriptions remain visible as missing information.
 
 For kind=vlans|vrfs, the owning network route uses view=kind. Collection state is
 {kind}_q, {kind}_order, {kind}_page, {kind}_size; selected ID is {kind}, with
-{kind}_section=overview|history and {kind}_full=true for full-page display. New records
+{kind}_section=overview|networks|history and {kind}_full=true for full-page display. New records
 use {kind}=new. Browser state restores transient scroll/focus; direct links without
 list history return to their owning collection. Changing Network views clears record
 selection and preserves independent collection queries. Existing network/Wireless
@@ -57,7 +57,37 @@ records, failed/dirty editing, column persistence/reset, collection retry/empty 
 six widths, touch/short screens, 200% zoom and accessibility. Live workflow creates,
 edits and refreshes both kinds through Django/PostgreSQL. See progress.md for results.
 
-This does not close related subnet navigation, remaining network records, technician
+This does not close remaining network records, technician
 walkthroughs, release acceptance or other security/recovery/recurring-invoice
 obligations. Preserve all user/demo data. Local rebuild and Wiki edits do not publish
 a production release or change the version.
+
+## Associated networks checkpoint
+
+The Networks section lazily loads a compact list of explicitly associated subnets.
+It uses the existing network summary API with additive `vlan_id` or `vrf_id` entity
+filters. The server validates the parent in the exact authorized workspace before
+filtering by its association; matching a VLAN number alone is not an association.
+Invalid identifiers return 400; unavailable or foreign-workspace parents return 403.
+Existing `vlan` number filtering, domain writes and legacy consumers remain unchanged.
+No migration or preference-model change is needed.
+
+Related lists expose names and labeled CIDRs, search the whole authorized association,
+and use stable name/entity ordering with 25/50/100 rows. Their query state is stored in
+`{kind}_networks_q`, `_page` and `_size`; it is not saved as a personal collection view.
+These compact related summaries do not add columns, bulk actions or nested drawers.
+Network links open the existing full network record, retaining the originating parent
+URL in browser history. Back restores the parent section/query/page; refresh and
+opening the destination in a new tab work with the same canonical network route.
+A direct network link returns to the owning Networks collection. Parent edits remain
+guarded on section changes. Read failures support explicit retry, with empty/search
+states distinct from unavailable lookups.
+
+See progress.md for executed component/API/browser/live verification and limitations.
+
+Recommended next network checkpoint: focused wireless site/VLAN association editing.
+Reuse the successful parent-assignment flow, use bounded authorized option searches
+(including records beyond the first page), preserve unrelated associations with partial
+updates, and cover unavailable retained assignments and post-save dismissal. Keep
+remaining devices/racks/interfaces/DNS/circuits and final Phase 3 acceptance visible;
+associated subnet navigation does not migrate those surfaces.

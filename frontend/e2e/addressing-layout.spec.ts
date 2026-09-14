@@ -137,3 +137,51 @@ for (const kind of ['vlans', 'vrfs'] as const) {
     await expect(page.getByText(`No ${label}s match this workspace and search.`, { exact: true })).toBeVisible()
   })
 }
+
+for (const kind of ['vlans', 'vrfs'] as const) {
+  for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+    test(`${kind} associated networks retain section, search and paging at ${width}px`, async ({ page }) => {
+      await fixtures(page, kind)
+      await page.setViewportSize({ width, height: 600 })
+      const records = Array.from({ length: 31 }, (_, index) => ({ id: `subnet-${index}`, name: `Related ${String(index).padStart(2, '0')}${index === 30 ? 'X'.repeat(220) : ''}`, cidr: `10.20.${index}.0/24`, vlan: 1, description: 'Associated scope', notes: '', gateway: `10.20.${index}.1`, range_start: `10.20.${index}.1`, range_end: `10.20.${index}.254`, use_full_range: true, primary_dns: null, secondary_dns: null, location_id: null, location_name: null, site_name: null }))
+      await page.route('**/collection-preferences/networks', (route) => route.fulfill({ json: { columns: ['name', 'cidr'], available_columns: ['name', 'cidr'], default_columns: ['name', 'cidr'], page_size: 25 } }))
+      await page.route('**/api/v1/workspaces/**/networks?*', (route) => {
+        const query = new URL(route.request().url()).searchParams
+        if (query.has(kind === 'vlans' ? 'vlan_id' : 'vrf_id')) expect(query.get(kind === 'vlans' ? 'vlan_id' : 'vrf_id')).toBe(`${kind}-1`)
+        const size = Number(query.get('page_size')), number = Number(query.get('page'))
+        const found = records.filter((row) => row.name.includes(query.get('q') ?? ''))
+        return route.fulfill({ json: { results: found.slice((number - 1) * size, number * size), count: found.length, page: number, page_size: size, has_more: number * size < found.length, can_manage: false } })
+      })
+      await page.route('**/api/v1/workspaces/**/networks/subnet-*', (route) => route.fulfill({ json: records.find((row) => route.request().url().endsWith(row.id)) }))
+      await page.goto(`/networks?view=${kind}&${kind}=${kind}-1&${kind}_section=networks`)
+      const drawer = page.getByRole('dialog', { name: 'Office 01', exact: true })
+      await drawer.getByRole('button', { name: 'Next', exact: true }).click()
+      await expect(drawer.getByRole('link', { name: /^Related 30/ })).toBeVisible()
+      expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+      expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+      await drawer.getByRole('link', { name: /^Related 30/ }).click()
+      await expect(page.getByRole('heading', { level: 1, name: /^Related 30/ })).toBeVisible()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      await page.reload()
+      await expect(page.getByRole('heading', { level: 1, name: /^Related 30/ })).toBeVisible()
+      await page.goBack()
+      await expect(drawer.getByRole('link', { name: /^Related 30/ })).toBeVisible()
+      await expect(page).toHaveURL(new RegExp(`${kind}_networks_page=2`))
+      await drawer.getByRole('searchbox', { name: 'Search associated networks' }).fill('Related 01')
+      await drawer.getByRole('button', { name: 'Search', exact: true }).click()
+      await expect(drawer.getByRole('link', { name: 'Related 01', exact: true })).toBeVisible()
+      await expect(drawer.getByRole('link', { name: /^Related 30/ })).toHaveCount(0)
+      await page.reload()
+      await expect(drawer.getByRole('searchbox')).toHaveValue('Related 01')
+      if (width === 390) {
+        await page.setViewportSize({ width: 1280, height: 400 })
+        await page.evaluate(() => { document.documentElement.style.zoom = '2' })
+        expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+        await expect(drawer.getByRole('searchbox')).toBeVisible()
+        await page.evaluate(() => { document.documentElement.style.zoom = '' })
+        await page.setViewportSize({ width, height: 600 })
+      }
+      if (process.env.LAYOUT_SCREENSHOT_DIR && width === 390) await page.screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/${kind}-related-${test.info().project.name}.png` })
+    })
+  }
+}

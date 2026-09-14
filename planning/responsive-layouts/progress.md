@@ -581,3 +581,59 @@ API/schema compatibility, full check, live persistence and browser scenarios.
 Unconfirmed: intermittent existing WebKit post-save guard cause. Still open: related
 subnet navigation, remaining network surfaces and technician/release acceptance.
 This bounded VLAN/VRF register checkpoint is complete; Phase 3 remains open.
+
+## Associated VLAN/VRF networks — Phase 3 #80, pre-1.0 0.8.46
+
+Adds lazy Networks sections to VLAN/VRF drawers and full pages, compact associated
+subnet lists, whole-association search, 25/50/100 paging, and canonical full network
+links with browser Back/refresh context. Exact association filters validate authorized
+parent entities, preserving existing numeric VLAN filtering and all domain rules.
+API/schema/types, route inventory and implementation notes updated; no migration.
+
+Initial component run reproduced an incorrect test import path; corrected it without
+changing assertions. Nine focused component tests pass. An initial backend run used
+a stale image and selected no tests (exit 5); rebuilt image and restarted API checks.
+The first full check raced generated-type refresh and rejected stale types; types are
+now regenerated from the rebuilt schema and the full check is rerunning. Initial
+Chromium six-width related navigation checks pass; 390px screenshot visually inspected.
+Final gate, live and browser results follow below.
+
+The rebuilt API checks pass for both parent kinds, covering exact association (rather
+than same VLAN number), 31 records, off-page search, stable ordering, invalid IDs and
+foreign-workspace denial. The 90-case addressing browser suite passes across Chromium,
+Firefox and WebKit. A 230-character network name also passed the 390px overflow and
+round-trip check without application changes; long-name fixtures are retained.
+
+Full lint reproduced a FormData value stringification warning; narrowed the value to
+a string, preserving the existing search behavior. Focused lint/types pass and the
+full check restarted. Live navigation through associated records passed, but Chromium
+crashed later in the existing recurring-invoice workflow (Target crashed, line 81).
+The complete live rehearsal is rerunning unchanged; no assertion was weakened.
+
+Final make check passes (509 component tests, 107 files; lint/types, migration/schema
+drift, coverage, production build and unchanged bundle budgets). The complete live
+rehearsal passes on unchanged retry, including VLAN/VRF associated subnet creation,
+opening full network records, refresh and Back to the parent section. Independent
+PostgreSQL fixture assertions pass. The first browser crash remains recorded above
+as an unconfirmed browser crash with no inferred application fix. Local rebuild and
+the expanded long-name/short-height/200%-zoom browser cases are finishing.
+
+Expanded related-navigation run passes all 36 cases across three engines: six widths
+per parent kind, 230-character identifiers, page/search/refresh/Back, and short-height
+200% zoom. Chromium VLAN and WebKit VRF mobile screenshots were visually inspected.
+Local make up completed without removing volumes; readiness reports PostgreSQL and
+diagram renderer ready at 0.8.46. The broad network gate remains running its migration
+checks; final disposition follows below.
+
+Final `make test-network-validation` exits 0: network/API, IDOR/permission/RLS,
+migration stabilization, high-volume network stabilization and all 509 frontend
+components with coverage pass. `make check`, the 90-case browser suite, 36 expanded
+related-navigation cases and the complete live PostgreSQL journey pass. Wiki contract
+passes (37 pages, 25 contextual topics); final diff has no whitespace errors.
+
+Verified: this bounded associated-network navigation checkpoint and local 0.8.46
+readiness with retained data. Unconfirmed: the initial Chromium process crash later
+in the live invoice workflow; the unchanged complete rerun passes. Existing broader
+wireless intermittent-navigation observation remains tracked in its earlier checkpoint.
+Still open: wireless site/VLAN editing, remaining network record surfaces, technician
+walkthroughs and release acceptance. Phase 3 and the wider pre-1.0 plan remain open.

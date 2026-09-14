@@ -1,3 +1,4 @@
+import { RelatedNetworks } from './RelatedNetworks'
 import { useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import { browserCollectionPreferences } from '../collections/preferences'
@@ -35,7 +36,8 @@ export function AddressingRegister({ kind, workspace, client, preferenceClient =
 function AddressingRecordView({ record, kind, workspace, client, canManage, onSaved, onReturn }: Props & { kind: Kind }) {
   const [params] = useSearchParams()
   const location = useLocation()
-  const section = params.get(`${kind}_section`) === 'history' ? 'history' : 'overview'
+  const requestedSection = params.get(`${kind}_section`)
+  const section = requestedSection === 'history' || requestedSection === 'networks' ? requestedSection : 'overview'
   const initial = { name: record?.name ?? '', vlan_id: String(record?.vlan_id ?? 1), route_distinguisher: record?.route_distinguisher ?? '', description: record?.description ?? '' }
   const [form, setForm] = useState(initial)
   const [editing, setEditing] = useState(!record)
@@ -57,8 +59,8 @@ function AddressingRecordView({ record, kind, workspace, client, canManage, onSa
   }
   return <article className="record-page">
     {params.get(`${kind}_full`) === 'true' && <RecordHeader title={record?.name ?? t(`${kind}New`)} recordId={record?.id ?? 'new'} section={section} />}
-    {record && <RecordSections current={section} sections={['overview', 'history'].map((id) => ({ id, label: translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />}
-    {section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t(`${kind}HistoryHelp`)} emptyLabel={t(`${kind}HistoryEmpty`)} deniedLabel={t(`${kind}HistoryDenied`)} /> : <>
+    {record && <RecordSections current={section} sections={['overview', 'networks', 'history'].map((id) => ({ id, label: id === 'networks' ? t('heading') : translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />}
+    {section === 'networks' && record ? <RelatedNetworks kind={kind} recordId={record.id} workspace={workspace} client={client} /> : section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t(`${kind}HistoryHelp`)} emptyLabel={t(`${kind}HistoryEmpty`)} deniedLabel={t(`${kind}HistoryDenied`)} /> : <>
       {error && <p role="alert">{error}</p>}
       {editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
         <label>{t('name')}<input required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>

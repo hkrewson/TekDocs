@@ -10614,6 +10614,16 @@ paths:
           type: integer
           maximum: 4094
           minimum: 1
+      - in: query
+        name: vlan_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: vrf_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -22690,6 +22700,16 @@ paths:
           type: integer
           maximum: 4094
           minimum: 1
+      - in: query
+        name: vlan_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: vrf_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:

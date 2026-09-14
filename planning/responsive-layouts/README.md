@@ -12,7 +12,7 @@ Record names open a full record workspace in a right overlay drawer (full-screen
 
 1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API and navigation/edit-protection foundations implemented.
 2. **Assets** — Complete reference layout, operational overview, focused sections in a full record drawer and optional full page. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
-3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts, the simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers migrated; remaining network object surfaces and acceptance open.
+3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts, the simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers with associated subnet navigation migrated; remaining network object surfaces and acceptance open.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: pending.
 6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: pending.

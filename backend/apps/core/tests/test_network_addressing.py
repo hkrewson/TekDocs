@@ -450,3 +450,34 @@ def test_addressing_register_queries_and_preferences(owner_client, installation,
     )
     assert owner_client.get(prefs).json()["columns"] == ["name"]
     assert owner_client.delete(prefs).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind,field", [("vlans", "vlan_id"), ("vrfs", "vrf_id")])
+def test_network_collection_filters_exact_addressing_record(owner_client, installation, kind, field):
+    organization = _organization(installation, "Related networks")
+    sibling = _organization(installation, "Private networks")
+    payload = {"name": "Scope", **({"vlan_id": 20} if kind == "vlans" else {"route_distinguisher": "65000:20"})}
+    parent = _post(owner_client, f"organization-network-{kind}", organization, payload).json()["id"]
+    private = _post(owner_client, f"organization-network-{kind}", sibling, payload).json()["id"]
+    for index in range(31):
+        response = _post(owner_client, "organization-network-subnets", organization, {
+            "name": f"Related {index:02}", "cidr": f"10.99.{index}.0/24", field: parent,
+        })
+        assert response.status_code == 201
+    # A matching VLAN number is not sufficient: associations use entity identity.
+    unrelated = _post(owner_client, "organization-networks", organization, {
+        "name": "Unassociated", "cidr": "10.98.0.0/24", "vlan": 20,
+    })
+    assert unrelated.status_code == 201
+    url = reverse("organization-networks", kwargs={"organization_entity_id": organization.entity_id})
+    query = {field: parent, "page_size": 25, "summary": "true"}
+    result = owner_client.get(url, query).json()
+    assert result["count"] == 31
+    assert len(result["results"]) == 25
+    assert "description" not in result["results"][0]
+    assert len(owner_client.get(url, {**query, "page": 2}).json()["results"]) == 6
+    assert owner_client.get(url, {**query, "q": "Related 30"}).json()["count"] == 1
+    assert owner_client.get(url, {**query, "ordering": "-name"}).json()["results"][0]["name"] == "Related 30"
+    assert owner_client.get(url, {field: private}).status_code == 403
+    assert owner_client.get(url, {field: "invalid"}).status_code == 400

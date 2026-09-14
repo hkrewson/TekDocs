@@ -589,6 +589,21 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
     await expect(addressingDrawer.getByRole('button', { name: `Edit ${label}`, exact: true })).toBeVisible()
     await page.reload()
     await expect(addressingDrawer).toContainText('Verified addressing scope')
+    const kind = label === 'VLAN' ? 'vlans' : 'vrfs'
+    const parentId = new URL(page.url()).searchParams.get(kind)
+    const relatedCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+    const relatedResponse = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/subnets`, {
+      headers: { 'X-CSRFToken': relatedCsrf!.value },
+      data: { name: `Live ${label} subnet`, cidr: label === 'VLAN' ? '10.232.0.0/24' : '10.233.0.0/24', [label === 'VLAN' ? 'vlan_id' : 'vrf_id']: parentId },
+    })
+    expect(relatedResponse.status()).toBe(201)
+    await addressingDrawer.getByRole('link', { name: 'Networks', exact: true }).click()
+    await addressingDrawer.getByRole('link', { name: `Live ${label} subnet`, exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: `Live ${label} subnet` })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: `Live ${label} subnet` })).toBeVisible()
+    await page.goBack()
+    await expect(addressingDrawer.getByRole('link', { name: `Live ${label} subnet`, exact: true })).toBeVisible()
     await page.mouse.click(10, 100)
     await expect(addressingDrawer).toHaveCount(0)
   }

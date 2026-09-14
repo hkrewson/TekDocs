@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, context_has_permission
 
 from .collection_pagination import BoundedCollectionQuerySerializer, paginate
-from .models import NetworkSubnet
+from .models import NetworkSubnet, NetworkVLAN, NetworkVRF
 from .network_addressing import NetworkAddressingError
 from .network_addressing_views import CollectionResultSerializer, _error, _workspace
 from .network_inventory_views import StrictSerializer
@@ -73,6 +73,8 @@ NETWORK_ORDERING = {
 class NetworkCollectionQuerySerializer(BoundedCollectionQuerySerializer):
     q = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
     vlan = serializers.IntegerField(min_value=1, max_value=4094, required=False)
+    vlan_id = serializers.UUIDField(required=False)
+    vrf_id = serializers.UUIDField(required=False)
     ordering = serializers.ChoiceField(
         choices=[key for field in NETWORK_ORDERING for key in (field, f"-{field}")], required=False, default="name"
     )
@@ -102,6 +104,11 @@ class NetworkRecordListCreateView(APIView):
             )
         if "vlan" in values:
             records = records.filter(display_vlan=values["vlan"])
+        for field, model in (("vlan_id", NetworkVLAN), ("vrf_id", NetworkVRF)):
+            if field in values:
+                if not model.scoped.for_scope(workspace.data_scope).filter(entity_id=values[field]).exists():
+                    raise PermissionDenied("The selected network scope is unavailable.")
+                records = records.filter(**{field.removesuffix("_id") + "__entity_id": values[field]})
         ordering = values["ordering"]
         records = records.order_by(
             ("-" if ordering.startswith("-") else "") + NETWORK_ORDERING[ordering.lstrip("-")], "entity_id"

@@ -22794,6 +22794,8 @@ export interface operations {
                 readonly q?: string;
                 readonly summary?: boolean;
                 readonly vlan?: number;
+                readonly vlan_id?: string;
+                readonly vrf_id?: string;
             };
             readonly header?: never;
             readonly path?: never;
@@ -31282,6 +31284,8 @@ export interface operations {
                 readonly q?: string;
                 readonly summary?: boolean;
                 readonly vlan?: number;
+                readonly vlan_id?: string;
+                readonly vrf_id?: string;
             };
             readonly header?: never;
             readonly path: {

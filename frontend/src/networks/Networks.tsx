@@ -34,7 +34,7 @@ export function Networks(props: NetworksProps) {
   const wireless = params.get('view') === 'wireless'
   function href(view: string) {
     const next = new URLSearchParams(params)
-    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'vlans', 'vlans_full', 'vlans_section', 'vrfs', 'vrfs_full', 'vrfs_section', 'racks', 'racks_full', 'racks_section', 'racks_device', 'devices', 'devices_full', 'devices_section', 'interface', 'history_page']) next.delete(key)
+    for (const key of ['preview', 'record', 'create', 'section', 'address', 'wireless', 'ssid', 'ssid_full', 'ssid_section', 'vlans', 'vlans_full', 'vlans_section', 'vrfs', 'vrfs_full', 'vrfs_section', 'racks', 'racks_full', 'racks_section', 'racks_device', 'devices', 'devices_full', 'devices_section', 'interface', 'interface_view', 'interface_ip', 'interface_mac', 'history_page']) next.delete(key)
     if (view !== 'networks') next.set('view', view); else next.delete('view')
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }

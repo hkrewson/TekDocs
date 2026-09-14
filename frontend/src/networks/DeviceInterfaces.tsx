@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router'
+import { InterfaceEndpoints } from './InterfaceEndpoints'
 import { translate } from '../i18n/localization'
 import { browserCollectionPreferences } from '../collections/preferences'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
@@ -16,7 +18,7 @@ const kinds = [
 ]
 const statuses = [{ value: 'planned', label: t('rackStatusPlanned') }, { value: 'active', label: t('rackStatusActive') }, { value: 'disabled', label: t('interfaceDisabled') }, { value: 'retired', label: t('rackStatusRetired') }]
 const config: ChildCollectionConfig<Omit<NetworkInterface, 'description'>, NetworkInterface> = {
-  key: 'interface', feature: 'network-interfaces', parentField: 'device_id', columns: ['name', 'kind', 'status'],
+  key: 'interface', childSelectionKeys: ['interface_view', 'interface_ip', 'interface_mac'], feature: 'network-interfaces', parentField: 'device_id', columns: ['name', 'kind', 'status'],
   labels: { name: t('name'), kind: t('interfaceKind'), status: translate('collections.status') },
   title: t('interfaces'), back: t('interfacesBack'), create: t('interfacesNew'), search: t('interfacesSearch'),
   order: t('interfacesOrder'), failed: t('interfacesFailed'), empty: t('interfacesEmpty'), count: (count) => t('interfacesCount', { count }),
@@ -32,6 +34,9 @@ export function DeviceInterfaces({ workspace, deviceId, client, preferenceClient
 
 type InterfaceForm = Pick<NetworkInterface, 'name' | 'kind' | 'status' | 'description'>
 function InterfaceRecord({ record, parentId, workspace, client, canManage, onSaved, onReturn }: { record: NetworkInterface | null; parentId: string; workspace: WorkspaceContext; client: NetworksClient; canManage: boolean; onSaved: (record: NetworkInterface) => void; onReturn: () => void }) {
+  const [params] = useSearchParams(), location = useLocation()
+  const view = record && ['ip', 'mac'].includes(params.get('interface_view') ?? '') ? params.get('interface_view') as 'ip' | 'mac' : 'details'
+  function href(value: string) { const next = new URLSearchParams(params); next.set('interface_view', value); return `${location.pathname}?${next}` }
   const initial: InterfaceForm = record ? { name: record.name, kind: record.kind, status: record.status, description: record.description } : { name: '', kind: 'physical', status: 'active', description: '' }
   const [form, setForm] = useState(initial), [editing, setEditing] = useState(!record)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
@@ -48,6 +53,8 @@ function InterfaceRecord({ record, parentId, workspace, client, canManage, onSav
   return <>
     <button className="secondary-button" type="button" onClick={onReturn}>{t('interfacesBack')}</button>
     <h2 ref={heading} tabIndex={-1}>{record?.name ?? t('interfacesNew')}</h2>
+    {record && <nav className="collection-toolbar" aria-label={t('endpointNavigation')}>{(['details', 'ip', 'mac'] as const).map((value) => <Link key={value} to={href(value)} aria-current={view === value ? 'page' : undefined}>{t(value === 'details' ? 'interfaceDetails' : value === 'ip' ? 'endpointIPs' : 'endpointMACs')}</Link>)}</nav>}
+    {view !== 'details' && record ? <InterfaceEndpoints key={`${record.id}:${view}`} kind={view} workspace={workspace} interfaceId={record.id} client={client} /> : <>
     {error && <p role="alert">{error}</p>}
     {editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
       <label>{t('name')}<input required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
@@ -60,5 +67,6 @@ function InterfaceRecord({ record, parentId, workspace, client, canManage, onSav
       <p className="network-notes">{record.description || t('noDescription')}</p>
       {canManage && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('interfaceEdit')}</button>}
     </> : <p>{t('interfaceDenied')}</p>}
+    </>}
   </>
 }

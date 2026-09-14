@@ -19,6 +19,7 @@ from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import InventoryError, require_operational_owner
 from .models import NetworkInterface, NetworkIPAddress, NetworkMACAddress
 from .network_endpoints import (
+    NetworkAssignmentConflict,
     NetworkEndpointError,
     create_interface,
     create_ip_address,
@@ -64,6 +65,28 @@ class MACAddressWriteSerializer(StrictSerializer):
         source="hardware_asset_entity_id", required=False, allow_null=True, default=None
     )
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+
+
+class EndpointAssignmentSerializer(StrictSerializer):
+    interface_id = serializers.UUIDField(source="interface_entity_id", required=False, allow_null=True)
+    expected_interface_id = serializers.UUIDField(
+        source="expected_interface_entity_id", required=False, allow_null=True
+    )
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if ("interface_entity_id" in attrs) != ("expected_interface_entity_id" in attrs):
+            raise serializers.ValidationError("Interface changes require the expected current interface.")
+        if "interface_entity_id" in attrs and set(attrs) != {"interface_entity_id", "expected_interface_entity_id"}:
+            raise serializers.ValidationError("Change interface assignment separately from record fields.")
+        return attrs
+
+
+class IPAddressUpdateSerializer(EndpointAssignmentSerializer, IPAddressWriteSerializer):
+    pass
+
+
+class MACAddressUpdateSerializer(EndpointAssignmentSerializer, MACAddressWriteSerializer):
+    pass
 
 
 class InterfaceSerializer(serializers.Serializer):
@@ -120,7 +143,7 @@ class MACAddressSerializer(serializers.Serializer):
     hardware_asset_id = serializers.SerializerMethodField()
     hardware_asset_name = serializers.SerializerMethodField()
     device_name = serializers.SerializerMethodField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_hardware_asset_id(self, record: NetworkMACAddress) -> UUID | None:
@@ -320,7 +343,29 @@ class InterfaceDetailView(APIView):
 IP_ORDERING = {"name": "ordered_ip", "status": "status", "dns_name": "dns_name"}
 
 
-class IPAddressCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+class EndpointCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    interface_id = serializers.UUIDField(required=False)
+    unassigned = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs.get("unassigned") and "interface_id" in attrs:
+            raise serializers.ValidationError("Choose an interface or unassigned records, not both.")
+        return attrs
+
+
+def _endpoint_parent(
+    records: QuerySet[Any], values: dict[str, Any], workspace: ResolvedWorkspace
+) -> QuerySet[Any]:
+    if "interface_id" in values:
+        if not interfaces_for_scope(workspace.data_scope).filter(entity_id=values["interface_id"]).exists():
+            raise PermissionDenied("The selected interface is unavailable.")
+        records = records.filter(interface__entity_id=values["interface_id"])
+    if values["unassigned"]:
+        records = records.filter(interface__isnull=True, hardware_asset__isnull=True)
+    return records
+
+
+class IPAddressCollectionQuerySerializer(EndpointCollectionQuerySerializer):
     subnet_id = serializers.UUIDField(required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
     status = serializers.ChoiceField(choices=("active", "reserved", "dhcp", "deprecated"), required=False)
@@ -340,6 +385,7 @@ class IPAddressListCreateView(APIView):
         records = ip_addresses_for_scope(workspace.data_scope).annotate(
             ordered_ip=Cast("address", GenericIPAddressField())
         )
+        records = _endpoint_parent(records, values, workspace)
         if "subnet_id" in values:
             if not network_records_for_scope(workspace.data_scope).filter(entity_id=values["subnet_id"]).exists():
                 raise PermissionDenied("The selected network is unavailable.")
@@ -423,10 +469,10 @@ class IPAddressDetailView(APIView):
             ).data
         )
 
-    @extend_schema(request=IPAddressWriteSerializer, responses={200: IPAddressSerializer})
+    @extend_schema(request=IPAddressUpdateSerializer, responses={200: IPAddressSerializer, 409: None})
     def patch(self, request, ip_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
-        serializer = IPAddressWriteSerializer(data=request.data, partial=True)
+        serializer = IPAddressUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         if "hardware_asset_id" in request.data:
             require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
@@ -436,6 +482,8 @@ class IPAddressDetailView(APIView):
                 actor_id=request.user.pk,
                 values=serializer.validated_data,
             )
+        except NetworkAssignmentConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         can_view_assets = context_has_permission(
@@ -444,11 +492,49 @@ class IPAddressDetailView(APIView):
         return Response(IPAddressSerializer(record, context={"can_view_assets": can_view_assets}).data)
 
 
+class MACAddressCollectionQuerySerializer(EndpointCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=240, default="")
+    ordering = serializers.ChoiceField(choices=("name", "-name"), required=False, default="name")
+    summary = serializers.BooleanField(required=False, default=False)
+
+
 class MACAddressListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: MACAddressResultSerializer})
+    @extend_schema(parameters=[MACAddressCollectionQuerySerializer], responses={200: MACAddressResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(mac_addresses_for_scope(workspace.data_scope), request, workspace, MACAddressResultSerializer)
+        query = MACAddressCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = _endpoint_parent(mac_addresses_for_scope(workspace.data_scope), values, workspace)
+        if values["q"]:
+            records = records.filter(Q(address__icontains=values["q"]) | Q(description__icontains=values["q"]))
+        records = records.order_by("-address" if values["ordering"].startswith("-") else "address", "entity_id")
+        if values["summary"]:
+            records = records.defer("description")
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        serializer = MACAddressSerializer(
+            page.records,
+            many=True,
+            context={
+                "can_view_assets": context_has_permission(
+                    workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
+                )
+            },
+        )
+        if values["summary"]:
+            serializer.child.fields.pop("description")
+        return Response(
+            {
+                "results": serializer.data,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        )
 
     @extend_schema(request=MACAddressWriteSerializer, responses={201: MACAddressSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -489,10 +575,10 @@ class MACAddressDetailView(APIView):
             ).data
         )
 
-    @extend_schema(request=MACAddressWriteSerializer, responses={200: MACAddressSerializer})
+    @extend_schema(request=MACAddressUpdateSerializer, responses={200: MACAddressSerializer, 409: None})
     def patch(self, request, mac_address_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
-        serializer = MACAddressWriteSerializer(data=request.data, partial=True)
+        serializer = MACAddressUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         if "hardware_asset_id" in request.data:
             require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
@@ -502,6 +588,8 @@ class MACAddressDetailView(APIView):
                 actor_id=request.user.pk,
                 values=serializer.validated_data,
             )
+        except NetworkAssignmentConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         can_view_assets = context_has_permission(

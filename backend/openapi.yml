@@ -11818,6 +11818,11 @@ paths:
       operationId: workspaces_msp_networks_ip_addresses_retrieve_list
       parameters:
       - in: query
+        name: interface_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
         name: ordering
         schema:
           enum:
@@ -11881,6 +11886,11 @@ paths:
           format: uuid
       - in: query
         name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: unassigned
         schema:
           type: boolean
           default: false
@@ -11977,13 +11987,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -12000,10 +12010,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/networks/mac-addresses:
     get:
       operationId: workspaces_msp_networks_mac_addresses_retrieve_list
       parameters:
+      - in: query
+        name: interface_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          type: string
+          x-spec-enum-id: b9811c708314b1a9
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
       - in: query
         name: page
         schema:
@@ -12018,6 +12058,22 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: unassigned
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -12111,13 +12167,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -12134,6 +12190,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/networks/netbox/choices:
     get:
       operationId: workspaces_msp_networks_netbox_choices_retrieve
@@ -24381,6 +24449,11 @@ paths:
       operationId: workspaces_organizations_networks_ip_addresses_retrieve_list
       parameters:
       - in: query
+        name: interface_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
         name: ordering
         schema:
           enum:
@@ -24450,6 +24523,11 @@ paths:
           format: uuid
       - in: query
         name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: unassigned
         schema:
           type: boolean
           default: false
@@ -24565,13 +24643,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedIPAddressWrite'
+              $ref: '#/components/schemas/PatchedIPAddressUpdate'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -24588,10 +24666,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/mac-addresses:
     get:
       operationId: workspaces_organizations_networks_mac_addresses_retrieve_list
       parameters:
+      - in: query
+        name: interface_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          type: string
+          x-spec-enum-id: b9811c708314b1a9
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
       - in: path
         name: organization_entity_id
         schema:
@@ -24612,6 +24720,22 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: unassigned
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24724,13 +24848,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedMACAddressWrite'
+              $ref: '#/components/schemas/PatchedMACAddressUpdate'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -24747,6 +24871,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choices:
     get:
       operationId: workspaces_organizations_networks_netbox_choices_retrieve
@@ -37365,7 +37501,6 @@ components:
           type: string
       required:
       - address
-      - description
       - device_name
       - hardware_asset_id
       - hardware_asset_name
@@ -39336,9 +39471,17 @@ components:
         warranty_reference:
           type: string
           maxLength: 240
-    PatchedIPAddressWrite:
+    PatchedIPAddressUpdate:
       type: object
       properties:
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        expected_interface_id:
+          type: string
+          format: uuid
+          nullable: true
         address:
           type: string
           maxLength: 45
@@ -39564,9 +39707,17 @@ components:
           type: string
           format: uuid
           nullable: true
-    PatchedMACAddressWrite:
+    PatchedMACAddressUpdate:
       type: object
       properties:
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
+        expected_interface_id:
+          type: string
+          format: uuid
+          nullable: true
         address:
           type: string
           maxLength: 32

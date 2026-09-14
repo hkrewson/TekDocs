@@ -93,7 +93,7 @@ export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
 export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
-export type AddressQuery = { device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
+export type AddressQuery = { interface_id?: string; unassigned?: 'true'; device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
 export type AddressSummary = Omit<NetworkIPAddress, 'description'>
 export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'>
 export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'>
@@ -158,9 +158,12 @@ export interface NetworksClient {
   listIPAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkIPAddress>>
   createIPAddress(workspace: WorkspaceContext, values: IPAddressWrite): Promise<NetworkIPAddress>
   updateIPAddress(workspace: WorkspaceContext, id: string, values: Partial<IPAddressWrite>): Promise<NetworkIPAddress>
+  macCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<NetworkMACAddress, 'description'>>>
+  macDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkMACAddress>
+  assignEndpoint(workspace: WorkspaceContext, kind: 'ip' | 'mac', id: string, interfaceId: string | null, expectedInterfaceId: string | null): Promise<NetworkIPAddress | NetworkMACAddress>
   listMACAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkMACAddress>>
   createMACAddress(workspace: WorkspaceContext, values: MACAddressWrite): Promise<NetworkMACAddress>
-  updateMACAddress(workspace: WorkspaceContext, id: string, values: MACAddressWrite): Promise<NetworkMACAddress>
+  updateMACAddress(workspace: WorkspaceContext, id: string, values: Partial<MACAddressWrite>): Promise<NetworkMACAddress>
   wirelessCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<WirelessNetwork, 'description'>>>
   wirelessDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<WirelessNetwork>
   listWireless(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<WirelessNetwork>>
@@ -328,6 +331,14 @@ export const browserNetworksClient: NetworksClient = {
   },
   createIPAddress: (workspace, values) => write(`${basePath(workspace)}/ip-addresses`, 'POST', values),
   updateIPAddress: (workspace, id, values) => write(`${basePath(workspace)}/ip-addresses/${encodeURIComponent(id)}`, 'PATCH', values),
+  async macCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/mac-addresses?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async macDetail(workspace, id, signal) {
+    return json(await fetch(`${basePath(workspace)}/mac-addresses/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal }))
+  },
+  assignEndpoint: (workspace, kind, id, interfaceId, expectedInterfaceId) => write(`${basePath(workspace)}/${kind === 'ip' ? 'ip-addresses' : 'mac-addresses'}/${encodeURIComponent(id)}`, 'PATCH', { interface_id: interfaceId, expected_interface_id: expectedInterfaceId }),
   async listMACAddresses(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/mac-addresses?page=1&page_size=100`, { credentials: 'same-origin', signal }))
   },

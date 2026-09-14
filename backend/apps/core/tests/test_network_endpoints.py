@@ -506,3 +506,275 @@ def test_interface_collection_search_paging_parent_scope_and_partial_edit(owner_
     )
     assert owner_client.get(pref).json()["columns"] == ["name", "status"]
     assert owner_client.delete(pref).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["ip", "mac"])
+def test_interface_endpoint_assignment_is_bounded_and_compare_checked(owner_client, installation, kind, monkeypatch):
+    from rest_framework.exceptions import PermissionDenied
+
+    from apps.accounts.policy import PermissionKey
+    from apps.core import network_endpoint_views
+    from apps.core.models import AuditEvent
+    from apps.core.network_endpoints import create_interface, create_mac_address
+
+    organization = _organization(installation, "Assignment client")
+    sibling = _organization(installation, "Other assignment client")
+    device = _device(installation, organization)
+    outside_device = _device(installation, sibling)
+    interface = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Uplink",
+        device_entity_id=device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    outside = create_interface(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        name="Other uplink",
+        device_entity_id=outside_device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    subnet = _subnet(installation, organization)
+    rows = []
+    for index in range(1, 32):
+        common = dict(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            interface_entity_id=None,
+            description=f"Cable {index:02}",
+        )
+        rows.append(
+            create_ip_address(
+                **common, address=f"192.0.2.{index}", subnet_entity_id=subnet.entity_id, status="active", dns_name=""
+            )
+            if kind == "ip"
+            else create_mac_address(**common, address=f"02:00:00:00:00:{index:02x}")
+        )
+    kwargs = {"organization_entity_id": organization.entity_id}
+    url = reverse(f"organization-network-{kind}-addresses", kwargs=kwargs)
+    first = owner_client.get(url, {"unassigned": "true", "summary": "true", "page_size": 25}).json()
+    assert first["count"] == 31 and len(first["results"]) == 25 and first["has_more"]
+    assert "description" not in first["results"][0]
+    assert len(owner_client.get(url, {"unassigned": "true", "page_size": 25, "page": 2}).json()["results"]) == 6
+    found = owner_client.get(url, {"unassigned": "true", "q": "Cable 31"}).json()
+    assert found["count"] == 1 and found["results"][0]["id"] == str(rows[-1].entity_id)
+    assert owner_client.get(url, {"interface_id": outside.entity_id}).status_code == 403
+    assert owner_client.get(url, {"interface_id": interface.entity_id, "unassigned": "true"}).status_code == 400
+    detail = reverse(
+        f"organization-network-{kind}-address-detail",
+        kwargs={**kwargs, f"{kind}_address_entity_id": rows[-1].entity_id},
+    )
+
+    def patch(payload):
+        return owner_client.patch(detail, payload, content_type="application/json")
+
+    assert patch({"interface_id": str(interface.entity_id)}).status_code == 400
+    assert (
+        patch(
+            {"interface_id": str(interface.entity_id), "expected_interface_id": None, "description": "mixed"}
+        ).status_code
+        == 400
+    )
+    assert patch({"interface_id": str(outside.entity_id), "expected_interface_id": None}).status_code == 400
+    assigned = patch({"interface_id": str(interface.entity_id), "expected_interface_id": None})
+    assert assigned.status_code == 200, assigned.content
+    assert assigned.json()["interface_id"] == str(interface.entity_id)
+    assert owner_client.get(url, {"unassigned": "true"}).json()["count"] == 30
+    assert owner_client.get(url, {"interface_id": interface.entity_id}).json()["count"] == 1
+    assert patch({"interface_id": None, "expected_interface_id": None}).status_code == 409
+    assert patch({"description": "Updated cable"}).status_code == 200
+    rows[-1].refresh_from_db()
+    assert rows[-1].interface_id == interface.pk and rows[-1].description == "Updated cable"
+    audit_action = f"network_{kind}_address.updated"
+    assert AuditEvent.objects.filter(entity_id=rows[-1].entity_id, action=audit_action).count() == 2
+    assert patch({"interface_id": None, "expected_interface_id": str(interface.entity_id)}).status_code == 200
+    assert AuditEvent.objects.filter(entity_id=rows[-1].entity_id, action=audit_action).count() == 3
+    # An interface assignment must never replace a protected hardware binding.
+    rows[-1].hardware_asset = device.hardware_asset
+    rows[-1].save(update_fields=["hardware_asset"])
+    assert patch({"interface_id": str(interface.entity_id), "expected_interface_id": None}).status_code == 409
+    rows[-1].refresh_from_db()
+    assert rows[-1].hardware_asset_id == device.hardware_asset_id and rows[-1].interface_id is None
+    original = network_endpoint_views.require_permission
+
+    def require(user, permission, **kw):
+        if permission == PermissionKey.NETWORKS_EDIT:
+            raise PermissionDenied("Network editing denied.")
+        return original(user, permission, **kw)
+
+    monkeypatch.setattr(network_endpoint_views, "require_permission", require)
+    assert patch({"interface_id": str(interface.entity_id), "expected_interface_id": None}).status_code == 403
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("kind", ["ip", "mac"])
+def test_endpoint_assignment_concurrent_claim_has_one_winner(installation, kind):
+    from apps.core.network_endpoints import (
+        NetworkAssignmentConflict,
+        create_interface,
+        create_mac_address,
+        update_ip_address,
+        update_mac_address,
+    )
+
+    organization = _organization(installation, "Concurrent assignment")
+    device = _device(installation, organization)
+    interfaces = [
+        create_interface(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            name=f"Port {index}",
+            device_entity_id=device.entity_id,
+            kind="physical",
+            status="active",
+            description="",
+        )
+        for index in range(2)
+    ]
+    common = dict(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        interface_entity_id=None,
+        description="Concurrent cable",
+    )
+    record = (
+        create_ip_address(
+            **common,
+            address="192.0.2.70",
+            subnet_entity_id=_subnet(installation, organization).entity_id,
+            status="active",
+            dns_name="",
+        )
+        if kind == "ip"
+        else create_mac_address(**common, address="02:00:00:00:00:70")
+    )
+    barrier = threading.Barrier(2)
+    actor_id = installation.owner.id
+
+    def claim(interface_id):
+        close_old_connections()
+        try:
+            stale = type(record).objects.get(pk=record.pk)
+            barrier.wait(timeout=15)
+            update = update_ip_address if kind == "ip" else update_mac_address
+            update(
+                record=stale,
+                actor_id=actor_id,
+                values={"interface_entity_id": interface_id, "expected_interface_entity_id": None},
+            )
+            return "assigned"
+        except NetworkAssignmentConflict:
+            return "conflict"
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(claim, [item.entity_id for item in interfaces]))
+    assert sorted(outcomes) == ["assigned", "conflict"]
+    record.refresh_from_db()
+    assert record.interface_id in [item.pk for item in interfaces]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_waiting_ip_assignment_preserves_concurrent_subnet_change(installation):
+    import time
+
+    from apps.core.network_endpoints import create_interface, update_ip_address
+
+    organization = _organization(installation, "Concurrent namespace")
+    device = _device(installation, organization)
+    interface = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Uplink",
+        device_entity_id=device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    original = _subnet(installation, organization)
+    vrf = create_vrf(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Moved namespace",
+        route_distinguisher="65000:99",
+        description="",
+    )
+    destination = _subnet(installation, organization, vrf=vrf)
+    record = create_ip_address(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        address="192.0.2.80",
+        subnet_entity_id=original.entity_id,
+        interface_entity_id=None,
+        status="active",
+        dns_name="",
+        description="Concurrent namespace cable",
+    )
+    changed = threading.Event()
+    release = threading.Event()
+
+    def move():
+        close_old_connections()
+        try:
+            with transaction.atomic():
+                update_ip_address(
+                    record=record, actor_id=installation.owner.id, values={"subnet_entity_id": destination.entity_id}
+                )
+                changed.set()
+                assert release.wait(15)
+        finally:
+            close_old_connections()
+
+    def assign():
+        close_old_connections()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SET application_name = 'endpoint_namespace_waiter'")
+            return update_ip_address(
+                record=record,
+                actor_id=installation.owner.id,
+                values={"interface_entity_id": interface.entity_id, "expected_interface_entity_id": None},
+            )
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        moving = executor.submit(move)
+        assert changed.wait(15)
+        assigning = executor.submit(assign)
+        try:
+            deadline = time.monotonic() + 10
+            blocked = False
+            while time.monotonic() < deadline:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity "
+                        "WHERE application_name = 'endpoint_namespace_waiter' AND wait_event_type = 'Lock')"
+                    )
+                    blocked = cursor.fetchone()[0]
+                if blocked:
+                    break
+                time.sleep(0.02)
+            assert blocked, "Assignment must actually wait on the concurrent namespace update"
+        finally:
+            release.set()
+        moving.result(timeout=15)
+        assigning.result(timeout=15)
+    record.refresh_from_db()
+    assert record.interface_id == interface.pk
+    assert record.subnet_id == destination.pk

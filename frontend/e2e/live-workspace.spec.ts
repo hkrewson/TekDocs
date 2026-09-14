@@ -690,6 +690,35 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await expect(deviceDrawer).toContainText('Disabled')
   await expect(deviceDrawer).toContainText('Uplink to the core rack')
+  // Seed an unassigned MAC through the existing public API; assignment itself uses the UI.
+  const endpointCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+  const unassignedMAC = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/mac-addresses`, {
+    headers: { 'X-CSRFToken': endpointCsrf!.value },
+    data: { address: '02:00:00:00:00:71', description: 'Unassigned interface fixture' },
+  })
+  expect(unassignedMAC.status()).toBe(201)
+  for (const kind of ['IP', 'MAC'] as const) {
+    await deviceDrawer.getByRole('link', { name: `${kind} addresses`, exact: true }).click()
+    await deviceDrawer.getByRole('button', { name: `Assign existing ${kind} address`, exact: true }).click()
+    const address = kind === 'IP' ? '192.0.2.10' : '02:00:00:00:00:71'
+    await deviceDrawer.getByRole('searchbox', { name: 'Search available address records' }).fill(address)
+    await deviceDrawer.getByRole('button', { name: 'Search', exact: true }).click()
+    await deviceDrawer.getByRole('combobox', { name: 'Available address records' }).selectOption({ label: kind === 'IP' ? `${address} (192.0.2.0/24)` : address })
+    await deviceDrawer.getByRole('button', { name: 'Confirm assignment', exact: true }).click()
+    await expect(deviceDrawer.getByRole('heading', { name: address, exact: true })).toBeVisible()
+    await deviceDrawer.getByRole('button', { name: 'Edit address details', exact: true }).click()
+    await deviceDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill(`Live interface ${kind} address`)
+    await deviceDrawer.getByRole('button', { name: 'Save address details', exact: true }).click()
+    await expect(deviceDrawer.getByRole('button', { name: 'Edit address details', exact: true })).toBeVisible()
+    await page.reload()
+    await expect(deviceDrawer).toContainText(`Live interface ${kind} address`)
+    if (kind === 'MAC') {
+      await deviceDrawer.getByRole('button', { name: 'Remove from interface', exact: true }).click()
+      await expect(deviceDrawer).toContainText('record and its history are retained')
+      await deviceDrawer.getByRole('button', { name: 'Confirm removal', exact: true }).click()
+      await expect(deviceDrawer.getByText('0 MAC addresses', { exact: true })).toBeVisible()
+    }
+  }
   await deviceDrawer.getByRole('button', { name: 'Back to interfaces', exact: true }).click()
   await expect(deviceDrawer.getByRole('button', { name: 'Live uplink', exact: true })).toBeFocused()
   await page.mouse.click(10, 100)

@@ -11446,7 +11446,7 @@ export interface components {
             readonly hardware_asset_id: string | null;
             readonly hardware_asset_name: string | null;
             readonly device_name: string | null;
-            readonly description: string;
+            readonly description?: string;
         };
         readonly MACAddressResult: {
             readonly page: number;
@@ -12310,7 +12310,11 @@ export interface components {
             readonly warranty_ends_on?: string | null;
             readonly warranty_reference?: string;
         };
-        readonly PatchedIPAddressWrite: {
+        readonly PatchedIPAddressUpdate: {
+            /** Format: uuid */
+            readonly interface_id?: string | null;
+            /** Format: uuid */
+            readonly expected_interface_id?: string | null;
             readonly address?: string;
             /** Format: uuid */
             readonly subnet_id?: string;
@@ -12435,7 +12439,11 @@ export interface components {
             /** Format: uuid */
             readonly parent_id?: string | null;
         };
-        readonly PatchedMACAddressWrite: {
+        readonly PatchedMACAddressUpdate: {
+            /** Format: uuid */
+            readonly interface_id?: string | null;
+            /** Format: uuid */
+            readonly expected_interface_id?: string | null;
             readonly address?: string;
             /** Format: uuid */
             readonly hardware_asset_id?: string | null;
@@ -23702,6 +23710,7 @@ export interface operations {
     readonly workspaces_msp_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly interface_id?: string;
                 /**
                  * @description * `name` - name
                  *     * `-name` - -name
@@ -23723,6 +23732,7 @@ export interface operations {
                 readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
                 readonly subnet_id?: string;
                 readonly summary?: boolean;
+                readonly unassigned?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -23803,9 +23813,9 @@ export interface operations {
         };
         readonly requestBody?: {
             readonly content: {
-                readonly "application/json": components["schemas"]["PatchedIPAddressWrite"];
-                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedIPAddressWrite"];
-                readonly "multipart/form-data": components["schemas"]["PatchedIPAddressWrite"];
+                readonly "application/json": components["schemas"]["PatchedIPAddressUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedIPAddressUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedIPAddressUpdate"];
             };
         };
         readonly responses: {
@@ -23819,13 +23829,33 @@ export interface operations {
                     readonly "application/json": components["schemas"]["IPAddress"];
                 };
             };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly workspaces_msp_networks_mac_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly interface_id?: string;
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 */
+                readonly ordering?: "name" | "-name";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
+                readonly unassigned?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -23906,9 +23936,9 @@ export interface operations {
         };
         readonly requestBody?: {
             readonly content: {
-                readonly "application/json": components["schemas"]["PatchedMACAddressWrite"];
-                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedMACAddressWrite"];
-                readonly "multipart/form-data": components["schemas"]["PatchedMACAddressWrite"];
+                readonly "application/json": components["schemas"]["PatchedMACAddressUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedMACAddressUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedMACAddressUpdate"];
             };
         };
         readonly responses: {
@@ -23920,6 +23950,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["MACAddress"];
+                };
+            };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };
@@ -32361,6 +32402,7 @@ export interface operations {
     readonly workspaces_organizations_networks_ip_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly interface_id?: string;
                 /**
                  * @description * `name` - name
                  *     * `-name` - -name
@@ -32382,6 +32424,7 @@ export interface operations {
                 readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
                 readonly subnet_id?: string;
                 readonly summary?: boolean;
+                readonly unassigned?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -32468,9 +32511,9 @@ export interface operations {
         };
         readonly requestBody?: {
             readonly content: {
-                readonly "application/json": components["schemas"]["PatchedIPAddressWrite"];
-                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedIPAddressWrite"];
-                readonly "multipart/form-data": components["schemas"]["PatchedIPAddressWrite"];
+                readonly "application/json": components["schemas"]["PatchedIPAddressUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedIPAddressUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedIPAddressUpdate"];
             };
         };
         readonly responses: {
@@ -32484,13 +32527,33 @@ export interface operations {
                     readonly "application/json": components["schemas"]["IPAddress"];
                 };
             };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly workspaces_organizations_networks_mac_addresses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                readonly interface_id?: string;
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 */
+                readonly ordering?: "name" | "-name";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
+                readonly unassigned?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -32577,9 +32640,9 @@ export interface operations {
         };
         readonly requestBody?: {
             readonly content: {
-                readonly "application/json": components["schemas"]["PatchedMACAddressWrite"];
-                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedMACAddressWrite"];
-                readonly "multipart/form-data": components["schemas"]["PatchedMACAddressWrite"];
+                readonly "application/json": components["schemas"]["PatchedMACAddressUpdate"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedMACAddressUpdate"];
+                readonly "multipart/form-data": components["schemas"]["PatchedMACAddressUpdate"];
             };
         };
         readonly responses: {
@@ -32591,6 +32654,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["MACAddress"];
+                };
+            };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

@@ -286,15 +286,32 @@ def create_ip_address(
     return ip_addresses_for_scope(scope).get(pk=record.pk)
 
 
+class NetworkAssignmentConflict(NetworkEndpointError):
+    pass
+
+
+def _check_interface_assignment(record: NetworkIPAddress | NetworkMACAddress, values: dict[str, object]) -> None:
+    if "interface_entity_id" not in values:
+        return
+    current = cast(NetworkInterface, record.interface).entity_id if record.interface_id else None
+    if "expected_interface_entity_id" not in values or current != values["expected_interface_entity_id"]:
+        raise NetworkAssignmentConflict("The assignment changed. Reload the record before trying again.")
+    if record.hardware_asset_id or (current is not None and values["interface_entity_id"] is not None):
+        raise NetworkAssignmentConflict("The record is already assigned. Remove its current assignment first.")
+    if "hardware_asset_entity_id" in values:
+        raise NetworkEndpointError("Change interface assignment separately from hardware assignment.")
+
+
 @transaction.atomic
 def update_ip_address(*, record: NetworkIPAddress, actor_id: UUID, values: dict[str, object]) -> NetworkIPAddress:
-    # The routing namespace is optional; PostgreSQL cannot lock its outer join.
-    # Lock the address and its entity here; namespace serialization happens below.
+    # Lock the record and entity before reading its current routing namespace.
+    # Joined relations can be stale or disappear after waiting on another writer.
     locked = (
         NetworkIPAddress.objects.select_for_update(of=("self", "entity"))
-        .select_related("entity", "subnet__vrf")
+        .select_related("entity")
         .get(pk=record.pk)
     )
+    _check_interface_assignment(locked, values)
     scope = DataScope.owner(locked.tenant, locked.organization)
     host = canonical_host(str(values.get("address", locked.address)))
     subnet = _subnet(scope, cast(UUID, values.get("subnet_entity_id", locked.subnet.entity_id)))
@@ -367,8 +384,13 @@ def create_mac_address(
 @transaction.atomic
 def update_mac_address(*, record: NetworkMACAddress, actor_id: UUID, values: dict[str, object]) -> NetworkMACAddress:
     locked = (
-        NetworkMACAddress.objects.select_for_update().select_related("entity", "interface__entity").get(pk=record.pk)
+        # Read optional assignment relations only after the row lock is acquired;
+        # an outer join can retain a stale related snapshot after waiting on a writer.
+        NetworkMACAddress.objects.select_for_update(of=("self", "entity"))
+        .select_related("entity")
+        .get(pk=record.pk)
     )
+    _check_interface_assignment(locked, values)
     scope = DataScope.owner(locked.tenant, locked.organization)
     clean_address = canonical_mac(str(values.get("address", locked.address)))
     current_interface_id = cast(NetworkInterface, locked.interface).entity_id if locked.interface_id else None

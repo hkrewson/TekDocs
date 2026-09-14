@@ -938,3 +938,78 @@ The pre-existing incomplete separate Wiki checkout remains the documented limita
 its Roadmap update is saved locally and unpublished. No production deployment or
 version change. This closes the interface collection/core-editing checkpoint, not
 IP/MAC assignment, Phase 3, technician sign-off or pre-1.0 release acceptance.
+
+## Interface IP/MAC records and assignment — September 14, 2026
+
+Phase 3 (#80), required pre-1.0 under #60/#75. Implemented scope: bounded endpoint
+collections inside interfaces, ordinary edits, assignment of existing unbound
+records and confirmed removal. See interface-endpoints.md for route/query behavior,
+expected-binding PATCH semantics, compatibility and remaining creation/transfer work.
+No model, migration, permission grant, dependency or version change.
+
+Initial verification: 16 focused interface/endpoint/address component cases pass;
+11 Chromium cases pass across all six widths, including direct/full-page URLs,
+foreign parents, read-only access, off-page assignment search, conflicts, confirmed
+removal, touch/short heights and 200% zoom. The mobile assignment screenshot was
+visually inspected. Final browser run adds explicit assignment-heading focus.
+
+Reproduced server failures and fixes:
+- Initial PostgreSQL assignment test reproduced MAC update's nullable outer-join
+  row-lock error (`endpoint-layout-api-initial.log`). MAC updates now lock only the
+  record and its entity.
+- Concurrent MAC claims then reproduced a stale joined interface after waiting on
+  another writer (`endpoint-layout-api-final.log`). The optional relation is read
+  after acquiring the lock; the two-claim test now yields one winner/one conflict.
+- A deterministic waiting-IP test reproduced an existing record reported missing
+  after a concurrent subnet change (`endpoint-layout-namespace-repro.log`). IP
+  updates likewise read the namespace after acquiring the row lock. The regression
+  explicitly observes the waiting database lock before releasing the first writer.
+
+The four assignment/claim API tests passed before the final IP namespace regression
+was added. Main checking identified missing type annotations on the shared filter
+helper and an optional relation; both were corrected. Component fixture typing and
+one long test SQL string were corrected without weakening assertions or gates.
+No guard or approval behavior was relaxed.
+
+The first live browser→Django→PostgreSQL journey passes, independently verifying IP
+binding, ordinary edits, retained MAC removal and its three update audit events.
+The final server locking code is being verified with all five focused API cases,
+the full network gate and another live run. The repository Wiki manifest/help check
+passes (37 pages/25 topics); its separate checkout retains the previously documented
+missing-page limitation. The scoped Roadmap update is saved locally and unpublished.
+Version remains 0.8.46. Final outcomes follow below.
+
+All five focused PostgreSQL cases now pass, including the waiting-subnet regression
+and concurrent claims for both IP and MAC. The main check passes with 536 frontend
+tests across 112 files, lint/types, schema/generated agreement, migration drift,
+production build and bundle budgets. The live journey passes again with the final
+server locking code and independent retained-record/audit assertions. Only the
+assignment-heading focus improvement followed that live run; final browser and
+main checks include it. Full network gate and local rebuild results follow.
+
+The local `make up` succeeds with existing data/volumes retained. Readiness confirms
+healthy database/renderer and version 0.8.46. No production push/publication or
+version bump. The final browser run covers endpoints, interfaces, addresses and
+wireless assignment regressions through the shared collection; results follow.
+
+The final `make check` (including assignment-heading focus) exits 0: all 536 frontend
+tests, lint/types/schema checks, migration drift, production build and bundle limits
+pass. The final local rebuild already includes this code and remains at 0.8.46.
+No domain data was migrated or replaced. Browser/network gate outcomes follow.
+
+Final closeout: all 153 maintained-browser cases pass across Chromium, Firefox and
+WebKit, including endpoints, interfaces, addresses and wireless assignment regressions.
+Chromium/WebKit mobile assignment screenshots were visually inspected. Full
+`make test-network-validation` exits 0: network/API, permission/IDOR, runtime RLS,
+migration reversal/reapplication, high-volume stabilization and all 536 frontend
+tests pass. The focused concurrency regressions, main check, final live workflow
+and local rebuild are verified. No known new application regression remains.
+Whitespace and route-inventory JSON checks pass. Logs are under
+`/tmp/endpoint-layout-` (api-complete, check-complete, live-final, browser-final,
+network-gate, up); earlier reproduction logs are named above.
+
+The separate Wiki checkout remains incomplete as previously documented; the scoped
+Roadmap update is saved there and unpublished. No production deployment or version
+change. This closes the bounded interface endpoint collection/editing/assignment
+checkpoint, not endpoint creation/transfers, technician sign-off, Phase 3 or full
+pre-1.0 acceptance. Follow-up boundaries remain in interface-endpoints.md.

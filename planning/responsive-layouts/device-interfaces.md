@@ -79,3 +79,5 @@ assignment workflow. Do not merely add an input and resend both identities: revi
 permission checks, exact workspace/parent checks, mutually exclusive assignment,
 partial-update semantics, OpenAPI and negative tests together. Existing read
 responses can contain interface identity, but that is not an exposed write contract.
+
+IP/MAC collection, editing and bounded assignment are now implemented in [interface-endpoints.md](interface-endpoints.md). The prior caution above records the starting API contract; the new focused PATCH contract is documented there. Creation and transfer workflows remain open.

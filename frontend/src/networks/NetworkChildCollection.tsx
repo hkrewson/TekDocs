@@ -13,10 +13,10 @@ import { NavigationGuardContext } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { AddressQuery, ListResult, NetworksClient } from './api'
 
-type ChildRecord = { id: string; subnet_id?: string | null; device_id?: string }
+type ChildRecord = { id: string; subnet_id?: string | null; device_id?: string; interface_id?: string | null }
 export type ChildRecordProps<D> = { record: D | null; canManage: boolean; onSaved: (record: D) => void; onReturn: () => void }
 export type ChildCollectionConfig<S extends ChildRecord, D extends S> = {
-  parentField?: 'subnet_id' | 'device_id'; childSelectionKeys?: string[];
+  parentField?: 'subnet_id' | 'device_id' | 'interface_id'; childSelectionKeys?: string[];
   key: string; feature: string; columns: readonly string[]; labels: Record<string, string>
   title: string; back: string; create: string; search: string; order: string; failed: string; empty: string
   count: (count: number) => string
@@ -68,7 +68,8 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   function next(values: Record<string, string | null>) { const changedParams = new URLSearchParams(params); for (const [name, value] of Object.entries(values)) { if (value) changedParams.set(name, value); else changedParams.delete(name) } return changedParams }
   function browse(values: Record<string, string | null>) {
     const updated = next({ ...(!(`${config.key}_page` in values) && !(config.key in values) ? { [`${config.key}_page`]: null } : {}), ...values })
-    if (standalone && config.key in values) { for (const childKey of config.childSelectionKeys ?? []) updated.delete(childKey); updated.delete(`${config.key}_full`); updated.delete(`${config.key}_section`); updated.delete(`${config.key}_device`); updated.delete('history_page') }
+    if (config.key in values) for (const childKey of config.childSelectionKeys ?? []) updated.delete(childKey)
+    if (standalone && config.key in values) { updated.delete(`${config.key}_full`); updated.delete(`${config.key}_section`); updated.delete(`${config.key}_device`); updated.delete('history_page') }
     setParams(updated, { state: standalone && values[config.key] ? { childListY: window.scrollY } : location.state as unknown })
   }
   function href(values: Record<string, string | null>) { return `${location.pathname}?${next(values)}` }

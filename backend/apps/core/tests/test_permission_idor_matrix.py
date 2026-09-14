@@ -329,6 +329,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-networks": ("organization_entity_id",),
         "organization-network-detail": ("organization_entity_id", "network_entity_id"),
         "organization-network-choices": ("organization_entity_id",),
+        "organization-network-assignment-choices": ("organization_entity_id",),
         "organization-network-search": ("organization_entity_id",),
         "organization-network-export": ("organization_entity_id",),
         "organization-netbox-reference-list-create": ("organization_entity_id",),

@@ -3253,6 +3253,22 @@ export interface paths {
         readonly patch: operations["workspaces_msp_networks_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/networks/assignment-choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_networks_assignment_choices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/networks/choices": {
         readonly parameters: {
             readonly query?: never;
@@ -6516,6 +6532,22 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch: operations["workspaces_organizations_networks_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/networks/assignment-choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_networks_assignment_choices_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/networks/choices": {
@@ -11582,6 +11614,20 @@ export interface components {
             readonly object_id: number;
             /** @default  */
             readonly fingerprint: string;
+        };
+        readonly NetworkAssignmentChoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly identifier: string;
+        };
+        readonly NetworkAssignmentResult: {
+            readonly results: readonly components["schemas"]["NetworkAssignmentChoice"][];
+            readonly can_manage: boolean;
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
         };
         readonly NetworkChoice: {
             /** Format: uuid */
@@ -22894,6 +22940,36 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_networks_assignment_choices_retrieve: {
+        readonly parameters: {
+            readonly query: {
+                /**
+                 * @description * `site` - site
+                 *     * `vlan` - vlan
+                 */
+                readonly kind: "site" | "vlan";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetworkAssignmentResult"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_networks_choices_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -31386,6 +31462,38 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["NetworkRecord"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_networks_assignment_choices_retrieve: {
+        readonly parameters: {
+            readonly query: {
+                /**
+                 * @description * `site` - site
+                 *     * `vlan` - vlan
+                 */
+                readonly kind: "site" | "vlan";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetworkAssignmentResult"];
                 };
             };
         };

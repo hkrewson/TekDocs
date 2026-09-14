@@ -10740,6 +10740,61 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/networks/assignment-choices:
+    get:
+      operationId: workspaces_msp_networks_assignment_choices_retrieve
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - site
+          - vlan
+          type: string
+          x-spec-enum-id: d94f7d4d62b69f86
+          minLength: 1
+        description: |-
+          * `site` - site
+          * `vlan` - vlan
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkAssignmentResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/networks/choices:
     get:
       operationId: workspaces_msp_networks_choices_retrieve
@@ -22838,6 +22893,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkRecord'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/assignment-choices:
+    get:
+      operationId: workspaces_organizations_networks_assignment_choices_retrieve
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - site
+          - vlan
+          type: string
+          x-spec-enum-id: d94f7d4d62b69f86
+          minLength: 1
+        description: |-
+          * `site` - site
+          * `vlan` - vlan
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkAssignmentResult'
           description: ''
           headers:
             X-Request-ID:
@@ -37167,6 +37283,44 @@ components:
       - entity_id
       - object_id
       - object_type
+    NetworkAssignmentChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        identifier:
+          type: string
+      required:
+      - id
+      - identifier
+      - name
+    NetworkAssignmentResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkAssignmentChoice'
+        can_manage:
+          type: boolean
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     NetworkChoice:
       type: object
       properties:

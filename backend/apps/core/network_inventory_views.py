@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
+from django.db.models import Q, QuerySet
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -13,7 +14,7 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 
 from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import InventoryError, assets_for_scope, require_operational_owner
-from .models import NetworkDevice, NetworkDeviceRole, NetworkDeviceStatus, NetworkRack, NetworkRackStatus
+from .models import NetworkDevice, NetworkDeviceRole, NetworkDeviceStatus, NetworkRack, NetworkRackStatus, NetworkVLAN
 from .network_inventory import (
     NetworkInventoryError,
     create_device,
@@ -333,3 +334,67 @@ class NetworkChoiceListView(APIView):
             ],
             "hardware_assets": [{"id": item.entity_id, "name": item.entity.display_name} for item in assets],
         }).data)
+
+
+class NetworkAssignmentQuerySerializer(BoundedCollectionQuerySerializer):
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
+    kind = serializers.ChoiceField(choices=("site", "vlan"))
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
+
+
+class NetworkAssignmentChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    identifier = serializers.CharField(allow_blank=True)
+
+
+class NetworkAssignmentResultSerializer(serializers.Serializer):
+    results = NetworkAssignmentChoiceSerializer(many=True)
+    can_manage = serializers.BooleanField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
+class NetworkAssignmentChoiceListView(APIView):
+    @extend_schema(parameters=[NetworkAssignmentQuerySerializer], responses={200: NetworkAssignmentResultSerializer})
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
+        query = NetworkAssignmentQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records: QuerySet[Any] = (
+            sites_for_scope(workspace.data_scope)
+            if values["kind"] == "site"
+            else NetworkVLAN.scoped.for_scope(workspace.data_scope).select_related("entity")
+        )
+        if values["q"]:
+            term = values["q"]
+            condition = Q(entity__display_name__icontains=term)
+            if values["kind"] == "site":
+                condition |= Q(code__icontains=term)
+            elif term.isascii() and term.isdigit() and len(term) <= 4:
+                condition |= Q(vlan_id=int(term))
+            records = records.filter(condition)
+        records = records.order_by("entity__display_name", "entity_id")
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": str(item.entity_id),
+                        "name": item.entity.display_name,
+                        "identifier": str(item.code if values["kind"] == "site" else item.vlan_id),
+                    }
+                    for item in page.records
+                ],
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        )

@@ -637,3 +637,79 @@ in the live invoice workflow; the unchanged complete rerun passes. Existing broa
 wireless intermittent-navigation observation remains tracked in its earlier checkpoint.
 Still open: wireless site/VLAN editing, remaining network record surfaces, technician
 walkthroughs and release acceptance. Phase 3 and the wider pre-1.0 plan remain open.
+
+## Wireless site/VLAN assignment — Phase 3 #80, 0.8.46
+
+Adds focused assignment/removal in both wireless surfaces, one active editor, bounded
+name/code/VLAN-number lookup, retained failed/denied selections and partial updates.
+New assignment-choice APIs preserve existing legacy consumers and exact-workspace
+network permission boundaries. Schema/types, route inventory and handoff notes updated.
+No domain model, migration, dependency or version change.
+
+Initial checks reproduced long-line lint and an overly broad translation-key type;
+formatted the new code and narrowed the key union. Component scenarios passed before
+and after the typing correction. The API test reproduced page-two emptiness because
+the new endpoint inherited a 100-row default; explicitly set its default to 25 without
+weakening the six-record second-page assertion. Both API scenarios now pass.
+
+New browser assignment/save/remove/Escape scenarios reproduced stale dirty confirmation
+after visible editor removal (Chromium site/VLAN, including 390/1440px). Stopped the
+broad failing run and changed shared guard registration/cleanup to a layout effect.
+Nineteen focused navigation/wireless components pass; unchanged browser repetitions
+and broad regression checks are in progress. Final results follow below.
+
+Both API checks pass with the corrected default. Thirty unchanged site/VLAN
+assignment-save-remove-Escape repetitions pass (five repeats per kind across three
+engines) after synchronous guard cleanup. Initial make check passes; it is rerunning
+against the final guard change. The live PostgreSQL rehearsal and full network gate
+are running. Broader browser navigation coverage follows the live run.
+
+Final make check passes: 513 components in 108 files, frontend/backend lint and types,
+schema/migration drift, coverage, production build and unchanged bundle budgets. The
+complete live browser-to-Django-to-PostgreSQL journey passes with both assignments,
+removal and refresh while retaining wireless status; independent fixture assertions
+pass. Local rebuild and broad network/asset/contract browser regressions are underway.
+The full network gate has reached its migration checks without failures.
+
+Authorized local rebuild completed with existing volumes/data retained. Docker
+readiness reports database and renderer ready at 0.8.46. The mobile site-assignment
+failure screenshot was visually inspected: selection, error and controls remain
+readable within the single drawer scroll body. Broader browser and network gates
+are still finishing; final results follow below.
+
+All 225 network/asset-edit/contract browser scenarios pass across Chromium, Firefox
+and WebKit, including the old parent-assignment regression and both new association
+flows. Thirty additional post-save dismissal repeats passed earlier. No browser
+assertion was weakened to resolve the stale guard; cleanup timing changed.
+
+The broad network run completed API, IDOR/RLS and migration cases but failed its
+final route-inventory completeness assertion: the two new lookup routes were missing
+from permission_inventory.py. Added their networks.view contracts and the organization
+URL argument to the matrix fixture. No runtime policy changed. Rechecking the complete
+permission module on the rebuilt image; unaffected passed network/migration evidence
+is retained. Remaining high-volume and frontend gate stages will follow that rerun.
+
+The complete permission/IDOR module now exits 0 on the rebuilt image, including both
+new route contracts and anonymous/non-member probes. Targeted inventory lint passes.
+The original broad run's other network/API/RLS/migration cases passed and are unchanged
+by this metadata-only correction. Completing the remaining recipe stages with
+`make -o test-networks test-network-validation` avoids repeating those already-passed
+expensive migration cases; this is segmented gate evidence, not a claim that the
+initial unmodified command succeeded. Final stage results follow below.
+
+Final remaining gate stages exit 0: high-volume network stabilization and all 513
+frontend components with coverage pass. Network validation is complete in the segments
+described above: original passing network/API/RLS/migration cases, full permission
+matrix rerun after its metadata correction, then the unchanged remaining recipe.
+Backend type checks also pass on all 192 source files after the inventory update.
+
+Verified: final make check, 225 browser cases, 30 additional dismissal repeats, live
+PostgreSQL persistence, segmented network gate and local 0.8.46 readiness. Site
+Chromium and VLAN WebKit mobile screenshots were visually inspected. Wiki contract
+passes (37 pages, 25 contextual topics); no whitespace errors. No known regression
+remains from this slice. The earlier intermittent post-save guard symptom is now
+reproduced, corrected and covered by the unchanged browser assertions.
+
+This bounded checkpoint is complete. Devices, racks, interfaces, DNS, circuits,
+remaining network surfaces, technician walkthroughs and release acceptance stay open.
+No production publication, domain-data migration or version bump was performed.

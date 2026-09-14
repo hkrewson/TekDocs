@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { createContext, useContext, useCallback, useId, useLayoutEffect, useRef } from 'react'
 
 export type EditState = { dirty: boolean; busy: boolean; active: boolean; discard?: () => void }
 export type NavigationGuard = {
@@ -22,7 +22,8 @@ export function useUnsavedChanges(dirty: boolean, busy = false, onDiscard?: () =
   const discardRef = useRef(onDiscard)
   useLayoutEffect(() => { discardRef.current = onDiscard }, [onDiscard])
   const discard = useCallback(() => discardRef.current?.(), [])
-  useEffect(() => {
+  // Keep the guard in sync with visible editors, including immediately after save/unmount.
+  useLayoutEffect(() => {
     register(id, { dirty, busy, active, discard })
     return () => register(id, null)
   }, [id, dirty, busy, active, register, discard])

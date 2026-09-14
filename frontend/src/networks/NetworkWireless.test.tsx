@@ -151,6 +151,8 @@ it('allows viewing a direct full-page record without offering denied edits', asy
   expect(await screen.findByRole('heading', { level: 1, name: 'Office Staff' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Edit wireless network' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Change parent network' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Change site' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Change VLAN' })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Back to wireless networks' })).toBeInTheDocument()
 })
 
@@ -168,5 +170,7 @@ it('moves a parent-scoped SSID out of its collection without keeping a foreign d
   expect(updateWireless).toHaveBeenCalledWith(workspace, 'wifi-1', { subnet_id: 'network-2' })
   await waitFor(() => expect(window.location.search).not.toContain('wireless=wifi-1'))
   expect(screen.queryByRole('button', { name: 'Change parent network' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Change site' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Change VLAN' })).not.toBeInTheDocument()
   expect(await screen.findByRole('status')).toHaveTextContent('updated')
 })

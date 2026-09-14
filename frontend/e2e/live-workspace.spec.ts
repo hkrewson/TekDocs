@@ -608,6 +608,26 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
     await expect(addressingDrawer).toHaveCount(0)
   }
 
+  await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Wireless', exact: true }).click()
+  await page.getByRole('button', { name: 'Live unassigned Wi-Fi', exact: true }).click()
+  for (const [label, search, option] of [['site', 'MAIN', 'Live Main Campus · MAIN'], ['VLAN', '321', 'Live VLAN · 321']]) {
+    await standaloneWireless.getByRole('button', { name: `Change ${label}`, exact: true }).click()
+    await standaloneWireless.getByRole('searchbox', { name: `Search ${label}s`, exact: true }).fill(search)
+    await standaloneWireless.getByRole('button', { name: 'Search', exact: true }).click()
+    await standaloneWireless.getByRole('combobox', { name: `Matching ${label}s`, exact: true }).selectOption({ label: option })
+    await standaloneWireless.getByRole('button', { name: `Save ${label}`, exact: true }).click()
+    await expect(standaloneWireless.getByRole('button', { name: `Change ${label}`, exact: true })).toBeVisible()
+    await page.reload()
+    await expect(standaloneWireless.locator('dd').filter({ hasText: /^Disabled$/ })).toBeVisible()
+    await standaloneWireless.getByRole('button', { name: `Change ${label}`, exact: true }).click()
+    await expect(standaloneWireless).toContainText(label === 'site' ? 'Live Main Campus' : 'Live VLAN')
+    await standaloneWireless.getByRole('button', { name: `Use no ${label}`, exact: true }).click()
+    await standaloneWireless.getByRole('button', { name: `Save ${label}`, exact: true }).click()
+    await expect(standaloneWireless.getByRole('button', { name: `Change ${label}`, exact: true })).toBeVisible()
+  }
+  await page.mouse.click(10, 100)
+  await expect(standaloneWireless).toHaveCount(0)
+
   await page.getByRole('link', { name: 'People' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/people$/)
   await page.getByRole('button', { name: 'New person' }).click()

@@ -33,6 +33,7 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Wireless site and VLAN assignment](wireless-site-vlan-assignment.md)
 - [VLAN and VRF registers](addressing-registers.md)
 
 - [Wireless parent-network assignment](wireless-parent-assignment.md)

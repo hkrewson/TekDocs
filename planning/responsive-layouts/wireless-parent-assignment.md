@@ -52,3 +52,8 @@ Remaining Phase 3 work includes site/VLAN association editing and other network
 object surfaces. Technician walkthroughs, release acceptance and existing pre-1.0
 security/recovery/recurring-invoice obligations remain open. Local runtime rebuilding
 is separate from production publication; retain all user and demo data.
+
+Follow-up: site/VLAN assignment browser scenarios reproduced the previously intermittent
+post-save dirty-guard symptom more consistently. The shared guard now registers and
+unregisters with layout effects so visible editor state and navigation agree. See
+wireless-site-vlan-assignment.md and progress.md for reproduction and verification.

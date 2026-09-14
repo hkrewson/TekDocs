@@ -536,3 +536,70 @@ def test_wireless_parent_assignment_preserves_facts_and_rejects_foreign_parent(o
     assert denied.status_code == 400
     assert owner_client.get(url).json()["subnet_id"] is None
     assert owner_client.get(url).json()["vlan_id"] == str(vlan.entity_id)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["site", "vlan"])
+def test_wireless_assignment_choices_and_partial_update(owner_client, installation, kind):
+    organization = _organization(installation, "Assignment client")
+    sibling = _organization(installation, "Private client")
+
+    def create(parent, index):
+        common = {
+            "tenant": installation.tenant,
+            "organization": parent,
+            "actor_id": installation.owner.id,
+            "name": f"Choice {index:02}",
+        }
+        if kind == "vlan":
+            return create_vlan(**common, vlan_id=index + 100, description="")
+        return create_site(
+            **common,
+            code=f"S{index}",
+            address_line_1="",
+            address_line_2="",
+            city="",
+            region="",
+            postal_code="",
+            country_code="US",
+            timezone="UTC",
+            phone="",
+        )
+
+    choices = [create(organization, index) for index in range(31)]
+    foreign = create(sibling, 90)
+    url = reverse("organization-network-assignment-choices", kwargs={"organization_entity_id": organization.entity_id})
+    response = owner_client.get(url, {"kind": kind, "page_size": 25})
+    assert response.status_code == 200
+    assert response.json()["count"] == 31
+    assert len(response.json()["results"]) == 25
+    assert len(owner_client.get(url, {"kind": kind, "page": 2}).json()["results"]) == 6
+    assert owner_client.get(url, {"kind": kind, "q": "Choice 30"}).json()["results"][0]["id"] == str(
+        choices[30].entity_id
+    )
+    assert owner_client.get(url, {"kind": kind, "q": "130" if kind == "vlan" else "S30"}).json()["count"] == 1
+    assert owner_client.get(url, {"kind": kind, "q": "Choice 90"}).json()["count"] == 0
+    assert owner_client.get(url, {"kind": "invalid"}).status_code == 400
+    assert owner_client.get(url, {"kind": kind, "page_size": 101}).status_code == 400
+    wireless = _post(
+        owner_client,
+        "organization-network-wireless",
+        organization,
+        {"ssid": "Assignment SSID", "description": "Keep these settings"},
+    )
+    assert wireless.status_code == 201
+    detail = reverse(
+        "organization-network-wireless-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "wireless_entity_id": wireless.json()["id"]},
+    )
+    for identifier in [str(choices[30].entity_id), None]:
+        response = owner_client.patch(detail, {f"{kind}_id": identifier}, content_type="application/json")
+        assert response.status_code == 200
+        assert response.json()[f"{kind}_id"] == identifier
+        assert response.json()["description"] == "Keep these settings"
+    assert (
+        owner_client.patch(detail, {f"{kind}_id": str(foreign.entity_id)}, content_type="application/json").status_code
+        == 400
+    )
+    anonymous = Client()
+    assert anonymous.get(url, {"kind": kind}).status_code in (401, 403)

@@ -316,6 +316,7 @@ from apps.core.network_endpoint_views import (
     MACAddressListCreateView,
 )
 from apps.core.network_inventory_views import (
+    NetworkAssignmentChoiceListView,
     NetworkChoiceListView,
     NetworkDeviceDetailView,
     NetworkDeviceListCreateView,
@@ -835,6 +836,16 @@ urlpatterns = [
     path("api/v1/sites", MSPSiteListCreateView.as_view(), name="msp-site-list-create"),
     path("api/v1/sites/<uuid:site_entity_id>", MSPSiteDetailView.as_view(), name="msp-site-detail"),
     path("api/v1/workspaces/msp/networks/choices", NetworkChoiceListView.as_view(), name="msp-network-choices"),
+    path(
+        "api/v1/workspaces/msp/networks/assignment-choices",
+        NetworkAssignmentChoiceListView.as_view(),
+        name="msp-network-assignment-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/assignment-choices",
+        NetworkAssignmentChoiceListView.as_view(),
+        name="organization-network-assignment-choices",
+    ),
     path("api/v1/workspaces/msp/networks", NetworkRecordListCreateView.as_view(), name="msp-networks"),
     path(
         "api/v1/workspaces/msp/networks/<uuid:network_entity_id>",

@@ -712,6 +712,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "msp-network-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, mutations=(PermissionKey.NETWORKS_EDIT,)
     ),
     route("msp-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-network-assignment-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-search", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-export", ("GET",), PermissionKey.NETWORKS_VIEW),
     route(
@@ -978,6 +979,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route("organization-network-choices", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True),
+    route(
+        "organization-network-assignment-choices", ("GET",), PermissionKey.NETWORKS_VIEW, organization_scoped=True
+    ),
     route(
         "organization-networks",
         ("GET", "POST"),

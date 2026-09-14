@@ -116,6 +116,7 @@ export type ListResult<T> = { results: T[]; page: number; page_size: number; cou
 export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export interface NetworksClient {
+  assignmentChoices(workspace: WorkspaceContext, kind: 'site' | 'vlan', q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   addressingCollection(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', query: AddressQuery, signal?: AbortSignal): Promise<ListResult<AddressingSummary>>
   addressingDetail(workspace: WorkspaceContext, kind: 'vlans' | 'vrfs', id: string, signal?: AbortSignal): Promise<AddressingRecord>
   collection(workspace: WorkspaceContext, query: NetworkQuery, signal?: AbortSignal): Promise<ListResult<NetworkSummary>>
@@ -220,6 +221,10 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async assignmentChoices(workspace, kind, q, page, signal) {
+    const params = new URLSearchParams({ kind, q, page: String(page), page_size: '25' })
+    return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))
+  },
   async collection(workspace, query, signal) {
     const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
     return json(await fetch(`${basePath(workspace)}?${params}`, { credentials: 'same-origin', signal }))

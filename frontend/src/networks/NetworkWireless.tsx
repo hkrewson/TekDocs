@@ -1,3 +1,4 @@
+import { WirelessAssociation } from './WirelessAssociation'
 import { WirelessParent } from './WirelessParent'
 import { useLocation, useSearchParams } from 'react-router'
 import { RecordHeader, RecordSections } from '../records/RecordNavigation'
@@ -35,6 +36,7 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
   const [form, setForm] = useState(initial)
   const [editing, setEditing] = useState(!record)
   const [changingParent, setChangingParent] = useState(false)
+  const [assignment, setAssignment] = useState<'site' | 'vlan' | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -65,8 +67,9 @@ function WirelessRecord({ record, subnetId, workspace, client, canManage, onSave
     </fieldset></form> : record ? <>
       <dl className="record-facts">{[[t('networkColumn'), record.subnet_cidr || t('unassignedNetwork')], [t('addressStatus'), t(record.status)], [t('purpose'), t(record.purpose)], [t('security'), t(record.security)], [t('hidden'), t(record.hidden ? 'yes' : 'no')], [t('clientIsolation'), t(record.client_isolation ? 'yes' : 'no')], [translate('collections.site'), record.site_name || translate('collections.missing')], [t('vlan'), record.vlan_number === null ? translate('collections.missing') : String(record.vlan_number)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <p className="network-notes">{record.description || t('noDescription')}</p>
-      {canManage && !changingParent && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setEditing(true) }}>{t('editWireless')}</button>}
-      {changingParent ? <WirelessParent record={record} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setChangingParent(false)} /> : canManage && <button className="secondary-button" type="button" onClick={() => setChangingParent(true)}>{t('changeParent')}</button>}
+      {canManage && !changingParent && !assignment && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setEditing(true) }}>{t('editWireless')}</button>}
+      {changingParent ? <WirelessParent record={record} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setChangingParent(false)} /> : canManage && !assignment && <button className="secondary-button" type="button" onClick={() => setChangingParent(true)}>{t('changeParent')}</button>}
+      {assignment ? <WirelessAssociation key={assignment} kind={assignment} record={record} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setAssignment(null)} /> : canManage && !changingParent && (['site', 'vlan'] as const).map((kind) => <button key={kind} className="secondary-button" type="button" onClick={() => setAssignment(kind)}>{t(`${kind}AssignmentChange`)}</button>)}
     </> : <p>{t('wirelessDenied')}</p>}
   </>
 }

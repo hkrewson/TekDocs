@@ -46,3 +46,8 @@ attach/move/remove operations in a focused section. Site/VLAN editing, other net
 object surfaces and Phase 3 acceptance remain open. This
 checkpoint does not close technician, production/release, security, recovery or
 recurring-invoice obligations. See progress.md for executed verification evidence.
+
+Site/VLAN follow-up is implemented in wireless-site-vlan-assignment.md: one focused
+editor with bounded identifier search and partial updates, in both workspace and
+parent-scoped wireless surfaces. See progress.md for verified results and the shared
+post-save dirty-guard fix. Remaining network surfaces and Phase 3 acceptance stay open.

@@ -9,6 +9,7 @@ from django.db.models import Q, QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -83,7 +84,7 @@ class ZoneWriteSerializer(StrictSerializer):
 class ZoneSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField()
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
     record_count = serializers.IntegerField(read_only=True)
 
 
@@ -112,7 +113,7 @@ class RecordSerializer(serializers.Serializer):
     weight = serializers.IntegerField(allow_null=True)
     port = serializers.IntegerField(allow_null=True)
     ip_address_id = serializers.UUIDField(source="ip_address.entity_id", allow_null=True)
-    description = serializers.CharField()
+    description = serializers.CharField(required=False)
 
 
 class CollectionSerializer(serializers.Serializer):
@@ -136,26 +137,6 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     except InventoryError as exc:
         raise PermissionDenied(str(exc)) from exc
     return workspace
-
-
-def _page(
-    queryset: QuerySet[Any], request: Any, workspace: ResolvedWorkspace, item_serializer: type[serializers.Serializer]
-) -> Response:
-    query = BoundedCollectionQuerySerializer(data=request.query_params)
-    query.is_valid(raise_exception=True)
-    page = paginate(queryset, **query.validated_data)
-    return Response(
-        {
-            "results": item_serializer(page.records, many=True).data,
-            "page": page.page,
-            "page_size": page.page_size,
-            "count": page.count,
-            "has_more": page.has_more,
-            "can_manage": context_has_permission(
-                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
-            ),
-        }
-    )
 
 
 def _error(exc: Exception) -> serializers.ValidationError:
@@ -285,11 +266,87 @@ class WirelessDetailView(APIView):
         return Response(WirelessSerializer(record).data)
 
 
+DNS_ZONE_ORDERING = {"name": "name", "record_count": "record_count"}
+DNS_RECORD_ORDERING = {"name": "owner_name", "record_type": "record_type", "value": "value", "ttl": "ttl"}
+
+
+class DNSZoneQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    ordering = serializers.ChoiceField(
+        choices=[key for field in DNS_ZONE_ORDERING for key in (field, f"-{field}")], required=False
+    )
+    summary = serializers.BooleanField(required=False, default=False)
+
+
+class DNSRecordQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    zone_id = serializers.UUIDField(required=False)
+    record_type = serializers.ChoiceField(choices=DNSRecordType.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in DNS_RECORD_ORDERING for key in (field, f"-{field}")], required=False
+    )
+    summary = serializers.BooleanField(required=False, default=False)
+
+
+class DNSZoneCollectionSerializer(CollectionSerializer):
+    results = ZoneSerializer(many=True)
+
+
+class DNSRecordCollectionSerializer(CollectionSerializer):
+    results = RecordSerializer(many=True)
+
+
+def _dns_page(request: Request, workspace: ResolvedWorkspace, *, zones: bool) -> Response:
+    query = (DNSZoneQuerySerializer if zones else DNSRecordQuerySerializer)(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    records: QuerySet[Any] = (
+        dns_zones_for_scope(workspace.data_scope) if zones else dns_records_for_scope(workspace.data_scope)
+    )
+    if not zones and "zone_id" in values:
+        if not dns_zones_for_scope(workspace.data_scope).filter(entity_id=values["zone_id"]).exists():
+            raise PermissionDenied("The selected DNS zone is unavailable.")
+        records = records.filter(zone__entity_id=values["zone_id"])
+    if values["q"]:
+        search = Q(description__icontains=values["q"])
+        search |= (
+            Q(name__icontains=values["q"])
+            if zones
+            else Q(owner_name__icontains=values["q"])
+            | Q(value__icontains=values["q"])
+            | Q(zone__name__icontains=values["q"])
+        )
+        records = records.filter(search)
+    if "record_type" in values:
+        records = records.filter(record_type=values["record_type"])
+    if "ordering" in values:
+        order = values["ordering"]
+        fields = DNS_ZONE_ORDERING if zones else DNS_RECORD_ORDERING
+        records = records.order_by(("-" if order.startswith("-") else "") + fields[order.lstrip("-")], "entity_id")
+    page = paginate(records, page=values["page"], page_size=values["page_size"])
+    rows = (ZoneSerializer if zones else RecordSerializer)(page.records, many=True).data
+    if values["summary"]:
+        for row in rows:
+            row.pop("description")
+    return Response(
+        {
+            "results": rows,
+            "page": page.page,
+            "page_size": page.page_size,
+            "count": page.count,
+            "has_more": page.has_more,
+            "can_manage": context_has_permission(
+                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+            ),
+        }
+    )
+
+
 class DNSZoneListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: CollectionSerializer})
+    @extend_schema(parameters=[DNSZoneQuerySerializer], responses={200: DNSZoneCollectionSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(dns_zones_for_scope(workspace.data_scope), request, workspace, ZoneSerializer)
+        return _dns_page(request, workspace, zones=True)
 
     @extend_schema(request=ZoneWriteSerializer, responses={201: ZoneSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -335,10 +392,10 @@ class DNSZoneDetailView(APIView):
 
 
 class DNSRecordListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: CollectionSerializer})
+    @extend_schema(parameters=[DNSRecordQuerySerializer], responses={200: DNSRecordCollectionSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(dns_records_for_scope(workspace.data_scope), request, workspace, RecordSerializer)
+        return _dns_page(request, workspace, zones=False)
 
     @extend_schema(request=RecordWriteSerializer, responses={201: RecordSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

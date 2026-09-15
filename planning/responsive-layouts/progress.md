@@ -1013,3 +1013,196 @@ Roadmap update is saved there and unpublished. No production deployment or versi
 change. This closes the bounded interface endpoint collection/editing/assignment
 checkpoint, not endpoint creation/transfers, technician sign-off, Phase 3 or full
 pre-1.0 acceptance. Follow-up boundaries remain in interface-endpoints.md.
+
+## DNS zone register and child records — implementation, runtime verification open
+
+Phase 3 (#80), pre-1.0 under #60/#75, version 0.8.46. See dns-register.md.
+Implemented DNS navigation, zone register and full drawers, parent-scoped DNS
+records, guarded zone/record creation/editing, paged IP inventory choices, collection
+APIs and personal preferences; removed the obsolete NetworkServices component.
+OpenAPI/types and the local Wiki Roadmap are aligned, without publication.
+
+Verified locally with Node 24.12 and Python 3.13 using pinned Python lock files:
+- Eight focused component cases, including SRV zero values, zone/record dirty forms,
+  failed writes, parent mismatch, read-only records, IP choices and lazy collections.
+- 27 maintained-browser cases pass across Chromium, Firefox and WebKit, covering
+  six widths, refresh/full page/Back, focus, no overflow, axe, empty/failed/denied/
+  unavailable states, retry recovery, touch, short height and 200% CSS zoom.
+- Initial full frontend run: 538 passing tests in 112 files. Final run adds the
+  additional focused cases; its result is recorded below when available.
+- Lint, TypeScript, frontend build and bundle budgets, backend Ruff and mypy
+  (192 source files), generated API check, Wiki manifest, product-boundary and
+  interface-language checks pass. Schema generation has zero errors and the two
+  pre-existing simplified-network operation-ID warnings.
+
+Reproduced test issues: the new browser failure-state test initially expected
+"Retry" while the actual shared control and catalog say "Try again". Browser
+snapshots confirmed the control exists. Corrected the exact name and strengthened
+it to click the control and assert recovery; all 27 cases pass. The language gate
+also rejected the old "Canonical zone name" wording brought into this new view;
+changed it to "Zone name" and aligned component/live assertions, without changing
+DNS validation.
+
+Blocked runtime evidence: Docker Desktop's socket exists but /_ping times out,
+Compose queries do not return, and localhost:3200 was offline before verification.
+`make check` was attempted and stopped after 60 seconds waiting for its backend
+image prerequisite. PostgreSQL collection/preference tests, the new live DNS
+journey, full network validation and local `make up` have not passed on this change.
+A temporary frontend served synthetic browser fixtures only; it is not a rebuilt
+application. Restart approval was requested because restarting Docker interrupts
+other local containers. No engine restart, production deployment, publication,
+version change, or user/demo data changes are included.
+
+This slice remains uncommitted pending required Docker evidence, in accordance
+with AGENTS.md. Next: restore Docker; run make check and make test-network-validation
+(including the new services tests); run the isolated live-workspace rehearsal;
+verify DNS zone/record/TTL and audit persistence in its PostgreSQL database; rebuild
+local TekDocs; record evidence and commit this bounded slice. Record-level history,
+zone transfers, circuits/handoffs, broader inventory and Phase 3 acceptance remain
+open. The pre-existing incomplete local Wiki checkout is still not published.
+
+Final local verification: 542 frontend tests pass across 113 files; all 27 DNS
+browser cases pass; final lint/typecheck, API generation check, build/bundle budget,
+Wiki manifest, product-boundary and language checks pass. The isolated frontend and
+stalled Docker CLI requests started for this task were stopped. Docker itself was
+not restarted. The requested restart approval is still pending; no runtime closure
+or local deployment is claimed.
+
+## DNS record history and navigation follow-up — runtime evidence still open
+
+Continued the existing Phase 3 DNS checkpoint at 0.8.46. Docker /_ping still times
+out; no restart approval has been received and no engine restart was attempted.
+This pass completes DNS record history within its parent zone drawer rather than
+starting another unverified network register.
+
+Implemented a View record history / Back to record details flow with direct
+`dns_record_view=history` state and independent `dns_record_history_page` paging.
+Existing zone history keeps `history_page`. Record selection clears child history
+state; browser Back/Forward, refresh and full-page links retain the selected view.
+History uses the existing entity-scoped activity endpoint and permission policy,
+loads only on demand, and has readable DNS action labels. Dirty/busy navigation,
+denied/failed reads and return-to-details are covered. No model/API change in this
+follow-up; RecordActivity keeps its old default and accepts an optional page key.
+
+Reproduction before editing: the new focus check showed the zone heading remained
+focused after opening a DNS child record, and history links/views were absent.
+Three focused checks failed. Selected child headings now receive focus, and the
+new flow passes all 12 DNS component/IP-choice tests. Browser checks pass all 33
+cases (11 per Chromium/Firefox/WebKit), including all six widths, history paging
+isolation, retained direct links, denial/retry recovery and no extra overlay.
+The initial run remains in /tmp/tekdocs-dns-history-before.log; passing evidence
+is in /tmp/tekdocs-dns-history-components.log and the browser logs.
+
+The isolated live browser rehearsal now reads created/updated DNS history after
+creation and TTL editing. Its embedded PostgreSQL assertions independently verify
+zone/record tenant and organization ownership, TXT value, TTL 600, no unexpected
+IP link, and exactly the created/updated audit events. Shell syntax and embedded
+Python syntax checks pass. This is prepared runtime coverage, not an executed
+PostgreSQL or live-browser pass.
+
+Full frontend gate result follows when finished. The prior Docker make-check
+blocker still applies: network/database/live gates, local rebuild and the completed
+slice commit remain open. Version, existing application data and publication status
+are unchanged. Circuits/handoffs and the wider layout migration remain separate
+follow-ups; DNS record history is no longer a missing implementation item.
+
+Final history follow-up verification: frontend-gate check passes in full, including
+API contract check, lint, TypeScript, 546 tests across 113 files, build and bundle
+budgets. All 33 DNS browser cases and all 12 focused component cases pass. Wiki
+manifest and language checks pass. The temporary browser-test frontend was stopped.
+Runtime verification and local rebuilding remain blocked by Docker, so the DNS
+slice is still not committed or declared complete. Final evidence:
+/tmp/tekdocs-dns-history-frontend-gate.log,
+/tmp/tekdocs-dns-history-browser.log (Chromium), and
+/tmp/tekdocs-dns-history-browser-all.log (Firefox/WebKit).
+
+## DNS runtime closure — Docker recovered
+
+Resumed the DNS checkpoint after the user's continuation of the restart discussion.
+The normal Docker Desktop restart failed after 45 seconds because its processes
+would not exit. Docker's supported force-stop followed by start recovered the
+engine; /_ping returns OK and the existing TekDocs services report healthy. No
+Docker reset or container/volume deletion was used for recovery.
+
+`make check` now passes with Docker backend checks and all 546 frontend tests.
+All 14 network-service PostgreSQL cases pass, including the new DNS collection
+and personal-column cases. Full network validation and the isolated live browser
+rehearsal are running. The previous runtime blocker is resolved; this entry does
+not yet claim completion of those remaining gates or the local rebuild.
+
+
+### DNS runtime retry and long-name accessibility
+
+The first combined runtime attempt did not close the checkpoint: the network
+suite lost its Docker connection at 79% (unexpected EOF), while the live browser
+rehearsal timed out on the DNS Type field. Docker subsequently reported healthy;
+the full network gate was rerun separately and passed, including stabilization
+and all 547 frontend tests. No existing application volumes were reset.
+
+The browser failure was reproduced independently against the current frontend:
+exact label lookup included nested select/textarea content, while the accessibility
+tree correctly exposed combobox Type and textbox Value. The tests now use those
+exact accessible roles and names. An added browser regression changes type and
+value, saves both, and checks the retained result. All 36 DNS cases pass across
+Chromium, Firefox and WebKit. This corrects the harness without relaxing assertions.
+
+A failing component regression also reproduced that read-only users could not
+access the full long zone name on Overview. Overview now exposes the complete
+name in the existing wrapping record-facts layout. All 13 focused DNS component
+checks pass. No CSS, schema, permission or version change was needed.
+
+Evidence: /tmp/tekdocs-dns-network-retry.log,
+/tmp/tekdocs-dns-type-before-current.log,
+/tmp/tekdocs-dns-browser-final2.log,
+/tmp/tekdocs-dns-long-name-before.log,
+/tmp/tekdocs-dns-components-final.log. The corrected live rehearsal and final
+make check are in progress; completion and local rebuild evidence follow below.
+
+
+### DNS update runtime regression
+
+The corrected live browser reached creation but exposed HTTP 500 on TXT-record
+TTL updates. A new PostgreSQL regression reproduced the exception directly:
+`FOR UPDATE cannot be applied to the nullable side of an outer join`. The DNS
+update service had selected an optional IP relationship with an unrestricted row
+lock. It now locks only the DNS record and its entity, matching the existing
+wireless update pattern, while preserving scoped relationship validation and the
+DNS advisory lock. The regression verifies a partial TTL update preserves all
+other fields, parent/workspace ownership and the created/updated audit pair.
+Evidence before the fix: /tmp/tekdocs-dns-live-retry.log and
+/tmp/tekdocs-dns-update-before.log. This is a runtime bug fix within the DNS
+migration acceptance boundary; no schema or API contract change is introduced.
+
+
+### DNS checkpoint verified
+
+Verified after the save fix: `make check` passes (547 frontend tests, API contract,
+backend static checks, migration consistency, build/budgets); all 15 network-service
+PostgreSQL tests pass; all 12 collection-preference tests pass. The broader
+`make test-network-validation` passed before the one-line DNS locking correction;
+the affected network-service suite and complete live journey were rerun afterward.
+All 36 DNS browser cases and 13 component cases pass. `make test-e2e-live` completed
+successfully, including the independent DNS retained-row/ownership/audit assertions.
+Wiki manifest contract passes (37 pages, 25 topics). The local Wiki Roadmap is
+updated; publication and repair of the preexisting incomplete Wiki checkout remain
+separate from this local checkpoint.
+
+Evidence: /tmp/tekdocs-dns-check-closure.log,
+/tmp/tekdocs-dns-update-after.log,
+/tmp/tekdocs-dns-preferences-final.log,
+/tmp/tekdocs-dns-network-retry.log,
+/tmp/tekdocs-dns-browser-final2.log,
+/tmp/tekdocs-dns-components-final.log,
+/tmp/tekdocs-dns-live-final.log.
+
+This completes the bounded DNS migration, not Phase 3 or the overall interface
+plan. Circuits/handoffs, endpoint creation/transfers, remaining network surfaces,
+technician walkthroughs and release acceptance remain open. Version stays 0.8.46.
+
+
+Local availability: `make up` completed successfully. Readiness at
+http://localhost:3200/api/v1/health/ready reports status ok, database and diagram
+renderer ready, version 0.8.46; frontend/backend and supporting health-checked
+services report healthy. Existing database and application volumes were retained.
+Test the migrated surface from Networks → DNS. Build evidence:
+/tmp/tekdocs-dns-local-up.log. No production deployment, push or publication.

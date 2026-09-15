@@ -93,7 +93,7 @@ export type VRFWrite = Omit<NetworkVRF, 'id'>
 export type VLANWrite = Omit<NetworkVLAN, 'id'>
 export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> & { vrf_id: string | null; vlan_id: string | null }
 export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
-export type AddressQuery = { interface_id?: string; unassigned?: 'true'; device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
+export type AddressQuery = { zone_id?: string; interface_id?: string; unassigned?: 'true'; device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
 export type AddressSummary = Omit<NetworkIPAddress, 'description'>
 export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'>
 export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'>
@@ -118,6 +118,10 @@ export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationsh
 export type InventoryQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; site_id?: string; rack_id?: string; role?: string }
 
 export interface NetworksClient {
+  dnsZoneCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<DNSZone, 'description'>>>
+  dnsZoneDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<DNSZone>
+  dnsRecordCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<DNSRecord, 'description'>>>
+  dnsRecordDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<DNSRecord>
   hardwareAssetChoices(workspace: WorkspaceContext, q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   locationChoices(workspace: WorkspaceContext, siteId: string, q: string, page: number, signal?: AbortSignal): Promise<ListResult<{ id: string; name: string; identifier: string }>>
   rackCollection(workspace: WorkspaceContext, query: InventoryQuery, signal?: AbortSignal): Promise<ListResult<NetworkRack>>
@@ -174,7 +178,7 @@ export interface NetworksClient {
   updateDNSZone(workspace: WorkspaceContext, id: string, values: DNSZoneWrite): Promise<DNSZone>
   listDNSRecords(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<DNSRecord>>
   createDNSRecord(workspace: WorkspaceContext, values: DNSRecordWrite): Promise<DNSRecord>
-  updateDNSRecord(workspace: WorkspaceContext, id: string, values: DNSRecordWrite): Promise<DNSRecord>
+  updateDNSRecord(workspace: WorkspaceContext, id: string, values: Partial<DNSRecordWrite>): Promise<DNSRecord>
   listCircuits(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkCircuit> & { can_view_contracts: boolean }>
   circuitChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<CircuitChoices>
   createCircuit(workspace: WorkspaceContext, values: CircuitWrite): Promise<NetworkCircuit>
@@ -234,6 +238,17 @@ async function remove(url: string) {
 }
 
 export const browserNetworksClient: NetworksClient = {
+  async dnsZoneCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/dns-zones?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async dnsZoneDetail(workspace, id, signal) { return json(await fetch(`${basePath(workspace)}/dns-zones/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal })) },
+  async dnsRecordCollection(workspace, query, signal) {
+    const { association, ...rest } = query
+    const params = new URLSearchParams({ ...rest, ...(association ? { record_type: association } : {}), page: String(query.page), page_size: String(query.page_size), summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/dns-records?${params}`, { credentials: 'same-origin', signal }))
+  },
+  async dnsRecordDetail(workspace, id, signal) { return json(await fetch(`${basePath(workspace)}/dns-records/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal })) },
   async hardwareAssetChoices(workspace, q, page, signal) {
     const params = new URLSearchParams({ kind: 'hardware_asset', q, page: String(page), page_size: '25' })
     return json(await fetch(`${basePath(workspace)}/assignment-choices?${params}`, { credentials: 'same-origin', signal }))

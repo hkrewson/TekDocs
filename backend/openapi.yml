@@ -11324,6 +11324,30 @@ paths:
       operationId: workspaces_msp_networks_dns_records_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - record_type
+          - -record_type
+          - value
+          - -value
+          - ttl
+          - -ttl
+          type: string
+          x-spec-enum-id: 8e7f1dd92ee77cb8
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `record_type` - record_type
+          * `-record_type` - -record_type
+          * `value` - value
+          * `-value` - -value
+          * `ttl` - ttl
+          * `-ttl` - -ttl
+      - in: query
         name: page
         schema:
           type: integer
@@ -11337,6 +11361,48 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: record_type
+        schema:
+          enum:
+          - A
+          - AAAA
+          - CNAME
+          - MX
+          - TXT
+          - SRV
+          - CAA
+          - NS
+          - PTR
+          type: string
+          x-spec-enum-id: 16b0553fdf5d9f83
+          minLength: 1
+        description: |-
+          * `A` - A
+          * `AAAA` - AAAA
+          * `CNAME` - CNAME
+          * `MX` - MX
+          * `TXT` - TXT
+          * `SRV` - SRV
+          * `CAA` - CAA
+          * `NS` - NS
+          * `PTR` - PTR
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: zone_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -11347,7 +11413,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/DNSRecordCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -11458,6 +11524,22 @@ paths:
       operationId: workspaces_msp_networks_dns_zones_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - record_count
+          - -record_count
+          type: string
+          x-spec-enum-id: 437f1a1325980be9
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `record_count` - record_count
+          * `-record_count` - -record_count
+      - in: query
         name: page
         schema:
           type: integer
@@ -11471,6 +11553,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -11481,7 +11574,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/DNSZoneCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -23872,6 +23965,30 @@ paths:
     get:
       operationId: workspaces_organizations_networks_dns_records_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - record_type
+          - -record_type
+          - value
+          - -value
+          - ttl
+          - -ttl
+          type: string
+          x-spec-enum-id: 8e7f1dd92ee77cb8
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `record_type` - record_type
+          * `-record_type` - -record_type
+          * `value` - value
+          * `-value` - -value
+          * `ttl` - ttl
+          * `-ttl` - -ttl
       - in: path
         name: organization_entity_id
         schema:
@@ -23892,6 +24009,48 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: record_type
+        schema:
+          enum:
+          - A
+          - AAAA
+          - CNAME
+          - MX
+          - TXT
+          - SRV
+          - CAA
+          - NS
+          - PTR
+          type: string
+          x-spec-enum-id: 16b0553fdf5d9f83
+          minLength: 1
+        description: |-
+          * `A` - A
+          * `AAAA` - AAAA
+          * `CNAME` - CNAME
+          * `MX` - MX
+          * `TXT` - TXT
+          * `SRV` - SRV
+          * `CAA` - CAA
+          * `NS` - NS
+          * `PTR` - PTR
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: zone_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -23902,7 +24061,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/DNSRecordCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -24031,6 +24190,22 @@ paths:
     get:
       operationId: workspaces_organizations_networks_dns_zones_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - record_count
+          - -record_count
+          type: string
+          x-spec-enum-id: 437f1a1325980be9
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `record_count` - record_count
+          * `-record_count` - -record_count
       - in: path
         name: organization_entity_id
         schema:
@@ -24051,6 +24226,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -24061,7 +24247,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+                $ref: '#/components/schemas/DNSZoneCollection'
           description: ''
           headers:
             X-Request-ID:
@@ -30165,29 +30351,6 @@ components:
           maxLength: 240
       required:
       - model_id
-    Collection:
-      type: object
-      properties:
-        results:
-          type: array
-          items: {}
-        page:
-          type: integer
-        page_size:
-          type: integer
-        count:
-          type: integer
-        has_more:
-          type: boolean
-        can_manage:
-          type: boolean
-      required:
-      - can_manage
-      - count
-      - has_more
-      - page
-      - page_size
-      - results
     CollectionPreference:
       type: object
       properties:
@@ -31797,6 +31960,54 @@ components:
       - name
       - permissions
       - scope
+    DNSRecordCollection:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Record'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    DNSZoneCollection:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Zone'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     DataFlow:
       type: object
       properties:
@@ -41059,7 +41270,6 @@ components:
         description:
           type: string
       required:
-      - description
       - id
       - ip_address_id
       - owner_name
@@ -44406,7 +44616,6 @@ components:
           type: integer
           readOnly: true
       required:
-      - description
       - id
       - name
       - record_count

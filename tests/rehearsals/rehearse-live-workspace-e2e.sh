@@ -70,6 +70,7 @@ from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, Tena
 from apps.core.documents import resolve_document
 from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
 from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod
+from apps.core.models import DNSZone, DNSRecord
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
@@ -145,6 +146,20 @@ assert network_record.vlan_number == 20
 assert network_record.use_full_range is True
 assert network_record.assignable_start is None
 assert network_record.assignable_end is None
+dns_zone = DNSZone.objects.get(name="live-layout.example.invalid")
+dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-layout.example.invalid")
+assert dns_zone.organization == organization
+assert dns_zone.tenant == organization.tenant
+assert dns_record.organization == organization
+assert dns_record.tenant == organization.tenant
+assert dns_record.entity.organization_id == organization.id
+assert dns_record.record_type == "TXT"
+assert dns_record.value == "Live DNS value"
+assert dns_record.ttl == 600
+assert dns_record.ip_address_id is None
+assert sorted(AuditEvent.objects.filter(entity_id=dns_record.entity_id).values_list("action", flat=True)) == [
+    "dns_record.created", "dns_record.updated",
+]
 assert str(network_record.primary_dns) == "9.9.9.9"
 assert str(network_record.secondary_dns) == "1.1.1.1"
 assert network_mac.interface_id is None

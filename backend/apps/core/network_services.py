@@ -338,7 +338,7 @@ def create_dns_record(
 @transaction.atomic
 def update_dns_record(*, record: DNSRecord, actor_id: UUID, values: dict[str, object]) -> DNSRecord:
     locked = (
-        DNSRecord.objects.select_for_update()
+        DNSRecord.objects.select_for_update(of=("self", "entity"))
         .select_related("entity", "zone__entity", "ip_address__entity")
         .get(pk=record.pk)
     )

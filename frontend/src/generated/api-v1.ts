@@ -8326,14 +8326,6 @@ export interface components {
             /** @default  */
             readonly name: string;
         };
-        readonly Collection: {
-            readonly results: readonly unknown[];
-            readonly page: number;
-            readonly page_size: number;
-            readonly count: number;
-            readonly has_more: boolean;
-            readonly can_manage: boolean;
-        };
         readonly CollectionPreference: {
             readonly columns: readonly string[];
             /**
@@ -9016,6 +9008,22 @@ export interface components {
              */
             readonly scope: "tenant" | "organization" | "collection";
             readonly permissions: readonly string[];
+        };
+        readonly DNSRecordCollection: {
+            readonly results: readonly components["schemas"]["Record"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
+        };
+        readonly DNSZoneCollection: {
+            readonly results: readonly components["schemas"]["Zone"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
         };
         readonly DataFlow: {
             /** Format: uuid */
@@ -13055,7 +13063,7 @@ export interface components {
             readonly port: number | null;
             /** Format: uuid */
             readonly ip_address_id: string | null;
-            readonly description: string;
+            readonly description?: string;
         };
         readonly RecordWrite: {
             /** Format: uuid */
@@ -14450,7 +14458,7 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             readonly name: string;
-            readonly description: string;
+            readonly description?: string;
             readonly record_count: number;
         };
         readonly ZoneWrite: {
@@ -23352,8 +23360,34 @@ export interface operations {
     readonly workspaces_msp_networks_dns_records_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `record_type` - record_type
+                 *     * `-record_type` - -record_type
+                 *     * `value` - value
+                 *     * `-value` - -value
+                 *     * `ttl` - ttl
+                 *     * `-ttl` - -ttl
+                 */
+                readonly ordering?: "name" | "-name" | "record_type" | "-record_type" | "value" | "-value" | "ttl" | "-ttl";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `A` - A
+                 *     * `AAAA` - AAAA
+                 *     * `CNAME` - CNAME
+                 *     * `MX` - MX
+                 *     * `TXT` - TXT
+                 *     * `SRV` - SRV
+                 *     * `CAA` - CAA
+                 *     * `NS` - NS
+                 *     * `PTR` - PTR
+                 */
+                readonly record_type?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "SRV" | "CAA" | "NS" | "PTR";
+                readonly summary?: boolean;
+                readonly zone_id?: string;
             };
             readonly header?: never;
             readonly path?: never;
@@ -23368,7 +23402,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["DNSRecordCollection"];
                 };
             };
         };
@@ -23455,8 +23489,17 @@ export interface operations {
     readonly workspaces_msp_networks_dns_zones_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `record_count` - record_count
+                 *     * `-record_count` - -record_count
+                 */
+                readonly ordering?: "name" | "-name" | "record_count" | "-record_count";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -23471,7 +23514,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["DNSZoneCollection"];
                 };
             };
         };
@@ -32024,8 +32067,34 @@ export interface operations {
     readonly workspaces_organizations_networks_dns_records_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `record_type` - record_type
+                 *     * `-record_type` - -record_type
+                 *     * `value` - value
+                 *     * `-value` - -value
+                 *     * `ttl` - ttl
+                 *     * `-ttl` - -ttl
+                 */
+                readonly ordering?: "name" | "-name" | "record_type" | "-record_type" | "value" | "-value" | "ttl" | "-ttl";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `A` - A
+                 *     * `AAAA` - AAAA
+                 *     * `CNAME` - CNAME
+                 *     * `MX` - MX
+                 *     * `TXT` - TXT
+                 *     * `SRV` - SRV
+                 *     * `CAA` - CAA
+                 *     * `NS` - NS
+                 *     * `PTR` - PTR
+                 */
+                readonly record_type?: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "SRV" | "CAA" | "NS" | "PTR";
+                readonly summary?: boolean;
+                readonly zone_id?: string;
             };
             readonly header?: never;
             readonly path: {
@@ -32042,7 +32111,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["DNSRecordCollection"];
                 };
             };
         };
@@ -32133,8 +32202,17 @@ export interface operations {
     readonly workspaces_organizations_networks_dns_zones_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `record_count` - record_count
+                 *     * `-record_count` - -record_count
+                 */
+                readonly ordering?: "name" | "-name" | "record_count" | "-record_count";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -32151,7 +32229,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["Collection"];
+                    readonly "application/json": components["schemas"]["DNSZoneCollection"];
                 };
             };
         };

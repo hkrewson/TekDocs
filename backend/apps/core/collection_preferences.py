@@ -24,13 +24,25 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "dns-zones": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "record_count")),
+        ("name", "record_count"),
+    ),
+    "dns-records": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "record_type", "value", "ttl")),
+        ("name", "record_type", "value", "ttl"),
+    ),
     "interface-ip-addresses": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "status", "dns_name")),
         ("name", "status", "dns_name"),
     ),
     "interface-mac-addresses": CollectionDefinition(
-        PermissionKey.NETWORKS_VIEW, (("name", PermissionKey.NETWORKS_VIEW),), ("name",),
+        PermissionKey.NETWORKS_VIEW,
+        (("name", PermissionKey.NETWORKS_VIEW),),
+        ("name",),
     ),
     "network-interfaces": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,

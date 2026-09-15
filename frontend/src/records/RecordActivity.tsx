@@ -6,12 +6,12 @@ import { browserOperationsClient } from '../operations/api'
 import type { ActivityResult, OperationsClient } from '../operations/api'
 import type { WorkspaceContext } from '../workspaces/api'
 
-export function RecordActivity({ entityId, workspace, client = browserOperationsClient, description, emptyLabel, deniedLabel, actionLabels = {} }: {
-  entityId: string; description: string; emptyLabel: string; deniedLabel: string; actionLabels?: Record<string, string>; workspace: WorkspaceContext; client?: Pick<OperationsClient, 'activity'>
+export function RecordActivity({ entityId, workspace, client = browserOperationsClient, description, emptyLabel, deniedLabel, actionLabels = {}, pageParameter = 'history_page' }: {
+  pageParameter?: string; entityId: string; description: string; emptyLabel: string; deniedLabel: string; actionLabels?: Record<string, string>; workspace: WorkspaceContext; client?: Pick<OperationsClient, 'activity'>
 }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
-  const requestedPage = Number(params.get('history_page') ?? 1)
+  const requestedPage = Number(params.get(pageParameter) ?? 1)
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const [reload, setReload] = useState(0)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -33,8 +33,8 @@ export function RecordActivity({ entityId, workspace, client = browserOperations
   function go(next: number) {
     focusPage.current = true
     const query = new URLSearchParams(params)
-    if (next === 1) query.delete('history_page')
-    else query.set('history_page', String(next))
+    if (next === 1) query.delete(pageParameter)
+    else query.set(pageParameter, String(next))
     setParams(query, { state: location.state as unknown })
   }
   return <>

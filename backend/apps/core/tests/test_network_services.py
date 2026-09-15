@@ -603,3 +603,137 @@ def test_wireless_assignment_choices_and_partial_update(owner_client, installati
     )
     anonymous = Client()
     assert anonymous.get(url, {"kind": kind}).status_code in (401, 403)
+
+
+@pytest.mark.django_db
+def test_dns_collections_search_scope_sort_and_legacy(owner_client, installation):
+    from apps.core.network_services import create_dns_record
+
+    organization = _organization(installation, "DNS layout")
+    sibling = _organization(installation, "DNS sibling")
+    zone = create_dns_zone(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="example.invalid",
+        description="zone marker",
+    )
+    other = create_dns_zone(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        name="sibling.invalid",
+        description="private",
+    )
+    for index in range(31):
+        create_dns_record(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            zone_entity_id=zone.entity_id,
+            owner_name=f"host{index:02}.example.invalid",
+            record_type="TXT",
+            value=f"value {index}",
+            ttl=3600,
+            priority=None,
+            weight=None,
+            port=None,
+            ip_address_entity_id=None,
+            description=f"marker {index}",
+        )
+    kwargs = {"organization_entity_id": organization.entity_id}
+    url = reverse("organization-network-dns-records", kwargs=kwargs)
+    query = {"zone_id": str(zone.entity_id), "page_size": 25, "ordering": "name", "summary": "true"}
+    first = owner_client.get(url, query).json()
+    assert first["count"] == 31 and len(first["results"]) == 25 and first["has_more"]
+    assert "description" not in first["results"][0]
+    second = owner_client.get(url, {**query, "page": 2}).json()
+    assert len(second["results"]) == 6
+    assert not set(row["id"] for row in first["results"]) & set(row["id"] for row in second["results"])
+    assert owner_client.get(url, {**query, "q": "marker 30"}).json()["count"] == 1
+    assert owner_client.get(url, {**query, "record_type": "A"}).json()["count"] == 0
+    assert (
+        owner_client.get(url, {**query, "ordering": "-name"}).json()["results"][0]["owner_name"]
+        == "host30.example.invalid"
+    )
+    assert owner_client.get(url, {**query, "zone_id": str(other.entity_id)}).status_code == 403
+    for invalid in ({"ordering": "description"}, {"record_type": "INVALID"}, {"zone_id": "bad"}, {"page_size": 101}):
+        assert owner_client.get(url, {**query, **invalid}).status_code == 400
+    legacy = owner_client.get(url).json()
+    assert legacy["page_size"] == 50 and len(legacy["results"]) == 31
+    assert "description" in legacy["results"][0]
+    zones = reverse("organization-network-dns-zones", kwargs=kwargs)
+    assert owner_client.get(zones, {"q": "zone marker", "ordering": "-record_count", "summary": "true"}).json()[
+        "results"
+    ] == [{"id": str(zone.entity_id), "name": "example.invalid", "record_count": 31}]
+    assert owner_client.get(zones, {"q": "private"}).json()["count"] == 0
+    assert owner_client.get(zones, {"ordering": "bad"}).status_code == 400
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "feature,columns",
+    [("dns-zones", ["name", "record_count"]), ("dns-records", ["name", "record_type", "value", "ttl"])],
+)
+def test_dns_personal_columns(owner_client, installation, feature, columns):
+    organization = _organization(installation, "DNS preferences")
+    url = reverse(
+        "organization-collection-preferences",
+        kwargs={"organization_entity_id": organization.entity_id, "feature": feature},
+    )
+    defaults = owner_client.get(url)
+    assert defaults.status_code == 200
+    assert defaults.json()["columns"] == columns
+    saved = owner_client.put(url, {"columns": ["name"], "page_size": 50}, content_type="application/json")
+    assert saved.status_code == 200
+    assert owner_client.get(url).json()["page_size"] == 50
+    assert owner_client.delete(url).json() == defaults.json()
+    assert (
+        owner_client.put(
+            url, {"columns": ["name", "private"], "page_size": 25}, content_type="application/json"
+        ).status_code
+        == 400
+    )
+
+
+@pytest.mark.django_db
+def test_dns_record_drawer_partial_update_preserves_parent_and_audit(owner_client, installation):
+    from apps.core.models import AuditEvent
+
+    organization = _organization(installation, "DNS edit client")
+    zone = _post(owner_client, "organization-network-dns-zones", organization, {"name": "example.invalid"})
+    assert zone.status_code == 201
+    created = _post(
+        owner_client,
+        "organization-network-dns-records",
+        organization,
+        {
+            "zone_id": zone.json()["id"],
+            "owner_name": "host.example.invalid",
+            "record_type": "TXT",
+            "value": "Documented value",
+            "ttl": 3600,
+        },
+    )
+    assert created.status_code == 201
+    record_id = created.json()["id"]
+    detail = reverse(
+        "organization-network-dns-record-detail",
+        kwargs={
+            "organization_entity_id": organization.entity_id,
+            "record_entity_id": record_id,
+        },
+    )
+    updated = owner_client.patch(detail, {"ttl": 600}, content_type="application/json")
+    assert updated.status_code == 200, updated.content
+    assert updated.json() == {**created.json(), "ttl": 600}
+    retained = DNSRecord.objects.get(entity_id=record_id)
+    assert str(retained.zone.entity_id) == zone.json()["id"]
+    assert retained.ip_address_id is None
+    assert retained.organization_id == organization.id
+    assert list(
+        AuditEvent.objects.filter(entity_id=record_id).order_by("occurred_at").values_list("action", flat=True)
+    ) == [
+        "dns_record.created",
+        "dns_record.updated",
+    ]

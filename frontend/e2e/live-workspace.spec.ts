@@ -762,19 +762,24 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   const circuitProviderId = vendorHref.match(/organizations\/([0-9a-f-]+)/)?.[1]
   if (!circuitProviderId) throw new Error('The circuit fixture requires the vendor organization identifier.')
   const circuitCsrf = (await page.context().cookies()).find(cookie => cookie.name === 'csrftoken')!
-  const circuitSeed = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/circuits`, {
-    headers: { 'X-CSRFToken': circuitCsrf.value },
-    data: { name: 'Live layout circuit', provider_id: circuitProviderId, service_identifier: 'LIVE-CIRCUIT-01', kind: 'internet', status: 'active', description: 'Seeded circuit service' },
-  })
-  expect(circuitSeed.status()).toBe(201)
-  const circuitId = (await circuitSeed.json() as { id: string }).id
+  await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Circuits', exact: true }).click()
+  await page.getByRole('button', { name: 'New circuit', exact: true }).click()
+  const newCircuitDrawer = page.getByRole('dialog', { name: 'New circuit', exact: true })
+  await newCircuitDrawer.getByRole('textbox', { name: 'Name', exact: true }).fill('Live layout circuit')
+  await newCircuitDrawer.getByRole('textbox', { name: 'Service identifier', exact: true }).fill('LIVE-CIRCUIT-01')
+  await newCircuitDrawer.getByRole('combobox', { name: 'Provider', exact: true }).selectOption(circuitProviderId)
+  await newCircuitDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Seeded circuit service')
+  const createdCircuit = page.waitForResponse(response => response.url().endsWith('/networks/circuits') && response.request().method() === 'POST')
+  await newCircuitDrawer.getByRole('button', { name: 'Add circuit', exact: true }).click()
+  const circuitResponse = await createdCircuit
+  expect(circuitResponse.status()).toBe(201)
+  const circuitId = (await circuitResponse.json() as { id: string }).id
+  await expect(page.getByRole('dialog', { name: 'Live layout circuit', exact: true })).toBeVisible()
   const handoffSeed = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/circuits/${circuitId}/handoffs`, {
     headers: { 'X-CSRFToken': circuitCsrf.value },
     data: { name: 'Live circuit demarc', side: 'a', media: 'fiber', connector: 'LC', provider_reference: 'LIVE-DEMARC-01' },
   })
   expect(handoffSeed.status()).toBe(201)
-  await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Circuits', exact: true }).click()
-  await page.getByRole('button', { name: 'Live layout circuit', exact: true }).click()
   const circuitDrawer = page.getByRole('dialog', { name: 'Live layout circuit', exact: true })
   await circuitDrawer.getByRole('button', { name: 'Edit service details' }).click()
   await circuitDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Verified live circuit service')

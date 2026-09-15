@@ -56,13 +56,12 @@ special scrolling surface was added.
 
 ## Deliberate next slices
 
-Circuit creation, provider/contract assignment, circuit kind/status workflows,
+Circuit kind/status workflows,
 handoff creation/editing/placement/interface assignment, and handoff-specific
 history remain open. They need bounded pickers with off-page retained selections,
 existing provider/contract visibility enforcement and placement conflict checks.
 The prior component was not mounted in the shell; removing it does not remove an
-active creation workflow. Existing public mutation APIs continue to work. The new
-register does not offer creation controls until those focused workflows are ready.
+active creation workflow. Existing public mutation APIs continue to work. Creation and provider/contract editing are implemented in the subsequent checkpoint below.
 
 Do not describe this checkpoint as complete circuit lifecycle management or Phase 3
 acceptance. DNS transfers, endpoint creation/transfers, device relationships and
@@ -111,7 +110,29 @@ six-array response and limits. Query typos or filters without a choice are rejec
 OpenAPI describes both shapes; the frontend has a separate `circuitChoicePage`
 adapter, preserving its legacy helper. No new route, permission or migration.
 
-This prerequisite does not enable creation in the register. The next UI slice must
+This API prerequisite supports the subsequent creation UI checkpoint. The UI must
 use these bounded choices, retain chosen labels across searches, clear/reconfirm
 incompatible contracts when providers change, and preserve drafts on failed saves.
 Hidden contract/provider changes must still follow existing mutation permissions.
+
+## Circuit creation and provider/contract editing
+
+The register now offers New circuit to network editors. A focused form in the same
+full-screen/right overlay creates a named service with service identifier, kind,
+provider, optional contract and notes. New records explicitly start Ordered; dates,
+bandwidth and operational status remain separate service/lifecycle workflows.
+Successful creation opens the saved Overview without losing collection context or
+leaving a dirty guard. Contract/provider updates use a separate focused section;
+only changed provider and visible contract linkage are submitted, preserving all
+service fields. A restricted contract projection hides assignment editing. Selecting
+a different provider clears the draft contract and remounts its provider-filtered
+picker. Removing a selection is a draft action until Save.
+
+Pickers request 25 choices with name search and paging. Selected labels remain
+visible outside the current page/search, and retained-selection availability is
+checked within the API's permission/provider boundary. Failed reads offer Retry;
+failed writes preserve input and never retry automatically. The existing server
+validates provider/contract compatibility and permissions at mutation time. Dirty
+forms use Keep editing/Discard for cancellation, drawer dismissal and navigation.
+No additional drawer, CSS, domain model, migration or public API change is needed.
+Handoff editing, placement, kind/status transitions and Phase 3 acceptance remain open.

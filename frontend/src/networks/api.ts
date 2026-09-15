@@ -396,7 +396,7 @@ export const browserNetworksClient: NetworksClient = {
     const { association, ...values } = query
     const params = new URLSearchParams({ ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])), summary: 'true', ...(association ? { kind: association } : {}) })
     const result = await json<ListResult<CircuitSummary>>(await fetch(`${basePath(workspace)}/circuits?${params}`, { credentials: 'same-origin', signal }))
-    return { ...result, can_create: false }
+    return { ...result, can_create: result.can_manage }
   },
   circuitDetail: async (workspace, id, signal) => json(await fetch(`${basePath(workspace)}/circuits/${encodeURIComponent(id)}?include_handoffs=false`, { credentials: 'same-origin', signal })),
   async handoffCollection(workspace, circuitId, query, signal) {

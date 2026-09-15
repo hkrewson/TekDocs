@@ -44,6 +44,20 @@ async function fixtures(page: Page, { denied = false, fail = false, unavailable 
     return route.fulfill({ json: { results: [handoff], count: 1, page: 1, page_size: 25, has_more: false, can_manage: !denied } })
   })
   await page.route('**/circuits/circuit-30/handoffs/handoff-1', route => route.fulfill({ json: handoff }))
+  await page.route('**/networks/circuits/choices?*', route => {
+    const query = new URL(route.request().url()).searchParams
+    const values = query.get('choice') === 'providers' ? [{ id: 'carrier', name: 'Carrier' }, { id: 'carrier-2', name: 'Other carrier' }] : [{ id: 'agreement', name: 'Agreement' }]
+    return route.fulfill({ json: { results: query.get('q') ? [] : values, selected: query.get('selected_id') ? { id: query.get('selected_id'), name: 'Retained choice' } : null, count: query.get('q') ? 0 : values.length, page: Number(query.get('page')), page_size: 25, has_more: false, can_view_contracts: !denied } })
+  })
+  await page.route('**/networks/circuits', route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    if (fail) return route.fulfill({ status: 403, json: { detail: 'Denied. Entries kept.' } })
+    const values = route.request().postDataJSON() as Record<string, unknown>
+    expect(values.status).toBe('ordered')
+    const row = { ...rows[0], ...values, id: 'circuit-31', provider_name: 'Carrier' }
+    rows.push(row)
+    return route.fulfill({ status: 201, json: row })
+  })
   await page.route('**/activity?*', route => route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false, actions: [] } }))
 }
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
@@ -152,3 +166,33 @@ test('Circuit collection failure can be retried into an empty workspace', async 
   await expect(page.getByText('No circuits match this workspace and search.')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`Circuit creation preserves drawer navigation at ${width}px`, async ({ page }) => {
+    await fixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/networks?view=circuits')
+    await page.getByRole('button', { name: 'New circuit', exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'New circuit', exact: true })
+    await drawer.getByRole('textbox', { name: 'Name', exact: true }).fill('Created service')
+    await drawer.getByRole('textbox', { name: 'Service identifier', exact: true }).fill('CREATED-1')
+    await drawer.getByRole('combobox', { name: 'Provider', exact: true }).selectOption('carrier')
+    await drawer.getByRole('combobox', { name: 'Contract', exact: true }).selectOption('agreement')
+    await drawer.getByRole('combobox', { name: 'Provider', exact: true }).selectOption('carrier-2')
+    await expect(drawer.getByRole('button', { name: 'Remove contract selection' })).toBeDisabled()
+    await drawer.getByRole('combobox', { name: 'Provider', exact: true }).selectOption('carrier')
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await drawer.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await drawer.getByRole('button', { name: 'Add circuit', exact: true }).click()
+    const saved = page.getByRole('dialog', { name: 'Created service', exact: true })
+    await expect(saved).toBeVisible()
+    await page.reload()
+    await expect(saved).toBeVisible()
+    await page.mouse.click(1, 1)
+    if (width < 768) await saved.getByRole('link', { name: 'Back to circuits', exact: true }).click()
+    await expect(saved).not.toBeVisible()
+    expect(page.url()).not.toContain('circuits=circuit-31')
+  })
+}

@@ -1365,3 +1365,48 @@ Local delivery: `make up` completed. Readiness at localhost:3200 reports status 
 database and diagram renderer ready, version 0.8.46. Existing user/demo data and
 volumes were preserved. Evidence: /tmp/tekdocs-choice-local-up.log. No push,
 production deployment, release or Wiki publication occurred.
+
+### Circuit creation and assignment drawers — implementation
+
+Phase 3 #80 under #60/#75: New circuit now creates an Ordered service in the
+existing overlay, with named identity, service identifier, kind, provider, optional
+contract and notes. Successful creation opens Overview and releases the draft
+guard. Provider/contract edits use a separate focused form, preserving service
+fields and withholding restricted contract projections. Provider changes clear
+the draft contract. Pickers use the previously verified bounded API and retain
+selected labels outside search/pages. No new CSS, model, migration or API contract.
+
+All 51 circuit browser cases pass across maintained engines, including all six
+required widths, accessibility, provider change/contract clearing, dirty cancel,
+creation, refresh and dismissal. Focused editor/register tests pass. Main checks
+and the isolated live creation journey are running. The initial image build
+exposed unsupported Testing Library selector options and untyped test mocks;
+corrected test types/options without changing assertions or production behavior.
+The limited focused coverage invocation is not a full coverage gate.
+
+Handoff creation/editing, placement, status/kind transitions, technician acceptance
+and the broader pre-1.0 release gate remain open. Version remains 0.8.46.
+
+Main `make check` passes with 558 frontend tests in 115 files, backend/static/API
+checks, migration drift checks and the existing build budgets. All 51 circuit
+browser cases pass. Evidence: /tmp/tekdocs-circuit-create-check2.log and
+/tmp/tekdocs-circuit-create-browser.log. No backend domain/API logic changed in
+this slice; prior provider/contract isolation validation remains documented above.
+The isolated live rehearsal is in progress and now creates through the drawer.
+
+The isolated `make test-e2e-live` passes, including browser creation through New
+circuit, saved Overview navigation, service editing/reload, handoff browsing and
+history. Independent PostgreSQL assertions confirm exact workspace/tenant,
+provider, service identifier, Ordered status, absent contract/interface linkage
+and one service-update audit event. Evidence:
+/tmp/tekdocs-circuit-create-live2.log. Fixtures use an isolated stack and preserve
+existing user/demo data. The initial image build is discarded; corrected build
+and live run pass. This closes creation and provider/contract editing, not circuit
+status operations, handoff editing/placement or Phase 3 acceptance.
+
+Local delivery: `make up` completed and readiness at localhost:3200 reports ok,
+database/diagram renderer ready and version 0.8.46. Existing application/demo
+volumes and data were preserved. Evidence:
+/tmp/tekdocs-circuit-create-local-up.log. Test from Networks → Circuits → New circuit,
+or a visible-contract circuit Overview → Edit provider and contract. No push,
+production deployment, release version change or Wiki publication occurred.

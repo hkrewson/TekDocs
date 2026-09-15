@@ -2694,5 +2694,19 @@
   "networkLayout.circuitValue_a": "A side",
   "networkLayout.circuitValue_z": "Z side",
   "networkLayout.circuitCreated": "Circuit created",
-  "networkLayout.circuitUpdated": "Circuit updated"
+  "networkLayout.circuitUpdated": "Circuit updated",
+  "networkLayout.circuitProviderSearch": "Search providers",
+  "networkLayout.circuitContractSearch": "Search contracts",
+  "networkLayout.circuitChoiceNone": "No selection",
+  "networkLayout.circuitChoiceChoose": "Choose from this page",
+  "networkLayout.circuitChoiceEmpty": "No matching choices.",
+  "networkLayout.circuitChoiceFailed": "Choices could not be loaded. Your selection has been kept.",
+  "networkLayout.circuitChoiceUnavailable": "The selected record is no longer available. Choose an available record before saving.",
+  "networkLayout.circuitAssignmentEdit": "Edit provider and contract",
+  "networkLayout.circuitAssignmentRestricted": "Provider and contract changes require access to contracts.",
+  "networkLayout.circuitAssignmentReview": "Review the provider and contract before saving. Choosing a different provider clears the selected contract.",
+  "networkLayout.circuitAssignmentSave": "Save provider and contract",
+  "networkLayout.circuitContractClear": "Remove contract selection",
+  "networkLayout.circuitCreate": "Add circuit",
+  "networkLayout.circuitCreateStatus": "New circuits start as Ordered. Add service details after creation."
 }

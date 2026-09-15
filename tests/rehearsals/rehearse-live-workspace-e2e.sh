@@ -151,7 +151,7 @@ assert circuit.organization == organization
 assert circuit.tenant == organization.tenant
 assert circuit.description == "Verified live circuit service"
 assert circuit.service_identifier == "LIVE-CIRCUIT-01"
-assert circuit.status == "active"
+assert circuit.status == "ordered"
 assert circuit.provider.entity.display_name == "Live Northwind Vendor"
 assert circuit.contract_id is None
 handoff = NetworkCircuitHandoff.objects.get(circuit=circuit, entity__display_name="Live circuit demarc")

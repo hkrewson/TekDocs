@@ -6,6 +6,7 @@ import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RecordActivity } from '../records/RecordActivity'
 import { RecordHeader, RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
+import { CircuitEditor } from './CircuitEditor'
 import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig, ChildRecordProps } from './NetworkChildCollection'
 import type { CircuitDetail, CircuitSummary, CircuitWrite, HandoffDetail, NetworksClient } from './api'
@@ -31,7 +32,8 @@ export function CircuitRegister({ workspace, client, preferenceClient = browserC
 }
 const dateFields = ['installed_on', 'service_starts_on', 'review_on', 'planned_disconnect_on'] as const
 const dateLabels = { installed_on: t('circuitInstalled'), service_starts_on: t('circuitStarts'), review_on: t('circuitReview'), planned_disconnect_on: t('circuitDisconnect') }
-function CircuitView({ record, workspace, client, canManage, onSaved }: ChildRecordProps<CircuitDetail> & Context) {
+function CircuitView({ record, workspace, client, canManage, onSaved, onReturn }: ChildRecordProps<CircuitDetail> & Context) {
+  const [assignment, setAssignment] = useState(false)
   const [params] = useSearchParams(), location = useLocation()
   const section = ['handoffs', 'history'].includes(params.get('circuits_section') ?? '') ? params.get('circuits_section')! : 'overview'
   const initial = { name: record?.name ?? '', service_identifier: record?.service_identifier ?? '', bandwidth_down_mbps: record?.bandwidth_down_mbps ?? null, bandwidth_up_mbps: record?.bandwidth_up_mbps ?? null, installed_on: record?.installed_on ?? null, service_starts_on: record?.service_starts_on ?? null, review_on: record?.review_on ?? null, planned_disconnect_on: record?.planned_disconnect_on ?? null, description: record?.description ?? '' }
@@ -45,7 +47,8 @@ function CircuitView({ record, workspace, client, canManage, onSaved }: ChildRec
     catch (caught) { setError(caught instanceof Error ? caught.message : t('circuitSaveFailed')) } finally { setBusy(false) }
   }
   function href(id: string) { const next = new URLSearchParams(params); next.set('circuits_section', id); return `${location.pathname}?${next}` }
-  if (!record) return <p>{t('circuitUnavailable')}</p>
+  if (!record) return canManage ? <CircuitEditor record={null} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} onCancel={onReturn} /> : <p>{t('circuitUnavailable')}</p>
+  if (assignment) return <CircuitEditor record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} onCancel={() => setAssignment(false)} />
   return <article className="record-page">
     {params.get('circuits_full') === 'true' && <RecordHeader title={record.name} recordId={record.id} section={section} />}
     <RecordSections current={section} sections={['overview', 'handoffs', 'history'].map(id => ({ id, label: id === 'handoffs' ? t('circuitHandoffs') : translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />
@@ -60,6 +63,7 @@ function CircuitView({ record, workspace, client, canManage, onSaved }: ChildRec
         <dl className="record-facts">{circuitColumns.map(field => <div key={field}><dt>{circuitLabels[field]}</dt><dd>{field === 'kind' || field === 'status' ? label(record[field]) : record[field] ?? t('circuitMissing')}</dd></div>)}<div><dt>{t('circuitUpload')}</dt><dd>{record.bandwidth_up_mbps ?? t('circuitMissing')}</dd></div>{dateFields.map(field => <div key={field}><dt>{dateLabels[field]}</dt><dd>{record[field] ?? t('circuitMissing')}</dd></div>)}{record.contract && <div><dt>{t('circuitContract')}</dt><dd>{record.contract.name}</dd></div>}</dl>
         <p className="network-notes">{record.description || t('noDescription')}</p>
         {canManage && <button type="button" className="secondary-button" onClick={() => { setForm(initial); setEditing(true) }}>{t('circuitEdit')}</button>}
+        {canManage && 'contract' in record && <button type="button" className="secondary-button" onClick={() => setAssignment(true)}>{t('circuitAssignmentEdit')}</button>}
       </>}
       <h2>{t('circuitDates')}</h2>{record.lifecycle_events.length ? <ul className="plain-detail-list">{record.lifecycle_events.map(event => <li key={`${event.kind}-${event.date}`}><span>{event.date} · {event.label} · {label(event.state)}</span></li>)}</ul> : <p>{t('circuitDatesEmpty')}</p>}
     </>}

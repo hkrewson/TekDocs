@@ -6,8 +6,9 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
+from django.db.models import Q
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_field
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -74,6 +75,7 @@ class HandoffWriteSerializer(StrictSerializer):
 
 
 class HandoffSerializer(serializers.Serializer):
+    circuit_id = serializers.UUIDField(source="circuit.entity_id")
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
     side = serializers.CharField()
@@ -113,22 +115,35 @@ class CircuitSerializer(serializers.Serializer):
     name = serializers.CharField(source="entity.display_name")
     provider_id = serializers.UUIDField(source="provider.entity_id")
     provider_name = serializers.CharField(source="provider.entity.display_name")
-    contract = CircuitContractSerializer(allow_null=True)
+    contract = CircuitContractSerializer(allow_null=True, required=False)
     service_identifier = serializers.CharField()
     kind = serializers.CharField()
     status = serializers.CharField()
     bandwidth_down_mbps = serializers.DecimalField(max_digits=12, decimal_places=3, allow_null=True)
     bandwidth_up_mbps = serializers.DecimalField(max_digits=12, decimal_places=3, allow_null=True)
-    installed_on = serializers.DateField(allow_null=True)
-    service_starts_on = serializers.DateField(allow_null=True)
-    review_on = serializers.DateField(allow_null=True)
-    planned_disconnect_on = serializers.DateField(allow_null=True)
-    description = serializers.CharField()
-    handoffs = HandoffSerializer(many=True)
-    lifecycle_events = serializers.SerializerMethodField()
+    installed_on = serializers.DateField(allow_null=True, required=False)
+    service_starts_on = serializers.DateField(allow_null=True, required=False)
+    review_on = serializers.DateField(allow_null=True, required=False)
+    planned_disconnect_on = serializers.DateField(allow_null=True, required=False)
+    description = serializers.CharField(required=False)
+    handoffs = HandoffSerializer(many=True, required=False)
+    lifecycle_events = serializers.SerializerMethodField(required=False)
 
     def get_fields(self):  # type: ignore[no-untyped-def]
         fields = super().get_fields()
+        if self.context.get("omit_handoffs"):
+            fields.pop("handoffs", None)
+        if self.context.get("summary"):
+            for name in (
+                "description",
+                "contract",
+                "lifecycle_events",
+                "installed_on",
+                "service_starts_on",
+                "review_on",
+                "planned_disconnect_on",
+            ):
+                fields.pop(name, None)
         if not self.context.get("can_view_contracts"):
             fields.pop("contract", None)
         return fields
@@ -188,9 +203,12 @@ def _can_view_contracts(workspace: ResolvedWorkspace) -> bool:
     return context_has_permission(workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
 
 
-def _circuit(workspace: ResolvedWorkspace, entity_id: UUID) -> NetworkCircuit:
+def _circuit(workspace: ResolvedWorkspace, entity_id: UUID, *, include_handoffs: bool = True) -> NetworkCircuit:
+    records = circuits_for_scope(workspace.data_scope)
+    if not include_handoffs:
+        records = records.prefetch_related(None)
     try:
-        return circuits_for_scope(workspace.data_scope).get(entity_id=entity_id)
+        return records.get(entity_id=entity_id)
     except NetworkCircuit.DoesNotExist as exc:
         raise PermissionDenied("The selected circuit is unavailable.") from exc
 
@@ -221,13 +239,79 @@ def _require_contract_access(request: Any, workspace: ResolvedWorkspace, values:
         require_permission(request.user, PermissionKey.ASSETS_VIEW, organization=workspace.organization)
 
 
+CIRCUIT_ORDERING = {
+    "name": "entity__display_name",
+    "provider_name": "provider__entity__display_name",
+    "service_identifier": "service_identifier",
+    "kind": "kind",
+    "status": "status",
+    "bandwidth_down_mbps": "bandwidth_down_mbps",
+}
+HANDOFF_ORDERING = {
+    "name": "entity__display_name",
+    "side": "side",
+    "media": "media",
+    "site_name": "site__entity__display_name",
+}
+
+
+class CircuitQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    status = serializers.ChoiceField(choices=NetworkCircuitStatus.values, required=False)
+    kind = serializers.ChoiceField(choices=NetworkCircuitKind.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in CIRCUIT_ORDERING for key in (field, f"-{field}")], required=False
+    )
+    summary = serializers.BooleanField(default=False)
+
+
+class CircuitDetailQuerySerializer(serializers.Serializer):
+    include_handoffs = serializers.BooleanField(default=True)
+
+
+class HandoffQuerySerializer(BoundedCollectionQuerySerializer):
+    paginated = serializers.BooleanField(default=False)
+    q = serializers.CharField(required=False, allow_blank=True, max_length=253, default="")
+    side = serializers.ChoiceField(choices=NetworkHandoffSide.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in HANDOFF_ORDERING for key in (field, f"-{field}")], required=False
+    )
+
+
+class HandoffResultSerializer(serializers.Serializer):
+    results = HandoffSerializer(many=True)
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    can_manage = serializers.BooleanField()
+
+
 class CircuitListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: CircuitResultSerializer})
+    @extend_schema(parameters=[CircuitQuerySerializer], responses={200: CircuitResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = CircuitQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(circuits_for_scope(workspace.data_scope), **query.validated_data)
+        values = query.validated_data
+        records = circuits_for_scope(workspace.data_scope)
+        if values["summary"]:
+            records = records.prefetch_related(None)
+        if values["q"]:
+            records = records.filter(
+                Q(entity__display_name__icontains=values["q"])
+                | Q(service_identifier__icontains=values["q"])
+                | Q(provider__entity__display_name__icontains=values["q"])
+            )
+        for field in ("status", "kind"):
+            if field in values:
+                records = records.filter(**{field: values[field]})
+        if "ordering" in values:
+            order = values["ordering"]
+            records = records.order_by(
+                ("-" if order.startswith("-") else "") + CIRCUIT_ORDERING[order.lstrip("-")], "entity_id"
+            )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
         can_view_contracts = _can_view_contracts(workspace)
         return Response(
             CircuitResultSerializer(
@@ -242,7 +326,11 @@ class CircuitListCreateView(APIView):
                     ),
                     "can_view_contracts": can_view_contracts,
                 },
-                context={"can_view_contracts": can_view_contracts},
+                context={
+                    "can_view_contracts": can_view_contracts,
+                    "summary": values["summary"],
+                    "omit_handoffs": values["summary"],
+                },
             ).data
         )
 
@@ -266,10 +354,22 @@ class CircuitListCreateView(APIView):
 
 
 class CircuitDetailView(APIView):
-    @extend_schema(responses={200: CircuitSerializer})
+    @extend_schema(parameters=[CircuitDetailQuerySerializer], responses={200: CircuitSerializer})
     def get(self, request, circuit_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return Response(_data(_circuit(workspace, circuit_entity_id), workspace))
+        query = CircuitDetailQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        if query.validated_data["include_handoffs"]:
+            return Response(_data(_circuit(workspace, circuit_entity_id), workspace))
+        try:
+            record = circuits_for_scope(workspace.data_scope).prefetch_related(None).get(entity_id=circuit_entity_id)
+        except NetworkCircuit.DoesNotExist as exc:
+            raise PermissionDenied("The selected circuit is unavailable.") from exc
+        return Response(
+            CircuitSerializer(
+                record, context={"can_view_contracts": _can_view_contracts(workspace), "omit_handoffs": True}
+            ).data
+        )
 
     @extend_schema(request=CircuitWriteSerializer, responses={200: CircuitSerializer})
     def patch(self, request, circuit_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -318,12 +418,52 @@ class CircuitChoiceView(APIView):
 
 
 class HandoffListCreateView(APIView):
-    @extend_schema(responses={200: HandoffSerializer(many=True)})
+    @extend_schema(
+        parameters=[HandoffQuerySerializer],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="HandoffCollectionResponse",
+                serializers=[HandoffResultSerializer, HandoffSerializer(many=True)],
+                resource_type_field_name=None,
+                many=False,
+            )
+        },
+    )
     def get(self, request, circuit_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        circuit = _circuit(workspace, circuit_entity_id)
+        circuit = _circuit(workspace, circuit_entity_id, include_handoffs=False)
+        query = HandoffQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = handoffs_for_scope(workspace.data_scope).filter(circuit=circuit)
+        if not values["paginated"]:
+            return Response(HandoffSerializer(records, many=True).data)
+        if values["q"]:
+            records = records.filter(
+                Q(entity__display_name__icontains=values["q"])
+                | Q(provider_reference__icontains=values["q"])
+                | Q(connector__icontains=values["q"])
+            )
+        if "side" in values:
+            records = records.filter(side=values["side"])
+        order = values.get("ordering", "name")
+        records = records.order_by(
+            ("-" if order.startswith("-") else "") + HANDOFF_ORDERING[order.lstrip("-")], "entity_id"
+        )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
         return Response(
-            HandoffSerializer(handoffs_for_scope(workspace.data_scope).filter(circuit=circuit), many=True).data
+            HandoffResultSerializer(
+                {
+                    "results": page.records,
+                    "count": page.count,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "has_more": page.has_more,
+                    "can_manage": context_has_permission(
+                        workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                    ),
+                }
+            ).data
         )
 
     @extend_schema(request=HandoffWriteSerializer, responses={201: HandoffSerializer})
@@ -333,7 +473,9 @@ class HandoffListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             handoff = create_handoff(
-                circuit=_circuit(workspace, circuit_entity_id), actor_id=request.user.pk, **serializer.validated_data
+                circuit=_circuit(workspace, circuit_entity_id, include_handoffs=False),
+                actor_id=request.user.pk,
+                **serializer.validated_data,
             )
         except (NetworkCircuitError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
@@ -341,10 +483,16 @@ class HandoffListCreateView(APIView):
 
 
 class HandoffDetailView(APIView):
+    @extend_schema(responses={200: HandoffSerializer})
+    def get(self, request, circuit_entity_id, handoff_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
+        circuit = _circuit(workspace, circuit_entity_id, include_handoffs=False)
+        return Response(HandoffSerializer(_handoff(workspace, circuit, handoff_entity_id)).data)
+
     @extend_schema(request=HandoffWriteSerializer, responses={200: HandoffSerializer})
     def patch(self, request, circuit_entity_id, handoff_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
-        circuit = _circuit(workspace, circuit_entity_id)
+        circuit = _circuit(workspace, circuit_entity_id, include_handoffs=False)
         serializer = HandoffWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         try:

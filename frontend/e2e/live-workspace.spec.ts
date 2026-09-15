@@ -759,6 +759,41 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(dnsDrawer.getByRole('button', { name: 'host.live-layout.example.invalid', exact: true })).toBeFocused()
   await page.mouse.click(10, 100)
 
+  const circuitProviderId = vendorHref.match(/organizations\/([0-9a-f-]+)/)?.[1]
+  if (!circuitProviderId) throw new Error('The circuit fixture requires the vendor organization identifier.')
+  const circuitCsrf = (await page.context().cookies()).find(cookie => cookie.name === 'csrftoken')!
+  const circuitSeed = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/circuits`, {
+    headers: { 'X-CSRFToken': circuitCsrf.value },
+    data: { name: 'Live layout circuit', provider_id: circuitProviderId, service_identifier: 'LIVE-CIRCUIT-01', kind: 'internet', status: 'active', description: 'Seeded circuit service' },
+  })
+  expect(circuitSeed.status()).toBe(201)
+  const circuitId = (await circuitSeed.json() as { id: string }).id
+  const handoffSeed = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/circuits/${circuitId}/handoffs`, {
+    headers: { 'X-CSRFToken': circuitCsrf.value },
+    data: { name: 'Live circuit demarc', side: 'a', media: 'fiber', connector: 'LC', provider_reference: 'LIVE-DEMARC-01' },
+  })
+  expect(handoffSeed.status()).toBe(201)
+  await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Circuits', exact: true }).click()
+  await page.getByRole('button', { name: 'Live layout circuit', exact: true }).click()
+  const circuitDrawer = page.getByRole('dialog', { name: 'Live layout circuit', exact: true })
+  await circuitDrawer.getByRole('button', { name: 'Edit service details' }).click()
+  await circuitDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Verified live circuit service')
+  await circuitDrawer.getByRole('button', { name: 'Save circuit details' }).click()
+  await expect(circuitDrawer.getByText('Verified live circuit service', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(circuitDrawer.getByText('Verified live circuit service', { exact: true })).toBeVisible()
+  await circuitDrawer.getByRole('link', { name: 'Handoffs', exact: true }).click()
+  await circuitDrawer.getByRole('button', { name: 'Live circuit demarc', exact: true }).click()
+  await expect(circuitDrawer.getByRole('heading', { name: 'Live circuit demarc' })).toBeFocused()
+  await expect(circuitDrawer.getByText('LIVE-DEMARC-01', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(circuitDrawer.getByText('LIVE-DEMARC-01', { exact: true })).toBeVisible()
+  await circuitDrawer.getByRole('button', { name: 'Back to handoffs' }).click()
+  await expect(circuitDrawer.getByRole('button', { name: 'Live circuit demarc', exact: true })).toBeFocused()
+  await circuitDrawer.getByRole('link', { name: 'History', exact: true }).click()
+  await expect(circuitDrawer.getByText('Circuit updated', { exact: true })).toBeVisible()
+  await page.mouse.click(10, 100)
+
   await page.getByRole('link', { name: 'People' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/people$/)
   await page.getByRole('button', { name: 'New person' }).click()

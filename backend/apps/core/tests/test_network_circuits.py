@@ -138,9 +138,7 @@ def test_circuit_contract_handoff_and_lifecycle_projection(owner_client, install
         timezone="America/Chicago",
         phone="",
     )
-    hardware_asset = create_network_hardware_asset(
-        installation=installation, organization=client, name="Edge router"
-    )
+    hardware_asset = create_network_hardware_asset(installation=installation, organization=client, name="Edge router")
     device = create_device(
         tenant=installation.tenant,
         organization=client,
@@ -322,3 +320,99 @@ def test_circuit_entity_scope_cannot_be_forged(installation):
     )
     with pytest.raises(ValidationError, match="entity identity"):
         record.full_clean()
+
+
+@pytest.mark.django_db
+def test_circuit_summary_search_paging_handoffs_and_legacy_compatibility(owner_client, installation):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    client = _organization(installation, "Layout client", "client")
+    sibling = _organization(installation, "Layout sibling", "client")
+    provider = _organization(installation, "Layout carrier", "vendor")
+    collection = reverse("organization-network-circuits", kwargs={"organization_entity_id": client.entity_id})
+    records = []
+    for index in range(31):
+        payload = {
+            **_circuit_payload(provider),
+            "name": f"Circuit {index:02}",
+            "service_identifier": f"SERVICE-{index:02}",
+        }
+        created = owner_client.post(collection, payload, content_type="application/json")
+        assert created.status_code == 201
+        records.append(created.json())
+    with CaptureQueriesContext(connection) as queries:
+        summary = owner_client.get(collection, {"summary": "true", "page_size": 25, "ordering": "name"}).json()
+    assert summary["count"] == 31 and summary["has_more"]
+    assert len(summary["results"]) == 25
+    assert not {"description", "handoffs", "contract", "lifecycle_events"} & summary["results"][0].keys()
+    assert not any('FROM "core_networkcircuithandoff"' in query["sql"] for query in queries)
+    assert (
+        owner_client.get(collection, {"summary": "true", "q": "SERVICE-30"}).json()["results"][0]["id"]
+        == records[-1]["id"]
+    )
+    page = owner_client.get(collection, {"summary": "true", "page_size": 25, "page": 2, "ordering": "name"}).json()
+    assert len(page["results"]) == 6 and not page["has_more"]
+    assert owner_client.get(collection, {"status": "disconnected"}).json()["count"] == 0
+    assert owner_client.get(collection, {"kind": "voice"}).json()["count"] == 0
+    tied = owner_client.get(collection, {"ordering": "status"}).json()["results"]
+    assert [row["id"] for row in tied] == sorted(row["id"] for row in tied)
+    for query in ({"ordering": "contract"}, {"status": "invalid"}, {"page_size": 101}):
+        assert owner_client.get(collection, query).status_code == 400
+    circuit_id = records[0]["id"]
+    detail = reverse(
+        "organization-network-circuit-detail",
+        kwargs={"organization_entity_id": client.entity_id, "circuit_entity_id": circuit_id},
+    )
+    handoffs = reverse(
+        "organization-network-circuit-handoffs",
+        kwargs={"organization_entity_id": client.entity_id, "circuit_entity_id": circuit_id},
+    )
+    with CaptureQueriesContext(connection) as empty_detail_queries:
+        assert owner_client.get(detail).status_code == 200
+    for index in range(31):
+        created = owner_client.post(
+            handoffs,
+            {"name": f"Handoff {index:02}", "side": "a", "media": "fiber", "provider_reference": f"DEMARC-{index:02}"},
+            content_type="application/json",
+        )
+        assert created.status_code == 201
+    last_id = created.json()["id"]
+    assert len(owner_client.get(handoffs).json()) == 31
+    with CaptureQueriesContext(connection) as populated_detail_queries:
+        assert len(owner_client.get(detail).json()["handoffs"]) == 31
+    assert len(populated_detail_queries) <= len(empty_detail_queries) + 2
+    with CaptureQueriesContext(connection) as queries:
+        selected = owner_client.get(detail, {"include_handoffs": "false"}).json()
+    assert "handoffs" not in selected and "lifecycle_events" in selected
+    assert not any('FROM "core_networkcircuithandoff"' in query["sql"] for query in queries)
+    page = owner_client.get(handoffs, {"paginated": "true", "page_size": 25, "page": 2}).json()
+    assert page["count"] == 31 and len(page["results"]) == 6
+    found = owner_client.get(handoffs, {"paginated": "true", "q": "DEMARC-30"}).json()
+    assert [row["id"] for row in found["results"]] == [last_id]
+    assert owner_client.get(handoffs, {"paginated": "true", "side": "z"}).json()["count"] == 0
+    assert owner_client.get(handoffs, {"paginated": "true", "ordering": "invalid"}).status_code == 400
+    child_detail = reverse(
+        "organization-network-circuit-handoff-detail",
+        kwargs={
+            "organization_entity_id": client.entity_id,
+            "circuit_entity_id": circuit_id,
+            "handoff_entity_id": last_id,
+        },
+    )
+    assert owner_client.get(child_detail).json()["circuit_id"] == circuit_id
+    for organization_id, parent_id in [(sibling.entity_id, circuit_id), (client.entity_id, records[1]["id"])]:
+        hidden = reverse(
+            "organization-network-circuit-handoff-detail",
+            kwargs={
+                "organization_entity_id": organization_id,
+                "circuit_entity_id": parent_id,
+                "handoff_entity_id": last_id,
+            },
+        )
+        assert owner_client.get(hidden).status_code == 403
+    saved = owner_client.patch(detail, {"description": "Changed service notes"}, content_type="application/json")
+    assert saved.status_code == 200
+    assert saved.json()["provider_id"] == records[0]["provider_id"]
+    assert saved.json()["status"] == "active"
+    assert len(saved.json()["handoffs"]) == 31

@@ -24,6 +24,19 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "network-circuits": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple(
+            (column, PermissionKey.NETWORKS_VIEW)
+            for column in ("name", "provider_name", "service_identifier", "kind", "status", "bandwidth_down_mbps")
+        ),
+        ("name", "provider_name", "service_identifier", "kind", "status", "bandwidth_down_mbps"),
+    ),
+    "circuit-handoffs": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "side", "media", "site_name")),
+        ("name", "side", "media", "site_name"),
+    ),
     "dns-zones": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "record_count")),

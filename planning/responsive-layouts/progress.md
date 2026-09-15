@@ -1206,3 +1206,113 @@ renderer ready, version 0.8.46; frontend/backend and supporting health-checked
 services report healthy. Existing database and application volumes were retained.
 Test the migrated surface from Networks → DNS. Build evidence:
 /tmp/tekdocs-dns-local-up.log. No production deployment, push or publication.
+
+
+## Circuit register and service-detail checkpoint — implementation
+
+Resumed Phase 3 (#80) after DNS commit 9f9f18a. The old circuit component was
+unmounted, fetched every selected row's handoffs and filtered only its first 100
+records. Replaced it with the shared collection/drawer, service-detail editor,
+Overview lifecycle warnings, lazy handoff collection/details and circuit history.
+Creation, provider/contract changes, status workflows and handoff editing/placement
+are explicitly deferred to the next bounded slices; see circuit-register.md.
+
+The focused PostgreSQL circuit/preference run passes 18 cases, including 31-record
+collections, legacy array/detail compatibility, query bounds and scoped child reads.
+Six new component cases pass. All 30 circuit browser cases pass across Chromium,
+Firefox/WebKit, six widths, short-height touch, 200% zoom, focus and dirty forms.
+Initial browser test errors were reproduced: Search matched the shell and collection
+buttons, and an unavailable direct link expected a page-two row on page one. Tests
+now scope Search to main and explicitly retain page two for that return scenario.
+The component harness was corrected to use native-dialog backdrop events and the
+activity client's existing workspace argument. No UI assertions were removed.
+
+Build/type checks pass and the original bundle budgets remain unchanged. OpenAPI
+now explicitly models legacy array versus paginated handoffs; a generation warning
+revealed the required many=False on the response union, which was corrected before
+regenerating types. The existing handoff list operation IDs are preserved.
+
+Full network validation, final make check and the extended live rehearsal remain
+in progress. No completion or local-rebuild claim yet. Evidence so far:
+/tmp/tekdocs-circuit-api.log, /tmp/tekdocs-circuit-components2.log,
+/tmp/tekdocs-circuit-browser2.log, /tmp/tekdocs-circuit-frontend-build.log.
+
+
+### Circuit verification follow-up
+
+All 33 circuit browser cases now pass, including failure/retry into an empty
+collection, six widths, touch and 200% zoom. Main make check passed with 553 frontend
+tests; final generated-contract, lint and type checks pass. Existing operation IDs
+were compared before/after and none changed. The final serializer metadata retains
+required nested contract dates and handoff descriptions; only summary-omittable
+circuit fields are optional.
+
+A review preserved the existing prefetch for legacy full circuit details while
+explicitly skipping it for parent existence checks and the new detail/summary
+forms. Added a regression comparing empty versus 31-handoff legacy detail query
+counts so legacy callers do not acquire per-row identity queries.
+
+Do not use /tmp/tekdocs-circuit-network.log or
+/tmp/tekdocs-circuit-api-final.log as successful evidence: two temporary test-database
+jobs overlapped during migration tests, producing existing-table errors. The invalid
+run was stopped and all affected checks are rerunning serially from fresh test
+setup in /tmp/tekdocs-circuit-network-serial.log. The application database is separate
+and readiness remained healthy at 0.8.46; no application volume was reset.
+
+The first isolated live circuit fixture submitted the vendor route's /overview
+suffix instead of its UUID and correctly received 400. The fixture now uses the
+existing organization-ID extraction pattern and validates that ID before creating
+records. The corrected rehearsal is /tmp/tekdocs-circuit-live2.log. No product
+validation was relaxed to make the fixture pass. Completion remains pending.
+
+
+### Circuit live/runtime results
+
+The corrected isolated live rehearsal passed end to end, including independent
+PostgreSQL assertions for circuit and handoff tenant/workspace ownership, retained
+provider/service ID/status, absent unintended contract/interface links and the
+single expected circuit update event. Evidence: /tmp/tekdocs-circuit-live2.log.
+All 33 circuit browser cases pass in /tmp/tekdocs-circuit-browser-final.log; all
+553 frontend tests passed in the main project check. Final backend Ruff/mypy pass
+(192 source files), and generated contract, TypeScript and lint checks pass.
+
+The fresh serial network regression set reached 100% successfully, including
+migration restoration, runtime/permission isolation and the legacy query-count
+regression. This supersedes the discarded overlapping run. Its stabilization and
+frontend sub-gates are finishing; final gate and local-delivery results follow.
+
+
+### Circuit register/service-detail checkpoint verified
+
+The complete serial `make test-network-validation` finished successfully, including
+migration/isolation restoration, stabilization and 553 frontend tests. This is the
+valid runtime result; the earlier overlapping jobs are discarded. The final test
+set includes the legacy 31-handoff detail query-count regression. Main make check,
+33 maintained-browser cases, six component cases, final contract/static checks and
+the isolated live browser/database rehearsal all pass.
+
+Evidence: /tmp/tekdocs-circuit-network-serial.log,
+/tmp/tekdocs-circuit-check2.log,
+/tmp/tekdocs-circuit-browser-final.log,
+/tmp/tekdocs-circuit-components2.log,
+/tmp/tekdocs-circuit-live2.log,
+/tmp/tekdocs-circuit-final-contract.log,
+/tmp/tekdocs-circuit-static-final.log,
+/tmp/tekdocs-circuit-types-final.log,
+/tmp/tekdocs-circuit-lint-final.log.
+
+This closes circuit browsing, service-detail editing and handoff browsing only.
+Creation, provider/contract assignment, lifecycle status operations and handoff
+creation/editing/placement remain next slices, with their bounded-picker and
+permission/confirmation requirements recorded in circuit-register.md. Broader
+Phase 3, technician walkthroughs, production-image/release acceptance and other
+pre-1.0 obligations remain open. Version remains 0.8.46. Wiki Roadmap changes are
+local; publication is separate. The authorized local rebuild is running.
+
+
+Local delivery: `make up` completed successfully. Readiness at
+http://localhost:3200/api/v1/health/ready returns status ok, database/diagram renderer
+ready and version 0.8.46; frontend/backend and health-checked dependencies are
+healthy. Existing application/demo data and volumes were preserved. Test from
+Networks → Circuits. Evidence: /tmp/tekdocs-circuit-local-up.log. No production
+push, deployment, version bump or Wiki publication was performed.

@@ -763,7 +763,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-network-circuit-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-circuit-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route("msp-network-circuit-handoffs", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
-    route("msp-network-circuit-handoff-detail", ("PATCH",), mutations=(PermissionKey.NETWORKS_EDIT,)),
+    route(
+        "msp-network-circuit-handoff-detail",
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
+        (PermissionKey.NETWORKS_EDIT,),
+    ),
     route("msp-hardware-detail", ("GET", "PATCH"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
     route("msp-hardware-assignment-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route(
@@ -1206,7 +1211,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-network-circuit-handoff-detail",
-        ("PATCH",),
+        ("GET", "PATCH"),
+        PermissionKey.NETWORKS_VIEW,
         mutations=(PermissionKey.NETWORKS_EDIT,),
         organization_scoped=True,
     ),

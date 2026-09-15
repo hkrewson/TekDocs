@@ -3340,7 +3340,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["workspaces_msp_networks_circuits_handoffs_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -6621,7 +6621,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["workspaces_organizations_networks_circuits_handoffs_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -8175,15 +8175,15 @@ export interface components {
             /** Format: decimal */
             readonly bandwidth_up_mbps: string | null;
             /** Format: date */
-            readonly installed_on: string | null;
+            readonly installed_on?: string | null;
             /** Format: date */
-            readonly service_starts_on: string | null;
+            readonly service_starts_on?: string | null;
             /** Format: date */
-            readonly review_on: string | null;
+            readonly review_on?: string | null;
             /** Format: date */
-            readonly planned_disconnect_on: string | null;
-            readonly description: string;
-            readonly handoffs: readonly components["schemas"]["Handoff"][];
+            readonly planned_disconnect_on?: string | null;
+            readonly description?: string;
+            readonly handoffs?: readonly components["schemas"]["Handoff"][];
             readonly lifecycle_events: readonly components["schemas"]["LifecycleEvent"][];
         };
         readonly CircuitChoices: {
@@ -10333,6 +10333,8 @@ export interface components {
         };
         readonly Handoff: {
             /** Format: uuid */
+            readonly circuit_id: string;
+            /** Format: uuid */
             readonly id: string;
             readonly name: string;
             readonly side: string;
@@ -10352,6 +10354,15 @@ export interface components {
             readonly interface_id: string | null;
             readonly interface_name: string | null;
             readonly description: string;
+        };
+        readonly HandoffCollectionResponse: components["schemas"]["HandoffResult"] | readonly components["schemas"]["Handoff"][];
+        readonly HandoffResult: {
+            readonly results: readonly components["schemas"]["Handoff"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
         };
         readonly HandoffWrite: {
             readonly name: string;
@@ -23014,8 +23025,44 @@ export interface operations {
     readonly workspaces_msp_networks_circuits_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `internet` - internet
+                 *     * `wan` - wan
+                 *     * `mpls` - mpls
+                 *     * `dark_fiber` - dark_fiber
+                 *     * `broadband` - broadband
+                 *     * `cellular` - cellular
+                 *     * `voice` - voice
+                 *     * `other` - other
+                 */
+                readonly kind?: "internet" | "wan" | "mpls" | "dark_fiber" | "broadband" | "cellular" | "voice" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `provider_name` - provider_name
+                 *     * `-provider_name` - -provider_name
+                 *     * `service_identifier` - service_identifier
+                 *     * `-service_identifier` - -service_identifier
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `bandwidth_down_mbps` - bandwidth_down_mbps
+                 *     * `-bandwidth_down_mbps` - -bandwidth_down_mbps
+                 */
+                readonly ordering?: "name" | "-name" | "provider_name" | "-provider_name" | "service_identifier" | "-service_identifier" | "kind" | "-kind" | "status" | "-status" | "bandwidth_down_mbps" | "-bandwidth_down_mbps";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `ordered` - ordered
+                 *     * `provisioning` - provisioning
+                 *     * `active` - active
+                 *     * `suspended` - suspended
+                 *     * `disconnected` - disconnected
+                 */
+                readonly status?: "ordered" | "provisioning" | "active" | "suspended" | "disconnected";
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -23064,7 +23111,9 @@ export interface operations {
     };
     readonly workspaces_msp_networks_circuits_retrieve_detail: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly include_handoffs?: boolean;
+            };
             readonly header?: never;
             readonly path: {
                 readonly circuit_entity_id: string;
@@ -23116,7 +23165,28 @@ export interface operations {
     };
     readonly workspaces_msp_networks_circuits_handoffs_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `side` - side
+                 *     * `-side` - -side
+                 *     * `media` - media
+                 *     * `-media` - -media
+                 *     * `site_name` - site_name
+                 *     * `-site_name` - -site_name
+                 */
+                readonly ordering?: "name" | "-name" | "side" | "-side" | "media" | "-media" | "site_name" | "-site_name";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly paginated?: boolean;
+                readonly q?: string;
+                /**
+                 * @description * `a` - a
+                 *     * `z` - z
+                 */
+                readonly side?: "a" | "z";
+            };
             readonly header?: never;
             readonly path: {
                 readonly circuit_entity_id: string;
@@ -23132,7 +23202,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Handoff"][];
+                    readonly "application/json": components["schemas"]["HandoffCollectionResponse"];
                 };
             };
         };
@@ -23155,6 +23225,30 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Handoff"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_networks_circuits_handoffs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly circuit_entity_id: string;
+                readonly handoff_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;
@@ -31704,8 +31798,44 @@ export interface operations {
     readonly workspaces_organizations_networks_circuits_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `internet` - internet
+                 *     * `wan` - wan
+                 *     * `mpls` - mpls
+                 *     * `dark_fiber` - dark_fiber
+                 *     * `broadband` - broadband
+                 *     * `cellular` - cellular
+                 *     * `voice` - voice
+                 *     * `other` - other
+                 */
+                readonly kind?: "internet" | "wan" | "mpls" | "dark_fiber" | "broadband" | "cellular" | "voice" | "other";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `provider_name` - provider_name
+                 *     * `-provider_name` - -provider_name
+                 *     * `service_identifier` - service_identifier
+                 *     * `-service_identifier` - -service_identifier
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 *     * `bandwidth_down_mbps` - bandwidth_down_mbps
+                 *     * `-bandwidth_down_mbps` - -bandwidth_down_mbps
+                 */
+                readonly ordering?: "name" | "-name" | "provider_name" | "-provider_name" | "service_identifier" | "-service_identifier" | "kind" | "-kind" | "status" | "-status" | "bandwidth_down_mbps" | "-bandwidth_down_mbps";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `ordered` - ordered
+                 *     * `provisioning` - provisioning
+                 *     * `active` - active
+                 *     * `suspended` - suspended
+                 *     * `disconnected` - disconnected
+                 */
+                readonly status?: "ordered" | "provisioning" | "active" | "suspended" | "disconnected";
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {
@@ -31758,7 +31888,9 @@ export interface operations {
     };
     readonly workspaces_organizations_networks_circuits_retrieve_detail: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly include_handoffs?: boolean;
+            };
             readonly header?: never;
             readonly path: {
                 readonly circuit_entity_id: string;
@@ -31812,7 +31944,28 @@ export interface operations {
     };
     readonly workspaces_organizations_networks_circuits_handoffs_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `side` - side
+                 *     * `-side` - -side
+                 *     * `media` - media
+                 *     * `-media` - -media
+                 *     * `site_name` - site_name
+                 *     * `-site_name` - -site_name
+                 */
+                readonly ordering?: "name" | "-name" | "side" | "-side" | "media" | "-media" | "site_name" | "-site_name";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly paginated?: boolean;
+                readonly q?: string;
+                /**
+                 * @description * `a` - a
+                 *     * `z` - z
+                 */
+                readonly side?: "a" | "z";
+            };
             readonly header?: never;
             readonly path: {
                 readonly circuit_entity_id: string;
@@ -31829,7 +31982,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Handoff"][];
+                    readonly "application/json": components["schemas"]["HandoffCollectionResponse"];
                 };
             };
         };
@@ -31853,6 +32006,31 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Handoff"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_networks_circuits_handoffs_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly circuit_entity_id: string;
+                readonly handoff_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

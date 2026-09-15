@@ -10830,6 +10830,62 @@ paths:
       operationId: workspaces_msp_networks_circuits_retrieve_list
       parameters:
       - in: query
+        name: kind
+        schema:
+          enum:
+          - internet
+          - wan
+          - mpls
+          - dark_fiber
+          - broadband
+          - cellular
+          - voice
+          - other
+          type: string
+          x-spec-enum-id: 66294b46d9acb24f
+          minLength: 1
+        description: |-
+          * `internet` - internet
+          * `wan` - wan
+          * `mpls` - mpls
+          * `dark_fiber` - dark_fiber
+          * `broadband` - broadband
+          * `cellular` - cellular
+          * `voice` - voice
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - provider_name
+          - -provider_name
+          - service_identifier
+          - -service_identifier
+          - kind
+          - -kind
+          - status
+          - -status
+          - bandwidth_down_mbps
+          - -bandwidth_down_mbps
+          type: string
+          x-spec-enum-id: 1a4f36875aee8ea2
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `provider_name` - provider_name
+          * `-provider_name` - -provider_name
+          * `service_identifier` - service_identifier
+          * `-service_identifier` - -service_identifier
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
+          * `bandwidth_down_mbps` - bandwidth_down_mbps
+          * `-bandwidth_down_mbps` - -bandwidth_down_mbps
+      - in: query
         name: page
         schema:
           type: integer
@@ -10843,6 +10899,35 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - ordered
+          - provisioning
+          - active
+          - suspended
+          - disconnected
+          type: string
+          x-spec-enum-id: 62745400e8241658
+          minLength: 1
+        description: |-
+          * `ordered` - ordered
+          * `provisioning` - provisioning
+          * `active` - active
+          * `suspended` - suspended
+          * `disconnected` - disconnected
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -10903,6 +10988,11 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: include_handoffs
+        schema:
+          type: boolean
+          default: true
       tags:
       - workspaces
       security:
@@ -10969,6 +11059,67 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - side
+          - -side
+          - media
+          - -media
+          - site_name
+          - -site_name
+          type: string
+          x-spec-enum-id: 89a3b7bd4553590a
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `side` - side
+          * `-side` - -side
+          * `media` - media
+          * `-media` - -media
+          * `site_name` - site_name
+          * `-site_name` - -site_name
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: side
+        schema:
+          enum:
+          - a
+          - z
+          type: string
+          x-spec-enum-id: 61dc244d273f179c
+          minLength: 1
+        description: |-
+          * `a` - a
+          * `z` - z
       tags:
       - workspaces
       security:
@@ -10979,9 +11130,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Handoff'
+                $ref: '#/components/schemas/HandoffCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -11029,6 +11178,39 @@ paths:
                 type: string
                 format: uuid
   /api/v1/workspaces/msp/networks/circuits/{circuit_entity_id}/handoffs/{handoff_entity_id}:
+    get:
+      operationId: workspaces_msp_networks_circuits_handoffs_retrieve
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: handoff_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
     patch:
       operationId: workspaces_msp_networks_circuits_handoffs_partial_update
       parameters:
@@ -23396,6 +23578,62 @@ paths:
     get:
       operationId: workspaces_organizations_networks_circuits_retrieve_list
       parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - internet
+          - wan
+          - mpls
+          - dark_fiber
+          - broadband
+          - cellular
+          - voice
+          - other
+          type: string
+          x-spec-enum-id: 66294b46d9acb24f
+          minLength: 1
+        description: |-
+          * `internet` - internet
+          * `wan` - wan
+          * `mpls` - mpls
+          * `dark_fiber` - dark_fiber
+          * `broadband` - broadband
+          * `cellular` - cellular
+          * `voice` - voice
+          * `other` - other
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - provider_name
+          - -provider_name
+          - service_identifier
+          - -service_identifier
+          - kind
+          - -kind
+          - status
+          - -status
+          - bandwidth_down_mbps
+          - -bandwidth_down_mbps
+          type: string
+          x-spec-enum-id: 1a4f36875aee8ea2
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `provider_name` - provider_name
+          * `-provider_name` - -provider_name
+          * `service_identifier` - service_identifier
+          * `-service_identifier` - -service_identifier
+          * `kind` - kind
+          * `-kind` - -kind
+          * `status` - status
+          * `-status` - -status
+          * `bandwidth_down_mbps` - bandwidth_down_mbps
+          * `-bandwidth_down_mbps` - -bandwidth_down_mbps
       - in: path
         name: organization_entity_id
         schema:
@@ -23416,6 +23654,35 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - ordered
+          - provisioning
+          - active
+          - suspended
+          - disconnected
+          type: string
+          x-spec-enum-id: 62745400e8241658
+          minLength: 1
+        description: |-
+          * `ordered` - ordered
+          * `provisioning` - provisioning
+          * `active` - active
+          * `suspended` - suspended
+          * `disconnected` - disconnected
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -23483,6 +23750,11 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: include_handoffs
+        schema:
+          type: boolean
+          default: true
       - in: path
         name: organization_entity_id
         schema:
@@ -23561,12 +23833,73 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - side
+          - -side
+          - media
+          - -media
+          - site_name
+          - -site_name
+          type: string
+          x-spec-enum-id: 89a3b7bd4553590a
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `side` - side
+          * `-side` - -side
+          * `media` - media
+          * `-media` - -media
+          * `site_name` - site_name
+          * `-site_name` - -site_name
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: side
+        schema:
+          enum:
+          - a
+          - z
+          type: string
+          x-spec-enum-id: 61dc244d273f179c
+          minLength: 1
+        description: |-
+          * `a` - a
+          * `z` - z
       tags:
       - workspaces
       security:
@@ -23577,9 +23910,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Handoff'
+                $ref: '#/components/schemas/HandoffCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -23633,7 +23964,46 @@ paths:
                 type: string
                 format: uuid
   ? /api/v1/workspaces/organizations/{organization_entity_id}/networks/circuits/{circuit_entity_id}/handoffs/{handoff_entity_id}
-  : patch:
+  : get:
+      operationId: workspaces_organizations_networks_circuits_handoffs_retrieve
+      parameters:
+      - in: path
+        name: circuit_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: handoff_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    patch:
       operationId: workspaces_organizations_networks_circuits_handoffs_partial_update
       parameters:
       - in: path
@@ -29999,19 +30369,13 @@ components:
       required:
       - bandwidth_down_mbps
       - bandwidth_up_mbps
-      - description
-      - handoffs
       - id
-      - installed_on
       - kind
       - lifecycle_events
       - name
-      - planned_disconnect_on
       - provider_id
       - provider_name
-      - review_on
       - service_identifier
-      - service_starts_on
       - status
     CircuitChoices:
       type: object
@@ -35134,6 +35498,9 @@ components:
     Handoff:
       type: object
       properties:
+        circuit_id:
+          type: string
+          format: uuid
         id:
           type: string
           format: uuid
@@ -35178,6 +35545,7 @@ components:
         description:
           type: string
       required:
+      - circuit_id
       - connector
       - description
       - device_id
@@ -35193,6 +35561,36 @@ components:
       - side
       - site_id
       - site_name
+    HandoffCollectionResponse:
+      oneOf:
+      - $ref: '#/components/schemas/HandoffResult'
+      - type: array
+        items:
+          $ref: '#/components/schemas/Handoff'
+    HandoffResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Handoff'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     HandoffWrite:
       type: object
       properties:

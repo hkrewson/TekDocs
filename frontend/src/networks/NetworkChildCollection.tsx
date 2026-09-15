@@ -13,10 +13,10 @@ import { NavigationGuardContext } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { AddressQuery, ListResult, NetworksClient } from './api'
 
-type ChildRecord = { id: string; zone_id?: string; subnet_id?: string | null; device_id?: string; interface_id?: string | null }
+type ChildRecord = { id: string; circuit_id?: string; zone_id?: string; subnet_id?: string | null; device_id?: string | null; interface_id?: string | null }
 export type ChildRecordProps<D> = { record: D | null; canManage: boolean; onSaved: (record: D) => void; onReturn: () => void }
 export type ChildCollectionConfig<S extends ChildRecord, D extends S> = {
-  parentField?: 'zone_id' | 'subnet_id' | 'device_id' | 'interface_id'; childSelectionKeys?: string[];
+  parentField?: 'circuit_id' | 'zone_id' | 'subnet_id' | 'device_id' | 'interface_id'; childSelectionKeys?: string[];
   key: string; feature: string; columns: readonly string[]; labels: Record<string, string>
   title: string; back: string; create: string; search: string; order: string; failed: string; empty: string
   count: (count: number) => string

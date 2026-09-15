@@ -70,7 +70,7 @@ from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, Tena
 from apps.core.documents import resolve_document
 from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
 from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod
-from apps.core.models import DNSZone, DNSRecord
+from apps.core.models import DNSZone, DNSRecord, NetworkCircuit, NetworkCircuitHandoff
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
@@ -146,6 +146,20 @@ assert network_record.vlan_number == 20
 assert network_record.use_full_range is True
 assert network_record.assignable_start is None
 assert network_record.assignable_end is None
+circuit = NetworkCircuit.objects.get(entity__display_name="Live layout circuit")
+assert circuit.organization == organization
+assert circuit.tenant == organization.tenant
+assert circuit.description == "Verified live circuit service"
+assert circuit.service_identifier == "LIVE-CIRCUIT-01"
+assert circuit.status == "active"
+assert circuit.provider.entity.display_name == "Live Northwind Vendor"
+assert circuit.contract_id is None
+handoff = NetworkCircuitHandoff.objects.get(circuit=circuit, entity__display_name="Live circuit demarc")
+assert handoff.organization == organization
+assert handoff.tenant == organization.tenant
+assert handoff.provider_reference == "LIVE-DEMARC-01"
+assert handoff.interface_id is None
+assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 1
 dns_zone = DNSZone.objects.get(name="live-layout.example.invalid")
 dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-layout.example.invalid")
 assert dns_zone.organization == organization

@@ -15,6 +15,8 @@ class TekDocsAutoSchema(AutoSchema):
 
     def get_operation_id(self) -> str:
         operation_id = super().get_operation_id()
+        if operation_id.endswith("_circuits_handoffs_retrieve") and self.path.rstrip("/").endswith("/handoffs"):
+            return operation_id.removesuffix("retrieve") + "list"
         if COLLIDING_RETRIEVE_OPERATION.fullmatch(operation_id):
             return f"{operation_id}_{'detail' if self.path.rstrip('/').endswith('}') else 'list'}"
         return operation_id

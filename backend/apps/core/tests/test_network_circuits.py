@@ -14,6 +14,9 @@ from apps.core.models import (
     EntityVisibility,
     InstallationState,
     NetworkCircuit,
+    Organization,
+    OrganizationClassification,
+    Tenant,
     workspace_for_owner,
 )
 from apps.core.network_circuit_views import CircuitSerializer
@@ -416,3 +419,100 @@ def test_circuit_summary_search_paging_handoffs_and_legacy_compatibility(owner_c
     assert saved.json()["provider_id"] == records[0]["provider_id"]
     assert saved.json()["status"] == "active"
     assert len(saved.json()["handoffs"]) == 31
+
+
+@pytest.mark.django_db
+def test_paginated_circuit_choices_search_retention_and_boundaries(owner_client, installation, monkeypatch):
+    client = _organization(installation, "Choice client", "client")
+    sibling = _organization(installation, "Choice sibling", "client")
+    providers = [_organization(installation, f"Carrier {index:03}", "vendor") for index in range(101)]
+    url = reverse("organization-network-circuit-choices", kwargs={"organization_entity_id": client.entity_id})
+    legacy = owner_client.get(url)
+    assert legacy.status_code == 200
+    assert len(legacy.json()["providers"]) == 100
+    first = owner_client.get(url, {"choice": "providers"}).json()
+    assert (first["count"], first["page_size"], len(first["results"]), first["has_more"]) == (101, 25, 25, True)
+    last = owner_client.get(url, {"choice": "providers", "page": 5}).json()
+    assert [item["id"] for item in last["results"]] == [str(providers[-1].entity_id)]
+    assert last["has_more"] is False
+    searched = owner_client.get(
+        url,
+        {
+            "choice": "providers",
+            "q": "Carrier 100",
+            "selected_id": str(providers[0].entity_id),
+        },
+    ).json()
+    assert searched["results"] == last["results"]
+    assert searched["selected"]["id"] == str(providers[0].entity_id)
+    assert searched["count"] == 1
+    assert owner_client.get(url, {"choice": "providers", "q": "missing"}).json()["results"] == []
+    assert (
+        owner_client.get(url, {"choice": "providers", "selected_id": str(client.entity_id)}).json()["selected"] is None
+    )
+    for invalid in (
+        {"page": 2},
+        {"choice": "sites"},
+        {"choice": "providers", "page_size": 101},
+        {"choice": "providers", "provider_id": str(providers[0].entity_id)},
+        {"choice": "contracts", "unknown": "x"},
+    ):
+        assert owner_client.get(url, invalid).status_code == 400
+
+    contract = _contract(owner_client, client, providers[0]).json()
+    foreign = _contract(owner_client, sibling, providers[0]).json()
+    other = _contract(owner_client, client, providers[1]).json()
+    scoped = owner_client.get(url, {"choice": "contracts", "provider_id": str(providers[0].entity_id)}).json()
+    assert [item["id"] for item in scoped["results"]] == [contract["id"]]
+    assert scoped["results"][0]["provider_id"] == str(providers[0].entity_id)
+    for unavailable in (foreign["id"], other["id"]):
+        response = owner_client.get(
+            url,
+            {
+                "choice": "contracts",
+                "provider_id": str(providers[0].entity_id),
+                "selected_id": unavailable,
+            },
+        ).json()
+        assert response["selected"] is None
+    retained = owner_client.get(url, {"choice": "contracts", "q": "missing", "selected_id": contract["id"]}).json()
+    assert retained["results"] == []
+    assert retained["selected"]["id"] == contract["id"]
+    # Equal names still have deterministic paging; contracts beyond page one remain searchable/selectable.
+    from apps.core.commercial import create_contract
+
+    for _index in range(26):
+        create_contract(
+            tenant=installation.tenant,
+            organization=client,
+            actor_id=installation.owner.id,
+            values={"name": "Repeated agreement", "provider_id": providers[0].entity_id, "kind": "service"},
+        )
+    tied = owner_client.get(url, {"choice": "contracts", "q": "Repeated", "page_size": 25}).json()
+    final = owner_client.get(url, {"choice": "contracts", "q": "Repeated", "page": 2, "page_size": 25}).json()
+    ids = [item["id"] for item in tied["results"] + final["results"]]
+    assert len(ids) == 26 and ids == sorted(ids) and len(set(ids)) == 26
+    assert tied["count"] == 26 and final["has_more"] is False
+    foreign_tenant = Tenant.objects.create(name="Foreign choice MSP", slug="foreign-choice-msp")
+    foreign_anchor = Entity.objects.create_owned(
+        tenant=foreign_tenant,
+        entity_type="organization",
+        display_name="Foreign carrier",
+    )
+    foreign_provider = Organization.objects.create(tenant=foreign_tenant, entity=foreign_anchor)
+    OrganizationClassification.objects.create(tenant=foreign_tenant, organization=foreign_provider, kind="vendor")
+    hidden_provider = owner_client.get(
+        url,
+        {
+            "choice": "providers",
+            "q": "Foreign carrier",
+            "selected_id": str(foreign_provider.entity_id),
+        },
+    ).json()
+    assert hidden_provider["results"] == [] and hidden_provider["selected"] is None
+    # Policy projection must apply to counts and retained selections as well as rows.
+    monkeypatch.setattr("apps.core.network_circuit_views._can_view_contracts", lambda workspace: False)
+    assert owner_client.get(url, {"choice": "contracts", "selected_id": contract["id"]}).status_code == 403
+    assert owner_client.get(url, {"choice": "providers"}).json()["can_view_contracts"] is False
+    assert owner_client.get(url).json()["contracts"] == []
+    assert Client().get(url, {"choice": "providers"}).status_code == 403

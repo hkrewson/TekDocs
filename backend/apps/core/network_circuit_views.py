@@ -6,7 +6,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, extend_schema_field
 from rest_framework import serializers
@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
 from .collection_pagination import BoundedCollectionQuerySerializer, paginate
+from .commercial import contracts_for_scope, provider_choices
 from .inventory import InventoryError, require_operational_owner
 from .models import (
     NetworkCircuit,
@@ -173,6 +174,31 @@ class ChoiceSerializer(serializers.Serializer):
     provider_id = serializers.UUIDField(required=False)
     site_id = serializers.UUIDField(required=False, allow_null=True)
     device_id = serializers.UUIDField(required=False)
+
+
+class CircuitChoiceQuerySerializer(BoundedCollectionQuerySerializer):
+    choice = serializers.ChoiceField(choices=("providers", "contracts"), required=False)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, default=25)
+    q = serializers.CharField(required=False, allow_blank=True, max_length=240, default="")
+    provider_id = serializers.UUIDField(required=False)
+    selected_id = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if self.initial_data and "choice" not in attrs:
+            raise serializers.ValidationError({"choice": "Select a collection when using choice query parameters."})
+        if "provider_id" in attrs and attrs.get("choice") != "contracts":
+            raise serializers.ValidationError({"provider_id": "Provider filtering applies only to contracts."})
+        return attrs
+
+
+class CircuitChoicePageSerializer(serializers.Serializer):
+    results = ChoiceSerializer(many=True)
+    selected = ChoiceSerializer(allow_null=True)
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    can_view_contracts = serializers.BooleanField()
 
 
 class CircuitChoicesSerializer(serializers.Serializer):
@@ -389,10 +415,63 @@ class CircuitDetailView(APIView):
 
 
 class CircuitChoiceView(APIView):
-    @extend_schema(responses={200: CircuitChoicesSerializer})
+    @extend_schema(
+        parameters=[CircuitChoiceQuerySerializer],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="CircuitChoiceResponse",
+                serializers=[CircuitChoicesSerializer, CircuitChoicePageSerializer],
+                resource_type_field_name=None,
+                many=False,
+            )
+        },
+    )
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
         can_view_contracts = _can_view_contracts(workspace)
+        query = CircuitChoiceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        if values.get("choice"):
+            contracts = values["choice"] == "contracts"
+            if contracts and not can_view_contracts:
+                raise PermissionDenied("Contract choices are unavailable.")
+            records: QuerySet[Any] = (
+                contracts_for_scope(workspace.data_scope) if contracts else provider_choices(workspace.member.tenant)
+            )
+            if "provider_id" in values:
+                records = records.filter(provider__entity_id=values["provider_id"])
+            # Resolve retained selection within the same authorization/provider boundary,
+            # independently of the current search or page; never inject it into results.
+            selected = records.filter(entity_id=values["selected_id"]).first() if "selected_id" in values else None
+            if values["q"]:
+                records = records.filter(entity__display_name__icontains=values["q"])
+            page = paginate(
+                records.order_by("entity__display_name", "entity_id"),
+                page=values["page"],
+                page_size=values["page_size"],
+            )
+
+            def choice(item: Any) -> dict[str, object]:
+                return {
+                    "id": item.entity_id,
+                    "name": item.entity.display_name,
+                    **({"provider_id": item.provider.entity_id} if contracts else {}),
+                }
+
+            return Response(
+                CircuitChoicePageSerializer(
+                    {
+                        "results": [choice(item) for item in page.records],
+                        "selected": choice(selected) if selected is not None else None,
+                        "count": page.count,
+                        "page": page.page,
+                        "page_size": page.page_size,
+                        "has_more": page.has_more,
+                        "can_view_contracts": can_view_contracts,
+                    }
+                ).data
+            )
         choices = circuit_choices(workspace.data_scope, include_contracts=can_view_contracts)
         payload = {
             "providers": [

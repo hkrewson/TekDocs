@@ -78,4 +78,4 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 - [DNS register and records within zone drawers](dns-register.md)
 
-- [Circuit register and service-detail drawers](circuit-register.md)
+- [Circuit register, service-detail drawers and bounded provider/contract choices](circuit-register.md)

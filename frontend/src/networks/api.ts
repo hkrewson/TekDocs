@@ -83,6 +83,8 @@ export type NetworkCircuit = { id: string; name: string; provider_id: string; pr
 export type CircuitSummary = Pick<NetworkCircuit, 'id' | 'name' | 'provider_id' | 'provider_name' | 'service_identifier' | 'kind' | 'status' | 'bandwidth_down_mbps' | 'bandwidth_up_mbps'>
 export type CircuitDetail = Omit<NetworkCircuit, 'handoffs'>
 export type HandoffDetail = CircuitHandoff & { circuit_id: string }
+export type CircuitChoiceQuery = { choice: 'providers' | 'contracts'; q?: string; page?: number; page_size?: number; provider_id?: string; selected_id?: string }
+export type CircuitChoicePage = { results: Array<{ id: string; name: string; provider_id?: string }>; selected: { id: string; name: string; provider_id?: string } | null; count: number; page: number; page_size: number; has_more: boolean; can_view_contracts: boolean }
 export type CircuitChoices = { providers: Array<{ id: string; name: string }>; contracts: Array<{ id: string; name: string; provider_id: string }>; sites: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; site_id: string }>; devices: Array<{ id: string; name: string }>; interfaces: Array<{ id: string; name: string; device_id: string }>; can_view_contracts: boolean }
 export type NetBoxObjectType = 'dcim.rack' | 'dcim.device' | 'dcim.macaddress' | 'ipam.vlan' | 'ipam.prefix' | 'ipam.ipaddress'
 export type NetBoxReference = { id: string; entity_id: string; entity_name: string; entity_type: string; object_type: NetBoxObjectType; object_id: number; observed_fingerprint: string; last_observed_at: string | null }
@@ -187,6 +189,7 @@ export interface NetworksClient {
   handoffCollection(workspace: WorkspaceContext, circuitId: string, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<HandoffDetail>>
   handoffDetail(workspace: WorkspaceContext, circuitId: string, id: string, signal?: AbortSignal): Promise<HandoffDetail>
   listCircuits(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkCircuit> & { can_view_contracts: boolean }>
+  circuitChoicePage(workspace: WorkspaceContext, query: CircuitChoiceQuery, signal?: AbortSignal): Promise<CircuitChoicePage>
   circuitChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<CircuitChoices>
   createCircuit(workspace: WorkspaceContext, values: CircuitWrite): Promise<NetworkCircuit>
   updateCircuit(workspace: WorkspaceContext, id: string, values: Partial<CircuitWrite>): Promise<NetworkCircuit>
@@ -406,6 +409,10 @@ export const browserNetworksClient: NetworksClient = {
   handoffDetail: async (workspace, circuitId, id, signal) => json(await fetch(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal })),
   async listCircuits(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/circuits?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  async circuitChoicePage(workspace, query, signal) {
+    const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]))
+    return json(await fetch(`${basePath(workspace)}/circuits/choices?${params}`, { credentials: 'same-origin', signal }))
   },
   async circuitChoices(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/circuits/choices`, { credentials: 'same-origin', signal }))

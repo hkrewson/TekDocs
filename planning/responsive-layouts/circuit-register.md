@@ -94,3 +94,24 @@ the independent database assertions. Final backend Ruff/mypy, OpenAPI/generated
 types, frontend lint/type checks and the original build budgets pass. No existing
 API operation ID changed. Earlier discarded harness runs are documented in
 progress.md and are not counted as successful evidence.
+
+## Provider/contract choice API prerequisite
+
+The creation/assignment prerequisite adds an opt-in interface on the existing
+`circuits/choices` route: `choice=providers|contracts`, `q`, `page`, `page_size`
+(default 25, maximum 100), optional `selected_id`, and `provider_id` for contracts.
+It returns `results`, `selected`, count/page/page_size/has_more, and
+`can_view_contracts`. Search covers choice names across the full authorized
+collection, with name/entity-ID ordering. `selected` is resolved independently
+of search/paging but within the same workspace, permission and provider filter;
+unavailable selections return null. It is never inserted into the result page.
+Contract requests require the existing assets-view permission. No costs, histories,
+or placement choices are fetched. A request without parameters retains the legacy
+six-array response and limits. Query typos or filters without a choice are rejected.
+OpenAPI describes both shapes; the frontend has a separate `circuitChoicePage`
+adapter, preserving its legacy helper. No new route, permission or migration.
+
+This prerequisite does not enable creation in the register. The next UI slice must
+use these bounded choices, retain chosen labels across searches, clear/reconfirm
+incompatible contracts when providers change, and preserve drafts on failed saves.
+Hidden contract/provider changes must still follow existing mutation permissions.

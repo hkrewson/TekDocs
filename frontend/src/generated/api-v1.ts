@@ -8186,6 +8186,16 @@ export interface components {
             readonly handoffs?: readonly components["schemas"]["Handoff"][];
             readonly lifecycle_events: readonly components["schemas"]["LifecycleEvent"][];
         };
+        readonly CircuitChoicePage: {
+            readonly results: readonly components["schemas"]["Choice"][];
+            readonly selected: components["schemas"]["Choice"] | null;
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+            readonly can_view_contracts: boolean;
+        };
+        readonly CircuitChoiceResponse: components["schemas"]["CircuitChoices"] | components["schemas"]["CircuitChoicePage"];
         readonly CircuitChoices: {
             readonly providers: readonly components["schemas"]["Choice"][];
             readonly contracts: readonly components["schemas"]["Choice"][];
@@ -23292,7 +23302,18 @@ export interface operations {
     };
     readonly workspaces_msp_networks_circuits_choices_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `providers` - providers
+                 *     * `contracts` - contracts
+                 */
+                readonly choice?: "providers" | "contracts";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly provider_id?: string;
+                readonly q?: string;
+                readonly selected_id?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -23306,7 +23327,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["CircuitChoices"];
+                    readonly "application/json": components["schemas"]["CircuitChoiceResponse"];
                 };
             };
         };
@@ -32075,7 +32096,18 @@ export interface operations {
     };
     readonly workspaces_organizations_networks_circuits_choices_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `providers` - providers
+                 *     * `contracts` - contracts
+                 */
+                readonly choice?: "providers" | "contracts";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly provider_id?: string;
+                readonly q?: string;
+                readonly selected_id?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -32091,7 +32123,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["CircuitChoices"];
+                    readonly "application/json": components["schemas"]["CircuitChoiceResponse"];
                 };
             };
         };

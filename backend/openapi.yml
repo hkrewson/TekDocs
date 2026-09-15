@@ -11258,6 +11258,49 @@ paths:
   /api/v1/workspaces/msp/networks/circuits/choices:
     get:
       operationId: workspaces_msp_networks_circuits_choices_retrieve
+      parameters:
+      - in: query
+        name: choice
+        schema:
+          enum:
+          - providers
+          - contracts
+          type: string
+          x-spec-enum-id: 73a9d2a092ab8147
+          minLength: 1
+        description: |-
+          * `providers` - providers
+          * `contracts` - contracts
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: provider_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -11268,7 +11311,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CircuitChoices'
+                $ref: '#/components/schemas/CircuitChoiceResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -24057,12 +24100,54 @@ paths:
     get:
       operationId: workspaces_organizations_networks_circuits_choices_retrieve
       parameters:
+      - in: query
+        name: choice
+        schema:
+          enum:
+          - providers
+          - contracts
+          type: string
+          x-spec-enum-id: 73a9d2a092ab8147
+          minLength: 1
+        description: |-
+          * `providers` - providers
+          * `contracts` - contracts
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: provider_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected_id
+        schema:
+          type: string
+          format: uuid
       tags:
       - workspaces
       security:
@@ -24073,7 +24158,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CircuitChoices'
+                $ref: '#/components/schemas/CircuitChoiceResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -30377,6 +30462,39 @@ components:
       - provider_name
       - service_identifier
       - status
+    CircuitChoicePage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        selected:
+          allOf:
+          - $ref: '#/components/schemas/Choice'
+          nullable: true
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+        can_view_contracts:
+          type: boolean
+      required:
+      - can_view_contracts
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+      - selected
+    CircuitChoiceResponse:
+      oneOf:
+      - $ref: '#/components/schemas/CircuitChoices'
+      - $ref: '#/components/schemas/CircuitChoicePage'
     CircuitChoices:
       type: object
       properties:

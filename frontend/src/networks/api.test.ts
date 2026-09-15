@@ -20,6 +20,16 @@ describe('network inventory API client', () => {
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/devices/device%2F1', { credentials: 'same-origin', signal })
   })
 
+  it('requests independent circuit choice pages and retains the selected identifier', async () => {
+    const signal = new AbortController().signal
+    await browserNetworksClient.circuitChoicePage({ kind: 'organization', id: 'client/1' } as never, {
+      choice: 'contracts', q: 'Fiber / service', page: 2, page_size: 25, provider_id: 'provider/1', selected_id: 'contract/1',
+    }, signal)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/circuits/choices?choice=contracts&q=Fiber+%2F+service&page=2&page_size=25&provider_id=provider%2F1&selected_id=contract%2F1', { credentials: 'same-origin', signal })
+    await browserNetworksClient.circuitChoices({ kind: 'msp' } as never, signal)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/circuits/choices', { credentials: 'same-origin', signal })
+  })
+
   it('uses exact client workspace routes and CSRF-protected writes', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserNetworksClient.listNetworks(workspace)

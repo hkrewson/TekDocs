@@ -1316,3 +1316,52 @@ ready and version 0.8.46; frontend/backend and health-checked dependencies are
 healthy. Existing application/demo data and volumes were preserved. Test from
 Networks → Circuits. Evidence: /tmp/tekdocs-circuit-local-up.log. No production
 push, deployment, version bump or Wiki publication was performed.
+
+### Circuit provider/contract choice prerequisite — implementation
+
+Phase 3 #80 / #60 / #75: added opt-in paginated circuit provider/contract choices,
+name search, deterministic ordering, provider filtering and separately resolved
+retained selection. Legacy callers retain their response. Contract visibility
+applies to requests, counts and selected values. The separate frontend adapter
+and generated contract prepare creation/assignment without enabling unfinished UI.
+
+Acceptance covers 101 providers (including the previous cutoff), equal-name
+contract paging, retained selections outside search, provider mismatch, sibling
+workspace and foreign tenant exclusion, denied contract access, invalid queries,
+anonymous denial and legacy compatibility. Runtime/static verification is pending.
+Creation/assignment drawers, status operations and handoff editing remain open.
+
+Static verification: `make check` passes, including 554 frontend tests, API/type
+consistency, backend Ruff/mypy, migration drift checks and unchanged build budgets.
+The four focused network API-adapter cases pass from the frontend test environment.
+Evidence: /tmp/tekdocs-choice-check-final.log and
+/tmp/tekdocs-choice-adapter-final.log. Wiki contract passes (37 pages/25 topics).
+Initial runs exposed a missing required contract kind in synthetic fixtures and
+queryset typing errors; corrected without changing production business rules or
+weakening assertions. An adapter invocation from the repository root lacked the
+frontend browser-test environment; its result is discarded in favor of the
+correct frontend invocation. Full serial network validation is still pending.
+
+Full network run reached completion. Circuit choices, workspace/tenant isolation,
+permission inventory and migration cases passed. One existing IPv4 property test
+failed Hypothesis's input-generation speed health check (6 inputs in 1.06 seconds),
+not its canonical-network assertion. The exact reported seed
+140765790039409104343129155310579543983 passes on an unchanged isolated retry.
+No health checks were suppressed and no assertions were weakened. Evidence:
+/tmp/tekdocs-choice-network.log and /tmp/tekdocs-choice-ipv4-retry.log.
+This is not a clean single-invocation `make test-network-validation` result;
+downstream stabilization is being run separately. The next full release gate must
+confirm a clean complete run. No presentation changed, so the prior circuit browser
+and live-workflow evidence remains historical, not a new browser claim for this API
+prerequisite. Existing API operation IDs were independently compared and preserved.
+
+Downstream `make test-network-stabilization` passes unchanged after the exact-seed
+retry. Frontend coverage was already completed by `make check` (554 tests).
+Evidence: /tmp/tekdocs-choice-stabilization.log. The API prerequisite is verified
+with the broader gate's timing caveat above; no migration, new permission, version
+bump or visible creation/assignment UI is included. Local rebuild is in progress.
+
+Local delivery: `make up` completed. Readiness at localhost:3200 reports status ok,
+database and diagram renderer ready, version 0.8.46. Existing user/demo data and
+volumes were preserved. Evidence: /tmp/tekdocs-choice-local-up.log. No push,
+production deployment, release or Wiki publication occurred.

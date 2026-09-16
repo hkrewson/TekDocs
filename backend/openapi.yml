@@ -774,6 +774,11 @@ paths:
           type: string
           format: uuid
       - in: query
+        name: handoff_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
         name: occurred_after
         schema:
           type: string
@@ -14081,6 +14086,11 @@ paths:
           nullable: true
       - in: query
         name: entity_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: handoff_id
         schema:
           type: string
           format: uuid

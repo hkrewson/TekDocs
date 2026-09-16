@@ -8,7 +8,9 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import (
+    AuditEvent,
     CommercialContract,
     Entity,
     EntityVisibility,
@@ -20,7 +22,7 @@ from apps.core.models import (
     workspace_for_owner,
 )
 from apps.core.network_circuit_views import CircuitSerializer
-from apps.core.network_circuits import create_circuit
+from apps.core.network_circuits import create_circuit, create_handoff
 from apps.core.network_endpoints import create_interface
 from apps.core.network_inventory import create_device
 from apps.core.organizations import create_organization
@@ -551,3 +553,99 @@ def test_paginated_circuit_choices_search_retention_and_boundaries(owner_client,
     assert owner_client.get(url, {"choice": "providers"}).json()["can_view_contracts"] is False
     assert owner_client.get(url).json()["contracts"] == []
     assert Client().get(url, {"choice": "providers"}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_handoff_history_is_bounded_parent_scoped_and_authorized(owner_client, installation, monkeypatch):
+    organization = _organization(installation, "History client", "client")
+    sibling = _organization(installation, "History sibling", "client")
+    provider = _organization(installation, "History carrier", "vendor")
+    circuit = create_circuit(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="History circuit",
+        provider_entity_id=provider.entity_id,
+        contract_entity_id=None,
+        service_identifier="HISTORY",
+        kind="internet",
+        status="active",
+        bandwidth_down_mbps=None,
+        bandwidth_up_mbps=None,
+        installed_on=None,
+        service_starts_on=None,
+        review_on=None,
+        planned_disconnect_on=None,
+        description="",
+    )
+
+    def handoff(name):
+        return create_handoff(
+            circuit=circuit,
+            actor_id=installation.owner.id,
+            name=name,
+            side="a",
+            media="fiber",
+            connector="",
+            provider_reference="",
+            site_entity_id=None,
+            location_entity_id=None,
+            device_entity_id=None,
+            interface_entity_id=None,
+            description="",
+        )
+
+    selected, other = handoff("Selected"), handoff("Other")
+    for _ in range(30):
+        AuditEvent.objects.create(
+            tenant=installation.tenant,
+            actor=installation.owner,
+            entity_id=circuit.entity_id,
+            action="network_circuit.handoff_updated",
+            metadata={"handoff_id": str(selected.entity_id)},
+        )
+    url = reverse("organization-activity-list", kwargs={"organization_entity_id": organization.entity_id})
+    query = {"entity_id": str(circuit.entity_id), "handoff_id": str(selected.entity_id), "page_size": 25}
+    first = owner_client.get(url, query).json()
+    second = owner_client.get(url, {**query, "page": 2}).json()
+    assert first["count"] == 31 and first["has_more"] and len(first["results"]) == 25
+    assert len(second["results"]) == 6 and not second["has_more"]
+    assert {row["id"] for row in first["results"]}.isdisjoint(row["id"] for row in second["results"])
+    assert first == owner_client.get(url, query).json()
+    assert all("metadata" not in row for row in first["results"])
+    assert owner_client.get(url, {**query, "handoff_id": str(other.entity_id)}).json()["count"] == 1
+    assert owner_client.get(url, {"handoff_id": str(selected.entity_id)}).status_code == 400
+    assert owner_client.get(url, {**query, "handoff_id": ""}).status_code == 400
+    assert owner_client.get(url, {**query, "entity_id": str(provider.entity_id)}).status_code == 403
+    sibling_url = reverse("organization-activity-list", kwargs={"organization_entity_id": sibling.entity_id})
+    assert owner_client.get(sibling_url, query).status_code == 403
+    foreign_tenant = Tenant.objects.create(name="Foreign handoff MSP", slug="foreign-handoff")
+    foreign_entity = Entity.objects.create_owned(
+        tenant=foreign_tenant, entity_type="organization", display_name="Foreign client"
+    )
+    Organization.objects.create(tenant=foreign_tenant, entity=foreign_entity, legal_name="Foreign client")
+    foreign_url = reverse("organization-activity-list", kwargs={"organization_entity_id": foreign_entity.id})
+    assert owner_client.get(foreign_url, query).status_code == 404
+    reader = User.objects.create_user(email="handoff-reader@example.invalid", password=secrets.token_urlsafe(24))
+    membership = TenantMembership.objects.create(tenant=installation.tenant, user=reader, role=BuiltInRole.READ_ONLY)
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant, organization=organization, membership=membership, created_by=installation.owner
+    )
+    browser = Client()
+    browser.force_login(reader)
+    assert browser.get(url, query).status_code == 403
+
+    from rest_framework.exceptions import PermissionDenied
+
+    from apps.accounts.policy import PermissionKey
+    from apps.core import activity_views
+
+    original = activity_views.require_permission
+
+    def without_networks(user, permission, **kwargs):
+        if permission == PermissionKey.NETWORKS_VIEW:
+            raise PermissionDenied("Network access denied.")
+        return original(user, permission, **kwargs)
+
+    monkeypatch.setattr(activity_views, "require_permission", without_networks)
+    assert owner_client.get(url, query).status_code == 403

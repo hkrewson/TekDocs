@@ -272,3 +272,37 @@ test('Handoff placement conflict preserves values and guards backdrop dismissal'
   await page.getByRole('button', { name: 'Keep editing' }).click()
   await expect(drawer.getByRole('combobox', { name: 'Interface', exact: true })).toHaveValue('interface')
 })
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) test(`handoff history keeps drawer context at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 650 })
+  await fixtures(page)
+  const requests: string[] = []
+  await page.route('**/activity?*', route => {
+    const query = new URL(route.request().url()).searchParams
+    requests.push(route.request().url())
+    expect(query.get('entity_id')).toBe('circuit-30')
+    expect(query.get('handoff_id')).toBe('handoff-1')
+    const current = Number(query.get('page'))
+    return route.fulfill({ json: { results: [], count: 26, page: current, page_size: 25, has_more: current === 1, actions: [] } })
+  })
+  await page.goto('/networks?view=circuits&circuits=circuit-30&circuits_section=handoffs&handoff=handoff-1')
+  const drawer = page.getByRole('dialog')
+  await expect(drawer.getByRole('heading', { name: 'Carrier demarc' })).toBeVisible()
+  expect(requests).toHaveLength(0)
+  await drawer.getByRole('link', { name: 'View handoff history' }).click()
+  await expect(drawer.getByText('No changes have been recorded for this handoff.')).toBeVisible()
+  await drawer.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page).toHaveURL(/handoff_history_page=2/)
+  await expect(drawer.getByRole('heading', { name: 'History', exact: true })).toBeFocused()
+  await page.reload()
+  await expect(drawer.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+  const returnQuery = new URL((await drawer.locator('a').filter({ hasText: 'Back to circuits' }).getAttribute('href'))!, 'http://localhost').searchParams
+  for (const key of ['handoff', 'handoff_section', 'handoff_history_page']) expect(returnQuery.has(key)).toBe(false)
+  await drawer.getByRole('link', { name: 'Back to handoff details' }).click()
+  await expect(drawer.getByRole('heading', { name: 'Carrier demarc' })).toBeFocused()
+  await expect(page).not.toHaveURL(/handoff_history_page/)
+  await page.goBack()
+  await expect(drawer.getByText('No changes have been recorded for this handoff.')).toBeVisible()
+})

@@ -6,8 +6,8 @@ import { browserOperationsClient } from '../operations/api'
 import type { ActivityResult, OperationsClient } from '../operations/api'
 import type { WorkspaceContext } from '../workspaces/api'
 
-export function RecordActivity({ entityId, workspace, client = browserOperationsClient, description, emptyLabel, deniedLabel, actionLabels = {}, pageParameter = 'history_page' }: {
-  pageParameter?: string; entityId: string; description: string; emptyLabel: string; deniedLabel: string; actionLabels?: Record<string, string>; workspace: WorkspaceContext; client?: Pick<OperationsClient, 'activity'>
+export function RecordActivity({ entityId, handoffId, workspace, client = browserOperationsClient, description, emptyLabel, deniedLabel, actionLabels = {}, pageParameter = 'history_page' }: {
+  handoffId?: string; pageParameter?: string; entityId: string; description: string; emptyLabel: string; deniedLabel: string; actionLabels?: Record<string, string>; workspace: WorkspaceContext; client?: Pick<OperationsClient, 'activity'>
 }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
@@ -16,15 +16,15 @@ export function RecordActivity({ entityId, workspace, client = browserOperations
   const [reload, setReload] = useState(0)
   const heading = useRef<HTMLHeadingElement>(null)
   const focusPage = useRef(false)
-  const key = JSON.stringify([workspace.kind, workspace.id, entityId, page, reload])
+  const key = JSON.stringify([workspace.kind, workspace.id, entityId, handoffId, page, reload])
   const [response, setResponse] = useState<{ key: string; result?: ActivityResult; denied?: boolean } | null>(null)
   useEffect(() => {
     const controller = new AbortController()
-    client.activity(workspace.kind === 'organization' ? { organizationId: workspace.id } : {}, { entity_id: entityId, page, page_size: 25 }, controller.signal)
+    client.activity(workspace.kind === 'organization' ? { organizationId: workspace.id } : {}, { entity_id: entityId, ...(handoffId ? { handoff_id: handoffId } : {}), page, page_size: 25 }, controller.signal)
       .then((result) => { if (!controller.signal.aborted) setResponse({ key, result }) })
       .catch((error: unknown) => { if (!controller.signal.aborted) setResponse({ key, denied: error instanceof AuthRequestError && error.status === 403 }) })
     return () => controller.abort()
-  }, [entityId, workspace.kind, workspace.id, page, key, client])
+  }, [entityId, handoffId, workspace.kind, workspace.id, page, key, client])
   const state = response?.key === key ? response : null
   const result = state?.result
   useEffect(() => {

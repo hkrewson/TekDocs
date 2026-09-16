@@ -3,12 +3,13 @@ from typing import Any
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_permission
 
-from .models import AuditEvent, Entity
+from .models import AuditEvent, Entity, NetworkCircuitHandoff
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -20,12 +21,18 @@ class ActivityEntityFilter(serializers.UUIDField):
 
 class ActivityQuerySerializer(serializers.Serializer):
     entity_id = ActivityEntityFilter(required=False)
+    handoff_id = ActivityEntityFilter(required=False)
     q = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
     actor_id = serializers.UUIDField(required=False, allow_null=True, default=None)
     occurred_after = serializers.DateTimeField(required=False, allow_null=True, default=None)
     occurred_before = serializers.DateTimeField(required=False, allow_null=True, default=None)
     page = serializers.IntegerField(min_value=1, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=100, default=50)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if "handoff_id" in attrs and "entity_id" not in attrs:
+            raise serializers.ValidationError({"entity_id": "A parent circuit is required for handoff history."})
+        return attrs
 
 
 class ActivityRecordSerializer(serializers.Serializer):
@@ -72,6 +79,18 @@ def _activity(workspace: ResolvedWorkspace, request: Any) -> Response:
         events = events.filter(Q(entity_id__in=entity_ids) | Q(entity_id=workspace.organization.entity_id))
     if "entity_id" in values:
         events = events.filter(entity_id=values["entity_id"])
+    if "handoff_id" in values:
+        require_permission(request.user, PermissionKey.NETWORKS_VIEW, organization=workspace.organization)
+        if (
+            not NetworkCircuitHandoff.scoped.for_scope(workspace.data_scope)
+            .filter(entity_id=values["handoff_id"], circuit__entity_id=values["entity_id"])
+            .exists()
+        ):
+            raise PermissionDenied("This handoff is unavailable in this circuit and workspace.")
+        events = events.filter(
+            action__in=("network_circuit.handoff_created", "network_circuit.handoff_updated"),
+            metadata__handoff_id=str(values["handoff_id"]),
+        )
     if values["q"]:
         events = events.filter(action__icontains=values["q"])
     if values["actor_id"]:

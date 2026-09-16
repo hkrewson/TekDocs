@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router'
+import { RecordActivity } from '../records/RecordActivity'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -10,13 +12,23 @@ import { networkText as t } from './networkText'
 const sides = ['a', 'z'] as const
 const media = ['copper', 'fiber', 'coax', 'wireless', 'virtual', 'other'] as const
 export function HandoffView({ record, onReturn, workspace, client, canManage, parentId, onSaved }: ChildRecordProps<HandoffDetail> & { workspace: WorkspaceContext; client: NetworksClient; parentId: string }) {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const history = params.get('handoff_section') === 'history'
+  function href(show: boolean) {
+    const query = new URLSearchParams(params)
+    if (show) query.set('handoff_section', 'history')
+    else query.delete('handoff_section')
+    query.delete('handoff_history_page')
+    return `${location.pathname}?${query}`
+  }
   const heading = useRef<HTMLHeadingElement>(null)
   const [editing, setEditing] = useState<'details' | 'placement' | null>(record ? null : 'details')
-  useEffect(() => { if (!editing) heading.current?.focus() }, [record?.id, editing])
+  useEffect(() => { if (!editing) heading.current?.focus() }, [record?.id, editing, history])
   if (editing && canManage) return <HandoffEditor key={editing} record={record} workspace={workspace} client={client} parentId={parentId} mode={editing} onSaved={onSaved} onCancel={() => { if (record) setEditing(null); else onReturn() }} />
   if (!record) return <p>{t('circuitUnavailable')}</p>
   const facts = { side: t('circuitSide'), media: t('circuitMedia'), connector: t('circuitConnector'), provider_reference: t('circuitReference'), site_name: t('site'), location_name: t('location'), device_name: t('circuitDevice'), interface_name: t('circuitInterface') }
-  return <section><button type="button" className="secondary-button" onClick={onReturn}>{t('circuitHandoffsBack')}</button><h2 ref={heading} tabIndex={-1}>{record.name}</h2><dl className="record-facts">{(Object.keys(facts) as (keyof typeof facts)[]).map(field => <div key={field}><dt>{facts[field]}</dt><dd>{field === 'side' ? t(`circuitValue_${record.side}`) : field === 'media' ? t(`circuitValue_${record.media}`) : record[field] || t('circuitMissing')}</dd></div>)}</dl><p className="network-notes">{record.description || t('noDescription')}</p>{canManage && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditing('details')}>{t('handoffEdit')}</button><button type="button" className="secondary-button" onClick={() => setEditing('placement')}>{t('handoffPlacementEdit')}</button></div>}</section>
+  return <section><button type="button" className="secondary-button" onClick={onReturn}>{t('circuitHandoffsBack')}</button><h2 ref={heading} tabIndex={-1}>{record.name}</h2><Link to={href(!history)} state={location.state as unknown}>{t(history ? 'handoffHistoryBack' : 'handoffHistoryOpen')}</Link>{history ? <RecordActivity workspace={workspace} entityId={parentId} handoffId={record.id} pageParameter="handoff_history_page" description={t('handoffHistoryHelp')} emptyLabel={t('handoffHistoryEmpty')} deniedLabel={t('handoffHistoryDenied')} actionLabels={{ 'network_circuit.handoff_created': t('handoffCreated'), 'network_circuit.handoff_updated': t('handoffUpdated') }} /> : <><dl className="record-facts">{(Object.keys(facts) as (keyof typeof facts)[]).map(field => <div key={field}><dt>{facts[field]}</dt><dd>{field === 'side' ? t(`circuitValue_${record.side}`) : field === 'media' ? t(`circuitValue_${record.media}`) : record[field] || t('circuitMissing')}</dd></div>)}</dl><p className="network-notes">{record.description || t('noDescription')}</p>{canManage && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditing('details')}>{t('handoffEdit')}</button><button type="button" className="secondary-button" onClick={() => setEditing('placement')}>{t('handoffPlacementEdit')}</button></div>}</>}</section>
 }
 function HandoffEditor({ record, workspace, client, parentId, mode, onSaved, onCancel }: {
   record: HandoffDetail | null; workspace: WorkspaceContext; client: NetworksClient; parentId: string; mode: 'details' | 'placement'; onSaved: (record: HandoffDetail) => void; onCancel: () => void

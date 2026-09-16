@@ -1,8 +1,8 @@
 # Circuit register and service-detail drawers
 
 Pre-1.0 Phase 3 (#80), under #60/#75. Version stays 0.8.46.
-Status: circuit browsing, creation, assignment and handoff editing checkpoint.
-Circuit lifecycle/history and broader Phase 3 acceptance remain open.
+Status: circuit browsing, creation, assignment, handoff editing and selected history checkpoints.
+Circuit kind/status workflows and broader Phase 3 acceptance remain open.
 
 ## Scope and decisions
 
@@ -56,8 +56,8 @@ special scrolling surface was added.
 
 ## Deliberate next slices
 
-Circuit kind/status workflows and handoff-specific history remain open.
-Creation, provider/contract assignment and handoff details/placement have subsequent
+Circuit kind/status workflows remain open.
+Creation, provider/contract assignment, handoff details/placement and history have subsequent
 implementation checkpoints below. Existing public mutation APIs continue to work.
 Do not silently expand this work to service disconnection or cross-workspace moves.
 
@@ -162,3 +162,55 @@ audit events; frontend mutation types now reflect partial values and the already
 returned circuit_id. No new endpoint, schema, migration, permission, dependency or
 CSS. Handoff-specific history presentation and circuit kind/status workflows remain
 open, as do wider Phase 3 and pre-1.0 acceptance.
+
+
+## Selected handoff history checkpoint
+
+Phase 3 (#80, under #60/#75): selected handoffs now offer View handoff history
+inside the existing circuit drawer. This is a focused reader with a return link,
+not another drawer or child tab bar. `handoff_section=history` and
+`handoff_history_page` make the reader and its 25-event pages refreshable and
+bookmarkable. History loads only when requested; returning restores the handoff
+heading. Changing handoffs or leaving the circuit clears child history parameters,
+including through mobile return links. Existing dirty edit guards remain authoritative.
+
+The existing authenticated activity API adds optional `handoff_id`, requiring
+`entity_id` to identify its parent circuit. Both activity-view and network-view
+permissions apply in the exact workspace. A mismatched/unavailable parent-child
+pair is denied before audit selection. Filtering uses the existing parent-owned
+handoff audit metadata and only handoff-created/updated actions; counts, actions
+and deterministic ordering are calculated after filtering. Event metadata is not
+returned. Legacy queries retain their behavior. OpenAPI and generated types are
+updated; no persistence, domain-data or audit migration is required.
+
+Empty, denied and failed history retain the return path; failed requests retry only
+on user action. Wider Phase 3 acceptance and circuit kind/status workflows remain
+open. Earlier statements that handoff history is open describe prior checkpoints.
+
+
+### Build-on notes and remaining circuit slice
+
+History displays the event action, actor and time. Existing handoff audit metadata
+contains only the handoff identifier, so this change cannot reconstruct old field
+values or placement diffs. A future richer audit model must preserve append-only
+history and distinguish newly captured data from historical events with no diff.
+
+The next circuit slice can reuse the existing partial PATCH serializer for kind
+and status. Current server enums are Internet/WAN/MPLS/Dark fiber/Broadband/Cellular/
+Voice/Other and Ordered/Provisioning/Active/Suspended/Disconnected. The present
+backend validates and records documentation changes; it does not invoke a carrier
+or provisioning integration. Use a separate focused form for kind and a deliberate
+status workflow, with confirmation for consequential suspension/disconnection.
+Submit only the selected fields, retain failed drafts, use the existing navigation
+guard, and keep lifecycle warnings on Overview. Cover permissions, unrelated-field
+preservation, failure/confirmation states, updated list filters, full-page/drawer
+parity and the live PostgreSQL journey before calling that slice complete.
+
+
+Verification: `make check` and the full `make test-network-validation` gate passed;
+focused components/API client 27 cases, PostgreSQL circuit/document activity 15
+cases, circuit browser 90 cases across maintained browser projects and six widths,
+and the isolated live browser→Django→PostgreSQL journey passed. Current local
+backend/frontend images are healthy at localhost:3200, version 0.8.46. Detailed
+logs and test corrections are recorded in progress.md. Production deployment,
+Wiki publication and broader Phase 3 acceptance are separate.

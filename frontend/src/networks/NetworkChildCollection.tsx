@@ -65,10 +65,17 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   useEffect(() => { if (!selected || selected === 'new') return; const controller = new AbortController(); config.read(client, workspace, selected, controller.signal).then((value) => { if (!controller.signal.aborted) setDetail({ key: detailKey, ...((standalone || value[parentField] === subnetId) ? { record: value } : {}) }) }).catch(() => { if (!controller.signal.aborted) setDetail({ key: detailKey }) }); return () => controller.abort() }, [workspace, client, selected, detailKey, subnetId, config, standalone, parentField])
   useEffect(() => { if (!pending || guarded) return; const frame = requestAnimationFrame(() => { setParams(pending, { replace: true, state: location.state as unknown }); setPending(null) }); return () => cancelAnimationFrame(frame) }, [pending, guarded, setParams, location.state])
   useEffect(() => { if (selected) previousAddress.current = selected; else if (result && previousAddress.current) { if (standalone) window.scrollTo({ top: (location.state as { childListY?: number } | null)?.childListY ?? 0 }); (document.getElementById(`${config.key}-${previousAddress.current}`) ?? heading.current)?.focus({ preventScroll: standalone }); previousAddress.current = null } }, [selected, result, config.key, standalone, location.state])
-  function next(values: Record<string, string | null>) { const changedParams = new URLSearchParams(params); for (const [name, value] of Object.entries(values)) { if (value) changedParams.set(name, value); else changedParams.delete(name) } return changedParams }
+  function next(values: Record<string, string | null>) {
+    const changedParams = new URLSearchParams(params)
+    for (const [name, value] of Object.entries(values)) {
+      if (value) changedParams.set(name, value)
+      else changedParams.delete(name)
+    }
+    if (config.key in values) for (const childKey of config.childSelectionKeys ?? []) changedParams.delete(childKey)
+    return changedParams
+  }
   function browse(values: Record<string, string | null>) {
     const updated = next({ ...(!(`${config.key}_page` in values) && !(config.key in values) ? { [`${config.key}_page`]: null } : {}), ...values })
-    if (config.key in values) for (const childKey of config.childSelectionKeys ?? []) updated.delete(childKey)
     if (standalone && config.key in values) { updated.delete(`${config.key}_full`); updated.delete(`${config.key}_section`); updated.delete(`${config.key}_device`); updated.delete('history_page') }
     setParams(updated, { state: standalone && values[config.key] ? { childListY: window.scrollY } : location.state as unknown })
   }

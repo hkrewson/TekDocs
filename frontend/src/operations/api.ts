@@ -44,7 +44,7 @@ export interface OperationsClient {
   reminders(scope: DocumentScope, signal?: AbortSignal): Promise<ReminderRecord[]>
   createReminder(scope: DocumentScope, input: ReminderInput): Promise<ReminderRecord>
   reminderCalendarUrl(scope: DocumentScope): string
-  activity(scope: DocumentScope, filters: { entity_id?: string; page_size?: number; q?: string; occurred_after?: string; occurred_before?: string; page?: number }, signal?: AbortSignal): Promise<ActivityResult>
+  activity(scope: DocumentScope, filters: { entity_id?: string; handoff_id?: string; page_size?: number; q?: string; occurred_after?: string; occurred_before?: string; page?: number }, signal?: AbortSignal): Promise<ActivityResult>
 }
 
 function workspacePath(scope: DocumentScope) {
@@ -80,6 +80,7 @@ export const browserOperationsClient: OperationsClient = {
   activity(scope, filters, signal) {
     const query = new URLSearchParams({ page: String(filters.page ?? 1), page_size: String(filters.page_size ?? 50) })
     if (filters.entity_id) query.set('entity_id', filters.entity_id)
+    if (filters.handoff_id) query.set('handoff_id', filters.handoff_id)
     if (filters.q) query.set('q', filters.q)
     if (filters.occurred_after) query.set('occurred_after', filters.occurred_after)
     if (filters.occurred_before) query.set('occurred_before', filters.occurred_before)

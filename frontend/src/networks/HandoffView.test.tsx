@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, it, vi } from 'vitest'
+import { AuthRequestError } from '../auth/api'
+import { browserOperationsClient } from '../operations/api'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { HandoffDetail, NetworksClient } from './api'
@@ -76,4 +78,32 @@ it('clears the interface when changing devices while preserving site and locatio
   expect(screen.getByRole('button', { name: 'Clear handoff interface' })).toBeDisabled()
   await user.click(screen.getByRole('button', { name: 'Save handoff' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith(workspace, 'circuit', 'handoff', { site_id: 'site', location_id: 'location', device_id: 'new', interface_id: null }))
+})
+
+it('loads only selected handoff history on demand, pages by URL, and restores details focus', async () => {
+  const activity = vi.spyOn(browserOperationsClient, 'activity').mockReset().mockImplementation((_scope, query) => Promise.resolve({ results: [], count: 31, page: query.page ?? 1, page_size: 25, has_more: query.page !== 2, actions: [] }))
+  const { user } = setup()
+  expect(activity).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('link', { name: 'View handoff history' }))
+  expect(await screen.findByText('No changes have been recorded for this handoff.')).toBeVisible()
+  expect(activity).toHaveBeenLastCalledWith({}, { entity_id: 'circuit', handoff_id: 'handoff', page: 1, page_size: 25 }, expect.any(AbortSignal))
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+  await waitFor(() => expect(activity).toHaveBeenLastCalledWith({}, { entity_id: 'circuit', handoff_id: 'handoff', page: 2, page_size: 25 }, expect.any(AbortSignal)))
+  expect(window.location.search).toContain('handoff_history_page=2')
+  await user.click(screen.getByRole('link', { name: 'Back to handoff details' }))
+  expect(screen.getByRole('heading', { name: 'Demarc' })).toHaveFocus()
+  expect(screen.getByText('WAN1')).toBeVisible()
+  expect(window.location.search).not.toContain('handoff_history_page')
+})
+
+it('keeps a return path after denied history and retries only when requested', async () => {
+  const activity = vi.spyOn(browserOperationsClient, 'activity').mockReset().mockRejectedValueOnce(new AuthRequestError('Not allowed', 403)).mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false, actions: [] })
+  const { user } = setup({ denied: true })
+  await user.click(screen.getByRole('link', { name: 'View handoff history' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to view this handoff history.')
+  expect(activity).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('link', { name: 'Back to handoff details' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Retry history' }))
+  expect(await screen.findByText('No changes have been recorded for this handoff.')).toBeVisible()
+  expect(activity).toHaveBeenCalledTimes(2)
 })

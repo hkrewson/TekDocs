@@ -1467,3 +1467,60 @@ and volumes were preserved. Evidence: /tmp/tekdocs-handoff-local-up.log. Test fr
 Networks → Circuits → selected circuit → Handoffs: New handoff, Edit handoff details
 or Edit handoff placement. No production push/deployment, release/version change
 or Wiki publication occurred.
+
+
+## 2026-09-15 — Phase 3 selected handoff history
+
+Implemented the next #80 slice under #60/#75 at 0.8.46. Handoff history is now a
+lazy focused reader inside the circuit drawer with direct section/page URLs,
+25-event pages, explicit retry, denied/empty states and return heading focus.
+No child drawer or tab bar. Parent and child return links clear selected child
+history state, including mobile navigation. Existing dirty forms remain guarded.
+
+The additive activity `handoff_id` filter requires its parent `entity_id`, validates
+exact workspace/parent membership and requires activity-view plus network-view.
+Existing circuit-owned audit rows are filtered without rewriting them or exposing
+metadata. Legacy activity behavior, permission boundaries and deterministic paging
+remain compatible. OpenAPI/generated types updated; no migration or CSS change.
+
+Verified: focused components/API-client 27 cases; `make check` passed with 566
+frontend tests in 116 files, Ruff/mypy, schema/type/migration checks and existing
+bundle limits. PostgreSQL focused circuit/document activity 15 cases passed,
+including 31-event paging, repeat ordering, isolated handoffs, malformed filters,
+wrong parent, sibling workspace, foreign installation, denied reader and independent
+network-view denial. Isolated live browser→Django→PostgreSQL rehearsal passed,
+including real handoff creation, placement/detail edits, selected history and refresh.
+Evidence: /tmp/tekdocs-handoff-history-components-final.log,
+/tmp/tekdocs-handoff-history-api-current.log,
+/tmp/tekdocs-handoff-history-check-final.log and
+/tmp/tekdocs-handoff-history-live.log.
+
+Test corrections: the first browser accessibility selector looked for an explicit
+role attribute, while our drawer is a native dialog; changed to the established
+collection-drawer selector without changing accessibility assertions. A child URL
+cleanup assertion initially matched the valid parent section value `handoffs`;
+corrected it to check the actual handoff/section/page parameter keys. A denial
+component spy retained prior test calls; resetting that spy isolates the no-retry
+assertion. The first reader-denial fixture lacked organization access; added an
+explicit assignment and rebuilt the backend test image before the passing run.
+No application permission or assertion was weakened.
+
+Final browser sweep passed 90 cases across Chromium/Firefox/WebKit, all six widths,
+refresh, URL paging, return links, browser Back, focus and axe checks. Evidence:
+/tmp/tekdocs-handoff-history-browser-complete.log. The full `make test-network-validation` gate passed, including network APIs,
+reconciliation/transfers, relationship/permission/RLS coverage, migration recovery,
+scale/stabilization and the final 566-test frontend suite. The main suite includes
+one skipped check; this does not close broader acceptance. Evidence:
+/tmp/tekdocs-handoff-history-network-gate.log. Circuit kind/status
+workflows, technician walkthroughs and broader Phase 3/pre-1.0 release gates remain
+open. This checkpoint does not replace security, recovery or financial obligations.
+Wiki Roadmap updated locally; publication/deployment/version changes remain separate.
+
+
+Local delivery: built current backend/migrate/frontend images and restarted only
+backend/frontend with no dependencies, since this slice requires no migration.
+This avoids concurrent migration work while the network test database is active.
+Readiness at localhost:3200 reports status ok, database/diagram renderer ready and
+version 0.8.46. Existing application/demo data and volumes were preserved. Evidence:
+/tmp/tekdocs-handoff-history-local-up.log. No production deployment, push, release
+change or Wiki publication occurred.

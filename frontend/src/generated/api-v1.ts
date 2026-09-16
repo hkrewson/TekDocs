@@ -15136,6 +15136,7 @@ export interface operations {
             readonly query?: {
                 readonly actor_id?: string | null;
                 readonly entity_id?: string;
+                readonly handoff_id?: string;
                 readonly occurred_after?: string | null;
                 readonly occurred_before?: string | null;
                 readonly page?: number;
@@ -25282,6 +25283,7 @@ export interface operations {
             readonly query?: {
                 readonly actor_id?: string | null;
                 readonly entity_id?: string;
+                readonly handoff_id?: string;
                 readonly occurred_after?: string | null;
                 readonly occurred_before?: string | null;
                 readonly page?: number;

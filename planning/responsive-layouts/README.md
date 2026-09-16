@@ -76,6 +76,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 - [Interface IP/MAC records and assignment](interface-endpoints.md)
 
+- [Device relationships within device records](device-relationships.md)
+
 - [DNS register and records within zone drawers](dns-register.md)
 
 - [Circuit register, service-detail drawers and bounded provider/contract choices](circuit-register.md)

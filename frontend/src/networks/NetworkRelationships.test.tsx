@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { RelationshipsClient } from '../relationships/api'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import type { WorkspaceContext } from '../workspaces/api'
 import { NetworkRelationships } from './NetworkRelationships'
 
@@ -15,6 +17,10 @@ const relationship = {
   direction: 'outgoing',
   related_entity: { id: 'device-2', display_name: 'Distribution switch', entity_type: 'network_device' },
 } as never
+
+function renderRelationships(element: ReactNode) {
+  return render(<ApplicationRouter>{element}</ApplicationRouter>)
+}
 
 function client(overrides: Partial<RelationshipsClient> = {}): RelationshipsClient {
   return {
@@ -39,7 +45,7 @@ describe('NetworkRelationships', () => {
     const archive = vi.fn().mockResolvedValue(undefined)
     const api = client({ create, archive })
     const user = userEvent.setup()
-    render(<NetworkRelationships workspace={workspace} deviceId="device-1" deviceName="Core switch" canCreate canArchive client={api} />)
+    renderRelationships(<NetworkRelationships workspace={workspace} deviceId="device-1" deviceName="Core switch" canCreate canArchive client={api} />)
     expect(await screen.findByText('No logical relationships have been added.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add relationship' }))
     await user.type(screen.getByLabelText('Find a network device'), 'distribution')
@@ -53,7 +59,7 @@ describe('NetworkRelationships', () => {
   })
 
   it('keeps failures visible without exposing unavailable actions', async () => {
-    render(<NetworkRelationships
+    renderRelationships(<NetworkRelationships
       workspace={{ ...workspace, kind: 'msp' }}
       deviceId="device-1"
       deviceName="Core switch"

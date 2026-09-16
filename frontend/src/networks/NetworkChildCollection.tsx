@@ -14,7 +14,13 @@ import type { WorkspaceContext } from '../workspaces/api'
 import type { AddressQuery, ListResult, NetworksClient } from './api'
 
 type ChildRecord = { id: string; circuit_id?: string; zone_id?: string; subnet_id?: string | null; device_id?: string | null; interface_id?: string | null }
-export type ChildRecordProps<D> = { record: D | null; canManage: boolean; onSaved: (record: D) => void; onReturn: () => void }
+export type ChildRecordProps<D> = {
+  record: D | null
+  canManage: boolean
+  relationshipAccess?: { view: boolean; create: boolean; archive: boolean }
+  onSaved: (record: D) => void
+  onReturn: () => void
+}
 export type ChildCollectionConfig<S extends ChildRecord, D extends S> = {
   parentField?: 'circuit_id' | 'zone_id' | 'subnet_id' | 'device_id' | 'interface_id'; childSelectionKeys?: string[];
   key: string; feature: string; columns: readonly string[]; labels: Record<string, string>
@@ -59,6 +65,11 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   const key = `${config.feature}:${workspace.kind}:${workspace.id}:${queryText}`
   const detailKey = `${config.feature}:${workspace.kind}:${workspace.id}:${subnetId}:${selected}`
   const result = response?.key === key ? response.result : null
+  const relationshipCapabilities = result as typeof result & Partial<{
+    can_view_relationships: boolean
+    can_create_relationships: boolean
+    can_archive_relationships: boolean
+  }>
   const record = detail?.key === detailKey ? detail.record : null
   useEffect(() => { const controller = new AbortController(); preferenceClient.load(workspace, config.feature, config.columns, controller.signal).then((value) => { if (!controller.signal.aborted) setPreferences(value) }).catch(() => { if (!controller.signal.aborted) setPreferences(defaultPreferences(config.columns)) }); return () => controller.abort() }, [workspace, preferenceClient, config])
   useEffect(() => { if (!preferences) return; const controller = new AbortController(); config.load(client, workspace, query, controller.signal).then((value) => { if (controller.signal.aborted) return; setResponse({ key, result: value }); if (changed.current) { setNotice(translate(value.results.some((row) => row.id === changed.current) ? 'networkLayout.recordUpdated' : 'networkLayout.updatedOutside')); changed.current = null } }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) }); return () => controller.abort() }, [workspace, client, key, query, preferences, reload, config])
@@ -91,7 +102,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   }
   const recordContent = <>
       {standalone && notice && <p role="status">{notice}</p>}
-      {selected === 'new' || record ? <RecordComponent key={selected} record={record ?? null} workspace={workspace} subnetId={subnetId} parentId={subnetId} client={client} canManage={Boolean(result?.can_manage)} onSaved={saved} onReturn={() => browse({ [config.key]: null })} /> : <><button type="button" className="secondary-button" onClick={() => browse({ [config.key]: null })}>{config.back}</button><p role={detail?.key === detailKey ? 'alert' : 'status'}>{translate(detail?.key === detailKey ? 'collections.recordUnavailable' : 'collections.loading')}</p></>}
+      {selected === 'new' || record ? <RecordComponent key={selected} record={record ?? null} workspace={workspace} subnetId={subnetId} parentId={subnetId} client={client} canManage={Boolean(result?.can_manage)} relationshipAccess={{ view: Boolean(relationshipCapabilities?.can_view_relationships), create: Boolean(relationshipCapabilities?.can_create_relationships), archive: Boolean(relationshipCapabilities?.can_archive_relationships) }} onSaved={saved} onReturn={() => browse({ [config.key]: null })} /> : <><button type="button" className="secondary-button" onClick={() => browse({ [config.key]: null })}>{config.back}</button><p role={detail?.key === detailKey ? 'alert' : 'status'}>{translate(detail?.key === detailKey ? 'collections.recordUnavailable' : 'collections.loading')}</p></>}
   </>
   const collectionContent = <>
       <Heading id={`network-child-${config.key}`} ref={heading} tabIndex={-1}>{config.title}</Heading>

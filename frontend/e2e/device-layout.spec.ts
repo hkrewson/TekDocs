@@ -5,6 +5,7 @@ async function fixtures(page: Page, denied = false, failSave = false) {
   await page.addInitScript(() => { document.cookie = `csrftoken=${crypto.randomUUID().replaceAll('-', '')}; path=/` })
   const columns = ['name', 'role', 'status', 'site', 'rack', 'rack_unit']
   let preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
+  let relationships: Array<Record<string, unknown>> = []
   const records = Array.from({ length: 31 }, (_, index) => ({ id: `device-${index + 1}`, name: `Device ${String(index + 1).padStart(2, '0')}`, role: 'switch', status: 'active', hardware_asset_id: null, hardware_asset_name: null, site_id: 'site-1', site_name: 'Campus'.repeat(40), location_id: 'room-1', location_name: 'Room'.repeat(50), rack_id: 'rack-1', rack_name: 'Equipment rack'.repeat(30), rack_unit: index + 1, rack_units: 1 }))
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
@@ -20,7 +21,7 @@ async function fixtures(page: Page, denied = false, failSave = false) {
     const size = Number(query.get('page_size')), pageNumber = Number(query.get('page'))
     let found = records.filter((item) => item.name.includes(query.get('q') ?? '') && (!query.get('status') || item.status === query.get('status')) && (!query.get('role') || item.role === query.get('role')))
     if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
-    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: !denied, can_create: false } })
+    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: !denied, can_create: false, can_view_relationships: !denied, can_create_relationships: !denied, can_archive_relationships: !denied } })
   })
   await page.route(/\/networks\/devices\/device-\d+$/, (route) => {
     const record = records.find((item) => route.request().url().endsWith(`/${item.id}`))
@@ -37,6 +38,15 @@ async function fixtures(page: Page, denied = false, failSave = false) {
   })
   await page.route('**/networks/racks?*', (route) => route.fulfill({ json: { results: [{ id: 'rack-2', name: 'New rack' }], page: 1, page_size: 25, count: 1, has_more: false } }))
   await page.route('**/networks/assignment-choices?*', (route) => route.fulfill({ json: { results: [], page: 1, page_size: 25, count: 0, has_more: false } }))
+  await page.route('**/api/v1/entities/search?*', (route) => route.fulfill({ json: { results: [{ id: 'device-2', display_name: 'Device 02', entity_type: 'network_device', visibility: 'msp_private', workspace_label: 'Synthetic MSP', eligible_link_types: ['connected_to', 'related_to'] }], page: 1, page_size: 15, count: 1, has_more: false } }))
+  await page.route(/\/api\/v1\/entities\/device-\d+\/links(?:\/link-1)?$/, (route) => {
+    if (route.request().method() === 'POST') {
+      relationships = [{ id: 'link-1', link_type: 'connected_to', label: 'Connected to', direction: 'outgoing', source_id: 'device-1', target_id: 'device-2', related_entity: { id: 'device-2', display_name: 'Device 02', entity_type: 'network_device', visibility: 'msp_private', workspace_label: 'Synthetic MSP', eligible_link_types: ['connected_to', 'related_to'] }, created_at: '2026-09-16T12:00:00Z' }]
+      return route.fulfill({ json: relationships[0] })
+    }
+    if (route.request().method() === 'DELETE') { relationships = []; return route.fulfill({ status: 204 }) }
+    return route.fulfill({ json: { relationships } })
+  })
   await page.route('**/activity?*', (route) => route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false, actions: [] } }))
 }
 async function section(page: Page, name: string, id: string, width: number) {
@@ -59,6 +69,9 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
     await section(page, 'Placement', 'placement', width)
     await expect(drawer).toContainText('Occupied units')
+    await section(page, 'Relationships', 'relationships', width)
+    await expect(drawer).toContainText('No logical relationships have been added.')
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     await section(page, 'History', 'history', width)
     await expect(drawer).toContainText('No device history is available.')
     await page.reload(); await expect(drawer).toContainText('No device history is available.')
@@ -82,6 +95,27 @@ test('device fact saves dismiss immediately without changing bindings', async ({
   await drawer.getByRole('button', { name: 'Save device', exact: true }).click()
   await expect(drawer.getByRole('button', { name: 'Edit device details' })).toBeVisible()
   await page.mouse.click(10, 100); await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+test('device relationships create, archive and guard an unfinished search', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 600 }, hasTouch: true })
+  try {
+    const page = await context.newPage(); await fixtures(page)
+    await page.goto('/networks?view=devices&devices=device-1&devices_section=relationships')
+    const drawer = page.getByRole('dialog', { name: 'Device 01' })
+    await expect(drawer).toContainText('No logical relationships have been added.')
+    await drawer.getByRole('button', { name: 'Add relationship' }).tap()
+    await drawer.getByRole('searchbox', { name: 'Find a network device' }).fill('Device 02')
+    await drawer.getByRole('combobox', { name: 'Sections', exact: true }).selectOption('history')
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(drawer.getByRole('searchbox', { name: 'Find a network device' })).toHaveValue('Device 02')
+    await drawer.getByRole('combobox', { name: 'Related device' }).selectOption('device-2')
+    await drawer.getByRole('button', { name: 'Add relationship' }).tap()
+    await expect(drawer).toContainText('Device 02')
+    await page.reload(); await expect(drawer).toContainText('Device 02')
+    await drawer.getByRole('button', { name: 'Archive relationship with Device 02' }).tap()
+    await expect(drawer).toContainText('No logical relationships have been added.')
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+  } finally { await context.close() }
 })
 test('device denied and unavailable records keep a return path', async ({ page }) => {
   await fixtures(page, true); await page.goto('/networks?view=devices&devices=device-1&devices_full=true')

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link2, Trash2 } from 'lucide-react'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import type { RelationshipsClient, EntityLinkType, EntityReference, EntityRelationship } from '../relationships/api'
 import type { WorkspaceContext } from '../workspaces/api'
+import { networkText as t } from './networkText'
 
 const relationshipTypes: Array<{ value: EntityLinkType; label: string }> = [
-  { value: 'connected_to', label: 'Connected to' },
-  { value: 'depends_on', label: 'Depends on' },
-  { value: 'related_to', label: 'Related to' },
+  { value: 'connected_to', label: t('deviceRelationshipConnected') },
+  { value: 'depends_on', label: t('deviceRelationshipDepends') },
+  { value: 'related_to', label: t('deviceRelationshipRelated') },
 ]
 
 export function NetworkRelationships({ workspace, deviceId, deviceName, canCreate, canArchive, client }: {
@@ -26,11 +28,12 @@ export function NetworkRelationships({ workspace, deviceId, deviceName, canCreat
   const [linkType, setLinkType] = useState<EntityLinkType>('connected_to')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const attempt = useUnsavedChanges(adding && Boolean(query || targetId || linkType !== 'connected_to'), busy, () => { setAdding(false); setQuery(''); setTargetId(''); setLinkType('connected_to') }, adding || busy)
 
   useEffect(() => {
     const controller = new AbortController()
     client.list(scope, deviceId, controller.signal).then(setItems).catch((caught: unknown) => {
-      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Logical relationships could not be loaded.')
+      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : t('deviceRelationshipsFailed'))
     })
     return () => controller.abort()
   }, [client, deviceId, scope])
@@ -41,7 +44,7 @@ export function NetworkRelationships({ workspace, deviceId, deviceName, canCreat
     client.search(scope, query, 'network_device', controller.signal).then((result) => {
       setCandidates(result.results.filter((item) => item.id !== deviceId && item.eligible_link_types.includes(linkType)))
     }).catch((caught: unknown) => {
-      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Network devices could not be searched.')
+      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : t('deviceRelationshipSearchFailed'))
     })
     return () => controller.abort()
   }, [adding, client, deviceId, linkType, query, scope])
@@ -52,7 +55,7 @@ export function NetworkRelationships({ workspace, deviceId, deviceName, canCreat
     try {
       const created = await client.create(scope, deviceId, targetId, linkType)
       setItems((current) => [...(current ?? []), created]); setAdding(false); setTargetId(''); setQuery('')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'The relationship could not be added.') }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : t('deviceRelationshipAddFailed')) }
     finally { setBusy(false) }
   }
 
@@ -61,21 +64,21 @@ export function NetworkRelationships({ workspace, deviceId, deviceName, canCreat
     try {
       await client.archive(scope, deviceId, item.id)
       setItems((current) => (current ?? []).filter((candidate) => candidate.id !== item.id))
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'The relationship could not be archived.') }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : t('deviceRelationshipArchiveFailed')) }
     finally { setBusy(false) }
   }
 
   return <section className="network-relationships" aria-labelledby="network-relationships-heading">
-    <div className="section-heading"><div><h3 id="network-relationships-heading">Logical relationships</h3><p>Typed links and backlinks for {deviceName}.</p></div>{canCreate && <button className="secondary-button" type="button" onClick={() => setAdding((value) => !value)}>{adding ? 'Cancel' : 'Add relationship'}</button>}</div>
+    <div className="section-heading"><div><h3 id="network-relationships-heading">{t('deviceRelationshipsHeading')}</h3><p>{t('deviceRelationshipsHelp', { name: deviceName })}</p></div>{canCreate && <button className="secondary-button" type="button" onClick={() => attempt(() => setAdding((value) => !value))}>{t(adding ? 'deviceRelationshipCancel' : 'deviceRelationshipAdd')}</button>}</div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {adding && <div className="network-relationship-form">
-      <label><span>Relationship</span><select value={linkType} onChange={(event) => { setLinkType(event.target.value as EntityLinkType); setTargetId('') }}>{relationshipTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-      <label><span>Find a network device</span><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setTargetId('') }} /></label>
-      <label><span>Related device</span><select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Choose a device…</option>{candidates.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
-      <button className="primary-button" type="button" disabled={busy || !targetId} onClick={() => void create()}>{busy ? 'Adding…' : 'Add relationship'}</button>
+      <label><span>{t('deviceRelationshipType')}</span><select value={linkType} onChange={(event) => { setLinkType(event.target.value as EntityLinkType); setTargetId('') }}>{relationshipTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      <label><span>{t('deviceRelationshipSearch')}</span><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setTargetId('') }} /></label>
+      <label><span>{t('deviceRelationshipTarget')}</span><select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">{t('deviceRelationshipChoose')}</option>{candidates.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
+      <button className="primary-button" type="button" disabled={busy || !targetId} onClick={() => void create()}>{t(busy ? 'deviceRelationshipAdding' : 'deviceRelationshipAdd')}</button>
     </div>}
-    {items === null && !error && <p role="status">Loading logical relationships…</p>}
-    {items?.length === 0 && <p>No logical relationships have been added.</p>}
-    {items && items.length > 0 && <ul className="network-relationship-list">{items.map((item) => <li key={item.id}><Link2 size={15} aria-hidden="true" /><span><strong>{item.label}</strong> {item.related_entity.display_name}</span><span>{item.direction === 'incoming' ? 'Backlink' : 'Outgoing'}</span>{canArchive && <button className="icon-button" type="button" disabled={busy} aria-label={`Archive relationship with ${item.related_entity.display_name}`} onClick={() => void archive(item)}><Trash2 size={14} /></button>}</li>)}</ul>}
+    {items === null && !error && <p role="status">{t('deviceRelationshipsLoading')}</p>}
+    {items?.length === 0 && <p>{t('deviceRelationshipsEmpty')}</p>}
+    {items && items.length > 0 && <ul className="network-relationship-list">{items.map((item) => <li key={item.id}><Link2 size={15} aria-hidden="true" /><span><strong>{item.label}</strong> {item.related_entity.display_name}</span><span>{t(item.direction === 'incoming' ? 'deviceRelationshipBacklink' : 'deviceRelationshipOutgoing')}</span>{canArchive && <button className="icon-button" type="button" disabled={busy} aria-label={t('deviceRelationshipArchive', { name: item.related_entity.display_name })} onClick={() => void archive(item)}><Trash2 size={14} /></button>}</li>)}</ul>}
   </section>
 }

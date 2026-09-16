@@ -64,10 +64,11 @@ verifies hardware identity, derived location, occupancy and audit events in Post
 Executed outcomes are recorded in progress.md.
 
 This is the device register/core editing checkpoint, not full network acceptance.
-Interfaces and their addresses/MAC records need bounded parent collections and focused
-editing next. Device relationship editing and hardware-binding replacement remain
-explicit follow-ups. DNS, circuits, other surfaces, technician validation and final
-release/recovery obligations remain open. No production publication or version bump.
+Interfaces and their addresses/MAC records are implemented in the linked follow-up
+records. Device relationship editing is implemented in
+[device-relationships.md](device-relationships.md). Hardware-binding replacement,
+other surfaces, technician validation and final release/recovery obligations remain
+open. No production publication or version bump.
 
 ### Handoff for the next interface slice
 

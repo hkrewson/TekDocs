@@ -4,7 +4,7 @@ Phase 3 (#80), required pre-1.0 under #60/#75. Version remains 0.8.46.
 
 ## Implemented boundary
 
-The Devices record has Overview, Placement, Interfaces and History sections. Its
+The Devices record has Overview, Placement, Interfaces, Relationships and History sections. Its
 Interfaces section is a parent-scoped collection with search, kind/status filters,
 curated name/kind/status columns, saved column choices/reset, and 25/50/100-row pages.
 It loads on section entry. Selecting an interface replaces the child list within
@@ -72,8 +72,10 @@ records that still carry both interface and hardware bindings. Ordinary edits co
 to omit the parent. Existing IP and MAC records remain attached to a successfully
 moved interface.
 
-Device relationships and hardware rebinding, remaining network surfaces, technician
-validation and full Phase 3/release acceptance remain open.
+Device relationships are implemented in
+[device-relationships.md](device-relationships.md). Hardware rebinding, remaining
+network surfaces, technician validation and full Phase 3/release acceptance remain
+open.
 
 No production publication or version change is included. The local Wiki Roadmap
 update is unpublished; its pre-existing missing-page limitation is unchanged.

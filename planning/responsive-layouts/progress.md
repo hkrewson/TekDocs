@@ -1649,3 +1649,31 @@ verifies the destination device, retained IP binding and interface update audit.
 Device relationships and hardware rebinding, remaining network surfaces, technician
 walkthroughs and broader Phase 3/pre-1.0 acceptance remain open. No push, production
 deployment, release/version change or Wiki publication occurred.
+
+## 2026-09-16 — Device relationships within device records
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Authorized device records now include a Relationships section in the existing drawer
+and full-page view. It supports direct URLs, permission-controlled visibility,
+exact-workspace device search, typed link creation and relationship removal. Draft
+searches and selections participate in the shared navigation guard, and failed reads
+or writes remain visible without automatic retries.
+
+Existing relationship endpoints, models and permissions remain authoritative. The
+device collection exposes the existing view, create and archive capabilities so the
+record can omit unavailable sections and actions before a request is attempted. New
+workflow copy uses the shared translation catalog. No route, model, migration,
+permission grant, dependency or CSS changed.
+
+Final verification: `make check` exits 0 with backend lint, types, migration drift,
+API schema agreement, all 579 frontend tests in 116 files, coverage and the production
+bundle budget. All 33 focused device browser cases pass in Chromium, Firefox and
+WebKit across the six maintained widths, including create, reload, archive,
+navigation protection and accessibility. The isolated live
+browser-to-Django-to-PostgreSQL rehearsal also passes and independently verifies the
+exact `Connected to` link and its single creation audit event.
+
+Hardware rebinding, remaining network surfaces, technician walkthroughs and broader
+Phase 3/pre-1.0 acceptance remain open. Existing application and demo data were
+preserved. No push, production deployment, release/version change or Wiki publication
+occurred.

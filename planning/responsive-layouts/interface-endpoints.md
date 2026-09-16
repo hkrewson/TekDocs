@@ -83,9 +83,10 @@ Independent PostgreSQL assertions verify the transferred IP binding, retained MA
 record/removal and audit history.
 Executed results and reproduced failures are recorded in progress.md.
 
-Workspace-wide MAC browsing, moving interfaces between devices, device relationships/
-hardware rebinding, remaining network surfaces, technician sign-off and full Phase 3/
-release acceptance remain open. IP creation in a subnet and asset MAC creation remain
+Workspace-wide MAC browsing, device relationships/hardware rebinding, remaining
+network surfaces, technician sign-off and full Phase 3/release acceptance remain
+open. Conflict-safe interface-to-device moves are recorded in
+[device-interfaces.md](device-interfaces.md). IP creation in a subnet and asset MAC creation remain
 available through their existing parent records.
 No production publication or version change is included. The separate Wiki checkout's
 previously recorded missing-page limitation is unchanged.

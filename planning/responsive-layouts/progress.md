@@ -1618,3 +1618,34 @@ Moving interfaces between devices, device relationship/hardware rebinding, remai
 network surfaces, technician walkthroughs and broader Phase 3/pre-1.0 acceptance
 remain open. No push, production deployment, release/version change or Wiki
 publication occurred.
+
+## 2026-09-16 — Conflict-safe interface device moves
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Selected interface details now move the interface to another device through a
+searchable, paged destination picker. The picker retains an explicit choice through
+searches and failed writes, participates in the shared navigation guard and returns
+to the source device's interface list after success. Existing IP and MAC records move
+with the interface.
+
+The focused PATCH accepts only the destination device and expected current device.
+The service locks the interface, rejects stale and same-device requests, resolves the
+destination in the exact workspace and applies destination interface-name uniqueness.
+It refuses to move interfaces used by circuit handoffs or imported addresses that
+still carry a hardware binding. Ordinary detail edits cannot replace the parent.
+No route, model, migration, permission grant, dependency or CSS changed.
+
+Final verification: focused PostgreSQL API tests cover success, stale/same-device and
+workspace failures, retained endpoints, audit history, circuit handoff protection and
+legacy hardware protection. Component/API-client tests pass for successful and failed
+moves without retry. All 33 focused interface browser cases pass in Chromium, Firefox
+and WebKit across the six maintained widths. `make check` exits 0 with backend
+lint/types/migration drift, API schema agreement, all 577 frontend tests in 116 files,
+coverage and the production bundle budget. `make test-network-validation` exits 0 for
+the complete PostgreSQL network, stabilization and repeated frontend suites. The
+isolated live browser-to-Django-to-PostgreSQL rehearsal also passes and independently
+verifies the destination device, retained IP binding and interface update audit.
+
+Device relationships and hardware rebinding, remaining network surfaces, technician
+walkthroughs and broader Phase 3/pre-1.0 acceptance remain open. No push, production
+deployment, release/version change or Wiki publication occurred.

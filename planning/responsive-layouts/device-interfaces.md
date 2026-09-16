@@ -58,13 +58,21 @@ edits status, reloads it and returns to the child list. Independent PostgreSQL
 assertions verify exact device/organization, description, kind/status and audit.
 Executed results and any limitations are recorded in progress.md.
 
-## Next boundary
+## Device reassignment follow-up
 
 Interface IP/MAC child collections, direct creation, bounded assignment, conflict-safe
 transfer and confirmed removal are implemented in
-[interface-endpoints.md](interface-endpoints.md). Moving an interface between devices
-stays a separate focused workflow; ordinary edits deliberately omit its parent. Device
-relationships and hardware rebinding, remaining network surfaces, technician
+[interface-endpoints.md](interface-endpoints.md). Selected interface details now offer
+a separate Move to another device workflow with a searchable 25-row destination
+picker. A move submits only the destination and expected current device, retains a
+failed choice without retry and returns to the source interface list after success.
+The locked update rejects stale or same-device requests, exact-workspace failures,
+destination name conflicts, interfaces used by circuit handoffs and imported address
+records that still carry both interface and hardware bindings. Ordinary edits continue
+to omit the parent. Existing IP and MAC records remain attached to a successfully
+moved interface.
+
+Device relationships and hardware rebinding, remaining network surfaces, technician
 validation and full Phase 3/release acceptance remain open.
 
 No production publication or version change is included. The local Wiki Roadmap

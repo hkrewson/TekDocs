@@ -407,6 +407,38 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Retained supplier instructions.')).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
   await page.getByRole('button', { name: 'New asset' }).click()
+  await page.getByLabel('Find a supplier model').fill('LIVE-ES-24')
+  await page.getByRole('dialog', { name: 'New asset' }).getByRole('combobox').selectOption({ label: 'Live Northwind Vendor · Live EdgeSwitch · Live EdgeSwitch 24 (LIVE-ES-24)' })
+  await page.getByLabel('Asset name (optional)').fill('Live backup core switch')
+  await page.getByRole('button', { name: 'Create asset' }).click()
+  await page.getByRole('link', { name: 'Open created asset' }).click()
+  await expect(page.getByRole('heading', { name: 'Live backup core switch' })).toBeVisible()
+  const backupAssetResponse = await page.request.get(
+    `/api/v1/workspaces/organizations/${clientId}/networks/assignment-choices?kind=hardware_asset&q=Live%20backup%20core%20switch&page=1&page_size=25`,
+  )
+  expect(backupAssetResponse.ok()).toBe(true)
+  const backupAssetChoices = await backupAssetResponse.json() as { results: Array<{ id: string }> }
+  expect(backupAssetChoices.results).toHaveLength(1)
+  const deviceCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
+  const backupDeviceResponse = await page.request.post(
+    `/api/v1/workspaces/organizations/${clientId}/networks/devices`,
+    {
+      headers: { 'X-CSRFToken': deviceCsrf!.value },
+      data: {
+        name: 'Live backup network switch',
+        role: 'switch',
+        status: 'active',
+        rack_units: 1,
+        hardware_asset_id: backupAssetChoices.results[0].id,
+        site_id: null,
+        location_id: null,
+        rack_id: null,
+        rack_unit: null,
+      },
+    },
+  )
+  expect(backupDeviceResponse.status()).toBe(201)
+  await page.getByRole('button', { name: 'New asset' }).click()
   await page.getByLabel('Find a supplier model').fill('LIVE-SEC-BIZ')
   await page.getByRole('dialog', { name: 'New asset' }).getByRole('combobox').selectOption({ label: 'Live Northwind Vendor · Live Secure Agent · Live Secure Agent Business (LIVE-SEC-BIZ)' })
   await page.getByLabel('Asset name (optional)').fill('Live endpoint protection')
@@ -428,7 +460,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Installation updated', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Vendors' }).click()
   await expect(page.getByText('Live Northwind Vendor', { exact: true })).toBeVisible()
-  await expect(page.getByText('2 assets', { exact: true })).toBeVisible()
+  await expect(page.getByText('3 assets', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: /Current workspace: Live Acme Client/ }).click()
   await page.getByRole('textbox', { name: 'Find a client' }).fill('Live Acme')
@@ -736,6 +768,22 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await deviceDrawer.getByRole('button', { name: 'Live backup uplink', exact: true }).click()
   await deviceDrawer.getByRole('link', { name: 'IP addresses', exact: true }).click()
   await expect(deviceDrawer.getByRole('button', { name: '192.0.2.11', exact: true })).toBeVisible()
+  await deviceDrawer.getByRole('link', { name: 'Interface details', exact: true }).click()
+  await deviceDrawer.getByRole('button', { name: 'Move to another device', exact: true }).click()
+  await deviceDrawer.getByRole('searchbox', { name: 'Search destination devices' }).fill('Live backup network switch')
+  await deviceDrawer.getByRole('button', { name: 'Search', exact: true }).click()
+  await deviceDrawer.getByRole('combobox', { name: 'Available devices' }).selectOption({ label: 'Live backup network switch' })
+  await deviceDrawer.getByRole('button', { name: 'Confirm device move', exact: true }).click()
+  await expect(deviceDrawer.getByText('1 interfaces', { exact: true })).toBeVisible()
+  await expect(deviceDrawer.getByRole('button', { name: 'Live backup uplink', exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Live backup network switch', exact: true }).click()
+  const backupDeviceDrawer = page.getByRole('dialog', { name: 'Live backup network switch', exact: true })
+  await backupDeviceDrawer.getByRole('link', { name: 'Interfaces', exact: true }).click()
+  await backupDeviceDrawer.getByRole('button', { name: 'Live backup uplink', exact: true }).click()
+  await backupDeviceDrawer.getByRole('link', { name: 'IP addresses', exact: true }).click()
+  await expect(backupDeviceDrawer.getByRole('button', { name: '192.0.2.11', exact: true })).toBeVisible()
   await page.mouse.click(10, 100)
   await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Racks', exact: true }).click()
   await page.getByRole('button', { name: 'Live layout rack', exact: true }).click()

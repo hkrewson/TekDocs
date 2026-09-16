@@ -53,7 +53,7 @@ async function fixtures(page: Page, denied = false, failSave = false) {
     const query = new URL(route.request().url()).searchParams
     expect(query.get('device_id')).toBe('device-1'); expect(query.has('subnet_id')).toBe(false); expect(query.has('association')).toBe(false)
     const pageNumber = Number(query.get('page')), size = Number(query.get('page_size'))
-    let found = records.filter((item) => item.name.includes(query.get('q') ?? '') && (!query.get('status') || item.status === query.get('status')) && (!query.get('kind') || item.kind === query.get('kind')))
+    let found = records.filter((item) => item.device_id === query.get('device_id') && item.name.includes(query.get('q') ?? '') && (!query.get('status') || item.status === query.get('status')) && (!query.get('kind') || item.kind === query.get('kind')))
     if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
     return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size).map(({ id, name, device_id, device_name, kind, status }) => ({ id, name, device_id, device_name, kind, status })), page: pageNumber, page_size: size, count: found.length, has_more: size * pageNumber < found.length, can_manage: !denied } })
   })
@@ -69,9 +69,11 @@ async function fixtures(page: Page, denied = false, failSave = false) {
     if (!record) return route.fulfill({ status: 403, json: {} })
     if (route.request().method() === 'PATCH') {
       const values = route.request().postDataJSON() as Record<string, unknown>
-      expect(Object.keys(values).sort()).toEqual(['description', 'kind', 'name', 'status'])
+      const moving = 'device_id' in values
+      expect(Object.keys(values).sort()).toEqual(moving ? ['device_id', 'expected_device_id'] : ['description', 'kind', 'name', 'status'])
       if (failSave) return route.fulfill({ status: 409, json: { detail: 'Interface conflict. Your entries have been kept.' } })
       Object.assign(record, values)
+      if (moving) record.device_name = 'Device 02'
     }
     return route.fulfill({ json: record })
   })
@@ -116,6 +118,17 @@ test('interface creation and immediate saved dismissal retain the device binding
   await drawer.getByRole('button', { name: 'Save interface' }).click()
   await expect(drawer.getByRole('button', { name: 'Edit interface' })).toBeVisible()
   await page.mouse.click(10, 100); await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+test('interface moves to a searched device and leaves the source collection', async ({ page }) => {
+  await fixtures(page); await page.goto(`${url}&interface=port-1`)
+  const drawer = page.getByRole('dialog', { name: 'Device 01', exact: true })
+  await drawer.getByRole('button', { name: 'Move to another device', exact: true }).click()
+  await drawer.getByRole('searchbox', { name: 'Search destination devices' }).fill('Device 02')
+  await drawer.getByRole('button', { name: 'Search', exact: true }).click()
+  await drawer.getByRole('combobox', { name: 'Available devices' }).selectOption({ label: 'Device 02' })
+  await drawer.getByRole('button', { name: 'Confirm device move', exact: true }).click()
+  await expect(drawer.getByText('30 interfaces', { exact: true })).toBeVisible()
+  await expect(page).not.toHaveURL(/interface=port-1/)
 })
 test('failed interface drafts survive touch, parent-section navigation and zoom', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 500 }, hasTouch: true })

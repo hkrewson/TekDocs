@@ -46,6 +46,22 @@ class InterfaceWriteSerializer(StrictSerializer):
     )
     status = serializers.ChoiceField(choices=("planned", "active", "disabled", "retired"), default="active")
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+    expected_device_id = serializers.UUIDField(
+        source="expected_device_entity_id", required=False
+    )
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if not self.partial:
+            if "expected_device_entity_id" in attrs:
+                raise serializers.ValidationError("Expected device is only used when moving an interface.")
+            return attrs
+        changing_device = "device_entity_id" in attrs
+        has_expected = "expected_device_entity_id" in attrs
+        if changing_device != has_expected:
+            raise serializers.ValidationError("Device changes require the expected current device.")
+        if changing_device and set(attrs) != {"device_entity_id", "expected_device_entity_id"}:
+            raise serializers.ValidationError("Move the interface separately from editing its details.")
+        return attrs
 
 
 class IPAddressWriteSerializer(StrictSerializer):
@@ -338,7 +354,7 @@ class InterfaceDetailView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
         return Response(InterfaceSerializer(self._record(workspace, interface_entity_id)).data)
 
-    @extend_schema(request=InterfaceWriteSerializer, responses={200: InterfaceSerializer})
+    @extend_schema(request=InterfaceWriteSerializer, responses={200: InterfaceSerializer, 409: None})
     def patch(self, request, interface_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = InterfaceWriteSerializer(data=request.data, partial=True)
@@ -349,6 +365,8 @@ class InterfaceDetailView(APIView):
                 actor_id=request.user.pk,
                 values=serializer.validated_data,
             )
+        except NetworkAssignmentConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         return Response(InterfaceSerializer(record).data)

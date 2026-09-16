@@ -218,7 +218,19 @@ def create_interface(
 def update_interface(*, record: NetworkInterface, actor_id: UUID, values: dict[str, object]) -> NetworkInterface:
     locked = NetworkInterface.objects.select_for_update().select_related("entity", "device__entity").get(pk=record.pk)
     scope = DataScope.owner(locked.tenant, locked.organization)
-    device = _device(scope, cast(UUID, values.get("device_entity_id", locked.device.entity_id)))
+    device = locked.device
+    if "device_entity_id" in values:
+        if values.get("expected_device_entity_id") != locked.device.entity_id:
+            raise NetworkAssignmentConflict("The device assignment changed. Reload the interface before trying again.")
+        device = _device(scope, cast(UUID, values["device_entity_id"]))
+        if device.pk == locked.device_id:
+            raise NetworkAssignmentConflict("Choose a different device.")
+        if locked.network_circuit_handoffs.exists():
+            raise NetworkAssignmentConflict("Remove this interface from its circuit handoff before moving it.")
+        if locked.ip_addresses.filter(hardware_asset__isnull=False).exists() or locked.mac_addresses.filter(
+            hardware_asset__isnull=False
+        ).exists():
+            raise NetworkAssignmentConflict("Remove legacy hardware address bindings before moving this interface.")
     name = str(values.get("name", locked.entity.display_name)).strip()
     _lock_interface_name(device)
     _assert_interface_name_available(device=device, name=name, exclude_interface_id=locked.pk)

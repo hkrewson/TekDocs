@@ -188,6 +188,34 @@ def test_circuit_contract_handoff_and_lifecycle_projection(owner_client, install
     )
     assert handoff.status_code == 201
     assert handoff.json()["interface_name"] == "WAN1"
+    alternate_asset = create_network_hardware_asset(
+        installation=installation, organization=client, name="Alternate router"
+    )
+    alternate_device = create_device(
+        tenant=installation.tenant,
+        organization=client,
+        actor_id=installation.owner.id,
+        name="Alternate router",
+        role="router",
+        status="active",
+        hardware_asset_entity_id=alternate_asset.entity_id,
+        site_entity_id=site.entity_id,
+        location_entity_id=None,
+        rack_entity_id=None,
+        rack_unit=None,
+        rack_units=1,
+    )
+    interface_detail = reverse(
+        "organization-network-interface-detail",
+        kwargs={"organization_entity_id": client.entity_id, "interface_entity_id": interface.entity_id},
+    )
+    blocked_interface_move = owner_client.patch(
+        interface_detail,
+        {"device_id": str(alternate_device.entity_id), "expected_device_id": str(device.entity_id)},
+        content_type="application/json",
+    )
+    assert blocked_interface_move.status_code == 409
+    assert "circuit handoff" in blocked_interface_move.json()["detail"]
     detail_url = reverse(
         "organization-network-circuit-handoff-detail",
         kwargs={

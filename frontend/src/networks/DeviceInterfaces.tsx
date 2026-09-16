@@ -8,6 +8,7 @@ import type { WorkspaceContext } from '../workspaces/api'
 import type { NetworkInterface, NetworksClient } from './api'
 import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig } from './NetworkChildCollection'
+import { CollectionPagination } from '../CollectionPagination'
 import { networkText as t } from './networkText'
 
 const kinds = [
@@ -38,10 +39,10 @@ function InterfaceRecord({ record, parentId, workspace, client, canManage, onSav
   const view = record && ['ip', 'mac'].includes(params.get('interface_view') ?? '') ? params.get('interface_view') as 'ip' | 'mac' : 'details'
   function href(value: string) { const next = new URLSearchParams(params); next.set('interface_view', value); return `${location.pathname}?${next}` }
   const initial: InterfaceForm = record ? { name: record.name, kind: record.kind, status: record.status, description: record.description } : { name: '', kind: 'physical', status: 'active', description: '' }
-  const [form, setForm] = useState(initial), [editing, setEditing] = useState(!record)
+  const [form, setForm] = useState(initial), [editing, setEditing] = useState(!record), [moving, setMoving] = useState(false)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
-  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial) }, editing)
+  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial); setMoving(false) }, editing)
   useEffect(() => { heading.current?.focus() }, [record?.id])
   async function save() {
     if (busy) return
@@ -56,7 +57,7 @@ function InterfaceRecord({ record, parentId, workspace, client, canManage, onSav
     {record && <nav className="collection-toolbar" aria-label={t('endpointNavigation')}>{(['details', 'ip', 'mac'] as const).map((value) => <Link key={value} to={href(value)} aria-current={view === value ? 'page' : undefined}>{t(value === 'details' ? 'interfaceDetails' : value === 'ip' ? 'endpointIPs' : 'endpointMACs')}</Link>)}</nav>}
     {view !== 'details' && record ? <InterfaceEndpoints key={`${record.id}:${view}`} kind={view} workspace={workspace} interfaceId={record.id} client={client} /> : <>
     {error && <p role="alert">{error}</p>}
-    {editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
+    {moving && record && canManage ? <InterfaceTransfer record={record} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setMoving(false)} /> : editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
       <label>{t('name')}<input required maxLength={240} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
       <div className="field-grid"><label>{t('interfaceKind')}<select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value as NetworkInterface['kind'] })}>{kinds.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <label>{translate('collections.status')}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as NetworkInterface['status'] })}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label></div>
@@ -65,8 +66,43 @@ function InterfaceRecord({ record, parentId, workspace, client, canManage, onSav
     </fieldset></form> : record ? <>
       <dl className="record-facts">{(['kind', 'status'] as const).map((column) => <div key={column}><dt>{config.labels[column]}</dt><dd>{config.value(record, column)}</dd></div>)}</dl>
       <p className="network-notes">{record.description || t('noDescription')}</p>
-      {canManage && <button className="secondary-button" type="button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('interfaceEdit')}</button>}
+      {canManage && <div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('interfaceEdit')}</button><button className="secondary-button" type="button" onClick={() => { setError(''); setMoving(true) }}>{t('interfaceMove')}</button></div>}
     </> : <p>{t('interfaceDenied')}</p>}
     </>}
   </>
+}
+
+function InterfaceTransfer({ record, workspace, client, onSaved, onCancel }: { record: NetworkInterface; workspace: WorkspaceContext; client: NetworksClient; onSaved: (record: NetworkInterface) => void; onCancel: () => void }) {
+  type Choice = Awaited<ReturnType<NetworksClient['deviceCollection']>>['results'][number]
+  const [search, setSearch] = useState(''), [draft, setDraft] = useState(''), [page, setPage] = useState(1), [reload, setReload] = useState(0)
+  const [selected, setSelected] = useState<Choice | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [response, setResponse] = useState<{ key: string; value?: Awaited<ReturnType<NetworksClient['deviceCollection']>> } | null>(null)
+  const key = `${workspace.kind}:${workspace.id}:${page}:${search}`
+  const result = response?.key === key ? response : null
+  const choices = result?.value?.results.filter((row) => row.id !== record.device_id) ?? []
+  const attempt = useUnsavedChanges(Boolean(selected), busy, () => setSelected(null), true)
+  useEffect(() => {
+    const controller = new AbortController()
+    client.deviceCollection(workspace, { q: search, page, page_size: 25, ordering: 'name' }, controller.signal).then((value) => { if (!controller.signal.aborted) setResponse({ key, value }) }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) })
+    return () => controller.abort()
+  }, [workspace, client, search, page, key, reload])
+  function find() { setSearch(draft); setPage(1) }
+  async function save() {
+    if (busy) return
+    if (!selected) { setError(t('interfaceMoveRequired')); return }
+    setBusy(true); setError('')
+    try { const value = await client.moveInterface(workspace, record.id, selected.id, record.device_id); setSelected(null); onSaved(value) }
+    catch (caught) { setError(caught instanceof Error ? caught.message : t('interfaceSaveFailed')) } finally { setBusy(false) }
+  }
+  return <section aria-label={t('interfaceMove')}>
+    <p>{t('interfaceMoveHelp')}</p>
+    {error && <p role="alert">{error}</p>}
+    <p>{t('interfaceMoveSelected')}: <strong>{selected?.name ?? t('interfaceMoveChoose')}</strong></p>
+    <div className="collection-search"><input type="search" maxLength={240} aria-label={t('interfaceMoveSearch')} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); find() } }} /><button type="button" className="secondary-button" onClick={find}>{translate('collections.searchAction')}</button></div>
+    {!result ? <p role="status">{translate('collections.loading')}</p> : !result.value ? <p role="alert">{t('interfaceMoveFailed')} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p> : <>
+      {choices.length || selected ? <label>{t('interfaceMoveChoices')}<select value={selected?.id ?? ''} onChange={(event) => { const row = choices.find((item) => item.id === event.target.value); if (row) setSelected(row); else setSelected(null) }}><option value="">{t('interfaceMoveChoose')}</option>{selected && !choices.some((row) => row.id === selected.id) && <option value={selected.id}>{selected.name}</option>}{choices.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label> : <p>{t('interfaceMoveEmpty')}</p>}
+      <CollectionPagination label={t('interfaceMoveChoices')} page={page} pageSize={25} count={result.value.count} hasMore={result.value.has_more} onPageChange={setPage} />
+    </>}
+    <div className="form-actions"><button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? translate('common.saving') : t('interfaceMoveSave')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => attempt(onCancel)}>{translate('common.cancel')}</button></div>
+  </section>
 }

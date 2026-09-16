@@ -12136,6 +12136,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/networks/ip-addresses:
     get:
       operationId: workspaces_msp_networks_ip_addresses_retrieve_list
@@ -25123,6 +25135,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/ip-addresses:
     get:
       operationId: workspaces_organizations_networks_ip_addresses_retrieve_list
@@ -36554,6 +36578,9 @@ components:
           type: string
           default: ''
           maxLength: 4000
+        expected_device_id:
+          type: string
+          format: uuid
       required:
       - device_id
       - name
@@ -40367,6 +40394,9 @@ components:
           type: string
           default: ''
           maxLength: 4000
+        expected_device_id:
+          type: string
+          format: uuid
     PatchedInvoiceLineUpdate:
       type: object
       properties:

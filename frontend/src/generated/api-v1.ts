@@ -10709,6 +10709,8 @@ export interface components {
             readonly status: "planned" | "active" | "disabled" | "retired";
             /** @default  */
             readonly description: string;
+            /** Format: uuid */
+            readonly expected_device_id?: string;
         };
         readonly Invitation: {
             /** Format: uuid */
@@ -12397,6 +12399,8 @@ export interface components {
             readonly status: "planned" | "active" | "disabled" | "retired";
             /** @default  */
             readonly description: string;
+            /** Format: uuid */
+            readonly expected_device_id?: string;
         };
         readonly PatchedInvoiceLineUpdate: {
             readonly description?: string;
@@ -23868,6 +23872,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["Interface"];
                 };
             };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly workspaces_msp_networks_ip_addresses_retrieve_list: {
@@ -32698,6 +32713,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Interface"];
+                };
+            };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

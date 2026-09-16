@@ -163,6 +163,7 @@ export interface NetworksClient {
   listInterfaces(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkInterface>>
   createInterface(workspace: WorkspaceContext, values: InterfaceWrite): Promise<NetworkInterface>
   updateInterface(workspace: WorkspaceContext, id: string, values: Partial<InterfaceWrite>): Promise<NetworkInterface>
+  moveInterface(workspace: WorkspaceContext, id: string, deviceId: string, expectedDeviceId: string): Promise<NetworkInterface>
   addressCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<AddressSummary>>
   addressDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<NetworkIPAddress>
   listIPAddresses(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkIPAddress>>
@@ -349,6 +350,7 @@ export const browserNetworksClient: NetworksClient = {
   },
   createInterface: (workspace, values) => write(`${basePath(workspace)}/interfaces`, 'POST', values),
   updateInterface: (workspace, id, values) => write(`${basePath(workspace)}/interfaces/${encodeURIComponent(id)}`, 'PATCH', values),
+  moveInterface: (workspace, id, deviceId, expectedDeviceId) => write(`${basePath(workspace)}/interfaces/${encodeURIComponent(id)}`, 'PATCH', { device_id: deviceId, expected_device_id: expectedDeviceId }),
   async addressCollection(workspace, query, signal) {
     const params = new URLSearchParams({ ...query, page: String(query.page), page_size: String(query.page_size), summary: 'true' })
     return json(await fetch(`${basePath(workspace)}/ip-addresses?${params}`, { credentials: 'same-origin', signal }))

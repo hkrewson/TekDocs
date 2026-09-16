@@ -598,6 +598,101 @@ def test_interface_collection_search_paging_parent_scope_and_partial_edit(owner_
 
 
 @pytest.mark.django_db
+def test_interface_device_move_is_compare_checked_and_retains_endpoints(owner_client, installation):
+    from apps.core.models import AuditEvent
+    from apps.core.network_endpoints import create_interface, create_mac_address
+
+    organization = _organization(installation, "Interface move client")
+    sibling = _organization(installation, "Outside interface move client")
+    source = _device(installation, organization, "Source switch")
+    destination = _device(installation, organization, "Destination switch")
+    outside = _device(installation, sibling, "Outside switch")
+    interface = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Uplink",
+        device_entity_id=source.entity_id,
+        kind="physical",
+        status="active",
+        description="Keep this description",
+    )
+    endpoint = create_mac_address(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        address="02:00:00:00:00:91",
+        interface_entity_id=interface.entity_id,
+        hardware_asset_entity_id=None,
+        description="Keep this address",
+    )
+    detail = reverse(
+        "organization-network-interface-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "interface_entity_id": interface.entity_id},
+    )
+
+    def move(device_id, expected_id=source.entity_id, **extra):  # type: ignore[no-untyped-def]
+        return owner_client.patch(
+            detail,
+            {"device_id": str(device_id), "expected_device_id": str(expected_id), **extra},
+            content_type="application/json",
+        )
+
+    missing_expected = owner_client.patch(
+        detail, {"device_id": str(destination.entity_id)}, content_type="application/json"
+    )
+    assert missing_expected.status_code == 400
+    assert move(destination.entity_id, status="disabled").status_code == 400
+    assert move(outside.entity_id).status_code == 400
+    assert move(source.entity_id).status_code == 409
+    assert move(destination.entity_id, destination.entity_id).status_code == 409
+
+    moved = move(destination.entity_id)
+    assert moved.status_code == 200, moved.content
+    assert moved.json()["device_id"] == str(destination.entity_id)
+    assert moved.json()["description"] == "Keep this description"
+    interface.refresh_from_db()
+    endpoint.refresh_from_db()
+    assert interface.device_id == destination.pk and endpoint.interface_id == interface.pk
+    assert AuditEvent.objects.filter(entity_id=interface.entity_id, action="network_interface.updated").count() == 1
+    assert move(source.entity_id, source.entity_id).status_code == 409
+
+    legacy_interface = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Legacy uplink",
+        device_entity_id=source.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    create_mac_address(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        address="02:00:00:00:00:92",
+        interface_entity_id=legacy_interface.entity_id,
+        hardware_asset_entity_id=source.hardware_asset.entity_id,
+        description="Imported dual binding",
+    )
+    legacy_detail = reverse(
+        "organization-network-interface-detail",
+        kwargs={
+            "organization_entity_id": organization.entity_id,
+            "interface_entity_id": legacy_interface.entity_id,
+        },
+    )
+    legacy_move = owner_client.patch(
+        legacy_detail,
+        {"device_id": str(destination.entity_id), "expected_device_id": str(source.entity_id)},
+        content_type="application/json",
+    )
+    assert legacy_move.status_code == 409
+    assert "legacy hardware" in legacy_move.json()["detail"]
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("kind", ["ip", "mac"])
 def test_interface_endpoint_assignment_is_bounded_and_compare_checked(owner_client, installation, kind, monkeypatch):
     from rest_framework.exceptions import PermissionDenied

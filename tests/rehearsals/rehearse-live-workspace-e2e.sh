@@ -350,22 +350,25 @@ assert AuditEvent.objects.filter(entity_id=rack.entity_id, action="network_rack.
 print("Live rack creation and update retained its exact site, location and audit history.")
 from apps.core.models import NetworkDevice
 device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity__display_name="Live network switch")
+backup_device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity__display_name="Live backup network switch")
 assert device.organization == organization and device.rack == rack
 assert device.site_id == rack.site_id and device.location_id == rack.location_id
 assert device.rack_unit == 5 and device.rack_units == 2 and device.status == "offline"
 assert device.hardware_asset.entity.display_name == "Live core switch"
+assert backup_device.organization == organization and backup_device.hardware_asset.entity.display_name == "Live backup core switch"
 assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 2
 print("Live device retained hardware identity, ordinary edits and rack-derived placement.")
 from apps.core.models import NetworkInterface
 interface = NetworkInterface.objects.get(entity__display_name="Live uplink")
 destination_interface = NetworkInterface.objects.get(entity__display_name="Live backup uplink")
 assert interface.organization == organization and interface.device_id == device.pk
-assert destination_interface.organization == organization and destination_interface.device_id == device.pk
+assert destination_interface.organization == organization and destination_interface.device_id == backup_device.pk
 assert interface.status == "disabled" and interface.kind == "physical"
 assert interface.description == "Uplink to the core rack"
 assert destination_interface.description == "Transfer destination"
 assert AuditEvent.objects.filter(entity_id=interface.entity_id, action="network_interface.updated").count() == 1
-print("Live interface retained its device binding, description, status and update audit.")
+assert AuditEvent.objects.filter(entity_id=destination_interface.entity_id, action="network_interface.updated").count() == 1
+print("Live interfaces retained their details and conflict-safe device assignments.")
 from apps.core.models import NetworkIPAddress
 interface_ip = NetworkIPAddress.objects.get(address="192.0.2.11", organization=organization)
 assert interface_ip.interface_id == destination_interface.pk and interface_ip.hardware_asset_id is None

@@ -1410,3 +1410,60 @@ volumes and data were preserved. Evidence:
 /tmp/tekdocs-circuit-create-local-up.log. Test from Networks → Circuits → New circuit,
 or a visible-contract circuit Overview → Edit provider and contract. No push,
 production deployment, release version change or Wiki publication occurred.
+
+### Handoff creation/details/placement — implementation
+
+Phase 3 #80 under #60/#75: parent circuit Handoffs now supports New handoff,
+separate guarded detail and placement forms, bounded site/location/device/interface
+choices and focused save/return navigation. Details preserve placement; placement
+preserves identity/service facts. Dependent draft selections clear on parent changes.
+Read-only and server-conflict cases preserve authoritative permissions and rules.
+The API types reflect existing partial PATCH and circuit_id responses; no backend
+mutation/schema changes, new CSS, migration or dependency.
+
+Eleven focused handoff/circuit component cases pass. Main checks, browser widths
+and the isolated live creation/placement rehearsal are running. Focused PostgreSQL
+circuit tests add partial-edit preservation, duplicate interface rejection, invalid
+device/interface pairing and valid paired clearing. No main database test jobs
+overlap. Remaining scope: handoff history, circuit lifecycle/status and wider
+Phase 3/technician/release acceptance. Version remains 0.8.46.
+
+Focused Docker PostgreSQL circuit tests pass (seven cases), including the new
+partial handoff detail preservation, duplicate interface rejection, invalid
+paired placement rollback and valid device/interface clearing. Evidence:
+/tmp/tekdocs-handoff-api.log. Initial browser run reproduced three Firefox strict
+selector failures: pending save briefly exposed both selected-location text and
+an option with the same name. The test now waits for the saved view and checks its
+exact `dd` location fact, strengthening persisted-state verification. No production
+workaround or weakened assertion. An intermediate run captured the old selector;
+only the final updated run counts as browser evidence. A fixture spread assertion
+was also corrected for the existing lint rules. Main checks and live stack remain
+in progress. Component evidence: /tmp/tekdocs-handoff-components.log.
+
+All 72 maintained-browser cases pass after the exact saved-fact selector fix.
+Evidence: /tmp/tekdocs-handoff-browser-final.log. Main checks exposed one obsolete
+`as never` fixture cast when the handoff update type became partial; removed only
+that cast, preserving the request assertion. The final main gate is rerunning.
+No production mutation rules or database schema were altered.
+
+The isolated `make test-e2e-live` passes. Circuit and handoff creation, placement
+assignment and detail editing run through the browser, then reload/return/history.
+Independent PostgreSQL assertions confirm exact ownership, site/location/device/
+interface links, retained provider reference, saved notes and one handoff-created
+plus two handoff-updated audit events. Evidence: /tmp/tekdocs-handoff-live.log.
+Existing user/demo data and main volumes remain untouched by the isolated fixtures.
+
+Final `make check` passes with 564 frontend tests in 116 files, backend Ruff/mypy,
+API/generated-type consistency, migration drift and unchanged build budgets.
+Evidence: /tmp/tekdocs-handoff-check-final.log. Final browser evidence is 72 cases,
+focused PostgreSQL circuit evidence is seven cases, and the isolated live journey
+passes. This closes handoff creation, detail editing and placement only. Circuit
+status/kind workflows, handoff-specific history, technician acceptance and broader
+pre-1.0 release gates remain open. Local rebuild is running at version 0.8.46.
+
+Local delivery: `make up` completed. Readiness at localhost:3200 reports ok,
+database/diagram renderer ready and version 0.8.46. Existing application/demo data
+and volumes were preserved. Evidence: /tmp/tekdocs-handoff-local-up.log. Test from
+Networks → Circuits → selected circuit → Handoffs: New handoff, Edit handoff details
+or Edit handoff placement. No production push/deployment, release/version change
+or Wiki publication occurred.

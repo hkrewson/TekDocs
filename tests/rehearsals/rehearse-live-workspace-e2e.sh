@@ -158,7 +158,13 @@ handoff = NetworkCircuitHandoff.objects.get(circuit=circuit, entity__display_nam
 assert handoff.organization == organization
 assert handoff.tenant == organization.tenant
 assert handoff.provider_reference == "LIVE-DEMARC-01"
-assert handoff.interface_id is None
+assert handoff.interface.entity.display_name == "Live uplink"
+assert handoff.device.entity.display_name == "Live network switch"
+assert handoff.site.entity.display_name == "Live Main Campus"
+assert handoff.location.entity.display_name == "Building A"
+assert handoff.description == "Verified live demarc"
+assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_created").count() == 1
+assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_updated").count() == 2
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 1
 dns_zone = DNSZone.objects.get(name="live-layout.example.invalid")
 dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-layout.example.invalid")

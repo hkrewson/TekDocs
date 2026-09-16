@@ -193,8 +193,8 @@ export interface NetworksClient {
   circuitChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<CircuitChoices>
   createCircuit(workspace: WorkspaceContext, values: CircuitWrite): Promise<NetworkCircuit>
   updateCircuit(workspace: WorkspaceContext, id: string, values: Partial<CircuitWrite>): Promise<NetworkCircuit>
-  createCircuitHandoff(workspace: WorkspaceContext, circuitId: string, values: HandoffWrite): Promise<CircuitHandoff>
-  updateCircuitHandoff(workspace: WorkspaceContext, circuitId: string, id: string, values: HandoffWrite): Promise<CircuitHandoff>
+  createCircuitHandoff(workspace: WorkspaceContext, circuitId: string, values: HandoffWrite): Promise<HandoffDetail>
+  updateCircuitHandoff(workspace: WorkspaceContext, circuitId: string, id: string, values: Partial<HandoffWrite>): Promise<HandoffDetail>
   listNetBoxReferences(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetBoxReference[]>
   netBoxChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: NetBoxChoice[]; can_manage: boolean }>
   setNetBoxReference(workspace: WorkspaceContext, values: NetBoxReferenceWrite): Promise<NetBoxReference>
@@ -404,7 +404,7 @@ export const browserNetworksClient: NetworksClient = {
     void _parent
     const params = new URLSearchParams({ ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])), paginated: 'true', ...(association ? { side: association } : {}) })
     const result = await json<ListResult<HandoffDetail>>(await fetch(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs?${params}`, { credentials: 'same-origin', signal }))
-    return { ...result, can_create: false }
+    return { ...result, can_create: result.can_manage }
   },
   handoffDetail: async (workspace, circuitId, id, signal) => json(await fetch(`${basePath(workspace)}/circuits/${encodeURIComponent(circuitId)}/handoffs/${encodeURIComponent(id)}`, { credentials: 'same-origin', signal })),
   async listCircuits(workspace, signal) {

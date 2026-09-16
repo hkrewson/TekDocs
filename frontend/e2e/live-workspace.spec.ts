@@ -761,7 +761,6 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   const circuitProviderId = vendorHref.match(/organizations\/([0-9a-f-]+)/)?.[1]
   if (!circuitProviderId) throw new Error('The circuit fixture requires the vendor organization identifier.')
-  const circuitCsrf = (await page.context().cookies()).find(cookie => cookie.name === 'csrftoken')!
   await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Circuits', exact: true }).click()
   await page.getByRole('button', { name: 'New circuit', exact: true }).click()
   const newCircuitDrawer = page.getByRole('dialog', { name: 'New circuit', exact: true })
@@ -773,13 +772,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await newCircuitDrawer.getByRole('button', { name: 'Add circuit', exact: true }).click()
   const circuitResponse = await createdCircuit
   expect(circuitResponse.status()).toBe(201)
-  const circuitId = (await circuitResponse.json() as { id: string }).id
   await expect(page.getByRole('dialog', { name: 'Live layout circuit', exact: true })).toBeVisible()
-  const handoffSeed = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/circuits/${circuitId}/handoffs`, {
-    headers: { 'X-CSRFToken': circuitCsrf.value },
-    data: { name: 'Live circuit demarc', side: 'a', media: 'fiber', connector: 'LC', provider_reference: 'LIVE-DEMARC-01' },
-  })
-  expect(handoffSeed.status()).toBe(201)
   const circuitDrawer = page.getByRole('dialog', { name: 'Live layout circuit', exact: true })
   await circuitDrawer.getByRole('button', { name: 'Edit service details' }).click()
   await circuitDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Verified live circuit service')
@@ -788,9 +781,23 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await expect(circuitDrawer.getByText('Verified live circuit service', { exact: true })).toBeVisible()
   await circuitDrawer.getByRole('link', { name: 'Handoffs', exact: true }).click()
-  await circuitDrawer.getByRole('button', { name: 'Live circuit demarc', exact: true }).click()
+  await circuitDrawer.getByRole('button', { name: 'New handoff', exact: true }).click()
+  await circuitDrawer.getByRole('textbox', { name: 'Name', exact: true }).fill('Live circuit demarc')
+  await circuitDrawer.getByRole('textbox', { name: 'Connector', exact: true }).fill('LC')
+  await circuitDrawer.getByRole('textbox', { name: 'Provider handoff reference', exact: true }).fill('LIVE-DEMARC-01')
+  await circuitDrawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
   await expect(circuitDrawer.getByRole('heading', { name: 'Live circuit demarc' })).toBeFocused()
-  await expect(circuitDrawer.getByText('LIVE-DEMARC-01', { exact: true })).toBeVisible()
+  await circuitDrawer.getByRole('button', { name: 'Edit handoff placement' }).click()
+  await circuitDrawer.getByRole('combobox', { name: 'Site', exact: true }).selectOption({ label: 'Live Main Campus' })
+  await circuitDrawer.getByRole('combobox', { name: 'Location', exact: true }).selectOption({ label: 'Building A' })
+  await circuitDrawer.getByRole('combobox', { name: 'Device', exact: true }).selectOption({ label: 'Live network switch' })
+  await circuitDrawer.getByRole('combobox', { name: 'Interface', exact: true }).selectOption({ label: 'Live uplink' })
+  await circuitDrawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+  await expect(circuitDrawer.getByRole('button', { name: 'Edit handoff details' })).toBeVisible()
+  await circuitDrawer.getByRole('button', { name: 'Edit handoff details' }).click()
+  await circuitDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Verified live demarc')
+  await circuitDrawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+  await expect(circuitDrawer.getByText('Verified live demarc', { exact: true })).toBeVisible()
   await page.reload()
   await expect(circuitDrawer.getByText('LIVE-DEMARC-01', { exact: true })).toBeVisible()
   await circuitDrawer.getByRole('button', { name: 'Back to handoffs' }).click()

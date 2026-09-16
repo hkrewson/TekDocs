@@ -186,6 +186,41 @@ def test_circuit_contract_handoff_and_lifecycle_projection(owner_client, install
     )
     assert handoff.status_code == 201
     assert handoff.json()["interface_name"] == "WAN1"
+    detail_url = reverse(
+        "organization-network-circuit-handoff-detail",
+        kwargs={
+            "organization_entity_id": client.entity_id,
+            "circuit_entity_id": circuit["id"],
+            "handoff_entity_id": handoff.json()["id"],
+        },
+    )
+    edited = owner_client.patch(
+        detail_url, {"connector": "SC", "description": "Verified demarc"}, content_type="application/json"
+    )
+    assert edited.status_code == 200
+    assert edited.json()["connector"] == "SC"
+    assert edited.json()["site_id"] == str(site.entity_id)
+    assert edited.json()["interface_id"] == str(interface.entity_id)
+    duplicate = owner_client.post(
+        handoff_url,
+        {
+            "name": "Conflicting demarc",
+            "side": "z",
+            "media": "fiber",
+            "device_id": str(device.entity_id),
+            "interface_id": str(interface.entity_id),
+        },
+        content_type="application/json",
+    )
+    assert duplicate.status_code == 400
+    mismatch = owner_client.patch(detail_url, {"device_id": None}, content_type="application/json")
+    assert mismatch.status_code == 400
+    assert owner_client.get(detail_url).json()["device_id"] == str(device.entity_id)
+    cleared = owner_client.patch(detail_url, {"device_id": None, "interface_id": None}, content_type="application/json")
+    assert cleared.status_code == 200
+    assert cleared.json()["device_id"] is None and cleared.json()["interface_id"] is None
+    assert cleared.json()["site_id"] == str(site.entity_id)
+    assert cleared.json()["description"] == "Verified demarc"
     assert owner_client.get(collection).json()["results"][0]["handoffs"][0]["name"] == "Carrier demarc"
     sibling_list = owner_client.get(
         reverse("organization-network-circuits", kwargs={"organization_entity_id": sibling.entity_id})

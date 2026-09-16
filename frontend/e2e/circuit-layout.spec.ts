@@ -8,6 +8,7 @@ async function fixtures(page: Page, { denied = false, fail = false, unavailable 
   await page.route('**/api/v1/auth/context', route => route.fulfill({ json: { user: { id: 'owner', email: 'layout@example.invalid', display_name: 'Layout owner' }, tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', permissions: ['networks.view', 'networks.edit'], surface: 'msp', organization: null, mfa_enrollment_required: false } }))
   const rows = Array.from({ length: 31 }, (_, index) => ({ id: `circuit-${index}`, name: `Circuit ${index.toString().padStart(2, '0')}`, provider_id: 'carrier', provider_name: 'Carrier', service_identifier: `SERVICE-${index}`, kind: 'internet', status: 'active', bandwidth_down_mbps: '1000.000', bandwidth_up_mbps: null, installed_on: null, service_starts_on: null, review_on: null, planned_disconnect_on: null, description: 'Service notes '.repeat(150), lifecycle_events: [{ kind: 'review', date: '2026-01-01', label: 'Review circuit', state: 'overdue' }] }))
   const handoff = { id: 'handoff-1', circuit_id: 'circuit-30', name: 'Carrier demarc', side: 'a', media: 'fiber', connector: 'LC', provider_reference: 'REFERENCE'.repeat(30), site_name: null, location_name: null, device_name: null, interface_name: null, description: 'Handoff notes '.repeat(80) }
+  const handoffs = [handoff]
   const circuitColumns = ['name', 'provider_name', 'service_identifier', 'kind', 'status', 'bandwidth_down_mbps']
   const saved: Record<string, { columns: string[]; page_size: number }> = {}
   await page.route('**/collection-preferences/*', route => {
@@ -41,9 +42,36 @@ async function fixtures(page: Page, { denied = false, fail = false, unavailable 
   })
   await page.route('**/circuits/circuit-30/handoffs?*', route => {
     expect(new URL(route.request().url()).searchParams.get('paginated')).toBe('true')
-    return route.fulfill({ json: { results: [handoff], count: 1, page: 1, page_size: 25, has_more: false, can_manage: !denied } })
+    return route.fulfill({ json: { results: handoffs, count: handoffs.length, page: 1, page_size: 25, has_more: false, can_manage: !denied } })
   })
-  await page.route('**/circuits/circuit-30/handoffs/handoff-1', route => route.fulfill({ json: handoff }))
+  await page.route(/\/circuits\/circuit-30\/handoffs\/handoff-[\w-]+$/, route => {
+    const row = handoffs.find(value => route.request().url().endsWith(`/${value.id}`))!
+    if (route.request().method() === 'PATCH') {
+      if (fail) return route.fulfill({ status: 409, json: { detail: 'Interface already assigned. Entries kept.' } })
+      const values = route.request().postDataJSON() as Record<string, unknown>
+      Object.assign(row, values)
+      if ('site_id' in values) Object.assign(row, { site_name: values.site_id ? 'Office' : null, location_name: values.location_id ? 'Closet' : null, device_name: values.device_id ? 'Router' : null, interface_name: values.interface_id ? 'WAN1' : null })
+    }
+    return route.fulfill({ json: row })
+  })
+  await page.route('**/circuits/circuit-30/handoffs', route => {
+    const values = route.request().postDataJSON() as Record<string, unknown>
+    const row = { ...handoff, ...values, id: 'handoff-new' }
+    handoffs.push(row)
+    return route.fulfill({ status: 201, json: row })
+  })
+  await page.route('**/networks/assignment-choices?*', route => {
+    const query = new URL(route.request().url()).searchParams
+    expect(query.get('page_size')).toBe('25')
+    if (query.get('kind') === 'location') expect(query.get('site_id')).toBe('site')
+    const row = query.get('kind') === 'site' ? { id: 'site', name: 'Office' } : { id: 'location', name: 'Closet' }
+    return route.fulfill({ json: { results: [row], page: 1, page_size: 25, count: 1, has_more: false } })
+  })
+  await page.route('**/networks/devices?*', route => route.fulfill({ json: { results: [{ id: 'device', name: 'Router' }], page: 1, page_size: 25, count: 1, has_more: false } }))
+  await page.route('**/networks/interfaces?*', route => {
+    expect(new URL(route.request().url()).searchParams.get('device_id')).toBe('device')
+    return route.fulfill({ json: { results: [{ id: 'interface', name: 'WAN1' }], page: 1, page_size: 25, count: 1, has_more: false } })
+  })
   await page.route('**/networks/circuits/choices?*', route => {
     const query = new URL(route.request().url()).searchParams
     const values = query.get('choice') === 'providers' ? [{ id: 'carrier', name: 'Carrier' }, { id: 'carrier-2', name: 'Other carrier' }] : [{ id: 'agreement', name: 'Agreement' }]
@@ -196,3 +224,51 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect(page.url()).not.toContain('circuits=circuit-31')
   })
 }
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`Handoff creation and placement fit ${width}px`, async ({ page }) => {
+    await fixtures(page)
+    await page.setViewportSize({ width, height: 600 })
+    await page.goto('/networks?view=circuits&circuits=circuit-30&circuits_section=handoffs')
+    const drawer = page.getByRole('dialog', { name: 'Circuit 30', exact: true })
+    await drawer.getByRole('button', { name: 'New handoff', exact: true }).click()
+    await drawer.getByRole('textbox', { name: 'Name', exact: true }).fill('New demarc')
+    await drawer.getByRole('textbox', { name: 'Connector', exact: true }).fill('SC')
+    await drawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+    await expect(drawer.getByRole('heading', { name: 'New demarc', exact: true })).toBeFocused()
+    await drawer.getByRole('button', { name: 'Edit handoff placement' }).click()
+    await drawer.getByRole('combobox', { name: 'Site', exact: true }).selectOption('site')
+    await drawer.getByRole('combobox', { name: 'Location', exact: true }).selectOption('location')
+    await drawer.getByRole('combobox', { name: 'Device', exact: true }).selectOption('device')
+    await drawer.getByRole('combobox', { name: 'Interface', exact: true }).selectOption('interface')
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await drawer.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Keep editing', exact: true }).click()
+    await drawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+    await expect(drawer.getByRole('button', { name: 'Edit handoff details' })).toBeVisible()
+    await expect(drawer.locator('dd').filter({ hasText: /^Closet$/ })).toBeVisible()
+    await drawer.getByRole('button', { name: 'Edit handoff details' }).click()
+    await drawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Verified demarc')
+    await drawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+    await page.reload()
+    await expect(drawer.getByText('Verified demarc', { exact: true })).toBeVisible()
+    await expect(drawer.getByText('WAN1', { exact: true })).toBeVisible()
+    expect(await page.getByRole('dialog').count()).toBe(1)
+    await drawer.getByRole('button', { name: 'Back to handoffs', exact: true }).click()
+    await expect(drawer.getByRole('button', { name: 'New demarc', exact: true })).toBeFocused()
+  })
+}
+test('Handoff placement conflict preserves values and guards backdrop dismissal', async ({ page }) => {
+  await fixtures(page, { fail: true })
+  await page.goto('/networks?view=circuits&circuits=circuit-30&circuits_section=handoffs&handoff=handoff-1')
+  const drawer = page.getByRole('dialog', { name: 'Circuit 30', exact: true })
+  await drawer.getByRole('button', { name: 'Edit handoff placement' }).click()
+  await drawer.getByRole('combobox', { name: 'Device', exact: true }).selectOption('device')
+  await drawer.getByRole('combobox', { name: 'Interface', exact: true }).selectOption('interface')
+  await drawer.getByRole('button', { name: 'Save handoff', exact: true }).click()
+  await expect(drawer.getByRole('alert')).toContainText('Interface already assigned')
+  await page.mouse.click(1, 1)
+  await page.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(drawer.getByRole('combobox', { name: 'Interface', exact: true })).toHaveValue('interface')
+})

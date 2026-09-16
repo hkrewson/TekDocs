@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import { browserCollectionPreferences } from '../collections/preferences'
 import { translate } from '../i18n/localization'
@@ -6,6 +6,7 @@ import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RecordActivity } from '../records/RecordActivity'
 import { RecordHeader, RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
+import { HandoffView } from './HandoffView'
 import { CircuitEditor } from './CircuitEditor'
 import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig, ChildRecordProps } from './NetworkChildCollection'
@@ -71,11 +72,4 @@ function CircuitView({ record, workspace, client, canManage, onSaved, onReturn }
 }
 function handoffs(parentId: string): ChildCollectionConfig<HandoffDetail, HandoffDetail> {
   return { key: 'handoff', feature: 'circuit-handoffs', parentField: 'circuit_id', columns: ['name', 'side', 'media', 'site_name'], labels: { name: t('name'), side: t('circuitSide'), media: t('circuitMedia'), site_name: t('site') }, title: t('circuitHandoffs'), back: t('circuitHandoffsBack'), create: t('circuitHandoffNew'), search: t('circuitHandoffSearch'), order: t('circuitHandoffOrder'), failed: t('circuitHandoffFailed'), empty: t('circuitHandoffEmpty'), count: count => t('circuitHandoffCount', { count }), statuses: [], association: { label: t('circuitSide'), choices: ['a', 'z'].map(value => ({ value, label: label(value) })) }, identity: row => row.name, value: (row, column) => column === 'side' || column === 'media' ? label(row[column]) : row.site_name ?? t('circuitMissing'), load: (client, workspace, query, signal) => client.handoffCollection(workspace, parentId, query, signal), read: (client, workspace, id, signal) => client.handoffDetail(workspace, parentId, id, signal) }
-}
-function HandoffView({ record, onReturn }: ChildRecordProps<HandoffDetail> & Context) {
-  const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => { heading.current?.focus() }, [record?.id])
-  if (!record) return <p>{t('circuitUnavailable')}</p>
-  const facts = { side: t('circuitSide'), media: t('circuitMedia'), connector: t('circuitConnector'), provider_reference: t('circuitReference'), site_name: t('site'), location_name: t('location'), device_name: t('circuitDevice'), interface_name: t('circuitInterface') }
-  return <section><button type="button" className="secondary-button" onClick={onReturn}>{t('circuitHandoffsBack')}</button><h2 ref={heading} tabIndex={-1}>{record.name}</h2><dl className="record-facts">{(Object.keys(facts) as (keyof typeof facts)[]).map(field => <div key={field}><dt>{facts[field]}</dt><dd>{field === 'side' || field === 'media' ? label(record[field]) : record[field] || t('circuitMissing')}</dd></div>)}</dl><p className="network-notes">{record.description || t('noDescription')}</p></section>
 }

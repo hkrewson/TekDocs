@@ -2708,5 +2708,19 @@
   "networkLayout.circuitAssignmentSave": "Save provider and contract",
   "networkLayout.circuitContractClear": "Remove contract selection",
   "networkLayout.circuitCreate": "Add circuit",
-  "networkLayout.circuitCreateStatus": "New circuits start as Ordered. Add service details after creation."
+  "networkLayout.circuitCreateStatus": "New circuits start as Ordered. Add service details after creation.",
+  "networkLayout.handoffEdit": "Edit handoff details",
+  "networkLayout.handoffPlacementEdit": "Edit handoff placement",
+  "networkLayout.handoffSave": "Save handoff",
+  "networkLayout.handoffSaveFailed": "The handoff could not be saved. Your entries have been kept.",
+  "networkLayout.handoffCreateHelp": "Create the handoff first, then assign its site, location, device and interface.",
+  "networkLayout.handoffPlacementHelp": "Review placement before saving. Changing a site clears location, device and interface selections. Changing a device clears its interface. An interface can belong to only one handoff.",
+  "networkLayout.handoffSearch_site": "Search handoff sites",
+  "networkLayout.handoffSearch_location": "Search handoff locations",
+  "networkLayout.handoffSearch_device": "Search handoff devices",
+  "networkLayout.handoffSearch_interface": "Search handoff interfaces",
+  "networkLayout.handoffClear_site": "Clear handoff site",
+  "networkLayout.handoffClear_location": "Clear handoff location",
+  "networkLayout.handoffClear_device": "Clear handoff device",
+  "networkLayout.handoffClear_interface": "Clear handoff interface"
 }

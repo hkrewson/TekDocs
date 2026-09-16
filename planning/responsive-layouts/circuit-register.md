@@ -1,8 +1,8 @@
 # Circuit register and service-detail drawers
 
 Pre-1.0 Phase 3 (#80), under #60/#75. Version stays 0.8.46.
-Status: verified implementation checkpoint. This is a bounded circuit
-browsing/service-editing checkpoint, not completion of circuits or Phase 3.
+Status: circuit browsing, creation, assignment and handoff editing checkpoint.
+Circuit lifecycle/history and broader Phase 3 acceptance remain open.
 
 ## Scope and decisions
 
@@ -56,12 +56,10 @@ special scrolling surface was added.
 
 ## Deliberate next slices
 
-Circuit kind/status workflows,
-handoff creation/editing/placement/interface assignment, and handoff-specific
-history remain open. They need bounded pickers with off-page retained selections,
-existing provider/contract visibility enforcement and placement conflict checks.
-The prior component was not mounted in the shell; removing it does not remove an
-active creation workflow. Existing public mutation APIs continue to work. Creation and provider/contract editing are implemented in the subsequent checkpoint below.
+Circuit kind/status workflows and handoff-specific history remain open.
+Creation, provider/contract assignment and handoff details/placement have subsequent
+implementation checkpoints below. Existing public mutation APIs continue to work.
+Do not silently expand this work to service disconnection or cross-workspace moves.
 
 Do not describe this checkpoint as complete circuit lifecycle management or Phase 3
 acceptance. DNS transfers, endpoint creation/transfers, device relationships and
@@ -135,4 +133,32 @@ failed writes preserve input and never retry automatically. The existing server
 validates provider/contract compatibility and permissions at mutation time. Dirty
 forms use Keep editing/Discard for cancellation, drawer dismissal and navigation.
 No additional drawer, CSS, domain model, migration or public API change is needed.
-Handoff editing, placement, kind/status transitions and Phase 3 acceptance remain open.
+Handoff-specific history, kind/status transitions and Phase 3 acceptance remain open.
+
+## Handoff creation, details and placement checkpoint
+
+Handoffs offers New handoff for network editors. Creation takes name, side, media,
+connector, provider reference and notes; optional placement is explicitly unassigned.
+It opens selected child detail within the same circuit drawer and URL. Detail and
+placement edits are separate forms, one at a time. Detail PATCH submits only its
+fields, preserving placement. Placement PATCH submits site/location/device/interface
+IDs, preserving identity and service facts. Cancel, dismissal and navigation guard
+dirty forms; errors retain drafts and never trigger uncertain automatic retries.
+Successful save returns to the focused handoff heading; Back to handoffs restores
+row focus. Read-only viewers retain details and have no create/edit actions.
+
+Placement reuses existing bounded APIs: site and site-scoped location choices,
+device register summaries and device-scoped interface summaries, all pages of 25
+with name search. Selected labels stay visible outside result pages. Location and
+interface pickers load only after their parent is chosen. Changing site clears all
+placement dependencies; changing device clears interface. Clear buttons alter drafts
+until Save. Device choices include unplaced devices, which existing handoff rules
+permit; the server rejects site contradictions, wrong parent links, workspace/tenant
+mismatches and interface reuse by another handoff. Failed writes retain selections.
+
+The previous read-only handoff view is replaced by HandoffView. Existing
+mutation endpoints already support partial PATCH and emit circuit-owned handoff
+audit events; frontend mutation types now reflect partial values and the already
+returned circuit_id. No new endpoint, schema, migration, permission, dependency or
+CSS. Handoff-specific history presentation and circuit kind/status workflows remain
+open, as do wider Phase 3 and pre-1.0 acceptance.

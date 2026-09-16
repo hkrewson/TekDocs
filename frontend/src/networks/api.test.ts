@@ -55,7 +55,7 @@ describe('network inventory API client', () => {
     await browserNetworksClient.createCircuit(workspace, {} as never)
     await browserNetworksClient.updateCircuit(workspace, 'circuit/1', {})
     await browserNetworksClient.createCircuitHandoff(workspace, 'circuit/1', {} as never)
-    await browserNetworksClient.updateCircuitHandoff(workspace, 'circuit/1', 'handoff/1', {} as never)
+    await browserNetworksClient.updateCircuitHandoff(workspace, 'circuit/1', 'handoff/1', {})
     await browserNetworksClient.createRack(workspace, { name: 'Core rack', site_id: 'site-1', location_id: null, unit_count: 42, status: 'active' })
 
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks?page=1&page_size=100', expect.any(Object))

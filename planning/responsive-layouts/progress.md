@@ -1524,3 +1524,31 @@ Readiness at localhost:3200 reports status ok, database/diagram renderer ready a
 version 0.8.46. Existing application/demo data and volumes were preserved. Evidence:
 /tmp/tekdocs-handoff-history-local-up.log. No production deployment, push, release
 change or Wiki publication occurred.
+
+## 2026-09-15 — Circuit kind and status workflows
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Circuit Overview now has separate focused kind and status editors. Suspension and
+disconnection require an in-page review step that states TekDocs records the value
+without contacting the provider or changing carrier service. Mutations submit only
+the selected field, retain failed drafts without automatic retry and use the shared
+dirty-navigation guard. The same component serves drawer and full-page routes; a
+status change that leaves the active list filter shows the existing out-of-filter
+notice. Read-only users receive no mutation controls. No API, model, migration,
+permission, dependency or CSS change.
+
+Verified: the frontend check gate passed with 568 tests in 116 files, lint,
+typecheck, API/generated-type consistency, production build and existing bundle
+budgets. The maintained-browser circuit sweep passed 90 unaffected cases; after an
+assertion was corrected to use the actual localized out-of-filter sentence, the new
+kind/status case passed in Chromium, Firefox and WebKit, for effective coverage of
+all 93 cases. The isolated live browser→Django→PostgreSQL journey passed and its
+independent database assertions confirmed WAN kind, Suspended status and three
+append-only circuit update audit events. The first live run reached the correct
+history but its old single-event locator became ambiguous after the two added
+updates; the corrected assertion requires exactly three events.
+
+Broader Phase 3 acceptance, remaining network surfaces, technician/native zoom and
+screen-reader walkthroughs, and pre-1.0 release gates remain open. Existing user and
+demo data were preserved. No push, production deployment, release change or Wiki
+publication occurred.

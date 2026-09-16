@@ -1,8 +1,8 @@
 # Circuit register and service-detail drawers
 
 Pre-1.0 Phase 3 (#80), under #60/#75. Version stays 0.8.46.
-Status: circuit browsing, creation, assignment, handoff editing and selected history checkpoints.
-Circuit kind/status workflows and broader Phase 3 acceptance remain open.
+Status: circuit browsing, creation, assignment, kind/status, handoff editing and selected history checkpoints.
+Broader Phase 3 acceptance remains open.
 
 ## Scope and decisions
 
@@ -195,16 +195,21 @@ contains only the handoff identifier, so this change cannot reconstruct old fiel
 values or placement diffs. A future richer audit model must preserve append-only
 history and distinguish newly captured data from historical events with no diff.
 
-The next circuit slice can reuse the existing partial PATCH serializer for kind
-and status. Current server enums are Internet/WAN/MPLS/Dark fiber/Broadband/Cellular/
-Voice/Other and Ordered/Provisioning/Active/Suspended/Disconnected. The present
-backend validates and records documentation changes; it does not invoke a carrier
-or provisioning integration. Use a separate focused form for kind and a deliberate
-status workflow, with confirmation for consequential suspension/disconnection.
-Submit only the selected fields, retain failed drafts, use the existing navigation
-guard, and keep lifecycle warnings on Overview. Cover permissions, unrelated-field
-preservation, failure/confirmation states, updated list filters, full-page/drawer
-parity and the live PostgreSQL journey before calling that slice complete.
+Kind and status now use separate focused forms backed by the existing partial PATCH
+serializer. The status workflow confirms suspension and disconnection and explains
+that TekDocs records the state without contacting the provider, interrupting service
+or cancelling it. Each save submits only kind or status, retains failed drafts,
+uses the shared navigation guard and keeps lifecycle warnings on Overview. Drawer
+and full-page views share the workflow. A status change that leaves the active list
+filter produces the existing out-of-filter notice rather than silently restoring
+the row.
+
+The server enums remain Internet/WAN/MPLS/Dark fiber/Broadband/Cellular/Voice/Other
+and Ordered/Provisioning/Active/Suspended/Disconnected. These are documentation
+changes; no carrier or provisioning integration is invoked. Permission hiding,
+unrelated-field preservation, confirmation/failure states, filtered-list refresh,
+full-page parity and the live PostgreSQL/audit journey are covered. No API, model,
+migration, permission, dependency or CSS change was required.
 
 
 Verification: `make check` and the full `make test-network-validation` gate passed;

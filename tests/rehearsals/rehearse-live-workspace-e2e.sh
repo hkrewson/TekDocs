@@ -151,7 +151,8 @@ assert circuit.organization == organization
 assert circuit.tenant == organization.tenant
 assert circuit.description == "Verified live circuit service"
 assert circuit.service_identifier == "LIVE-CIRCUIT-01"
-assert circuit.status == "ordered"
+assert circuit.kind == "wan"
+assert circuit.status == "suspended"
 assert circuit.provider.entity.display_name == "Live Northwind Vendor"
 assert circuit.contract_id is None
 handoff = NetworkCircuitHandoff.objects.get(circuit=circuit, entity__display_name="Live circuit demarc")
@@ -165,7 +166,7 @@ assert handoff.location.entity.display_name == "Building A"
 assert handoff.description == "Verified live demarc"
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_created").count() == 1
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_updated").count() == 2
-assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 1
+assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 3
 dns_zone = DNSZone.objects.get(name="live-layout.example.invalid")
 dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-layout.example.invalid")
 assert dns_zone.organization == organization

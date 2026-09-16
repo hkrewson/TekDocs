@@ -38,14 +38,27 @@ function CircuitView({ record, workspace, client, canManage, onSaved, onReturn }
   const [params] = useSearchParams(), location = useLocation()
   const section = ['handoffs', 'history'].includes(params.get('circuits_section') ?? '') ? params.get('circuits_section')! : 'overview'
   const initial = { name: record?.name ?? '', service_identifier: record?.service_identifier ?? '', bandwidth_down_mbps: record?.bandwidth_down_mbps ?? null, bandwidth_up_mbps: record?.bandwidth_up_mbps ?? null, installed_on: record?.installed_on ?? null, service_starts_on: record?.service_starts_on ?? null, review_on: record?.review_on ?? null, planned_disconnect_on: record?.planned_disconnect_on ?? null, description: record?.description ?? '' }
-  const [form, setForm] = useState(initial), [editing, setEditing] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial) }, editing)
+  const [form, setForm] = useState(initial), [editing, setEditing] = useState<'details' | 'kind' | 'status' | null>(null)
+  const [kind, setKind] = useState<CircuitDetail['kind']>(record?.kind ?? 'internet')
+  const [status, setStatus] = useState<CircuitDetail['status']>(record?.status ?? 'ordered')
+  const [confirmingStatus, setConfirmingStatus] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const dirty = editing === 'details' ? JSON.stringify(form) !== JSON.stringify(initial) : editing === 'kind' ? kind !== record?.kind : editing === 'status' ? status !== record?.status : false
+  const attempt = useUnsavedChanges(dirty, busy, () => { setEditing(null); setForm(initial); setKind(record?.kind ?? 'internet'); setStatus(record?.status ?? 'ordered'); setConfirmingStatus(false) }, Boolean(editing))
   const handoffConfig = useMemo(() => handoffs(record?.id ?? ''), [record?.id])
-  async function save() {
+  async function save(changes: Partial<CircuitWrite>) {
     if (!record || busy) return
     setBusy(true); setError('')
-    try { const saved = await client.updateCircuit(workspace, record.id, form satisfies Partial<CircuitWrite>); setEditing(false); onSaved(saved) }
+    try { const saved = await client.updateCircuit(workspace, record.id, changes); setEditing(null); setConfirmingStatus(false); onSaved(saved) }
     catch (caught) { setError(caught instanceof Error ? caught.message : t('circuitSaveFailed')) } finally { setBusy(false) }
+  }
+  function begin(mode: 'details' | 'kind' | 'status') {
+    setError(''); setEditing(mode); setForm(initial); setKind(record?.kind ?? 'internet'); setStatus(record?.status ?? 'ordered'); setConfirmingStatus(false)
+  }
+  function cancel() { attempt(() => { setEditing(null); setConfirmingStatus(false) }) }
+  function submitStatus() {
+    if (status === record?.status) return
+    if (status === 'suspended' || status === 'disconnected') setConfirmingStatus(true)
+    else void save({ status })
   }
   function href(id: string) { const next = new URLSearchParams(params); next.set('circuits_section', id); return `${location.pathname}?${next}` }
   if (!record) return canManage ? <CircuitEditor record={null} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} onCancel={onReturn} /> : <p>{t('circuitUnavailable')}</p>
@@ -55,15 +68,17 @@ function CircuitView({ record, workspace, client, canManage, onSaved, onReturn }
     <RecordSections current={section} sections={['overview', 'handoffs', 'history'].map(id => ({ id, label: id === 'handoffs' ? t('circuitHandoffs') : translate(id === 'overview' ? 'collections.overview' : 'collections.history'), href: href(id) }))} />
     {section === 'handoffs' ? <NetworkChildCollection workspace={workspace} parentId={record.id} client={client} config={handoffConfig} RecordComponent={HandoffView} /> : section === 'history' ? <RecordActivity workspace={workspace} entityId={record.id} description={t('circuitHistoryHelp')} emptyLabel={t('circuitHistoryEmpty')} deniedLabel={t('circuitHistoryDenied')} actionLabels={{ 'network_circuit.created': t('circuitCreated'), 'network_circuit.updated': t('circuitUpdated') }} /> : <>
       {error && <p role="alert">{error}</p>}
-      {editing && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); void save() }}><fieldset disabled={busy}><div className="field-grid">
+      {editing === 'details' && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); void save(form satisfies Partial<CircuitWrite>) }}><fieldset disabled={busy}><div className="field-grid">
         <label>{t('name')}<input required maxLength={240} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label>
         <label>{t('circuitIdentifier')}<input required maxLength={240} value={form.service_identifier} onChange={event => setForm({ ...form, service_identifier: event.target.value })} /></label>
         {(['bandwidth_down_mbps', 'bandwidth_up_mbps'] as const).map(field => <label key={field}>{field === 'bandwidth_down_mbps' ? t('circuitDownload') : t('circuitUpload')}<input type="number" min="0.001" step="0.001" value={form[field] ?? ''} onChange={event => setForm({ ...form, [field]: event.target.value || null })} /></label>)}
         {dateFields.map(field => <label key={field}>{dateLabels[field]}<input type="date" value={form[field] ?? ''} onChange={event => setForm({ ...form, [field]: event.target.value || null })} /></label>)}
-      </div><label>{t('description')}<textarea rows={4} maxLength={4000} value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></label><div className="form-actions"><button className="primary-button">{busy ? translate('common.saving') : t('circuitSave')}</button><button type="button" className="secondary-button" onClick={() => attempt(() => setEditing(false))}>{translate('common.cancel')}</button></div></fieldset></form> : <>
+      </div><label>{t('description')}<textarea rows={4} maxLength={4000} value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></label><div className="form-actions"><button className="primary-button">{busy ? translate('common.saving') : t('circuitSave')}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></fieldset></form> : editing === 'kind' && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); void save({ kind }) }}><fieldset disabled={busy}><label>{t('circuitKind')}<select value={kind} onChange={event => setKind(event.target.value as CircuitDetail['kind'])}>{kinds.map(value => <option key={value} value={value}>{label(value)}</option>)}</select></label><div className="form-actions"><button className="primary-button" disabled={kind === record.kind}>{busy ? translate('common.saving') : t('circuitKindSave')}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></fieldset></form> : editing === 'status' && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); submitStatus() }}><fieldset disabled={busy}><label>{translate('collections.status')}<select value={status} onChange={event => { setStatus(event.target.value as CircuitDetail['status']); setConfirmingStatus(false) }}>{statuses.map(value => <option key={value} value={value}>{label(value)}</option>)}</select></label>{confirmingStatus && <div className="archive-confirmation" role="alertdialog" aria-labelledby="circuit-status-confirmation"><div><strong id="circuit-status-confirmation">{t('circuitStatusConfirm', { status: label(status) })}</strong><p>{t(status === 'disconnected' ? 'circuitDisconnectHelp' : 'circuitSuspendHelp')}</p></div><div className="form-actions"><button className="danger-button" type="button" onClick={() => { void save({ status }) }}>{busy ? translate('common.saving') : t('circuitStatusConfirmAction')}</button><button className="secondary-button" type="button" onClick={() => setConfirmingStatus(false)}>{translate('common.cancel')}</button></div></div>}<div className="form-actions">{!confirmingStatus && <button className="primary-button" disabled={status === record.status}>{busy ? translate('common.saving') : (status === 'suspended' || status === 'disconnected') ? t('circuitStatusReview') : t('circuitStatusSave')}</button>}<button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></fieldset></form> : <>
         <dl className="record-facts">{circuitColumns.map(field => <div key={field}><dt>{circuitLabels[field]}</dt><dd>{field === 'kind' || field === 'status' ? label(record[field]) : record[field] ?? t('circuitMissing')}</dd></div>)}<div><dt>{t('circuitUpload')}</dt><dd>{record.bandwidth_up_mbps ?? t('circuitMissing')}</dd></div>{dateFields.map(field => <div key={field}><dt>{dateLabels[field]}</dt><dd>{record[field] ?? t('circuitMissing')}</dd></div>)}{record.contract && <div><dt>{t('circuitContract')}</dt><dd>{record.contract.name}</dd></div>}</dl>
         <p className="network-notes">{record.description || t('noDescription')}</p>
-        {canManage && <button type="button" className="secondary-button" onClick={() => { setForm(initial); setEditing(true) }}>{t('circuitEdit')}</button>}
+        {canManage && <button type="button" className="secondary-button" onClick={() => begin('details')}>{t('circuitEdit')}</button>}
+        {canManage && <button type="button" className="secondary-button" onClick={() => begin('kind')}>{t('circuitKindEdit')}</button>}
+        {canManage && <button type="button" className="secondary-button" onClick={() => begin('status')}>{t('circuitStatusEdit')}</button>}
         {canManage && 'contract' in record && <button type="button" className="secondary-button" onClick={() => setAssignment(true)}>{t('circuitAssignmentEdit')}</button>}
       </>}
       <h2>{t('circuitDates')}</h2>{record.lifecycle_events.length ? <ul className="plain-detail-list">{record.lifecycle_events.map(event => <li key={`${event.kind}-${event.date}`}><span>{event.date} · {event.label} · {label(event.state)}</span></li>)}</ul> : <p>{t('circuitDatesEmpty')}</p>}

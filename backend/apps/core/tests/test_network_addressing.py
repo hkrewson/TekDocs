@@ -92,6 +92,17 @@ def test_vrf_vlan_subnet_crud_and_overlap_policy(owner_client, installation):
     assert subnet.json()["address_family"] == 4
     assert subnet.json()["vrf_name"] == "Guest"
     assert subnet.json()["vlan_number"] == 20
+    subnet_list = reverse(
+        "organization-network-subnets", kwargs={"organization_entity_id": organization.entity_id}
+    )
+    choice = owner_client.get(
+        subnet_list,
+        {"q": "192.0.2", "ordering": "name", "summary": "true", "page": 1, "page_size": 25},
+    )
+    assert choice.status_code == 200, choice.content
+    assert choice.json()["count"] == 1 and choice.json()["results"][0]["id"] == subnet.json()["id"]
+    assert "description" not in choice.json()["results"][0]
+    assert owner_client.get(subnet_list, {"ordering": "invalid"}).status_code == 400
 
     overlap = _post(
         owner_client,

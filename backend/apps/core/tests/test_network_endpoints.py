@@ -12,6 +12,7 @@ from hypothesis import strategies as st
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import (
+    AuditEvent,
     Entity,
     EntityVisibility,
     InstallationState,
@@ -171,6 +172,93 @@ def test_interface_ip_mac_crud_and_workspace_isolation(owner_client, installatio
         {"address": "02:00:00:00:00:09", "hardware_asset_id": str(sibling_asset.entity_id)},
     )
     assert foreign_asset.status_code == 400
+
+
+@pytest.mark.django_db
+def test_endpoint_creation_can_bind_exact_interface_without_hardware(owner_client, installation):
+    from apps.core.network_endpoints import create_interface
+
+    organization = _organization(installation, "Interface endpoint creation")
+    sibling = _organization(installation, "Sibling interface endpoint creation")
+    device = _device(installation, organization)
+    sibling_device = _device(installation, sibling)
+    interface = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Uplink",
+        device_entity_id=device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    sibling_interface = create_interface(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        name="Private uplink",
+        device_entity_id=sibling_device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    subnet = _subnet(installation, organization)
+    ip_address = _post(
+        owner_client,
+        "organization-network-ip-addresses",
+        organization,
+        {
+            "address": "192.0.2.90",
+            "subnet_id": str(subnet.entity_id),
+            "interface_id": str(interface.entity_id),
+            "hardware_asset_id": None,
+            "status": "active",
+            "dns_name": "uplink.example.invalid",
+        },
+    )
+    assert ip_address.status_code == 201, ip_address.content
+    assert ip_address.json()["interface_id"] == str(interface.entity_id)
+    assert ip_address.json()["hardware_asset_id"] is None
+    mac_address = _post(
+        owner_client,
+        "organization-network-mac-addresses",
+        organization,
+        {"address": "02:00:00:00:00:90", "interface_id": str(interface.entity_id), "hardware_asset_id": None},
+    )
+    assert mac_address.status_code == 201, mac_address.content
+    assert mac_address.json()["interface_id"] == str(interface.entity_id)
+    assert (
+        AuditEvent.objects.filter(
+            entity_id=ip_address.json()["id"], action="network_ip_address.created"
+        ).count()
+        == 1
+    )
+    assert (
+        AuditEvent.objects.filter(
+            entity_id=mac_address.json()["id"], action="network_mac_address.created"
+        ).count()
+        == 1
+    )
+
+    mixed = _post(
+        owner_client,
+        "organization-network-mac-addresses",
+        organization,
+        {
+            "address": "02:00:00:00:00:91",
+            "interface_id": str(interface.entity_id),
+            "hardware_asset_id": str(device.hardware_asset.entity_id),
+        },
+    )
+    assert mixed.status_code == 400
+    assert "interface or hardware asset" in mixed.content.decode()
+    foreign = _post(
+        owner_client,
+        "organization-network-mac-addresses",
+        organization,
+        {"address": "02:00:00:00:00:92", "interface_id": str(sibling_interface.entity_id)},
+    )
+    assert foreign.status_code == 400
 
 
 @pytest.mark.django_db

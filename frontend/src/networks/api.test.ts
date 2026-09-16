@@ -14,10 +14,12 @@ describe('network inventory API client', () => {
     await browserNetworksClient.deviceCollection(workspace, { q: '', page: 1, page_size: 50, ordering: 'rack_unit', role: 'switch', rack_id: 'rack-1' }, signal)
     await browserNetworksClient.rackDetail(workspace, 'rack/1', signal)
     await browserNetworksClient.deviceDetail(workspace, 'device/1', signal)
+    await browserNetworksClient.subnetCollection(workspace, { q: 'office / 31', page: 2, page_size: 25, ordering: 'name' }, signal)
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks?q=rack+%2F+31&page=2&page_size=25&ordering=-name&status=active&site_id=site-1', { credentials: 'same-origin', signal })
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/devices?q=&page=1&page_size=50&ordering=rack_unit&role=switch&rack_id=rack-1', { credentials: 'same-origin', signal })
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/racks/rack%2F1', { credentials: 'same-origin', signal })
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/devices/device%2F1', { credentials: 'same-origin', signal })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/subnets?q=office+%2F+31&page=2&page_size=25&ordering=name&summary=true', { credentials: 'same-origin', signal })
   })
 
   it('requests independent circuit choice pages and retains the selected identifier', async () => {

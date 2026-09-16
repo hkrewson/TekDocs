@@ -78,6 +78,14 @@ async function interfaceFixtures(page: Page, denied = false, failSave = false) {
 }
 async function fixtures(page: Page, denied = false, failSave = false) {
   await interfaceFixtures(page)
+  const subnets = Array.from({ length: 31 }, (_, index) => ({ id: `subnet-${index + 1}`, name: `Network ${String(index + 1).padStart(2, '0')}`, cidr: `10.${index + 1}.0.0/24`, address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null }))
+  await page.route('**/networks/subnets?*', (route) => {
+    const query = new URL(route.request().url()).searchParams
+    expect(query.get('summary')).toBe('true')
+    const pageNumber = Number(query.get('page')), size = Number(query.get('page_size'))
+    const found = subnets.filter((item) => item.name.includes(query.get('q') ?? '') || item.cidr.includes(query.get('q') ?? ''))
+    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), page: pageNumber, page_size: size, count: found.length, has_more: pageNumber * size < found.length, can_manage: !denied } })
+  })
   for (const kind of ['ip', 'mac'] as const) {
     const columns = kind === 'ip' ? ['name', 'status', 'dns_name'] : ['name']
     let prefs = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
@@ -96,6 +104,14 @@ async function fixtures(page: Page, denied = false, failSave = false) {
       let found = rows.filter((item) => (query.get('unassigned') === 'true' ? item.interface_id === null : item.interface_id === query.get('interface_id')) && (item.address.includes(query.get('q') ?? '') || item.description.includes(query.get('q') ?? '')) && (!query.get('status') || item.status === query.get('status')))
       if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
       return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size).map((row) => { const summary = { ...row }; delete (summary as { description?: string }).description; return summary }), page: pageNumber, page_size: size, count: found.length, has_more: pageNumber * size < found.length, can_manage: !denied } })
+    })
+    await page.route(`**/networks/${kind}-addresses`, (route) => {
+      const values = route.request().postDataJSON() as Record<string, unknown>
+      expect(values.interface_id).toBe('port-1'); expect(values.hardware_asset_id).toBeNull()
+      if (kind === 'ip') expect(values.subnet_id).toBe('subnet-31')
+      const id = `${kind}-63`, row = { id, address: String(values.address), interface_id: 'port-1', interface_name: 'Port 01', hardware_asset_id: null, hardware_asset_name: null, description: String(values.description), ...(kind === 'ip' ? { subnet_id: String(values.subnet_id), subnet_cidr: '10.31.0.0/24', status: String(values.status), dns_name: String(values.dns_name) } : {}) }
+      rows.push(row)
+      return route.fulfill({ status: 201, json: row })
     })
     await page.route(new RegExp(`/networks/${kind}-addresses/${kind}-\\d+$`), (route) => {
       const id = route.request().url().split('/').pop()
@@ -149,6 +165,7 @@ for (const kind of ['ip', 'mac'] as const) {
   test(`${kind} assignment searches off-page choices, edits, confirms removal and returns`, async ({ page }) => {
     await fixtures(page); await page.goto(`${url}&interface_view=${kind}`)
     const drawer = page.getByRole('dialog', { name: 'Device 01', exact: true }), label = kind === 'ip' ? 'IP address' : 'MAC address'
+    await drawer.getByRole('button', { name: `Add ${label}` }).click()
     await drawer.getByRole('button', { name: `Assign existing ${label}` }).click()
     await expect(drawer.getByRole('heading', { name: `Assign existing ${label}`, exact: true })).toBeFocused()
     await drawer.getByRole('searchbox', { name: 'Search available address records' }).fill('Cable 62')
@@ -172,6 +189,7 @@ for (const kind of ['ip', 'mac'] as const) {
     try {
       const page = await context.newPage(); await fixtures(page, false, true); await page.goto(`${url}&interface_view=${kind}&interface_${kind}=new`)
       const drawer = page.getByRole('dialog', { name: 'Device 01', exact: true })
+      await drawer.getByRole('button', { name: kind === 'ip' ? 'Assign existing IP address' : 'Assign existing MAC address' }).tap()
       await drawer.getByRole('combobox', { name: 'Available address records' }).selectOption(`${kind}-32`)
       await drawer.getByRole('button', { name: 'Confirm assignment' }).tap()
       await expect(drawer.getByRole('alert')).toContainText('Assignment changed')
@@ -186,6 +204,26 @@ for (const kind of ['ip', 'mac'] as const) {
     } finally { await context.close() }
   })
 }
+test('new IP and MAC records are created on the current interface with bounded network search', async ({ page }) => {
+  await fixtures(page)
+  const drawer = page.getByRole('dialog', { name: 'Device 01', exact: true })
+  await page.goto(`${url}&interface_view=ip`)
+  await drawer.getByRole('button', { name: 'Add IP address' }).click()
+  await drawer.getByRole('textbox', { name: 'IP address' }).fill('10.31.0.90')
+  await drawer.getByRole('searchbox', { name: 'Search available networks' }).fill('Network 31')
+  await drawer.getByRole('button', { name: 'Search', exact: true }).click()
+  await drawer.getByRole('combobox', { name: 'Network', exact: true }).selectOption('subnet-31')
+  await drawer.getByRole('textbox', { name: 'Description' }).fill('Created on interface')
+  await drawer.getByRole('button', { name: 'Create address' }).click()
+  await expect(drawer.getByRole('heading', { name: '10.31.0.90' })).toBeVisible()
+  await drawer.getByRole('button', { name: 'Back to IP addresses' }).click()
+  await drawer.getByRole('link', { name: 'MAC addresses', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Add MAC address' }).click()
+  await drawer.getByRole('textbox', { name: 'MAC address' }).fill('02:00:00:00:00:90')
+  await drawer.getByRole('textbox', { name: 'Description' }).fill('Created MAC on interface')
+  await drawer.getByRole('button', { name: 'Create address' }).click()
+  await expect(drawer.getByRole('heading', { name: '02:00:00:00:00:90' })).toBeVisible()
+})
 test('endpoint details reject foreign parents and respect read-only access', async ({ page }) => {
   await fixtures(page, true)
   for (const kind of ['ip', 'mac'] as const) {
@@ -193,7 +231,7 @@ test('endpoint details reject foreign parents and respect read-only access', asy
     const drawer = page.getByRole('dialog', { name: 'Device 01', exact: true }), label = kind === 'ip' ? 'IP addresses' : 'MAC addresses'
     await expect(drawer.getByRole('alert')).toContainText('unavailable')
     await drawer.getByRole('button', { name: `Back to ${label}` }).click()
-    await expect(drawer.getByRole('button', { name: /Assign existing/ })).toHaveCount(0)
+    await expect(drawer.getByRole('button', { name: /Add (IP|MAC) address/ })).toHaveCount(0)
     await drawer.getByRole('button', { name: kind === 'ip' ? '192.0.2.1' : '02:00:00:00:00:01', exact: true }).click()
     await expect(drawer.getByRole('button', { name: 'Edit address details' })).toHaveCount(0)
     await expect(drawer.getByRole('button', { name: 'Remove from interface' })).toHaveCount(0)

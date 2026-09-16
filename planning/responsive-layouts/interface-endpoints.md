@@ -10,7 +10,10 @@ there is no nested overlay. The IP collection has address/status/DNS columns and
 status filters; the MAC collection uses a compact address column. Both support
 server search, 25/50/100 pages, personal columns/reset and selected detail on demand.
 IP details retain the network CIDR. Ordinary editing preserves subnet, interface and
-hardware identity by sending only editable record fields.
+hardware identity by sending only editable record fields. Add IP address and Add MAC
+address open focused create forms already bound to the current interface. IP creation
+uses a bounded, searchable subnet choice; assignment of an existing record remains a
+separate explicit path. Successful creation opens the saved detail in place.
 
 Assign existing IP/MAC address opens a bounded search of records that have neither
 interface nor hardware assignment. A selected choice remains explicit when search
@@ -33,7 +36,9 @@ together are invalid. Parent IDs must exist within the exact workspace. Unassign
 means neither an interface nor a hardware asset, never a permission-hidden binding.
 MAC collections gain address/description search, deterministic address ordering and
 optional summaries. Legacy default page size/full detail behavior remains; the UI
-requests bounded summaries explicitly. OpenAPI and generated types are aligned.
+requests bounded summaries explicitly. Subnet collections also accept bounded
+display-name/CIDR/description search, stable name/CIDR ordering and summary responses
+for the create picker. OpenAPI and generated types are aligned.
 
 PATCH accepts `interface_id` with required `expected_interface_id`. These two fields
 must be the entire assignment request; they cannot be mixed with ordinary fields,
@@ -43,7 +48,13 @@ under a row lock. A stale value or already-bound candidate returns 409 without
 changing the record or adding an update audit. It never replaces hardware bindings
 or directly transfers a record from another interface. Existing network-edit policy
 and exact workspace services authorize writes; existing hardware-edit policy stays
-unchanged. Create APIs remain unchanged and do not accept interface assignment.
+unchanged.
+
+Create APIs accept an optional `interface_id` and resolve it inside the same database
+transaction as the new IP or MAC record. Interface and hardware bindings are mutually
+exclusive. The interface must belong to the exact workspace and requires network-edit
+permission; supplying a hardware asset continues to require hardware-edit permission.
+Failed creates leave the draft intact and never retry automatically.
 
 Preferences use `interface-ip-addresses` and `interface-mac-addresses`, reusing the
 existing installation/user ownership and RLS. No new route, model, migration,
@@ -60,15 +71,14 @@ Component/browser checks cover one drawer, all six widths, long content, paging,
 selected details, direct/full-page navigation, focus, touch/short height/200% zoom,
 assignment selection, failed writes, confirmations and permission/parent failures.
 
-The live rehearsal seeds an unassigned MAC via the existing API, then uses the UI
-to assign the existing IP/MAC, edit their descriptions, reload and remove the MAC
-assignment. Independent PostgreSQL assertions verify the retained IP binding,
-MAC record/removal and audit history. Executed results and reproduced failures are
-recorded in progress.md.
+The live rehearsal creates an IP and MAC directly from the selected interface, edits
+their descriptions, reloads and removes the MAC assignment. Independent PostgreSQL
+assertions verify the retained IP binding, MAC record/removal and audit history.
+Executed results and reproduced failures are recorded in progress.md.
 
-Creating new addresses directly within an interface, transferring existing bindings,
-workspace-wide MAC browsing, device relationships/hardware rebinding, DNS/circuits,
-technician sign-off and full Phase 3/release acceptance remain open. IP creation
-remains available in its subnet; asset MAC creation remains in the asset record.
+Transferring existing bindings, workspace-wide MAC browsing, device relationships/
+hardware rebinding, remaining network surfaces, technician sign-off and full Phase 3/
+release acceptance remain open. IP creation in a subnet and asset MAC creation remain
+available through their existing parent records.
 No production publication or version change is included. The separate Wiki checkout's
 previously recorded missing-page limitation is unchanged.

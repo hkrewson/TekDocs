@@ -163,6 +163,10 @@ class VLANCollectionQuerySerializer(AddressingCollectionQuerySerializer):
     ordering = serializers.ChoiceField(choices=("name", "-name", "vlan_id", "-vlan_id"), required=False, default="name")
 
 
+class SubnetCollectionQuerySerializer(AddressingCollectionQuerySerializer):
+    ordering = serializers.ChoiceField(choices=("name", "-name", "cidr", "-cidr"), required=False, default="name")
+
+
 def _addressing_page(
     queryset: QuerySet[Any],
     request: Any,
@@ -310,10 +314,39 @@ class VLANDetailView(APIView):
 
 
 class SubnetListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: SubnetResultSerializer})
+    @extend_schema(parameters=[SubnetCollectionQuerySerializer], responses={200: SubnetResultSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
-        return _page(subnets_for_scope(workspace.data_scope), request, workspace, SubnetResultSerializer)
+        query = SubnetCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = subnets_for_scope(workspace.data_scope)
+        if values["q"]:
+            records = records.filter(
+                Q(entity__display_name__icontains=values["q"])
+                | Q(cidr__icontains=values["q"])
+                | Q(description__icontains=values["q"])
+            )
+        order = values["ordering"]
+        field = "entity__display_name" if order.lstrip("-") == "name" else "cidr"
+        records = records.order_by(("-" if order.startswith("-") else "") + field, "entity_id")
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        body = SubnetResultSerializer(
+            {
+                "results": page.records,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+            }
+        ).data
+        if values["summary"]:
+            for row in body["results"]:
+                row.pop("description")
+        return Response(body)
 
     @extend_schema(request=SubnetWriteSerializer, responses={201: SubnetSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

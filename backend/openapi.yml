@@ -12897,6 +12897,23 @@ paths:
       operationId: workspaces_msp_networks_subnets_retrieve_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - cidr
+          - -cidr
+          type: string
+          x-spec-enum-id: ab6c76988b123adf
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `cidr` - cidr
+          * `-cidr` - -cidr
+      - in: query
         name: page
         schema:
           type: integer
@@ -12910,6 +12927,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -25970,6 +25998,23 @@ paths:
     get:
       operationId: workspaces_organizations_networks_subnets_retrieve_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - cidr
+          - -cidr
+          type: string
+          x-spec-enum-id: ab6c76988b123adf
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `cidr` - cidr
+          * `-cidr` - -cidr
       - in: path
         name: organization_entity_id
         schema:
@@ -25990,6 +26035,17 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
       tags:
       - workspaces
       security:
@@ -36113,6 +36169,10 @@ components:
         subnet_id:
           type: string
           format: uuid
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
         hardware_asset_id:
           type: string
           format: uuid
@@ -38274,6 +38334,10 @@ components:
         address:
           type: string
           maxLength: 32
+        interface_id:
+          type: string
+          format: uuid
+          nullable: true
         hardware_asset_id:
           type: string
           format: uuid

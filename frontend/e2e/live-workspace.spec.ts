@@ -690,21 +690,18 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await expect(deviceDrawer).toContainText('Disabled')
   await expect(deviceDrawer).toContainText('Uplink to the core rack')
-  // Seed an unassigned MAC through the existing public API; assignment itself uses the UI.
-  const endpointCsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')
-  const unassignedMAC = await page.request.post(`/api/v1/workspaces/organizations/${clientId}/networks/mac-addresses`, {
-    headers: { 'X-CSRFToken': endpointCsrf!.value },
-    data: { address: '02:00:00:00:00:71', description: 'Unassigned interface fixture' },
-  })
-  expect(unassignedMAC.status()).toBe(201)
   for (const kind of ['IP', 'MAC'] as const) {
     await deviceDrawer.getByRole('link', { name: `${kind} addresses`, exact: true }).click()
-    await deviceDrawer.getByRole('button', { name: `Assign existing ${kind} address`, exact: true }).click()
-    const address = kind === 'IP' ? '192.0.2.10' : '02:00:00:00:00:71'
-    await deviceDrawer.getByRole('searchbox', { name: 'Search available address records' }).fill(address)
-    await deviceDrawer.getByRole('button', { name: 'Search', exact: true }).click()
-    await deviceDrawer.getByRole('combobox', { name: 'Available address records' }).selectOption({ label: kind === 'IP' ? `${address} (192.0.2.0/24)` : address })
-    await deviceDrawer.getByRole('button', { name: 'Confirm assignment', exact: true }).click()
+    await deviceDrawer.getByRole('button', { name: `Add ${kind} address`, exact: true }).click()
+    const address = kind === 'IP' ? '192.0.2.11' : '02:00:00:00:00:71'
+    await deviceDrawer.getByRole('textbox', { name: `${kind} address`, exact: true }).fill(address)
+    if (kind === 'IP') {
+      await deviceDrawer.getByRole('searchbox', { name: 'Search available networks' }).fill('Live management LAN')
+      await deviceDrawer.getByRole('button', { name: 'Search', exact: true }).click()
+      await deviceDrawer.getByRole('combobox', { name: 'Network', exact: true }).selectOption({ label: 'Live management LAN (192.0.2.0/24)' })
+      await deviceDrawer.getByRole('combobox', { name: 'Status', exact: true }).selectOption('reserved')
+    }
+    await deviceDrawer.getByRole('button', { name: 'Create address', exact: true }).click()
     await expect(deviceDrawer.getByRole('heading', { name: address, exact: true })).toBeVisible()
     await deviceDrawer.getByRole('button', { name: 'Edit address details', exact: true }).click()
     await deviceDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill(`Live interface ${kind} address`)

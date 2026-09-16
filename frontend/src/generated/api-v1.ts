@@ -10539,6 +10539,8 @@ export interface components {
             /** Format: uuid */
             readonly subnet_id: string;
             /** Format: uuid */
+            readonly interface_id?: string | null;
+            /** Format: uuid */
             readonly hardware_asset_id?: string | null;
             /**
              * @description * `active` - active
@@ -11487,6 +11489,8 @@ export interface components {
         };
         readonly MACAddressWrite: {
             readonly address: string;
+            /** Format: uuid */
+            readonly interface_id?: string | null;
             /** Format: uuid */
             readonly hardware_asset_id?: string | null;
             /** @default  */
@@ -24396,8 +24400,17 @@ export interface operations {
     readonly workspaces_msp_networks_subnets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `cidr` - cidr
+                 *     * `-cidr` - -cidr
+                 */
+                readonly ordering?: "name" | "-name" | "cidr" | "-cidr";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path?: never;
@@ -33248,8 +33261,17 @@ export interface operations {
     readonly workspaces_organizations_networks_subnets_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `cidr` - cidr
+                 *     * `-cidr` - -cidr
+                 */
+                readonly ordering?: "name" | "-name" | "cidr" | "-cidr";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                readonly summary?: boolean;
             };
             readonly header?: never;
             readonly path: {

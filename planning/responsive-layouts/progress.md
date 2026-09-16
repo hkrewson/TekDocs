@@ -1552,3 +1552,38 @@ Broader Phase 3 acceptance, remaining network surfaces, technician/native zoom a
 screen-reader walkthroughs, and pre-1.0 release gates remain open. Existing user and
 demo data were preserved. No push, production deployment, release change or Wiki
 publication occurred.
+
+## 2026-09-15 — Direct interface endpoint creation
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Selected interfaces now create IP and MAC records directly in the existing drawer.
+IP creation uses a searchable, paged subnet choice; creating a new record and
+assigning an existing unbound record are separate actions. Successful creates open
+the saved detail, while failed creates retain the draft and never retry automatically.
+No CSS, model, migration, permission grant or dependency changed.
+
+The create API accepts an optional exact-workspace `interface_id` and writes the
+record and binding atomically. Interface and hardware bindings are mutually exclusive;
+network-edit and existing hardware-edit policies remain authoritative. Subnet lists
+now support bounded search, stable name/CIDR ordering and summary responses. OpenAPI
+and generated client types are aligned.
+
+Verified: `make check` passes with 571 frontend tests in 116 files, Ruff/mypy,
+schema/type/migration checks and existing bundle budgets. All 36 focused endpoint
+browser cases pass across Chromium, Firefox and WebKit, including six maintained
+widths. The full `make test-network-validation` gate passes its PostgreSQL API,
+permissions, RLS, reconciliation, transfer, recovery and scale coverage, with its
+one expected skip and repeated frontend suite.
+
+The isolated `make test-e2e-live` browser→Django→PostgreSQL journey passes. It creates
+an IP and MAC through the selected interface, edits and reloads them, then removes the
+MAC binding. Independent database assertions confirm exact interface binding, retained
+IP and removed-MAC history, plus one IP create/update and one MAC create/two update
+audit events. Existing application/demo volumes were preserved. The first main check
+found two overlong test assertions; the second exposed an asynchronous dialog query.
+Formatting the assertions and waiting for the rendered dialog resolved both without
+changing behavior or weakening coverage.
+
+Endpoint transfers, device relationship/hardware rebinding, remaining network
+surfaces, technician walkthroughs and broader Phase 3/pre-1.0 acceptance remain open.
+No push, production deployment, release/version change or Wiki publication occurred.

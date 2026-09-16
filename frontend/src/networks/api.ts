@@ -100,8 +100,8 @@ export type SubnetWrite = Pick<NetworkSubnet, 'name' | 'cidr' | 'description'> &
 export type InterfaceWrite = Pick<NetworkInterface, 'name' | 'device_id' | 'kind' | 'status' | 'description'>
 export type AddressQuery = { circuit_id?: string; zone_id?: string; interface_id?: string; unassigned?: 'true'; device_id?: string; kind?: string; subnet_id?: string; association?: string; q: string; status?: string; ordering: string; page: number; page_size: number }
 export type AddressSummary = Omit<NetworkIPAddress, 'description'>
-export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'>
-export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'>
+export type IPAddressWrite = Pick<NetworkIPAddress, 'address' | 'subnet_id' | 'hardware_asset_id' | 'status' | 'dns_name' | 'description'> & { interface_id?: string | null }
+export type MACAddressWrite = Pick<NetworkMACAddress, 'address' | 'hardware_asset_id' | 'description'> & { interface_id?: string | null }
 export type WirelessWrite = Pick<WirelessNetwork, 'ssid' | 'purpose' | 'security' | 'status' | 'hidden' | 'client_isolation' | 'site_id' | 'vlan_id' | 'subnet_id' | 'description'>
 export type DNSZoneWrite = Pick<DNSZone, 'name' | 'description'>
 export type DNSRecordWrite = Pick<DNSRecord, 'zone_id' | 'owner_name' | 'record_type' | 'value' | 'ttl' | 'priority' | 'weight' | 'port' | 'ip_address_id' | 'description'>
@@ -155,6 +155,7 @@ export interface NetworksClient {
   createVLAN(workspace: WorkspaceContext, values: VLANWrite): Promise<NetworkVLAN>
   updateVLAN(workspace: WorkspaceContext, id: string, values: VLANWrite): Promise<NetworkVLAN>
   listSubnets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkSubnet>>
+  subnetCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<NetworkSubnet, 'description'>>>
   createSubnet(workspace: WorkspaceContext, values: SubnetWrite): Promise<NetworkSubnet>
   updateSubnet(workspace: WorkspaceContext, id: string, values: SubnetWrite): Promise<NetworkSubnet>
   interfaceCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<Omit<NetworkInterface, 'description'>>>
@@ -329,6 +330,10 @@ export const browserNetworksClient: NetworksClient = {
   updateVLAN: (workspace, id, values) => write(`${basePath(workspace)}/vlans/${encodeURIComponent(id)}`, 'PATCH', values),
   async listSubnets(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/subnets?page=1&page_size=100`, { credentials: 'same-origin', signal }))
+  },
+  async subnetCollection(workspace, query, signal) {
+    const params = new URLSearchParams({ q: query.q, page: String(query.page), page_size: String(query.page_size), ordering: query.ordering, summary: 'true' })
+    return json(await fetch(`${basePath(workspace)}/subnets?${params}`, { credentials: 'same-origin', signal }))
   },
   createSubnet: (workspace, values) => write(`${basePath(workspace)}/subnets`, 'POST', values),
   updateSubnet: (workspace, id, values) => write(`${basePath(workspace)}/subnets/${encodeURIComponent(id)}`, 'PATCH', values),

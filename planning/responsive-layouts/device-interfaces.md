@@ -59,25 +59,19 @@ Executed results and any limitations are recorded in progress.md.
 
 ## Next boundary
 
-Interface IP/MAC child collections and assignment remain open. Implement bounded
-parent retrieval and explicit binding/unbinding through existing services; preserve
-MAC uniqueness, IP rules and asset permissions. Do not consume `listIPAddresses` or
-`listMACAddresses` as complete datasets or preload all endpoints into this section.
-Moving an interface between devices is also a separate focused workflow; ordinary
-edits deliberately omit the parent. Device relationships and hardware rebinding,
-DNS/circuits, technician validation and full Phase 3/release acceptance remain open.
+Interface IP/MAC child collections, direct creation, bounded assignment and confirmed
+removal are implemented in [interface-endpoints.md](interface-endpoints.md). Moving an
+interface between devices or transferring an endpoint between existing bindings stays
+a separate focused workflow; ordinary edits deliberately omit their parents. Device
+relationships and hardware rebinding, remaining network surfaces, technician
+validation and full Phase 3/release acceptance remain open.
 
 No production publication or version change is included. The local Wiki Roadmap
 update is unpublished; its pre-existing missing-page limitation is unchanged.
 
-Next-slice API caution: `IPAddressWriteSerializer` and `MACAddressWriteSerializer`
-do not currently expose `interface_id`; their create views explicitly pass
-`interface_entity_id=None`. The underlying `network_endpoints.py` services can
-resolve interface bindings, while explicitly submitting a hardware asset binding
-clears the current interface. Preserve that distinction when designing a public
-assignment workflow. Do not merely add an input and resend both identities: review
-permission checks, exact workspace/parent checks, mutually exclusive assignment,
-partial-update semantics, OpenAPI and negative tests together. Existing read
-responses can contain interface identity, but that is not an exposed write contract.
-
-IP/MAC collection, editing and bounded assignment are now implemented in [interface-endpoints.md](interface-endpoints.md). The prior caution above records the starting API contract; the new focused PATCH contract is documented there. Creation and transfer workflows remain open.
+`IPAddressWriteSerializer` and `MACAddressWriteSerializer` now expose optional
+`interface_id` for atomic creation under an interface, with exact-workspace checks,
+network-edit permission and mutually exclusive hardware binding. The separate focused
+PATCH contract still handles attach/detach with expected-binding conflict protection.
+Creation and assignment details are recorded in
+[interface-endpoints.md](interface-endpoints.md); transfer workflows remain open.

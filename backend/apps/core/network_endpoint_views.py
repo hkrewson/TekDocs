@@ -51,6 +51,7 @@ class InterfaceWriteSerializer(StrictSerializer):
 class IPAddressWriteSerializer(StrictSerializer):
     address = serializers.CharField(max_length=45, trim_whitespace=True)
     subnet_id = serializers.UUIDField(source="subnet_entity_id")
+    interface_id = serializers.UUIDField(source="interface_entity_id", required=False, allow_null=True, default=None)
     hardware_asset_id = serializers.UUIDField(
         source="hardware_asset_entity_id", required=False, allow_null=True, default=None
     )
@@ -58,13 +59,24 @@ class IPAddressWriteSerializer(StrictSerializer):
     dns_name = serializers.CharField(max_length=253, required=False, allow_blank=True, default="")
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
 
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs.get("interface_entity_id") is not None and attrs.get("hardware_asset_entity_id") is not None:
+            raise serializers.ValidationError("Choose an interface or hardware asset, not both.")
+        return attrs
+
 
 class MACAddressWriteSerializer(StrictSerializer):
     address = serializers.CharField(max_length=32, trim_whitespace=True)
+    interface_id = serializers.UUIDField(source="interface_entity_id", required=False, allow_null=True, default=None)
     hardware_asset_id = serializers.UUIDField(
         source="hardware_asset_entity_id", required=False, allow_null=True, default=None
     )
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs.get("interface_entity_id") is not None and attrs.get("hardware_asset_entity_id") is not None:
+            raise serializers.ValidationError("Choose an interface or hardware asset, not both.")
+        return attrs
 
 
 class EndpointAssignmentSerializer(StrictSerializer):
@@ -442,7 +454,6 @@ class IPAddressListCreateView(APIView):
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=request.user.pk,
-                interface_entity_id=None,
                 **serializer.validated_data,
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
@@ -548,7 +559,6 @@ class MACAddressListCreateView(APIView):
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=request.user.pk,
-                interface_entity_id=None,
                 **serializer.validated_data,
             )
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:

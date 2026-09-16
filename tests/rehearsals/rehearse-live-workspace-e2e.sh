@@ -358,23 +358,26 @@ assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_dev
 print("Live device retained hardware identity, ordinary edits and rack-derived placement.")
 from apps.core.models import NetworkInterface
 interface = NetworkInterface.objects.get(entity__display_name="Live uplink")
+destination_interface = NetworkInterface.objects.get(entity__display_name="Live backup uplink")
 assert interface.organization == organization and interface.device_id == device.pk
+assert destination_interface.organization == organization and destination_interface.device_id == device.pk
 assert interface.status == "disabled" and interface.kind == "physical"
 assert interface.description == "Uplink to the core rack"
+assert destination_interface.description == "Transfer destination"
 assert AuditEvent.objects.filter(entity_id=interface.entity_id, action="network_interface.updated").count() == 1
 print("Live interface retained its device binding, description, status and update audit.")
 from apps.core.models import NetworkIPAddress
 interface_ip = NetworkIPAddress.objects.get(address="192.0.2.11", organization=organization)
-assert interface_ip.interface_id == interface.pk and interface_ip.hardware_asset_id is None
+assert interface_ip.interface_id == destination_interface.pk and interface_ip.hardware_asset_id is None
 assert interface_ip.description == "Live interface IP address" and interface_ip.status == "reserved"
 interface_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:71", organization=organization)
 assert interface_mac.interface_id is None and interface_mac.hardware_asset_id is None
 assert interface_mac.description == "Live interface MAC address"
 assert AuditEvent.objects.filter(entity_id=interface_ip.entity_id, action="network_ip_address.created").count() == 1
-assert AuditEvent.objects.filter(entity_id=interface_ip.entity_id, action="network_ip_address.updated").count() == 1
+assert AuditEvent.objects.filter(entity_id=interface_ip.entity_id, action="network_ip_address.updated").count() == 2
 assert AuditEvent.objects.filter(entity_id=interface_mac.entity_id, action="network_mac_address.created").count() == 1
 assert AuditEvent.objects.filter(entity_id=interface_mac.entity_id, action="network_mac_address.updated").count() == 2
-print("Live endpoint creation retains interface bindings, ordinary edits and removed MAC history.")
+print("Live endpoint creation retains transferred interface bindings, ordinary edits and removed MAC history.")
 
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization

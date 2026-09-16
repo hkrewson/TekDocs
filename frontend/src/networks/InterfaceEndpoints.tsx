@@ -4,7 +4,7 @@ import { browserCollectionPreferences } from '../collections/preferences'
 import { CollectionPagination } from '../CollectionPagination'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
-import type { ListResult, NetworkIPAddress, NetworkMACAddress, NetworkSubnet, NetworksClient } from './api'
+import type { ListResult, NetworkIPAddress, NetworkInterface, NetworkMACAddress, NetworkSubnet, NetworksClient } from './api'
 import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig, ChildRecordProps } from './NetworkChildCollection'
 import { networkText as t } from './networkText'
@@ -37,10 +37,10 @@ function IPRecord(props: Props) { return <EndpointRecord {...props} kind="ip" />
 function MACRecord(props: Props) { return <EndpointRecord {...props} kind="mac" /> }
 function EndpointRecord({ record, kind, parentId, workspace, client, canManage, onSaved, onReturn }: Props & { kind: Kind }) {
   const initial = { address: record?.address ?? '', description: record?.description ?? '', ...((record && 'status' in record) ? { status: record.status, dns_name: record.dns_name } : {}) }
-  const [form, setForm] = useState(initial), [editing, setEditing] = useState(false), [removing, setRemoving] = useState(false)
+  const [form, setForm] = useState(initial), [editing, setEditing] = useState(false), [removing, setRemoving] = useState(false), [moving, setMoving] = useState(false)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
-  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial); setRemoving(false) }, editing || removing)
+  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial); setRemoving(false); setMoving(false) }, editing || removing)
   useEffect(() => { heading.current?.focus() }, [record?.id])
   async function save(remove = false) {
     if (busy || !record) return
@@ -55,7 +55,7 @@ function EndpointRecord({ record, kind, parentId, workspace, client, canManage, 
     <button type="button" className="secondary-button" onClick={onReturn}>{configs[kind].back}</button>
     <h3 ref={heading} tabIndex={-1}>{record.address}</h3>
     {error && <p role="alert">{error}</p>}
-    {editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
+    {moving && canManage ? <EndpointTransfer kind={kind} record={record} parentId={parentId} workspace={workspace} client={client} onSaved={onSaved} onCancel={() => setMoving(false)} /> : editing && canManage ? <form className="network-inline-editor" onSubmit={(event) => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
       <label>{kind === 'ip' ? t('address') : t('endpointMAC')}<input required maxLength={kind === 'ip' ? 45 : 32} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>
       {kind === 'ip' && <><label>{t('addressStatus')}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as NetworkIPAddress['status'] })}>{statuses.map((value) => <option key={value} value={value}>{t(value)}</option>)}</select></label><label>{t('dnsName')}<input maxLength={253} value={form.dns_name} onChange={(event) => setForm({ ...form, dns_name: event.target.value })} /></label></>}
       <label>{t('description')}<textarea rows={4} maxLength={4000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
@@ -63,9 +63,43 @@ function EndpointRecord({ record, kind, parentId, workspace, client, canManage, 
     </fieldset></form> : removing && canManage ? <section aria-label={t('endpointRemove')}><p>{t('endpointRemoveHelp')}</p><div className="form-actions"><button className="primary-button" type="button" disabled={busy} onClick={() => void save(true)}>{busy ? translate('common.saving') : t('endpointConfirmRemove')}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => setRemoving(false)}>{translate('common.cancel')}</button></div></section> : <>
       {'status' in record && <dl className="record-facts"><div><dt>{t('addressStatus')}</dt><dd>{t(record.status)}</dd></div><div><dt>{t('dnsName')}</dt><dd>{record.dns_name || translate('collections.missing')}</dd></div><div><dt>{t('endpointSubnet')}</dt><dd>{record.subnet_cidr}</dd></div></dl>}
       <p className="network-notes">{record.description || t('noDescription')}</p>
-      {canManage && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('endpointEdit')}</button><button type="button" className="secondary-button" onClick={() => { setError(''); setRemoving(true) }}>{t('endpointRemove')}</button></div>}
+      {canManage && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('endpointEdit')}</button><button type="button" className="secondary-button" onClick={() => { setError(''); setMoving(true) }}>{t('endpointMove')}</button><button type="button" className="secondary-button" onClick={() => { setError(''); setRemoving(true) }}>{t('endpointRemove')}</button></div>}
     </>}
   </>
+}
+function EndpointTransfer({ kind, record, parentId, workspace, client, onSaved, onCancel }: { kind: Kind; record: Endpoint; parentId: string; workspace: WorkspaceContext; client: NetworksClient; onSaved: (record: Endpoint) => void; onCancel: () => void }) {
+  type Choice = Omit<NetworkInterface, 'description'>
+  const [search, setSearch] = useState(''), [draft, setDraft] = useState(''), [page, setPage] = useState(1), [reload, setReload] = useState(0)
+  const [selected, setSelected] = useState<Choice | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [response, setResponse] = useState<{ key: string; value?: ListResult<Choice> } | null>(null)
+  const key = `${workspace.kind}:${workspace.id}:${page}:${search}`
+  const result = response?.key === key ? response : null
+  const choices = result?.value?.results.filter((row) => row.id !== parentId) ?? []
+  const attempt = useUnsavedChanges(Boolean(selected), busy, () => setSelected(null), true)
+  useEffect(() => {
+    const controller = new AbortController()
+    client.interfaceCollection(workspace, { q: search, page, page_size: 25, ordering: 'name' }, controller.signal).then((value) => { if (!controller.signal.aborted) setResponse({ key, value }) }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) })
+    return () => controller.abort()
+  }, [workspace, client, search, page, key, reload])
+  function find() { setSearch(draft); setPage(1) }
+  async function save() {
+    if (busy) return
+    if (!selected) { setError(t('endpointMoveRequired')); return }
+    setBusy(true); setError('')
+    try { const value = await client.assignEndpoint(workspace, kind, record.id, selected.id, parentId); setSelected(null); onSaved(value) }
+    catch (caught) { setError(caught instanceof Error ? caught.message : t('endpointSaveFailed')) } finally { setBusy(false) }
+  }
+  return <section aria-label={t('endpointMove')}>
+    <p>{t('endpointMoveHelp')}</p>
+    {error && <p role="alert">{error}</p>}
+    <p>{t('endpointMoveSelected')}: <strong>{selected ? `${selected.device_name} — ${selected.name}` : t('endpointMoveChoose')}</strong></p>
+    <div className="collection-search"><input type="search" maxLength={240} aria-label={t('endpointMoveSearch')} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); find() } }} /><button type="button" className="secondary-button" onClick={find}>{translate('collections.searchAction')}</button></div>
+    {!result ? <p role="status">{translate('collections.loading')}</p> : !result.value ? <p role="alert">{t('endpointMoveFailed')} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p> : <>
+      {choices.length || selected ? <label>{t('endpointMoveChoices')}<select value={selected?.id ?? ''} onChange={(event) => { const row = choices.find((item) => item.id === event.target.value); if (row) setSelected(row); else setSelected(null) }}><option value="">{t('endpointMoveChoose')}</option>{selected && !choices.some((row) => row.id === selected.id) && <option value={selected.id}>{selected.device_name} — {selected.name}</option>}{choices.map((row) => <option key={row.id} value={row.id}>{row.device_name} — {row.name}</option>)}</select></label> : <p>{t('endpointMoveEmpty')}</p>}
+      <CollectionPagination label={t('endpointMoveChoices')} page={page} pageSize={25} count={result.value.count} hasMore={result.value.has_more} onPageChange={setPage} />
+    </>}
+    <div className="form-actions"><button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? translate('common.saving') : t('endpointMoveSave')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => attempt(onCancel)}>{translate('common.cancel')}</button></div>
+  </section>
 }
 function EndpointNew(props: Omit<Props, 'record'> & { kind: Kind }) {
   const [mode, setMode] = useState<'create' | 'assign'>('create')

@@ -20,6 +20,10 @@ interface nor hardware assignment. A selected choice remains explicit when searc
 or page changes. Confirm assignment submits a distinct binding operation. Remove
 from interface shows a focused confirmation explaining that the record and history
 are retained; confirmation clears the binding and returns to the parent list.
+Move to another interface opens a separate bounded picker that searches interface
+and device names across the exact workspace. The selected destination stays visible
+when search or page changes. Confirming moves the record, returns to the original
+interface's endpoint list and leaves the record available under the destination.
 Failures preserve drafts/choices and do not automatically retry uncertain mutations.
 Dirty/busy protection covers navigation, closing and changing the parent section.
 
@@ -44,11 +48,12 @@ PATCH accepts `interface_id` with required `expected_interface_id`. These two fi
 must be the entire assignment request; they cannot be mixed with ordinary fields,
 subnet changes or hardware identity. Attach expects null; detach expects the current
 interface's entity ID. The existing record transaction checks the expected value
-under a row lock. A stale value or already-bound candidate returns 409 without
-changing the record or adding an update audit. It never replaces hardware bindings
-or directly transfers a record from another interface. Existing network-edit policy
-and exact workspace services authorize writes; existing hardware-edit policy stays
-unchanged.
+under a row lock. A stale value, same-interface destination or already-bound candidate
+returns 409 without changing the record or adding an update audit. An interface-to-
+interface transfer resolves the destination inside the locked transaction and requires
+the same exact workspace. It never replaces hardware bindings. Existing network-edit
+policy and exact workspace services authorize writes; existing hardware-edit policy
+stays unchanged.
 
 Create APIs accept an optional `interface_id` and resolve it inside the same database
 transaction as the new IP or MAC record. Interface and hardware bindings are mutually
@@ -63,20 +68,22 @@ subnet rules remain authoritative.
 
 ## Verification and follow-up
 
-API tests cover 31 unassigned candidates, off-page search, parent filters, sibling
-workspace denial, invalid/mixed payloads, ordinary edits preserving assignment,
-stale attach/detach, protected hardware bindings, network-edit denial and audit
-counts. Concurrent IP/MAC claims must produce exactly one winner and one conflict.
+API tests cover 31 unassigned candidates, off-page search, interface/device-name
+search, parent filters, sibling workspace denial, invalid/mixed payloads, ordinary
+edits preserving assignment, successful transfer, same-interface and stale conflicts,
+protected hardware bindings, network-edit denial and audit counts. Concurrent IP/MAC
+claims must produce exactly one winner and one conflict.
 Component/browser checks cover one drawer, all six widths, long content, paging,
 selected details, direct/full-page navigation, focus, touch/short height/200% zoom,
 assignment selection, failed writes, confirmations and permission/parent failures.
 
-The live rehearsal creates an IP and MAC directly from the selected interface, edits
-their descriptions, reloads and removes the MAC assignment. Independent PostgreSQL
-assertions verify the retained IP binding, MAC record/removal and audit history.
+The live rehearsal creates two interfaces, creates IP and MAC records on the first,
+edits their descriptions, moves the IP to the second and removes the MAC assignment.
+Independent PostgreSQL assertions verify the transferred IP binding, retained MAC
+record/removal and audit history.
 Executed results and reproduced failures are recorded in progress.md.
 
-Transferring existing bindings, workspace-wide MAC browsing, device relationships/
+Workspace-wide MAC browsing, moving interfaces between devices, device relationships/
 hardware rebinding, remaining network surfaces, technician sign-off and full Phase 3/
 release acceptance remain open. IP creation in a subnet and asset MAC creation remain
 available through their existing parent records.

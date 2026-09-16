@@ -15,11 +15,12 @@ function setup(kind: 'ip' | 'mac', { failed = false, failCreate = false, denied 
   const assign = failed ? vi.fn().mockRejectedValue(new Error('The assignment changed. Reload before trying again.')) : vi.fn().mockImplementation((_workspace: WorkspaceContext, _kind: string, _id: string, parent: string | null) => Promise.resolve({ ...record, interface_id: parent }))
   const createIP = failCreate ? vi.fn().mockRejectedValue(new Error('Address is already recorded.')) : vi.fn().mockImplementation((_workspace, values) => Promise.resolve({ ...record, id: 'ip-new', ...values, subnet_cidr: '192.0.2.0/24' }))
   const createMAC = failCreate ? vi.fn().mockRejectedValue(new Error('Address is already recorded.')) : vi.fn().mockImplementation((_workspace, values) => Promise.resolve({ ...record, id: 'mac-new', ...values }))
-  const client = { addressCollection: collection, macCollection: collection, addressDetail: vi.fn().mockResolvedValue(record), macDetail: vi.fn().mockResolvedValue(record), updateIPAddress: update, updateMACAddress: update, assignEndpoint: assign, createIPAddress: createIP, createMACAddress: createMAC, subnetCollection: vi.fn().mockResolvedValue({ results: [{ id: 'subnet-1', name: 'Office LAN', cidr: '192.0.2.0/24' }], count: 1, page: 1, page_size: 25, has_more: false, can_manage: true }) } as unknown as NetworksClient
+  const interfaces = vi.fn().mockResolvedValue({ results: [{ id: 'port-1', name: 'Ethernet 1', device_id: 'device-1', device_name: 'Core switch', kind: 'physical', status: 'active' }, { id: 'port-2', name: 'Ethernet 2', device_id: 'device-2', device_name: 'Edge router', kind: 'physical', status: 'active' }], count: 2, page: 1, page_size: 25, has_more: false, can_manage: true })
+  const client = { addressCollection: collection, macCollection: collection, addressDetail: vi.fn().mockResolvedValue(record), macDetail: vi.fn().mockResolvedValue(record), updateIPAddress: update, updateMACAddress: update, assignEndpoint: assign, createIPAddress: createIP, createMACAddress: createMAC, subnetCollection: vi.fn().mockResolvedValue({ results: [{ id: 'subnet-1', name: 'Office LAN', cidr: '192.0.2.0/24' }], count: 1, page: 1, page_size: 25, has_more: false, can_manage: true }), interfaceCollection: interfaces } as unknown as NetworksClient
   const preferences = defaultPreferences(kind === 'ip' ? ['name', 'status', 'dns_name'] : ['name'])
   const preferenceClient = { load: vi.fn().mockResolvedValue(preferences), save: vi.fn().mockResolvedValue(preferences), reset: vi.fn().mockResolvedValue(preferences) }
   render(<ApplicationRouter><InterfaceEndpoints kind={kind} workspace={workspace} interfaceId="port-1" client={client} preferenceClient={preferenceClient} /></ApplicationRouter>)
-  return { user: userEvent.setup(), collection, update, assign, createIP, createMAC, address: record.address }
+  return { user: userEvent.setup(), collection, interfaces, update, assign, createIP, createMAC, address: record.address }
 }
 it('retains a failed new IP draft through guarded navigation without retrying', async () => {
   const { user, createIP } = setup('ip', { failCreate: true })
@@ -65,6 +66,31 @@ for (const kind of ['ip', 'mac'] as const) {
     await user.click(screen.getByRole('button', { name: 'Confirm removal' }))
     await waitFor(() => expect(assign).toHaveBeenCalledWith(workspace, kind, 'endpoint-1', null, 'port-1'))
     expect(await screen.findByRole('searchbox', { name: kind === 'ip' ? 'Search IP addresses' : 'Search MAC addresses' })).toBeVisible()
+  })
+  it(`${kind} moves to another interface through bounded search`, async () => {
+    const { user, interfaces, assign, address } = setup(kind)
+    await user.click(await screen.findByRole('button', { name: address }))
+    await user.click(await screen.findByRole('button', { name: 'Move to another interface' }))
+    await user.type(await screen.findByRole('searchbox', { name: 'Search interfaces by interface or device name' }), 'Edge')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(interfaces).toHaveBeenLastCalledWith(workspace, expect.objectContaining({ q: 'Edge', page_size: 25 }), expect.any(AbortSignal))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Available interfaces' }), 'port-2')
+    await user.click(screen.getByRole('button', { name: 'Confirm move' }))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(workspace, kind, 'endpoint-1', 'port-2', 'port-1'))
+    expect(await screen.findByRole('searchbox', { name: kind === 'ip' ? 'Search IP addresses' : 'Search MAC addresses' })).toBeVisible()
+  })
+  it(`${kind} retains a failed transfer choice through guarded return without retry`, async () => {
+    const { user, assign, address } = setup(kind, { failed: true })
+    await user.click(await screen.findByRole('button', { name: address }))
+    await user.click(await screen.findByRole('button', { name: 'Move to another interface' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Available interfaces' }), 'port-2')
+    await user.click(screen.getByRole('button', { name: 'Confirm move' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('assignment changed')
+    await user.click(screen.getByRole('button', { name: kind === 'ip' ? 'Back to IP addresses' : 'Back to MAC addresses' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('combobox', { name: 'Available interfaces' })).toHaveValue('port-2')
+    expect(assign).toHaveBeenCalledTimes(1)
+    expect(assign).toHaveBeenCalledWith(workspace, kind, 'endpoint-1', 'port-2', 'port-1')
   })
   it(`${kind} retains a stale assignment choice through guarded return without retry`, async () => {
     const { user, collection, assign } = setup(kind, { failed: true })

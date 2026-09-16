@@ -565,6 +565,7 @@ def test_interface_collection_search_paging_parent_scope_and_partial_edit(owner_
     assert second["results"][-1]["description"] == "Cable destination 30"
     found = owner_client.get(url, {"device_id": device.entity_id, "q": "destination 30"}).json()
     assert found["count"] == 1 and found["results"][0]["id"] == str(interfaces[-1].entity_id)
+    assert owner_client.get(url, {"q": "Other switch"}).json()["count"] == 1
     descending = owner_client.get(url, {"device_id": device.entity_id, "ordering": "-name"}).json()
     assert descending["results"][0]["name"] == "Port 30"
     assert owner_client.get(url, {"device_id": device.entity_id, "kind": "virtual"}).json()["count"] == 0
@@ -619,6 +620,16 @@ def test_interface_endpoint_assignment_is_bounded_and_compare_checked(owner_clie
         kind="physical",
         status="active",
         description="",
+    )
+    destination = create_interface(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        name="Backup uplink",
+        device_entity_id=device.entity_id,
+        kind="physical",
+        status="active",
+        description="Transfer destination",
     )
     outside = create_interface(
         tenant=installation.tenant,
@@ -679,13 +690,31 @@ def test_interface_endpoint_assignment_is_bounded_and_compare_checked(owner_clie
     assert owner_client.get(url, {"unassigned": "true"}).json()["count"] == 30
     assert owner_client.get(url, {"interface_id": interface.entity_id}).json()["count"] == 1
     assert patch({"interface_id": None, "expected_interface_id": None}).status_code == 409
+    assert (
+        patch(
+            {
+                "interface_id": str(interface.entity_id),
+                "expected_interface_id": str(interface.entity_id),
+            }
+        ).status_code
+        == 409
+    )
     assert patch({"description": "Updated cable"}).status_code == 200
     rows[-1].refresh_from_db()
     assert rows[-1].interface_id == interface.pk and rows[-1].description == "Updated cable"
     audit_action = f"network_{kind}_address.updated"
     assert AuditEvent.objects.filter(entity_id=rows[-1].entity_id, action=audit_action).count() == 2
-    assert patch({"interface_id": None, "expected_interface_id": str(interface.entity_id)}).status_code == 200
-    assert AuditEvent.objects.filter(entity_id=rows[-1].entity_id, action=audit_action).count() == 3
+    moved = patch(
+        {
+            "interface_id": str(destination.entity_id),
+            "expected_interface_id": str(interface.entity_id),
+        }
+    )
+    assert moved.status_code == 200, moved.content
+    assert moved.json()["interface_id"] == str(destination.entity_id)
+    assert patch({"interface_id": None, "expected_interface_id": str(interface.entity_id)}).status_code == 409
+    assert patch({"interface_id": None, "expected_interface_id": str(destination.entity_id)}).status_code == 200
+    assert AuditEvent.objects.filter(entity_id=rows[-1].entity_id, action=audit_action).count() == 4
     # An interface assignment must never replace a protected hardware binding.
     rows[-1].hardware_asset = device.hardware_asset
     rows[-1].save(update_fields=["hardware_asset"])

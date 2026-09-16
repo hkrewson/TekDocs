@@ -1587,3 +1587,34 @@ changing behavior or weakening coverage.
 Endpoint transfers, device relationship/hardware rebinding, remaining network
 surfaces, technician walkthroughs and broader Phase 3/pre-1.0 acceptance remain open.
 No push, production deployment, release/version change or Wiki publication occurred.
+
+## 2026-09-16 — Conflict-safe interface endpoint transfers
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Selected IP and MAC records now offer a separate Move to another interface workflow.
+The destination picker is bounded and searchable by interface or device name across
+the exact workspace. It retains the explicit destination through searches and failed
+writes, never retries an uncertain mutation, and returns to the original interface's
+endpoint list after a successful move.
+
+The existing assignment PATCH now permits interface-to-interface transfer while the
+record is locked. It still requires the expected current interface, rejects stale or
+same-interface requests, resolves the destination in the exact workspace and refuses
+to replace a hardware binding. Ordinary endpoint edits continue to omit all binding
+fields. No route, model, migration, permission grant, dependency or CSS changed.
+
+Verified: the focused PostgreSQL API cases pass for IP and MAC transfer, device-name
+search, same-interface/stale conflicts, workspace denial, hardware protection and
+audit counts. The frontend check gate passes with 575 tests in 116 files, lint,
+typecheck, API consistency, production build and bundle budgets. All 42 focused
+endpoint browser cases pass in Chromium, Firefox and WebKit, including six maintained
+widths. The isolated browser→Django→PostgreSQL journey passes; it creates two
+interfaces, moves the IP between them and independently verifies the stored destination
+and two append-only IP update events. The first live run completed the browser journey
+but its prior database assertion expected the original binding; the corrected audit
+now verifies the transfer rather than weakening coverage.
+
+Moving interfaces between devices, device relationship/hardware rebinding, remaining
+network surfaces, technician walkthroughs and broader Phase 3/pre-1.0 acceptance
+remain open. No push, production deployment, release/version change or Wiki
+publication occurred.

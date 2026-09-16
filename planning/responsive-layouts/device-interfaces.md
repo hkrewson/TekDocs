@@ -28,8 +28,9 @@ Network-view/edit permissions and server business rules remain authoritative.
 
 Existing paginated interface endpoints accept additive `device_id`, `q`, `kind`,
 `status`, `ordering` and `summary` parameters. Parent IDs must exist in the exact
-workspace. Search covers name/description; sorting supports name/kind/status with
-entity-ID tie-breaking. The existing default page size of 50 and full-description
+workspace. Search covers interface name, device name and description; sorting supports
+name/kind/status with entity-ID tie-breaking. The existing default page size of 50 and
+full-description
 responses remain for legacy consumers. The UI explicitly requests 25 by default
 and summaries without descriptions, then selected detail on demand. No list fetches
 IP/MAC records, relationships, or histories. Invalid filters/orderings are rejected.
@@ -59,10 +60,10 @@ Executed results and any limitations are recorded in progress.md.
 
 ## Next boundary
 
-Interface IP/MAC child collections, direct creation, bounded assignment and confirmed
-removal are implemented in [interface-endpoints.md](interface-endpoints.md). Moving an
-interface between devices or transferring an endpoint between existing bindings stays
-a separate focused workflow; ordinary edits deliberately omit their parents. Device
+Interface IP/MAC child collections, direct creation, bounded assignment, conflict-safe
+transfer and confirmed removal are implemented in
+[interface-endpoints.md](interface-endpoints.md). Moving an interface between devices
+stays a separate focused workflow; ordinary edits deliberately omit its parent. Device
 relationships and hardware rebinding, remaining network surfaces, technician
 validation and full Phase 3/release acceptance remain open.
 
@@ -72,6 +73,6 @@ update is unpublished; its pre-existing missing-page limitation is unchanged.
 `IPAddressWriteSerializer` and `MACAddressWriteSerializer` now expose optional
 `interface_id` for atomic creation under an interface, with exact-workspace checks,
 network-edit permission and mutually exclusive hardware binding. The separate focused
-PATCH contract still handles attach/detach with expected-binding conflict protection.
-Creation and assignment details are recorded in
-[interface-endpoints.md](interface-endpoints.md); transfer workflows remain open.
+PATCH contract handles attach, detach and interface-to-interface transfer with
+expected-binding conflict protection. Creation and assignment details are recorded in
+[interface-endpoints.md](interface-endpoints.md).

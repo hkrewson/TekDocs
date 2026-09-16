@@ -296,8 +296,10 @@ def _check_interface_assignment(record: NetworkIPAddress | NetworkMACAddress, va
     current = cast(NetworkInterface, record.interface).entity_id if record.interface_id else None
     if "expected_interface_entity_id" not in values or current != values["expected_interface_entity_id"]:
         raise NetworkAssignmentConflict("The assignment changed. Reload the record before trying again.")
-    if record.hardware_asset_id or (current is not None and values["interface_entity_id"] is not None):
-        raise NetworkAssignmentConflict("The record is already assigned. Remove its current assignment first.")
+    if record.hardware_asset_id:
+        raise NetworkAssignmentConflict("The record is already assigned to hardware.")
+    if current is not None and values["interface_entity_id"] == current:
+        raise NetworkAssignmentConflict("Choose a different interface.")
     if "hardware_asset_entity_id" in values:
         raise NetworkEndpointError("Change interface assignment separately from hardware assignment.")
 

@@ -279,7 +279,9 @@ class InterfaceListCreateView(APIView):
             records = records.filter(device__entity_id=values["device_id"])
         if values["q"]:
             records = records.filter(
-                Q(entity__display_name__icontains=values["q"]) | Q(description__icontains=values["q"])
+                Q(entity__display_name__icontains=values["q"])
+                | Q(device__entity__display_name__icontains=values["q"])
+                | Q(description__icontains=values["q"])
             )
         for field in ("kind", "status"):
             if field in values:

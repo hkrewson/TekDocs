@@ -690,6 +690,14 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await expect(deviceDrawer).toContainText('Disabled')
   await expect(deviceDrawer).toContainText('Uplink to the core rack')
+  await deviceDrawer.getByRole('button', { name: 'Back to interfaces', exact: true }).click()
+  await deviceDrawer.getByRole('button', { name: 'New interface', exact: true }).click()
+  await deviceDrawer.getByRole('textbox', { name: 'Name', exact: true }).fill('Live backup uplink')
+  await deviceDrawer.getByRole('textbox', { name: 'Description', exact: true }).fill('Transfer destination')
+  await deviceDrawer.getByRole('button', { name: 'Save interface', exact: true }).click()
+  await expect(deviceDrawer.getByRole('heading', { name: 'Live backup uplink', exact: true })).toBeVisible()
+  await deviceDrawer.getByRole('button', { name: 'Back to interfaces', exact: true }).click()
+  await deviceDrawer.getByRole('button', { name: 'Live uplink', exact: true }).click()
   for (const kind of ['IP', 'MAC'] as const) {
     await deviceDrawer.getByRole('link', { name: `${kind} addresses`, exact: true }).click()
     await deviceDrawer.getByRole('button', { name: `Add ${kind} address`, exact: true }).click()
@@ -709,7 +717,14 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
     await expect(deviceDrawer.getByRole('button', { name: 'Edit address details', exact: true })).toBeVisible()
     await page.reload()
     await expect(deviceDrawer).toContainText(`Live interface ${kind} address`)
-    if (kind === 'MAC') {
+    if (kind === 'IP') {
+      await deviceDrawer.getByRole('button', { name: 'Move to another interface', exact: true }).click()
+      await deviceDrawer.getByRole('searchbox', { name: 'Search interfaces by interface or device name' }).fill('Live backup uplink')
+      await deviceDrawer.getByRole('button', { name: 'Search', exact: true }).click()
+      await deviceDrawer.getByRole('combobox', { name: 'Available interfaces' }).selectOption({ label: 'Live network switch — Live backup uplink' })
+      await deviceDrawer.getByRole('button', { name: 'Confirm move', exact: true }).click()
+      await expect(deviceDrawer.getByText('0 IP addresses', { exact: true })).toBeVisible()
+    } else {
       await deviceDrawer.getByRole('button', { name: 'Remove from interface', exact: true }).click()
       await expect(deviceDrawer).toContainText('record and its history are retained')
       await deviceDrawer.getByRole('button', { name: 'Confirm removal', exact: true }).click()
@@ -718,6 +733,9 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   }
   await deviceDrawer.getByRole('button', { name: 'Back to interfaces', exact: true }).click()
   await expect(deviceDrawer.getByRole('button', { name: 'Live uplink', exact: true })).toBeFocused()
+  await deviceDrawer.getByRole('button', { name: 'Live backup uplink', exact: true }).click()
+  await deviceDrawer.getByRole('link', { name: 'IP addresses', exact: true }).click()
+  await expect(deviceDrawer.getByRole('button', { name: '192.0.2.11', exact: true })).toBeVisible()
   await page.mouse.click(10, 100)
   await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Racks', exact: true }).click()
   await page.getByRole('button', { name: 'Live layout rack', exact: true }).click()

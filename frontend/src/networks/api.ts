@@ -187,6 +187,7 @@ export interface NetworksClient {
   listDNSRecords(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<DNSRecord>>
   createDNSRecord(workspace: WorkspaceContext, values: DNSRecordWrite): Promise<DNSRecord>
   updateDNSRecord(workspace: WorkspaceContext, id: string, values: Partial<DNSRecordWrite>): Promise<DNSRecord>
+  moveDNSRecord(workspace: WorkspaceContext, id: string, zoneId: string, expectedZoneId: string, ownerName: string): Promise<DNSRecord>
   circuitCollection(workspace: WorkspaceContext, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<CircuitSummary>>
   circuitDetail(workspace: WorkspaceContext, id: string, signal?: AbortSignal): Promise<CircuitDetail>
   handoffCollection(workspace: WorkspaceContext, circuitId: string, query: AddressQuery, signal?: AbortSignal): Promise<ListResult<HandoffDetail>>
@@ -401,6 +402,7 @@ export const browserNetworksClient: NetworksClient = {
   },
   createDNSRecord: (workspace, values) => write(`${basePath(workspace)}/dns-records`, 'POST', values),
   updateDNSRecord: (workspace, id, values) => write(`${basePath(workspace)}/dns-records/${encodeURIComponent(id)}`, 'PATCH', values),
+  moveDNSRecord: (workspace, id, zoneId, expectedZoneId, ownerName) => write(`${basePath(workspace)}/dns-records/${encodeURIComponent(id)}`, 'PATCH', { zone_id: zoneId, expected_zone_id: expectedZoneId, owner_name: ownerName }),
   async circuitCollection(workspace, query, signal) {
     const { association, ...values } = query
     const params = new URLSearchParams({ ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])), summary: 'true', ...(association ? { kind: association } : {}) })

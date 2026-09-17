@@ -29,6 +29,7 @@ from .models import (
 from .network_inventory_views import StrictSerializer
 from .network_records import network_records_for_scope
 from .network_services import (
+    NetworkServiceConflict,
     NetworkServiceError,
     create_dns_record,
     create_dns_zone,
@@ -90,6 +91,7 @@ class ZoneSerializer(serializers.Serializer):
 
 class RecordWriteSerializer(StrictSerializer):
     zone_id = serializers.UUIDField(source="zone_entity_id")
+    expected_zone_id = serializers.UUIDField(source="expected_zone_entity_id", required=False)
     owner_name = serializers.CharField(max_length=253, trim_whitespace=True)
     record_type = serializers.ChoiceField(choices=DNSRecordType.values)
     value = serializers.CharField(max_length=4096, trim_whitespace=False)
@@ -99,6 +101,19 @@ class RecordWriteSerializer(StrictSerializer):
     port = serializers.IntegerField(min_value=0, max_value=65535, required=False, allow_null=True, default=None)
     ip_address_id = serializers.UUIDField(source="ip_address_entity_id", required=False, allow_null=True, default=None)
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if not self.partial:
+            if "expected_zone_entity_id" in attrs:
+                raise serializers.ValidationError("Expected zone is only used when moving a DNS record.")
+            return attrs
+        changing_zone = "zone_entity_id" in attrs
+        has_expected = "expected_zone_entity_id" in attrs
+        if changing_zone != has_expected:
+            raise serializers.ValidationError("Zone changes require the expected current DNS zone.")
+        if changing_zone and set(attrs) != {"zone_entity_id", "expected_zone_entity_id", "owner_name"}:
+            raise serializers.ValidationError("Move the DNS record separately from editing its details.")
+        return attrs
 
 
 class RecordSerializer(serializers.Serializer):
@@ -426,7 +441,7 @@ class DNSRecordDetailView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
         return Response(RecordSerializer(self._record(workspace, record_entity_id)).data)
 
-    @extend_schema(request=RecordWriteSerializer, responses={200: RecordSerializer})
+    @extend_schema(request=RecordWriteSerializer, responses={200: RecordSerializer, 409: None})
     def patch(self, request, record_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = RecordWriteSerializer(data=request.data, partial=True)
@@ -437,6 +452,8 @@ class DNSRecordDetailView(APIView):
                 actor_id=request.user.pk,
                 values=serializer.validated_data,
             )
+        except NetworkServiceConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         except (NetworkServiceError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         return Response(RecordSerializer(record).data)

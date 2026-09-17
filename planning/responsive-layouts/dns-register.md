@@ -23,7 +23,8 @@ unrelated wireless/VLAN/subnet/IP collection.
 Zone and record creation/editing preserve existing DNS rules, including canonical
 names, zone ownership, record-type fields, CNAME restrictions and IP matching.
 Record creation fixes the parent zone. Ordinary record PATCH omits zone identity;
-there is no new move-between-zones action. Failed writes retain entered values,
+moving a record uses the separate compare-checked action described in
+[dns-record-transfer.md](dns-record-transfer.md). Failed writes retain entered values,
 with no automatic retry. Dirty and busy forms use the shared navigation guard.
 The zone Overview discloses that edits do not publish live DNS. Renaming a zone
 with records remains prohibited by the server and explained in the form.
@@ -83,7 +84,7 @@ PostgreSQL assertions verify exact workspace/tenant, TXT value, TTL 600, absence
 of an unintended IP link, and the two expected audit events. These database and live checks now pass in Docker, including the full real-browser
 journey and independent retained-data assertions.
 
-Zone transfers and broader Phase 3 technician/release acceptance remain follow-ups. No production publication or version change.
+Broader Phase 3 technician/release acceptance remains a follow-up. No production publication or version change.
 See progress.md for executed evidence, reproduced failures and their fixes.
 
 
@@ -103,6 +104,6 @@ The live run uncovered and verified a fix for DNS updates locking an optional IP
 join: the service now explicitly locks the record and identity rows. The new
 regression checks retained fields, parent/workspace and the expected audit pair.
 
-Remaining: DNS zone transfers, circuits/handoffs, other Phase 3 objects and
+Remaining: other Phase 3 objects and
 technician/production-image/release acceptance. No production publication or
 version change is included in this checkpoint.

@@ -737,3 +737,71 @@ def test_dns_record_drawer_partial_update_preserves_parent_and_audit(owner_clien
         "dns_record.created",
         "dns_record.updated",
     ]
+
+
+@pytest.mark.django_db
+def test_dns_record_zone_transfer_is_bounded_and_compare_checked(owner_client, installation):
+    from apps.core.models import AuditEvent
+
+    organization = _organization(installation, "DNS transfer client")
+    sibling = _organization(installation, "DNS transfer sibling")
+    source = _post(owner_client, "organization-network-dns-zones", organization, {"name": "source.invalid"}).json()
+    destination = _post(
+        owner_client, "organization-network-dns-zones", organization, {"name": "destination.invalid"}
+    ).json()
+    outside = _post(owner_client, "organization-network-dns-zones", sibling, {"name": "outside.invalid"}).json()
+    created = _post(
+        owner_client,
+        "organization-network-dns-records",
+        organization,
+        {
+            "zone_id": source["id"],
+            "owner_name": "host.source.invalid",
+            "record_type": "TXT",
+            "value": "Keep this value",
+            "ttl": 600,
+            "description": "Keep this description",
+        },
+    ).json()
+    detail = reverse(
+        "organization-network-dns-record-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "record_entity_id": created["id"]},
+    )
+
+    def move(zone_id, expected_id=source["id"], owner_name="host.destination.invalid", **extra):  # type: ignore[no-untyped-def]
+        return owner_client.patch(
+            detail,
+            {
+                "zone_id": zone_id,
+                "expected_zone_id": expected_id,
+                "owner_name": owner_name,
+                **extra,
+            },
+            content_type="application/json",
+        )
+
+    missing_compare = owner_client.patch(
+        detail, {"zone_id": destination["id"]}, content_type="application/json"
+    )
+    assert missing_compare.status_code == 400
+    assert move(destination["id"], ttl=300).status_code == 400
+    assert move(outside["id"]).status_code == 400
+    assert move(source["id"], owner_name="host.source.invalid").status_code == 409
+    assert move(destination["id"], owner_name="outside.invalid").status_code == 400
+
+    moved = move(destination["id"])
+    assert moved.status_code == 200, moved.content
+    assert moved.json() == {
+        **created,
+        "zone_id": destination["id"],
+        "zone_name": "destination.invalid",
+        "owner_name": "host.destination.invalid",
+    }
+    assert move(source["id"], expected_id=source["id"], owner_name="host.source.invalid").status_code == 409
+    retained = DNSRecord.objects.get(entity_id=created["id"])
+    assert str(retained.zone.entity_id) == destination["id"]
+    assert retained.record_type == "TXT" and retained.value == "Keep this value" and retained.ttl == 600
+    assert retained.description == "Keep this description" and retained.ip_address_id is None
+    assert list(
+        AuditEvent.objects.filter(entity_id=created["id"]).order_by("occurred_at").values_list("action", flat=True)
+    ) == ["dns_record.created", "dns_record.updated"]

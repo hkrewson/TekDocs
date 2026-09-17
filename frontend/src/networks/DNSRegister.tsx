@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { browserCollectionPreferences } from '../collections/preferences'
 import { translate } from '../i18n/localization'
+import { CollectionPagination } from '../CollectionPagination'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RecordActivity } from '../records/RecordActivity'
 import { RecordHeader, RecordSections } from '../records/RecordNavigation'
@@ -72,8 +73,8 @@ function DNSRecordView({ record, workspace, client, parentId, canManage, onSaved
   }
 
   const initial: DNSRecordWrite = { zone_id: parentId, owner_name: record?.owner_name ?? '', record_type: record?.record_type ?? 'A', value: record?.value ?? '', ttl: record?.ttl ?? 3600, priority: record?.priority ?? null, weight: record?.weight ?? null, port: record?.port ?? null, ip_address_id: record?.ip_address_id ?? null, description: record?.description ?? '' }
-  const [form, setForm] = useState(initial), [editing, setEditing] = useState(!record), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial) }, editing)
+  const [form, setForm] = useState(initial), [editing, setEditing] = useState(!record), [moving, setMoving] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const attempt = useUnsavedChanges(editing && JSON.stringify(form) !== JSON.stringify(initial), busy, () => { setEditing(false); setForm(initial); setMoving(false) }, editing)
   async function save() {
     if (busy) return
     setBusy(true); setError('')
@@ -89,7 +90,7 @@ function DNSRecordView({ record, workspace, client, parentId, canManage, onSaved
     {record && <p><Link to={href(!history)} state={location.state as unknown}>{t(history ? 'dnsRecordDetailsBack' : 'dnsRecordHistoryOpen')}</Link></p>}
     {history && record ? <RecordActivity workspace={workspace} entityId={record.id} pageParameter="dns_record_history_page" description={t('dnsRecordHistoryHelp')} emptyLabel={t('dnsRecordHistoryEmpty')} deniedLabel={t('dnsRecordHistoryDenied')} actionLabels={{ 'dns_record.created': t('dnsRecordCreated'), 'dns_record.updated': t('dnsRecordUpdated') }} /> : <>
     {error && <p role="alert">{error}</p>}
-    {editing && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
+    {moving && record && canManage ? <DNSRecordTransfer record={record} workspace={workspace} client={client} onSaved={(saved) => { setMoving(false); onSaved(saved) }} onCancel={() => setMoving(false)} /> : editing && canManage ? <form className="network-inline-editor" onSubmit={event => { event.preventDefault(); void save() }}><fieldset disabled={busy}>
       <div className="field-grid">
         <label>{t('dnsOwner')}<input required maxLength={253} value={form.owner_name} onChange={event => setForm({ ...form, owner_name: event.target.value })} /></label>
         <label>{t('dnsType')}<select value={form.record_type} onChange={event => setForm({ ...form, record_type: event.target.value as DNSRecordWrite['record_type'], priority: null, weight: null, port: null, ip_address_id: null })}>{types.map(type => <option key={type}>{type}</option>)}</select></label>
@@ -104,8 +105,54 @@ function DNSRecordView({ record, workspace, client, parentId, canManage, onSaved
     </fieldset></form> : record ? <>
       <dl className="record-facts">{(['record_type', 'value', 'ttl', 'priority', 'weight', 'port'] as const).map(field => record[field] !== null && <div key={field}><dt>{({ record_type: t('dnsType'), value: t('dnsValue'), ttl: t('dnsTTL'), priority: t('dnsPriority'), weight: t('dnsWeight'), port: t('dnsPort') })[field]}</dt><dd>{record[field]}</dd></div>)}{record.ip_address_id && <div><dt>{t('dnsIP')}</dt><dd>{record.value}</dd></div>}</dl>
       <p className="network-notes">{record.description || t('noDescription')}</p>
-      {canManage && <button type="button" className="secondary-button" onClick={() => { setForm(initial); setEditing(true) }}>{t('dnsRecordEdit')}</button>}
+      {canManage && <div className="form-actions"><button type="button" className="secondary-button" onClick={() => { setForm(initial); setError(''); setEditing(true) }}>{t('dnsRecordEdit')}</button><button type="button" className="secondary-button" onClick={() => { setError(''); setMoving(true) }}>{t('dnsRecordMove')}</button></div>}
     </> : <p>{t('dnsDenied')}</p>}
     </>}
+  </section>
+}
+
+function DNSRecordTransfer({ record, workspace, client, onSaved, onCancel }: { record: DNSRecord; workspace: WorkspaceContext; client: NetworksClient; onSaved: (record: DNSRecord) => void; onCancel: () => void }) {
+  type Choice = Awaited<ReturnType<NetworksClient['dnsZoneCollection']>>['results'][number]
+  const [search, setSearch] = useState(''), [draft, setDraft] = useState(''), [page, setPage] = useState(1), [reload, setReload] = useState(0)
+  const [selected, setSelected] = useState<Choice | null>(null), [ownerName, setOwnerName] = useState(record.owner_name)
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [response, setResponse] = useState<{ key: string; value?: Awaited<ReturnType<NetworksClient['dnsZoneCollection']>> } | null>(null)
+  const key = `${workspace.kind}:${workspace.id}:${page}:${search}`
+  const result = response?.key === key ? response : null
+  const choices = result?.value?.results.filter((row) => row.id !== record.zone_id) ?? []
+  const dirty = Boolean(selected || draft || search || ownerName !== record.owner_name)
+  const attempt = useUnsavedChanges(dirty, busy, () => { setSelected(null); setOwnerName(record.owner_name) }, true)
+  useEffect(() => {
+    const controller = new AbortController()
+    client.dnsZoneCollection(workspace, { q: search, page, page_size: 25, ordering: 'name' }, controller.signal).then((value) => { if (!controller.signal.aborted) setResponse({ key, value }) }).catch(() => { if (!controller.signal.aborted) setResponse({ key }) })
+    return () => controller.abort()
+  }, [workspace, client, search, page, key, reload])
+  function suggestedOwner(zoneName: string) {
+    if (record.owner_name === record.zone_name) return zoneName
+    const suffix = `.${record.zone_name}`
+    return record.owner_name.endsWith(suffix) ? `${record.owner_name.slice(0, -suffix.length)}.${zoneName}` : record.owner_name
+  }
+  function find() { setSearch(draft); setPage(1) }
+  async function save() {
+    if (busy) return
+    if (!selected) { setError(t('dnsRecordMoveRequired')); return }
+    setBusy(true); setError('')
+    try {
+      const value = await client.moveDNSRecord(workspace, record.id, selected.id, record.zone_id, ownerName)
+      setSelected(null); setDraft(''); setSearch(''); setOwnerName(record.owner_name); onSaved(value)
+    } catch (caught) { setError(caught instanceof Error ? caught.message : t('dnsSaveFailed')) } finally { setBusy(false) }
+  }
+  return <section aria-label={t('dnsRecordMove')}>
+    <p>{t('dnsRecordMoveHelp')}</p>
+    {error && <p role="alert">{error}</p>}
+    <p>{t('dnsRecordMoveSelected')}: <strong>{selected?.name ?? t('dnsRecordMoveChoose')}</strong></p>
+    <div className="collection-search"><input type="search" maxLength={253} aria-label={t('dnsRecordMoveSearch')} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); find() } }} /><button type="button" className="secondary-button" onClick={find}>{translate('collections.searchAction')}</button></div>
+    {!result ? <p role="status">{translate('collections.loading')}</p> : !result.value ? <p role="alert">{t('dnsRecordMoveFailed')} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p> : <>
+      {choices.length || selected ? <label>{t('dnsRecordMoveChoices')}<select value={selected?.id ?? ''} onChange={event => { const row = choices.find(item => item.id === event.target.value); setSelected(row ?? null); setOwnerName(row ? suggestedOwner(row.name) : record.owner_name) }}><option value="">{t('dnsRecordMoveChoose')}</option>{selected && !choices.some(row => row.id === selected.id) && <option value={selected.id}>{selected.name}</option>}{choices.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label> : <p>{t('dnsRecordMoveEmpty')}</p>}
+      <CollectionPagination label={t('dnsRecordMoveChoices')} page={page} pageSize={25} count={result.value.count} hasMore={result.value.has_more} onPageChange={setPage} />
+    </>}
+    <label>{t('dnsRecordMoveOwner')}<input required maxLength={253} value={ownerName} onChange={event => setOwnerName(event.target.value)} /></label>
+    <p>{t('dnsRecordMoveOwnerHelp')}</p>
+    <div className="form-actions"><button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? translate('common.saving') : t('dnsRecordMoveSave')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => attempt(onCancel)}>{translate('common.cancel')}</button></div>
   </section>
 }

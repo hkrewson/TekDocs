@@ -39,13 +39,16 @@ async function fixtures(page: Page, kind: Kind, denied = false, failSave = false
   const child = { id: 'record-1', zone_id: 'dns-31', zone_name: 'zone31.invalid', owner_name: 'host.zone31.invalid', record_type: 'TXT', value: 'long-value'.repeat(400), ttl: 3600, priority: null, weight: null, port: null, ip_address_id: null, description: 'Record notes' }
   await page.route('**/collection-preferences/dns-records', route => route.fulfill({ json: { columns: ['name', 'record_type', 'value', 'ttl'], available_columns: ['name', 'record_type', 'value', 'ttl'], default_columns: ['name', 'record_type', 'value', 'ttl'], page_size: 25 } }))
   await page.route('**/networks/dns-records?*', route => {
-    expect(new URL(route.request().url()).searchParams.get('zone_id')).toBe('dns-31')
-    return route.fulfill({ json: { results: [child], count: 1, page: 1, page_size: 25, has_more: false, can_manage: !denied } })
+    const zoneId = new URL(route.request().url()).searchParams.get('zone_id')
+    const results = child.zone_id === zoneId ? [child] : []
+    return route.fulfill({ json: { results, count: results.length, page: 1, page_size: 25, has_more: false, can_manage: !denied } })
   })
   await page.route('**/networks/dns-records/record-1', route => {
     if (route.request().method() === 'PATCH') {
       if (failSave) return route.fulfill({ status: 409, json: { detail: 'Record changed. Your entries have been kept.' } })
-      Object.assign(child, route.request().postDataJSON() as Record<string, unknown>)
+      const values = route.request().postDataJSON() as Record<string, unknown>
+      Object.assign(child, values)
+      if (typeof values.zone_id === 'string') child.zone_name = records.find(item => item.id === values.zone_id)?.name ?? child.zone_name
     }
     return route.fulfill({ json: child })
   })
@@ -91,6 +94,20 @@ test('DNS failed edits survive tab changes and dismissal', async ({ page }) => {
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Keep editing' }).click()
   await expect(drawer.getByRole('textbox', { name: 'Value', exact: true })).toHaveValue('unsaved DNS value')
+})
+test('DNS records move to a searched zone with a compare-checked request', async ({ page }) => {
+  await fixtures(page, 'dns')
+  await page.goto('/networks?view=dns&dns=dns-31&dns_section=records&dns_record=record-1')
+  const drawer = page.getByRole('dialog', { name: 'zone31.invalid', exact: true })
+  await drawer.getByRole('button', { name: 'Move to another zone', exact: true }).click()
+  await drawer.getByRole('searchbox', { name: 'Search destination DNS zones', exact: true }).fill('zone30')
+  await drawer.getByRole('button', { name: 'Search', exact: true }).click()
+  await drawer.getByRole('combobox', { name: 'Available DNS zones', exact: true }).selectOption('dns-30')
+  await expect(drawer.getByLabel('Owner name in destination zone')).toHaveValue('host.zone30.invalid')
+  const request = page.waitForRequest(value => value.url().endsWith('/networks/dns-records/record-1') && value.method() === 'PATCH')
+  await drawer.getByRole('button', { name: 'Confirm move', exact: true }).click()
+  expect((await request).postDataJSON()).toEqual({ zone_id: 'dns-30', expected_zone_id: 'dns-31', owner_name: 'host.zone30.invalid' })
+  await expect(drawer.getByText('No DNS records match this search.', { exact: true })).toBeVisible()
 })
 test('DNS denied, unavailable, failed and empty states retain navigation', async ({ page }) => {
   await fixtures(page, 'dns', true)

@@ -30,6 +30,10 @@ class NetworkServiceError(ValueError):
     pass
 
 
+class NetworkServiceConflict(NetworkServiceError):
+    pass
+
+
 def canonical_dns_name(value: str) -> str:
     submitted = value.strip()
     candidate = submitted[:-1] if submitted.endswith(".") else submitted
@@ -343,6 +347,11 @@ def update_dns_record(*, record: DNSRecord, actor_id: UUID, values: dict[str, ob
         .get(pk=record.pk)
     )
     scope = DataScope.owner(locked.tenant, locked.organization)
+    if "zone_entity_id" in values:
+        if values.get("expected_zone_entity_id") != locked.zone.entity_id:
+            raise NetworkServiceConflict("The DNS zone changed. Reload the record before trying again.")
+        if values["zone_entity_id"] == locked.zone.entity_id:
+            raise NetworkServiceConflict("Choose a different DNS zone.")
     zone_id = cast(UUID, values.get("zone_entity_id", locked.zone.entity_id))
     zone = _related(scope, DNSZone, zone_id, "DNS zone")
     linked_ip_id = cast(NetworkIPAddress, locked.ip_address).entity_id if locked.ip_address_id else None

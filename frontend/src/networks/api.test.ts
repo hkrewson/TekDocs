@@ -60,6 +60,7 @@ describe('network inventory API client', () => {
     await browserNetworksClient.updateCircuitHandoff(workspace, 'circuit/1', 'handoff/1', {})
     await browserNetworksClient.createRack(workspace, { name: 'Core rack', site_id: 'site-1', location_id: null, unit_count: 42, status: 'active' })
     await browserNetworksClient.moveInterface(workspace, 'interface/1', 'device/2', 'device/1')
+    await browserNetworksClient.moveDNSRecord(workspace, 'record/1', 'zone/2', 'zone/1', 'host.destination.invalid')
 
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks?page=1&page_size=100', expect.any(Object))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks', expect.objectContaining({ method: 'POST' }))
@@ -82,6 +83,7 @@ describe('network inventory API client', () => {
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/circuits/circuit%2F1', expect.objectContaining({ method: 'PATCH' }))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/circuits/circuit%2F1/handoffs/handoff%2F1', expect.objectContaining({ method: 'PATCH' }))
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/interfaces/interface%2F1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ device_id: 'device/2', expected_device_id: 'device/1' }) }))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/dns-records/record%2F1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ zone_id: 'zone/2', expected_zone_id: 'zone/1', owner_name: 'host.destination.invalid' }) }))
     const post = vi.mocked(fetch).mock.calls.find(([url, options]) => options?.method === 'POST' && typeof url === 'string' && url.endsWith('/racks'))
     expect(post?.[0]).toBe('/api/v1/workspaces/organizations/client%2F1/networks/racks')
     expect((post?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('network-csrf')

@@ -12656,6 +12656,8 @@ export interface components {
         readonly PatchedRecordWrite: {
             /** Format: uuid */
             readonly zone_id?: string;
+            /** Format: uuid */
+            readonly expected_zone_id?: string;
             readonly owner_name?: string;
             /**
              * @description * `A` - A
@@ -13102,6 +13104,8 @@ export interface components {
         readonly RecordWrite: {
             /** Format: uuid */
             readonly zone_id: string;
+            /** Format: uuid */
+            readonly expected_zone_id?: string;
             readonly owner_name: string;
             /**
              * @description * `A` - A
@@ -23624,6 +23628,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["Record"];
                 };
             };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly workspaces_msp_networks_dns_zones_retrieve_list: {
@@ -32462,6 +32477,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Record"];
+                };
+            };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

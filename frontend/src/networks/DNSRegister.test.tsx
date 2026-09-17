@@ -16,16 +16,18 @@ function setup({ denied = false, fail = false, mismatch = false, initial = '', h
   else activity.mockResolvedValue({ results: [], count: 31, page: 1, page_size: 25, has_more: true, actions: [] })
   window.history.replaceState({}, '', `/networks?view=dns${initial}`)
   const zone = { id: 'zone-1', name: zoneName, description: 'Zone notes', record_count: 31 }
+  const destination = { id: 'zone-2', name: 'destination.invalid', description: 'Destination notes', record_count: 0 }
   const record = { id: 'record-1', zone_id: mismatch ? 'another-zone' : zone.id, zone_name: zone.name, owner_name: 'host.example.invalid', record_type: 'TXT', value: 'Documented value', ttl: 3600, priority: null, weight: null, port: null, ip_address_id: null, description: 'Record notes' }
   const result = { page: 1, page_size: 25, count: 31, has_more: true, can_manage: !denied }
   const write = fail ? vi.fn().mockRejectedValue(new Error('Record changed.')) : vi.fn().mockResolvedValue(record)
+  const move = fail ? vi.fn().mockRejectedValue(new Error('Zone changed.')) : vi.fn().mockResolvedValue({ ...record, zone_id: destination.id, zone_name: destination.name, owner_name: 'host.destination.invalid' })
   const dnsRecordCollection = vi.fn().mockResolvedValue({ ...result, results: [record] })
   const createDNSZone = vi.fn().mockResolvedValue(zone)
-  const client = { dnsZoneCollection: vi.fn().mockResolvedValue({ ...result, results: [zone] }), dnsZoneDetail: vi.fn().mockResolvedValue(zone), dnsRecordCollection, dnsRecordDetail: vi.fn().mockResolvedValue(record), updateDNSZone: vi.fn().mockResolvedValue(zone), createDNSZone, updateDNSRecord: write, createDNSRecord: write, addressCollection: vi.fn().mockResolvedValue({ ...result, results: [] }) } as unknown as NetworksClient
+  const client = { dnsZoneCollection: vi.fn().mockResolvedValue({ ...result, results: [zone, destination] }), dnsZoneDetail: vi.fn().mockResolvedValue(zone), dnsRecordCollection, dnsRecordDetail: vi.fn().mockResolvedValue(record), updateDNSZone: vi.fn().mockResolvedValue(zone), createDNSZone, updateDNSRecord: write, createDNSRecord: write, moveDNSRecord: move, addressCollection: vi.fn().mockResolvedValue({ ...result, results: [] }) } as unknown as NetworksClient
   const preferenceClient = { load: vi.fn().mockImplementation((_workspace, feature) => Promise.resolve(defaultPreferences(feature === 'dns-zones' ? ['name', 'record_count'] : ['name', 'record_type', 'value', 'ttl']))), save: vi.fn(), reset: vi.fn() }
   // Child preferences use the browser client; fallback defaults must remain usable.
   render(<ApplicationRouter><DNSRegister workspace={workspace} client={client} preferenceClient={preferenceClient} /></ApplicationRouter>)
-  return { activity, createDNSZone, dnsRecordCollection, client, write, user: userEvent.setup() }
+  return { activity, createDNSZone, dnsRecordCollection, client, write, move, user: userEvent.setup() }
 }
 it('loads records only on demand and scopes search to the selected zone', async () => {
   const { dnsRecordCollection, user } = setup()
@@ -86,6 +88,21 @@ it('guards a new record when returning to its collection', async () => {
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(within(drawer).getByLabelText('Owner name')).toHaveValue('unsaved.example.invalid')
   expect(write).not.toHaveBeenCalled()
+})
+
+it('moves a record with a suggested owner and guards a failed transfer', async () => {
+  const { user, move } = setup({ fail: true, initial: '&dns=zone-1&dns_section=records&dns_record=record-1' })
+  const drawer = await screen.findByRole('dialog', { name: 'example.invalid' })
+  await user.click(await within(drawer).findByRole('button', { name: 'Move to another zone' }))
+  await user.selectOptions(await within(drawer).findByLabelText('Available DNS zones'), 'zone-2')
+  expect(within(drawer).getByLabelText('Owner name in destination zone')).toHaveValue('host.destination.invalid')
+  await user.click(within(drawer).getByRole('button', { name: 'Confirm move' }))
+  expect(await within(drawer).findByRole('alert')).toHaveTextContent('Zone changed')
+  expect(move).toHaveBeenCalledWith(workspace, 'record-1', 'zone-2', 'zone-1', 'host.destination.invalid')
+  await user.click(within(drawer).getByRole('button', { name: 'Back to DNS records' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(within(drawer).getByLabelText('Available DNS zones')).toHaveValue('zone-2')
+  expect(move).toHaveBeenCalledTimes(1)
 })
 
 it('creates a zone through the focused drawer and guards unsaved tab changes', async () => {

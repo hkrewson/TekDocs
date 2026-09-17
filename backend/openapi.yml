@@ -11761,6 +11761,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/networks/dns-zones:
     get:
       operationId: workspaces_msp_networks_dns_zones_retrieve_list
@@ -24715,6 +24727,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-zones:
     get:
       operationId: workspaces_organizations_networks_dns_zones_retrieve_list
@@ -40936,6 +40960,9 @@ components:
         zone_id:
           type: string
           format: uuid
+        expected_zone_id:
+          type: string
+          format: uuid
         owner_name:
           type: string
           maxLength: 253
@@ -41940,6 +41967,9 @@ components:
       type: object
       properties:
         zone_id:
+          type: string
+          format: uuid
+        expected_zone_id:
           type: string
           format: uuid
         owner_name:

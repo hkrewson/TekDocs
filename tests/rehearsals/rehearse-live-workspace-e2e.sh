@@ -167,8 +167,8 @@ assert handoff.description == "Verified live demarc"
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_created").count() == 1
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_updated").count() == 2
 assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 3
-dns_zone = DNSZone.objects.get(name="live-layout.example.invalid")
-dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-layout.example.invalid")
+dns_zone = DNSZone.objects.get(name="live-transfer.example.invalid")
+dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-transfer.example.invalid")
 assert dns_zone.organization == organization
 assert dns_zone.tenant == organization.tenant
 assert dns_record.organization == organization
@@ -179,7 +179,7 @@ assert dns_record.value == "Live DNS value"
 assert dns_record.ttl == 600
 assert dns_record.ip_address_id is None
 assert sorted(AuditEvent.objects.filter(entity_id=dns_record.entity_id).values_list("action", flat=True)) == [
-    "dns_record.created", "dns_record.updated",
+    "dns_record.created", "dns_record.updated", "dns_record.updated",
 ]
 assert str(network_record.primary_dns) == "9.9.9.9"
 assert str(network_record.secondary_dns) == "1.1.1.1"

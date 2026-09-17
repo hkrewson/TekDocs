@@ -1,6 +1,6 @@
 # Progress and verification
 
-Updated 2026-09-12. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+Updated 2026-09-17. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
 ## Completed implementation slices
 
@@ -1713,6 +1713,40 @@ lock now targets only the device row. A repeated full gate then exposed an immed
 capability assertion in the new component test; waiting for the asynchronously loaded
 authorized section removed that timing sensitivity and passed three focused repeats
 plus the complete target rerun.
+
+Remaining network surfaces, technician walkthroughs and broader Phase 3/pre-1.0
+acceptance remain open. Existing application and demo data were preserved. No push,
+production deployment, release/version change or Wiki publication occurred.
+
+## 2026-09-17 — Conflict-safe DNS record transfer
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Selected DNS records now offer **Move to another zone** inside the existing record
+view. The action searches exact-workspace zones in bounded pages and suggests the
+corresponding owner name while keeping it editable. Search, selection and owner-name
+drafts participate in the shared navigation guard; failed writes remain visible and
+are not retried automatically.
+
+Transfer uses an isolated three-field PATCH containing destination zone, expected
+current zone and owner name. The locked service rejects stale, same-zone,
+cross-workspace, mixed-edit and invalid-owner requests while retaining the record's
+type, value, TTL, type-specific fields, IP link, description, identity and history.
+No route, model, migration, permission, dependency or CSS changed. OpenAPI and the
+generated client contract include the expected-zone field and conflict response.
+
+Focused service, component, API-client and responsive browser coverage exercise the
+bounded workflow and its failure protection. The live browser journey creates two
+zones, moves an edited TXT record, reloads it from the destination and independently
+checks exact ownership, retained TTL/value/IP state and three append-only audit
+events in PostgreSQL. See [dns-record-transfer.md](dns-record-transfer.md) for the
+implemented contract and final gate evidence.
+
+Final verification: `make check` exits 0 with backend lint and types, migration and
+API-schema agreement, all 581 frontend tests in 116 files, coverage, the production
+build and existing bundle budgets. The focused move passes in Chromium, Firefox and
+WebKit. The isolated live browser-to-Django-to-PostgreSQL journey and its independent
+database assertions pass. The complete `make test-network-validation` PostgreSQL,
+stabilization and repeated 581-test frontend workflow also exits 0.
 
 Remaining network surfaces, technician walkthroughs and broader Phase 3/pre-1.0
 acceptance remain open. Existing application and demo data were preserved. No push,

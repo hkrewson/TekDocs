@@ -4758,6 +4758,27 @@ paths:
   /api/v1/organizations:
     get:
       operationId: organizations_list
+      parameters:
+      - in: query
+        name: classification
+        schema:
+          type: string
+      - in: query
+        name: ordering
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
       tags:
       - organizations
       security:
@@ -4768,9 +4789,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Organization'
+                $ref: '#/components/schemas/OrganizationResult'
           description: ''
           headers:
             X-Request-ID:
@@ -39667,6 +39686,27 @@ components:
       - assigned_staff
       - id
       - name
+    OrganizationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     OrganizationStaffWrite:
       type: object
       properties:

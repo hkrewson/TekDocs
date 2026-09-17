@@ -406,7 +406,7 @@ def test_runtime_role_administrator_can_create_and_reopen_fail_closed_organizati
     assert created.status_code == 201
     assert person_created.status_code == 201
     assert created.json()["access_mode"] == OrganizationAccessMode.ASSIGNED_ONLY
-    assert [item["name"] for item in listed.json()] == ["Runtime Created Client"]
+    assert [item["name"] for item in listed.json()["results"]] == ["Runtime Created Client"]
     organization = Organization.objects.get(entity_id=created.json()["id"])
     assert organization.entity.organization_id is None
     assert OrganizationAccessAssignment.objects.filter(

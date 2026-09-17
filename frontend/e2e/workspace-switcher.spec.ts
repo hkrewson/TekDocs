@@ -44,7 +44,7 @@ const clientWorkspace = {
   name: 'Acme Dental',
   classifications: ['client'],
   capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials', 'services', 'vendors'],
-  organization: { id: '', name: 'Acme Dental', legal_name: 'Acme Dental, LLC', website: '', classifications: ['client'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
+  organization: { id: '', name: 'Acme Dental', legal_name: 'Acme Dental, LLC', website: '', classifications: ['client'], access_mode: 'assigned_only', created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 clientWorkspace.organization.id = clientWorkspace.id
 
@@ -54,7 +54,7 @@ const supplierWorkspace = {
   name: 'Northwind Supply',
   classifications: ['vendor', 'manufacturer'],
   capabilities: ['overview', 'people', 'sites', 'custom_fields', 'documentation', 'files', 'products'],
-  organization: { id: '', name: 'Northwind Supply', legal_name: 'Northwind Supply Company', website: '', classifications: ['vendor', 'manufacturer'], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
+  organization: { id: '', name: 'Northwind Supply', legal_name: 'Northwind Supply Company', website: '', classifications: ['vendor', 'manufacturer'], access_mode: 'assigned_only', created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z' },
 }
 supplierWorkspace.organization.id = supplierWorkspace.id
 
@@ -175,7 +175,7 @@ async function mockWorkspaceApplication(page: Page) {
     if (url.pathname.endsWith('/people')) {
       return route.fulfill({ json: { results: [person], page: 1, page_size: 25, count: 1, has_more: false } })
     }
-    if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], count: 1 } })
+    if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], page: 1, page_size: 25, count: 1, has_more: false } })
     if (url.pathname.endsWith('/documents/search')) return route.fulfill({ json: { results: [], count: 0, collections: [], tags: [], health: [] } })
     if (url.pathname.endsWith('/documents/operations/choices')) return route.fulfill({ json: [] })
     if (url.pathname.endsWith('/documents/template-library')) return route.fulfill({ json: { results: [], count: 0 } })
@@ -322,7 +322,7 @@ test('client People directory supports field controls and remains accessible', a
   await page.goto(`/workspaces/organizations/${clientWorkspace.id}/people`)
 
   await expect(page.getByRole('heading', { name: 'People' })).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'Jordan Avery', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Jordan Avery', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Choose visible columns' }).click()
   await page.getByRole('checkbox', { name: 'Responsibility' }).check()
   await expect(page.getByRole('columnheader', { name: 'Responsibility' })).toBeVisible()
@@ -337,6 +337,7 @@ test('client Sites area shows nested workspace-owned locations accessibly', asyn
   await page.goto(`/workspaces/organizations/${clientWorkspace.id}/sites`)
 
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible()
+  await page.getByRole('button', { name: 'North Campus', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'North Campus' })).toBeVisible()
   await expect(page.getByText('Office 214')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sites' })).toHaveAttribute('href', `/workspaces/organizations/${clientWorkspace.id}/sites`)
@@ -353,8 +354,8 @@ test('client custom-field definitions and Site values remain workspace scoped an
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Sites' }).click()
-  await page.locator('summary[aria-label="More actions for North Campus"]').click()
-  await page.getByRole('button', { name: 'Custom fields for site North Campus' }).click()
+  await page.getByRole('button', { name: 'North Campus', exact: true }).click()
+  await page.getByRole('button', { name: 'Fields', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Custom fields for North Campus' })).toBeVisible()
   const doorCode = page.getByRole('textbox', { name: 'Door code' })
   await expect(doorCode).toHaveValue('4231')

@@ -90,6 +90,31 @@ class OrganizationSerializer(serializers.Serializer):
         return sorted(classification.kind for classification in organization.classifications.all())
 
 
+class OrganizationQuerySerializer(StrictQuerySerializer):
+    q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+    classification = serializers.ChoiceField(
+        choices=OrganizationKind.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "legal_name", "-legal_name", "website", "-website"),
+        required=False,
+        default="name",
+    )
+    page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
+
+
+class OrganizationResultSerializer(serializers.Serializer):
+    results = OrganizationSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
 class WorkspaceContextSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=("msp", "organization"))
     id = serializers.UUIDField()

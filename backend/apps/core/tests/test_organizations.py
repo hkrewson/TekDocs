@@ -66,8 +66,13 @@ def test_owner_can_create_list_read_update_and_archive_organization(owner_client
     listed = owner_client.get(reverse("organization-list-create"))
     detail = owner_client.get(reverse("organization-detail", kwargs={"entity_id": entity_id}))
     assert listed.status_code == 200
-    assert listed.json() == [created.json()]
+    assert listed.json()["results"] == [created.json()]
+    assert listed.json()["page"] == 1
+    assert listed.json()["page_size"] == 25
+    assert listed.json()["count"] == 1
+    assert listed.json()["has_more"] is False
     assert detail.json() == created.json()
+    assert owner_client.get(reverse("organization-list-create"), {"typo": "ignored"}).status_code == 400
 
     updated = owner_client.patch(
         reverse("organization-detail", kwargs={"entity_id": entity_id}),
@@ -97,12 +102,41 @@ def test_owner_can_create_list_read_update_and_archive_organization(owner_client
     assert archived.status_code == 204
     organization.entity.refresh_from_db()
     assert organization.entity.archived_at is not None
-    assert owner_client.get(reverse("organization-list-create")).json() == []
+    assert owner_client.get(reverse("organization-list-create")).json()["results"] == []
     assert owner_client.get(reverse("organization-detail", kwargs={"entity_id": entity_id})).status_code == 404
     assert list(
         AuditEvent.objects.filter(entity_id=entity_id).values_list("action", flat=True).order_by("occurred_at")
     ) == ["organization.created", "organization.updated", "organization.updated", "organization.archived"]
     assert not AuditEvent.objects.filter(entity_id=entity_id).exclude(metadata={}).exists()
+
+
+@pytest.mark.django_db
+def test_organization_collection_is_searchable_sorted_and_bounded(owner_client):
+    url = reverse("organization-list-create")
+    for index in range(27):
+        response = owner_client.post(
+            url,
+            organization_payload(
+                name=f"Organization {index:02d}",
+                legal_name=f"Legal Entity {index:02d}",
+                classifications=["vendor"] if index % 2 else ["client"],
+            ),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    first_page = owner_client.get(url, {"page_size": 10, "ordering": "-name"})
+    filtered = owner_client.get(url, {"q": "Legal Entity 04", "classification": "client"})
+
+    assert first_page.status_code == 200
+    assert first_page.json()["count"] == 27
+    assert first_page.json()["has_more"] is True
+    assert [organization["name"] for organization in first_page.json()["results"]] == [
+        f"Organization {index:02d}" for index in range(26, 16, -1)
+    ]
+    assert filtered.status_code == 200
+    assert filtered.json()["count"] == 1
+    assert filtered.json()["results"][0]["name"] == "Organization 04"
 
 
 @pytest.mark.django_db

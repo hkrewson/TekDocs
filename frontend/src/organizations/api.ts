@@ -7,15 +7,20 @@ export type Organization = {
   name: string
   legal_name: string
   website: string
+  access_mode: 'assigned_only' | 'all_authorized'
   classifications: OrganizationClassification[]
   created_at: string
   updated_at: string
 }
 
 export type OrganizationInput = Pick<Organization, 'name' | 'legal_name' | 'website' | 'classifications'>
+export type OrganizationOrdering = 'name' | '-name' | 'legal_name' | '-legal_name' | 'website' | '-website'
+export type OrganizationQuery = { q: string; classification: OrganizationClassification | ''; ordering: OrganizationOrdering; page: number; page_size: number }
+export type OrganizationResult = { results: Organization[]; page: number; page_size: number; count: number; has_more: boolean }
 
 export interface OrganizationClient {
-  list(): Promise<Organization[]>
+  list(query: OrganizationQuery, signal?: AbortSignal): Promise<OrganizationResult>
+  retrieve(id: string, signal?: AbortSignal): Promise<Organization>
   create(input: OrganizationInput): Promise<Organization>
   update(id: string, input: OrganizationInput): Promise<Organization>
   archive(id: string): Promise<void>
@@ -67,13 +72,31 @@ function writeError(response: Response): AuthRequestError {
 }
 
 export const browserOrganizationClient: OrganizationClient = {
-  async list() {
-    const response = await fetch('/api/v1/organizations', {
+  async list(query, signal) {
+    const parameters = new URLSearchParams({
+      ordering: query.ordering,
+      page: String(query.page),
+      page_size: String(query.page_size),
+    })
+    if (query.q) parameters.set('q', query.q)
+    if (query.classification) parameters.set('classification', query.classification)
+    const response = await fetch(`/api/v1/organizations?${parameters}`, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
+      signal,
     })
     if (!response.ok) throw new AuthRequestError('Organizations could not be loaded.', response.status)
-    return json<Organization[]>(response)
+    return json<OrganizationResult>(response)
+  },
+
+  async retrieve(id, signal) {
+    const response = await fetch(`/api/v1/organizations/${encodeURIComponent(id)}`, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    })
+    if (!response.ok) throw new AuthRequestError('That organization is unavailable or you no longer have access.', response.status)
+    return json<Organization>(response)
   },
 
   async create(input) {

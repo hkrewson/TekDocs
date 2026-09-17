@@ -11997,6 +11997,13 @@ export interface components {
             readonly access_mode: "all_authorized" | "assigned_only";
             readonly assigned_staff: readonly components["schemas"]["AssignedStaff"][];
         };
+        readonly OrganizationResult: {
+            readonly results: readonly components["schemas"]["Organization"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+        };
         readonly OrganizationStaffWrite: {
             /** Format: uuid */
             readonly user_id: string;
@@ -18305,7 +18312,13 @@ export interface operations {
     };
     readonly organizations_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly classification?: string;
+                readonly ordering?: string;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -18319,7 +18332,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Organization"][];
+                    readonly "application/json": components["schemas"]["OrganizationResult"];
                 };
             };
             /** @description Organization view permission required */

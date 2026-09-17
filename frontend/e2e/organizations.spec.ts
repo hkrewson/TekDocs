@@ -20,22 +20,24 @@ test('organization administration supports create, edit, filter, and archive', a
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
-  await page.route('**/api/v1/organizations', async (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: organizations })
-    expect(route.request().headers()['x-csrftoken']).toBeTruthy()
-    const input = route.request().postDataJSON() as OrganizationInput
-    organizations = [{ id, ...input, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]
-    return route.fulfill({ status: 201, json: organizations[0] })
-  })
-  await page.route(`**/api/v1/organizations/${id}`, async (route) => {
+  await page.route('**/api/v1/organizations**', async (route) => {
+    const detail = new URL(route.request().url()).pathname.endsWith(`/${id}`)
+    if (route.request().method() === 'GET') {
+      if (detail) return route.fulfill({ json: organizations[0] })
+      return route.fulfill({ json: { results: organizations, page: 1, page_size: 25, count: organizations.length, has_more: false } })
+    }
     expect(route.request().headers()['x-csrftoken']).toBeTruthy()
     if (route.request().method() === 'DELETE') {
       organizations = []
       return route.fulfill({ status: 204 })
     }
     const input = route.request().postDataJSON() as OrganizationInput
-    organizations = [{ ...organizations[0], ...input, updated_at: new Date().toISOString() }]
-    return route.fulfill({ json: organizations[0] })
+    if (detail) {
+      organizations = [{ ...organizations[0], ...input, updated_at: new Date().toISOString() }]
+      return route.fulfill({ json: organizations[0] })
+    }
+    organizations = [{ id, ...input, access_mode: 'assigned_only', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]
+    return route.fulfill({ status: 201, json: organizations[0] })
   })
 
   await page.goto('/organizations')
@@ -47,13 +49,13 @@ test('organization administration supports create, edit, filter, and archive', a
   await expect(page.getByRole('status')).toHaveText('Acme Dental was added.')
   await expect(page.getByText('Client, Partner')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Edit Acme Dental' }).click()
+  await page.getByRole('button', { name: 'Edit details' }).click()
   await page.getByLabel('Display name').fill('Acme Health')
   await page.getByRole('button', { name: 'Save organization' }).click()
-  await expect(page.getByRole('button', { name: 'Edit Acme Health' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Acme Health' })).toBeVisible()
   await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
 
-  await page.getByRole('button', { name: 'Archive Acme Health' }).click()
+  await page.getByRole('button', { name: 'Archive', exact: true }).click()
   await page.getByRole('button', { name: 'Archive organization' }).click()
   await expect(page.getByRole('status')).toHaveText('Acme Health was moved to the recycle bin.')
   await expect(page.getByText('No organizations have been added.')).toBeVisible()

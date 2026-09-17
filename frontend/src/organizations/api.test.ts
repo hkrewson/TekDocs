@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthRequestError } from '../auth/api'
 import { browserOrganizationClient } from './api'
-import type { Organization, OrganizationInput } from './api'
+import type { Organization, OrganizationInput, OrganizationQuery } from './api'
 
 const input: OrganizationInput = {
   name: 'Acme Dental',
@@ -13,9 +13,11 @@ const input: OrganizationInput = {
 const organization: Organization = {
   id: '00000000-0000-4000-8000-000000000010',
   ...input,
+  access_mode: 'assigned_only',
   created_at: '2026-08-08T12:00:00Z',
   updated_at: '2026-08-08T12:00:00Z',
 }
+const query: OrganizationQuery = { q: 'acme dental', classification: 'client', ordering: '-name', page: 2, page_size: 25 }
 
 describe('browserOrganizationClient', () => {
   beforeEach(() => {
@@ -23,13 +25,25 @@ describe('browserOrganizationClient', () => {
   })
 
   it('loads the tenant organization collection', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([organization]), { status: 200 }))
+    const payload = { results: [organization], page: 2, page_size: 25, count: 26, has_more: false }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(browserOrganizationClient.list()).resolves.toEqual([organization])
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/organizations', {
+    await expect(browserOrganizationClient.list(query)).resolves.toEqual(payload)
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/organizations?ordering=-name&page=2&page_size=25&q=acme+dental&classification=client', {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
+      signal: undefined,
+    })
+  })
+
+  it('retrieves one organization for direct record links', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(organization), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserOrganizationClient.retrieve(organization.id)).resolves.toEqual(organization)
+    expect(fetchMock).toHaveBeenCalledWith(`/api/v1/organizations/${organization.id}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: undefined,
     })
   })
 

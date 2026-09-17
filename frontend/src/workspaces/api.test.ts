@@ -14,6 +14,7 @@ const workspace: WorkspaceContext = {
     name: 'Acme Dental',
     legal_name: 'Acme Dental Associates, LLC',
     website: 'https://acme.example.com',
+    access_mode: 'assigned_only',
     classifications: ['client', 'vendor'],
     created_at: '2026-08-08T12:00:00Z',
     updated_at: '2026-08-08T12:00:00Z',

@@ -7,7 +7,7 @@ import type { CustomFieldDefinition, CustomFieldsClient } from './api'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: '00000000-0000-4000-8000-000000000010', name: 'Acme Dental', classifications: ['client'], capabilities: ['overview', 'sites', 'custom_fields'],
-  organization: { id: '00000000-0000-4000-8000-000000000010', name: 'Acme Dental', legal_name: '', website: '', classifications: ['client'], created_at: '', updated_at: '' },
+  organization: { id: '00000000-0000-4000-8000-000000000010', name: 'Acme Dental', legal_name: '', website: '', access_mode: 'assigned_only', classifications: ['client'], created_at: '', updated_at: '' },
 }
 const version = { id: '00000000-0000-4000-8000-000000000021', version: 1, label: 'Door code', description: 'Facilities entry code', required: false, field_type: 'text' as const, schema: { type: 'string' }, display_order: 1, created_at: '' }
 const definition: CustomFieldDefinition = { id: '00000000-0000-4000-8000-000000000020', key: 'door_code', entity_type: 'site', owner: 'organization', organization_id: workspace.id, inherited: false, archived: false, current_version: version, versions: [version] }

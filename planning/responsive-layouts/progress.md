@@ -1677,3 +1677,43 @@ Hardware rebinding, remaining network surfaces, technician walkthroughs and broa
 Phase 3/pre-1.0 acceptance remain open. Existing application and demo data were
 preserved. No push, production deployment, release/version change or Wiki publication
 occurred.
+
+## 2026-09-16 — Conflict-safe device hardware replacement
+
+Completed the next bounded Phase 3 #80 slice under #60/#75 at version 0.8.46.
+Authorized device records now include a Hardware section in the existing drawer and
+full-page view. It supports direct URLs and a bounded, paged search of unlinked
+hardware assets in the exact workspace. The section requires both network-edit and
+asset-view access. Search and selection drafts participate in the shared navigation
+guard, remain visible after failed writes and are never retried automatically.
+
+Replacement uses an isolated two-field PATCH containing the new asset and expected
+current asset. The service locks only the device row, rejects stale, same, occupied
+and cross-workspace choices, and preserves placement, interfaces, endpoints and typed
+relationships. Ordinary device and placement edits cannot change the hardware
+binding. No route, model, migration, permission grant, dependency or CSS changed.
+OpenAPI and generated client types are aligned with the additive conflict response,
+expected-binding field and combined capability.
+
+Final verification: all 11 focused PostgreSQL inventory tests pass, covering success,
+conflicts, scope, permission denial, separation from ordinary edits and audit history.
+The frontend gate passes with 580 tests in 116 files, lint, typecheck, API agreement,
+coverage, production build and existing bundle budgets. All 36 focused device browser
+cases pass across Chromium, Firefox and WebKit at the six maintained widths, including
+touch replacement, reload, navigation protection and accessibility. `make check` and
+the complete `make test-network-validation` PostgreSQL, stabilization and repeated
+frontend workflow both exit 0.
+
+The isolated browser-to-Django-to-PostgreSQL journey passes. It replaces a device's
+hardware after creating placement, interfaces, endpoints and a relationship;
+independent database assertions confirm the replacement, released original asset,
+retained connected records and three append-only device update events. The first live
+run exposed a PostgreSQL nullable-join row-lock defect in ordinary device edits; the
+lock now targets only the device row. A repeated full gate then exposed an immediate
+capability assertion in the new component test; waiting for the asynchronously loaded
+authorized section removed that timing sensitivity and passed three focused repeats
+plus the complete target rerun.
+
+Remaining network surfaces, technician walkthroughs and broader Phase 3/pre-1.0
+acceptance remain open. Existing application and demo data were preserved. No push,
+production deployment, release/version change or Wiki publication occurred.

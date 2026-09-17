@@ -10,9 +10,10 @@ register uses bounded server search, status/role filters, deterministic ordering
 rack, starting unit. Mobile rows prioritize identity, role, status and rack; site
 and unit details remain in the drawer. No page-spanning selection is introduced.
 
-Record names open the complete Overview/Placement/History drawer. Overview shows
-operational facts and the permitted hardware identity. Placement includes site,
-location, rack and unit occupancy. History loads entity-filtered activity on demand.
+Record names open the complete Overview/Hardware/Placement/Interfaces/Relationships/
+History drawer. Overview shows operational facts and the permitted hardware identity.
+Hardware provides a focused replacement workflow. Placement includes site, location,
+rack and unit occupancy. History loads entity-filtered activity on demand.
 The optional full-page link, direct record/section URLs, refresh and browser history
 retain context. Drawers close through backdrop/Escape or mobile Back, with one
 scrolling body and a labeled mobile Sections selector. Dirty/busy protection applies
@@ -24,8 +25,10 @@ hardware asset ID or replace physical placement. Placement edits send only place
 fields. Outside a rack, site/location are optional and changing site clears location.
 Inside a rack, site/location follow the server's selected rack. Capacity and overlap
 rules remain authoritative. A failed move retains rack choice and unit values.
-Existing hardware bindings are not editable in this checkpoint; binding replacement
-needs its own focused workflow and asset authorization.
+Hardware replacement is isolated from ordinary edits in its own permission-aware
+section. It uses bounded available-asset search and requires the expected current
+binding so stale requests cannot silently replace a newer assignment. Details are
+recorded in [device-hardware.md](device-hardware.md).
 
 Creation chooses an authorized, unlinked hardware asset from a bounded search by
 name. New records start unplaced; placement is set in the dedicated section after
@@ -41,6 +44,9 @@ a nested drawer. Browser Back restores the rack's selected child and list contex
 Existing assignment-choice routes accept `kind=hardware_asset`: exact-workspace,
 active hardware assets without a device binding, name search, name/entity-ID ordering,
 default 25 and maximum 100 results. Asset-view permission is explicitly required.
+Focused hardware replacement PATCHes only the replacement and expected current asset;
+the service locks the device, rejects stale and same-asset requests and retains the
+device's placement, interfaces and other facts.
 Other kinds and legacy unpaginated choice behavior are retained. Device collection
 responses add `can_create`, computed by the existing policy service. Existing write
 services revalidate authorization, binding uniqueness and physical placement.
@@ -66,9 +72,10 @@ Executed outcomes are recorded in progress.md.
 This is the device register/core editing checkpoint, not full network acceptance.
 Interfaces and their addresses/MAC records are implemented in the linked follow-up
 records. Device relationship editing is implemented in
-[device-relationships.md](device-relationships.md). Hardware-binding replacement,
-other surfaces, technician validation and final release/recovery obligations remain
-open. No production publication or version bump.
+[device-relationships.md](device-relationships.md), and hardware replacement is
+implemented in [device-hardware.md](device-hardware.md). Other surfaces, technician
+validation and final release/recovery obligations remain open. No production
+publication or version bump.
 
 ### Handoff for the next interface slice
 
@@ -93,6 +100,6 @@ sibling-workspace denial, failed partial saves, refresh and parent return. Inter
 IP/MAC children need their own bounded retrieval and binding checks; do not preload
 all addresses or expand the new section into the old stacked workspace. Existing
 IP assignment, MAC uniqueness, permissions and audit services remain authoritative.
-Rack placement and hardware-binding replacement stay separate from interface edits.
+Rack placement and hardware replacement stay separate from interface edits.
 
 Interface collection/core editing is now implemented in [device-interfaces.md](device-interfaces.md). The handoff above records the prior starting point; IP/MAC children and reassignment remain open.

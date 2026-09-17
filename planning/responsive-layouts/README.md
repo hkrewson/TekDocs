@@ -72,6 +72,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 - [Devices register and core editing](device-register.md)
 
+- [Device hardware replacement](device-hardware.md)
+
 - [Interfaces within device records](device-interfaces.md)
 
 - [Interface IP/MAC records and assignment](interface-endpoints.md)

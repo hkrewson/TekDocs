@@ -17,6 +17,7 @@ type ChildRecord = { id: string; circuit_id?: string; zone_id?: string; subnet_i
 export type ChildRecordProps<D> = {
   record: D | null
   canManage: boolean
+  canRebindHardware?: boolean
   relationshipAccess?: { view: boolean; create: boolean; archive: boolean }
   onSaved: (record: D) => void
   onReturn: () => void
@@ -66,6 +67,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   const detailKey = `${config.feature}:${workspace.kind}:${workspace.id}:${subnetId}:${selected}`
   const result = response?.key === key ? response.result : null
   const relationshipCapabilities = result as typeof result & Partial<{
+    can_rebind_hardware: boolean
     can_view_relationships: boolean
     can_create_relationships: boolean
     can_archive_relationships: boolean
@@ -102,7 +104,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   }
   const recordContent = <>
       {standalone && notice && <p role="status">{notice}</p>}
-      {selected === 'new' || record ? <RecordComponent key={selected} record={record ?? null} workspace={workspace} subnetId={subnetId} parentId={subnetId} client={client} canManage={Boolean(result?.can_manage)} relationshipAccess={{ view: Boolean(relationshipCapabilities?.can_view_relationships), create: Boolean(relationshipCapabilities?.can_create_relationships), archive: Boolean(relationshipCapabilities?.can_archive_relationships) }} onSaved={saved} onReturn={() => browse({ [config.key]: null })} /> : <><button type="button" className="secondary-button" onClick={() => browse({ [config.key]: null })}>{config.back}</button><p role={detail?.key === detailKey ? 'alert' : 'status'}>{translate(detail?.key === detailKey ? 'collections.recordUnavailable' : 'collections.loading')}</p></>}
+      {selected === 'new' || record ? <RecordComponent key={selected} record={record ?? null} workspace={workspace} subnetId={subnetId} parentId={subnetId} client={client} canManage={Boolean(result?.can_manage)} canRebindHardware={Boolean(relationshipCapabilities?.can_rebind_hardware)} relationshipAccess={{ view: Boolean(relationshipCapabilities?.can_view_relationships), create: Boolean(relationshipCapabilities?.can_create_relationships), archive: Boolean(relationshipCapabilities?.can_archive_relationships) }} onSaved={saved} onReturn={() => browse({ [config.key]: null })} /> : <><button type="button" className="secondary-button" onClick={() => browse({ [config.key]: null })}>{config.back}</button><p role={detail?.key === detailKey ? 'alert' : 'status'}>{translate(detail?.key === detailKey ? 'collections.recordUnavailable' : 'collections.loading')}</p></>}
   </>
   const collectionContent = <>
       <Heading id={`network-child-${config.key}`} ref={heading} tabIndex={-1}>{config.title}</Heading>

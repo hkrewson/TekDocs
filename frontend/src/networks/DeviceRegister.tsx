@@ -12,6 +12,7 @@ import { NetworkChildCollection } from './NetworkChildCollection'
 import type { ChildCollectionConfig, ChildRecordProps } from './NetworkChildCollection'
 import type { DeviceWrite, NetworkDevice, NetworksClient } from './api'
 import { DeviceInterfaces } from './DeviceInterfaces'
+import { DeviceHardware } from './DeviceHardware'
 import { NetworkRelationships } from './NetworkRelationships'
 import { DeviceChoice } from './DeviceChoice'
 import { RackPlaceChoice } from './RackPlaceChoice'
@@ -32,17 +33,17 @@ export function DeviceRegister({ workspace, client, relationshipsClient = browse
   return <DeviceRelationshipsClientContext.Provider value={relationshipsClient}><div className="device-register"><NetworkChildCollection standalone workspace={workspace} subnetId="" client={client} preferenceClient={preferenceClient} config={config} RecordComponent={DeviceRecord} /></div></DeviceRelationshipsClientContext.Provider>
 }
 type Props = ChildRecordProps<NetworkDevice> & { workspace: WorkspaceContext; client: NetworksClient }
-function DeviceRecord({ record, workspace, client, canManage, relationshipAccess, onSaved, onReturn }: Props) {
+function DeviceRecord({ record, workspace, client, canManage, canRebindHardware, relationshipAccess, onSaved, onReturn }: Props) {
   const [params] = useSearchParams(), location = useLocation()
   const relationshipsClient = useContext(DeviceRelationshipsClientContext)
   const requested = params.get('devices_section')
-  const section = record && (requested === 'placement' || requested === 'history' || requested === 'interfaces' || (requested === 'relationships' && relationshipAccess?.view)) ? requested : 'overview'
+  const section = record && (requested === 'placement' || requested === 'history' || requested === 'interfaces' || (requested === 'hardware' && canRebindHardware) || (requested === 'relationships' && relationshipAccess?.view)) ? requested : 'overview'
   function href(id: string) { const next = new URLSearchParams(params); next.set('devices_section', id); return `${location.pathname}?${next}` }
-  const sections = ['overview', 'placement', 'interfaces', ...(relationshipAccess?.view ? ['relationships'] : []), 'history']
+  const sections = ['overview', ...(canRebindHardware ? ['hardware'] : []), 'placement', 'interfaces', ...(relationshipAccess?.view ? ['relationships'] : []), 'history']
   return <article className="record-page">
     {params.get('devices_full') === 'true' && <RecordHeader title={record?.name ?? t('devicesNew')} recordId={record?.id ?? 'new'} section={section} />}
-    {record && <RecordSections current={section} sections={sections.map((id) => ({ id, label: id === 'interfaces' ? t('interfaces') : id === 'relationships' ? t('deviceRelationships') : id === 'placement' ? t('devicePlacement') : translate(id === 'history' ? 'collections.history' : 'collections.overview'), href: href(id) }))} />}
-    {section === 'interfaces' && record ? <DeviceInterfaces key={record.id} workspace={workspace} deviceId={record.id} client={client} /> : section === 'relationships' && record ? <NetworkRelationships key={record.id} workspace={workspace} deviceId={record.id} deviceName={record.name} canCreate={Boolean(relationshipAccess?.create)} canArchive={Boolean(relationshipAccess?.archive)} client={relationshipsClient} /> : section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t('devicesHistoryHelp')} emptyLabel={t('devicesHistoryEmpty')} deniedLabel={t('devicesHistoryDenied')} /> : section === 'placement' && record ? <DevicePlacement key={record.id} record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} /> : <DeviceOverview record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} />}
+    {record && <RecordSections current={section} sections={sections.map((id) => ({ id, label: id === 'interfaces' ? t('interfaces') : id === 'hardware' ? t('deviceHardware') : id === 'relationships' ? t('deviceRelationships') : id === 'placement' ? t('devicePlacement') : translate(id === 'history' ? 'collections.history' : 'collections.overview'), href: href(id) }))} />}
+    {section === 'hardware' && record ? <DeviceHardware key={record.id} record={record} workspace={workspace} client={client} onSaved={onSaved} /> : section === 'interfaces' && record ? <DeviceInterfaces key={record.id} workspace={workspace} deviceId={record.id} client={client} /> : section === 'relationships' && record ? <NetworkRelationships key={record.id} workspace={workspace} deviceId={record.id} deviceName={record.name} canCreate={Boolean(relationshipAccess?.create)} canArchive={Boolean(relationshipAccess?.archive)} client={relationshipsClient} /> : section === 'history' && record ? <RecordActivity workspace={workspace} entityId={record.id} description={t('devicesHistoryHelp')} emptyLabel={t('devicesHistoryEmpty')} deniedLabel={t('devicesHistoryDenied')} /> : section === 'placement' && record ? <DevicePlacement key={record.id} record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} /> : <DeviceOverview record={record} workspace={workspace} client={client} canManage={canManage} onSaved={onSaved} onReturn={onReturn} />}
   </article>
 }
 function DeviceOverview({ record, workspace, client, canManage, onSaved, onReturn }: Props) {

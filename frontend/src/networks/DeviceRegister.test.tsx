@@ -11,12 +11,13 @@ const workspace = { kind: 'msp', id: 'msp', name: 'MSP' } as WorkspaceContext
 function setup(denied = false, failed = false, createAllowed = true, relationshipAccess = false, initialPath = '/networks?view=devices') {
   window.history.replaceState({}, '', initialPath)
   const record = { id: 'device-1', name: 'Core switch', role: 'switch', status: 'active', hardware_asset_id: null, hardware_asset_name: null, site_id: 'site-1', site_name: 'Campus', location_id: null, location_name: null, rack_id: 'rack-1', rack_name: 'Core rack', rack_unit: 2, rack_units: 1 }
-  const deviceCollection = vi.fn().mockResolvedValue({ results: [record], count: 31, page: 1, page_size: 25, has_more: true, can_manage: !denied, can_create: createAllowed && !denied, can_view_relationships: relationshipAccess, can_create_relationships: relationshipAccess, can_archive_relationships: relationshipAccess })
+  const deviceCollection = vi.fn().mockResolvedValue({ results: [record], count: 31, page: 1, page_size: 25, has_more: true, can_manage: !denied, can_create: createAllowed && !denied, can_rebind_hardware: createAllowed && !denied, can_view_relationships: relationshipAccess, can_create_relationships: relationshipAccess, can_archive_relationships: relationshipAccess })
   const updateDevice = failed ? vi.fn().mockRejectedValue(new Error('Those units overlap.')) : vi.fn().mockImplementation((_workspace, _id, values) => Promise.resolve({ ...record, ...values }))
   const createDevice = vi.fn().mockImplementation((_workspace, values) => Promise.resolve({ ...record, ...values }))
   const choices = { results: [{ id: 'asset-1', name: 'Available switch' }], count: 1, page: 1, page_size: 25, has_more: false }
   const hardwareAssetChoices = vi.fn().mockResolvedValue(choices)
-  const client = { deviceCollection, deviceDetail: vi.fn().mockResolvedValue(record), updateDevice, createDevice, hardwareAssetChoices, rackCollection: vi.fn().mockResolvedValue({ ...choices, results: [{ id: 'rack-2', name: 'New rack' }] }) } as unknown as NetworksClient
+  const rebindDeviceHardware = vi.fn().mockImplementation((_workspace: WorkspaceContext, _id: string, hardwareAssetId: string) => Promise.resolve({ ...record, hardware_asset_id: hardwareAssetId, hardware_asset_name: 'Available switch' }))
+  const client = { deviceCollection, deviceDetail: vi.fn().mockResolvedValue(record), updateDevice, createDevice, rebindDeviceHardware, hardwareAssetChoices, rackCollection: vi.fn().mockResolvedValue({ ...choices, results: [{ id: 'rack-2', name: 'New rack' }] }) } as unknown as NetworksClient
   const relationship = { id: 'link-1', link_type: 'connected_to', label: 'Connected to', direction: 'outgoing', related_entity: { id: 'device-2', display_name: 'Distribution switch', entity_type: 'network_device' } } as never
   const createRelationship = vi.fn().mockResolvedValue(relationship)
   const relationshipsClient = {
@@ -27,7 +28,7 @@ function setup(denied = false, failed = false, createAllowed = true, relationshi
   const preferences = defaultPreferences(['name', 'role', 'status', 'site', 'rack', 'rack_unit'])
   const preferenceClient = { load: vi.fn().mockResolvedValue(preferences), save: vi.fn().mockResolvedValue(preferences), reset: vi.fn().mockResolvedValue(preferences) }
   render(<ApplicationRouter><DeviceRegister workspace={workspace} client={client} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} /></ApplicationRouter>)
-  return { deviceCollection, updateDevice, createDevice, hardwareAssetChoices, createRelationship, user: userEvent.setup() }
+  return { deviceCollection, updateDevice, createDevice, rebindDeviceHardware, hardwareAssetChoices, createRelationship, user: userEvent.setup() }
 }
 it('searches the authorized collection and edits facts without changing restricted bindings or placement', async () => {
   const { user, deviceCollection, updateDevice, hardwareAssetChoices } = setup()
@@ -79,6 +80,20 @@ it('does not offer creation when asset permission is absent', async () => {
   await screen.findByRole('dialog', { name: 'Core switch' })
   expect(screen.queryByRole('button', { name: 'New device' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Edit device details' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'Hardware' })).not.toBeInTheDocument()
+})
+it('replaces hardware through its guarded section with the expected current binding', async () => {
+  const { user, rebindDeviceHardware } = setup(false, false, true, false, '/networks?view=devices&devices=device-1&devices_section=hardware')
+  const drawer = await screen.findByRole('dialog', { name: 'Core switch' })
+  expect(await within(drawer).findByRole('heading', { name: 'Hardware binding' })).toBeInTheDocument()
+  await user.click(within(drawer).getByRole('button', { name: 'Replace hardware asset' }))
+  await user.selectOptions(await within(drawer).findByRole('combobox', { name: 'Available hardware assets' }), 'asset-1')
+  await user.click(within(drawer).getByRole('link', { name: 'History' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(within(drawer).getByRole('combobox', { name: 'Available hardware assets' })).toHaveValue('asset-1')
+  await user.click(within(drawer).getByRole('button', { name: 'Confirm hardware replacement' }))
+  await waitFor(() => expect(rebindDeviceHardware).toHaveBeenCalledWith(workspace, 'device-1', 'asset-1', null))
+  expect(await within(drawer).findByText('Available switch')).toBeInTheDocument()
 })
 it('omits all editing actions when network editing is denied', async () => {
   const { user } = setup(true)

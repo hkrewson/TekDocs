@@ -11706,6 +11706,7 @@ export interface components {
             readonly count: number;
             readonly has_more: boolean;
             readonly can_manage: boolean;
+            readonly can_rebind_hardware: boolean;
             readonly can_view_relationships: boolean;
             readonly can_create_relationships: boolean;
             readonly can_archive_relationships: boolean;
@@ -11734,6 +11735,8 @@ export interface components {
             readonly status: "planned" | "active" | "offline" | "retired";
             /** Format: uuid */
             readonly hardware_asset_id: string;
+            /** Format: uuid */
+            readonly expected_hardware_asset_id?: string | null;
             /** Format: uuid */
             readonly site_id?: string | null;
             /** Format: uuid */
@@ -12539,6 +12542,8 @@ export interface components {
             readonly status: "planned" | "active" | "offline" | "retired";
             /** Format: uuid */
             readonly hardware_asset_id?: string;
+            /** Format: uuid */
+            readonly expected_hardware_asset_id?: string | null;
             /** Format: uuid */
             readonly site_id?: string | null;
             /** Format: uuid */
@@ -23479,6 +23484,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["NetworkDevice"];
                 };
             };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly workspaces_msp_networks_dns_records_retrieve_list: {
@@ -32300,6 +32316,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["NetworkDevice"];
+                };
+            };
+            /** @description No response body */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

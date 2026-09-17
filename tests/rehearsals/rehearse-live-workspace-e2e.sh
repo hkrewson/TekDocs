@@ -354,9 +354,10 @@ backup_device = NetworkDevice.objects.select_related("hardware_asset__entity").g
 assert device.organization == organization and device.rack == rack
 assert device.site_id == rack.site_id and device.location_id == rack.location_id
 assert device.rack_unit == 5 and device.rack_units == 2 and device.status == "offline"
-assert device.hardware_asset.entity.display_name == "Live core switch"
+assert device.hardware_asset.entity.display_name == "Live replacement chassis"
 assert backup_device.organization == organization and backup_device.hardware_asset.entity.display_name == "Live backup core switch"
-assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 2
+assert not NetworkDevice.objects.filter(hardware_asset__entity__display_name="Live core switch").exists()
+assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 3
 from django.db.models import Q
 from apps.core.models import EntityLink
 device_link = EntityLink.objects.get(
@@ -367,7 +368,7 @@ device_link = EntityLink.objects.get(
 )
 assert device_link.tenant_id == device.tenant_id
 assert AuditEvent.objects.filter(entity_id=device.entity_id, action="entity_link.created").count() == 1
-print("Live device retained hardware identity, placement and its authorized typed relationship.")
+print("Live device retained placement, interfaces and relationships through conflict-safe hardware replacement.")
 from apps.core.models import NetworkInterface
 interface = NetworkInterface.objects.get(entity__display_name="Live uplink")
 destination_interface = NetworkInterface.objects.get(entity__display_name="Live backup uplink")

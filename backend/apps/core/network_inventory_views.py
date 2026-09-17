@@ -16,6 +16,7 @@ from .collection_pagination import BoundedCollectionQuerySerializer, CollectionP
 from .inventory import InventoryError, assets_for_scope, require_operational_owner
 from .models import NetworkDevice, NetworkDeviceRole, NetworkDeviceStatus, NetworkRack, NetworkRackStatus, NetworkVLAN
 from .network_inventory import (
+    NetworkInventoryConflict,
     NetworkInventoryError,
     create_device,
     create_rack,
@@ -53,11 +54,36 @@ class NetworkDeviceWriteSerializer(StrictSerializer):
     hardware_asset_id = serializers.UUIDField(
         source="hardware_asset_entity_id", allow_null=False, required=True
     )
+    expected_hardware_asset_id = serializers.UUIDField(
+        source="expected_hardware_asset_entity_id", allow_null=True, required=False
+    )
     site_id = serializers.UUIDField(source="site_entity_id", allow_null=True, required=False, default=None)
     location_id = serializers.UUIDField(source="location_entity_id", allow_null=True, required=False, default=None)
     rack_id = serializers.UUIDField(source="rack_entity_id", allow_null=True, required=False, default=None)
     rack_unit = serializers.IntegerField(min_value=1, max_value=100, allow_null=True, required=False, default=None)
     rack_units = serializers.IntegerField(min_value=1, max_value=100, required=False, default=1)
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if not self.partial:
+            if "expected_hardware_asset_entity_id" in attrs:
+                raise serializers.ValidationError(
+                    "Expected hardware is only used when replacing a device binding."
+                )
+            return attrs
+        changing_hardware = "hardware_asset_entity_id" in attrs
+        has_expected = "expected_hardware_asset_entity_id" in attrs
+        if changing_hardware != has_expected:
+            raise serializers.ValidationError(
+                "Hardware changes require the expected current hardware asset."
+            )
+        if changing_hardware and set(attrs) != {
+            "hardware_asset_entity_id",
+            "expected_hardware_asset_entity_id",
+        }:
+            raise serializers.ValidationError(
+                "Replace the hardware binding separately from editing device details."
+            )
+        return attrs
 
 
 class NetworkRackSerializer(serializers.Serializer):
@@ -123,6 +149,7 @@ class NetworkDeviceResultSerializer(serializers.Serializer):
     count = serializers.IntegerField()
     has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
+    can_rebind_hardware = serializers.BooleanField()
     can_view_relationships = serializers.BooleanField()
     can_create_relationships = serializers.BooleanField()
     can_archive_relationships = serializers.BooleanField()
@@ -338,6 +365,9 @@ class NetworkDeviceListCreateView(APIView):
             "can_manage": context_has_permission(
                 workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
             ),
+            "can_rebind_hardware": can_view_assets and context_has_permission(
+                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+            ),
             "can_view_relationships": context_has_permission(
                 workspace.member, PermissionKey.RELATIONSHIPS_VIEW, organization=workspace.organization
             ),
@@ -375,7 +405,7 @@ class NetworkDeviceDetailView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
         return Response(_device_data(_device(workspace, device_entity_id), workspace))
 
-    @extend_schema(request=NetworkDeviceWriteSerializer, responses={200: NetworkDeviceSerializer})
+    @extend_schema(request=NetworkDeviceWriteSerializer, responses={200: NetworkDeviceSerializer, 409: None})
     def patch(self, request, device_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_EDIT)
         serializer = NetworkDeviceWriteSerializer(data=request.data, partial=True)
@@ -388,6 +418,8 @@ class NetworkDeviceDetailView(APIView):
                 actor_id=request.user.pk,
                 values=serializer.validated_data,
             )
+        except NetworkInventoryConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         except NetworkInventoryError as exc:
             raise _service_error(exc) from exc
         return Response(_device_data(device, workspace))

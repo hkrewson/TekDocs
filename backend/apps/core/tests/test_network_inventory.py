@@ -12,6 +12,7 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import (
+    AuditEvent,
     Entity,
     InstallationState,
     NetworkDevice,
@@ -483,7 +484,8 @@ def test_device_creation_choices_and_preferences_are_scoped(owner_client, instal
     assert found["count"] == 1
     assert owner_client.get(url, {"kind": "hardware_asset", "q": "Outside"}).json()["count"] == 0
     device_url = reverse("organization-network-devices", kwargs=kwargs)
-    assert owner_client.get(device_url).json()["can_create"] is True
+    capabilities = owner_client.get(device_url).json()
+    assert capabilities["can_create"] is True and capabilities["can_rebind_hardware"] is True
     created = owner_client.post(
         device_url,
         {"name": "New device", "role": "switch", "hardware_asset_id": found["results"][0]["id"]},
@@ -501,6 +503,87 @@ def test_device_creation_choices_and_preferences_are_scoped(owner_client, instal
     )
     assert owner_client.get(pref).json()["columns"] == ["name", "status"]
     assert owner_client.delete(pref).json()["page_size"] == 25
+
+
+@pytest.mark.django_db
+def test_device_hardware_rebinding_is_scoped_conflict_safe_and_separate(owner_client, installation):
+    organization = _organization(installation, "Hardware replacement")
+    sibling = _organization(installation, "Other hardware replacement")
+    site = _site(owner_client, organization, "Replacement campus")
+    rack = _rack(owner_client, organization, site)
+    created = _device(owner_client, installation, organization, rack, "Bound switch", 3)
+    assert created.status_code == 201
+    original_asset_id = created.json()["hardware_asset_id"]
+    replacement = create_network_hardware_asset(
+        installation=installation, organization=organization, name="Replacement chassis"
+    )
+    occupied = create_network_hardware_asset(
+        installation=installation, organization=organization, name="Occupied chassis"
+    )
+    other_device = owner_client.post(
+        reverse("organization-network-devices", kwargs={"organization_entity_id": organization.entity_id}),
+        {"name": "Other device", "role": "switch", "hardware_asset_id": str(occupied.entity_id)},
+        content_type="application/json",
+    )
+    assert other_device.status_code == 201
+    outside = create_network_hardware_asset(
+        installation=installation, organization=sibling, name="Outside chassis"
+    )
+    detail = reverse(
+        "organization-network-device-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "device_entity_id": created.json()["id"]},
+    )
+    replaced = owner_client.patch(
+        detail,
+        {
+            "hardware_asset_id": str(replacement.entity_id),
+            "expected_hardware_asset_id": original_asset_id,
+        },
+        content_type="application/json",
+    )
+    assert replaced.status_code == 200, replaced.content
+    assert replaced.json()["hardware_asset_name"] == "Replacement chassis"
+    assert replaced.json()["rack_id"] == rack["id"] and replaced.json()["rack_unit"] == 3
+    assert AuditEvent.objects.filter(
+        entity_id=created.json()["id"], action="network_device.updated"
+    ).count() == 1
+
+    stale = owner_client.patch(
+        detail,
+        {"hardware_asset_id": original_asset_id, "expected_hardware_asset_id": original_asset_id},
+        content_type="application/json",
+    )
+    assert stale.status_code == 409 and "changed" in stale.json()["detail"].lower()
+    same = owner_client.patch(
+        detail,
+        {
+            "hardware_asset_id": str(replacement.entity_id),
+            "expected_hardware_asset_id": str(replacement.entity_id),
+        },
+        content_type="application/json",
+    )
+    assert same.status_code == 409 and "different" in same.json()["detail"].lower()
+    for unavailable in (occupied.entity_id, outside.entity_id):
+        denied = owner_client.patch(
+            detail,
+            {
+                "hardware_asset_id": str(unavailable),
+                "expected_hardware_asset_id": str(replacement.entity_id),
+            },
+            content_type="application/json",
+        )
+        assert denied.status_code == 400
+    mixed = owner_client.patch(
+        detail,
+        {
+            "name": "Mixed edit",
+            "hardware_asset_id": original_asset_id,
+            "expected_hardware_asset_id": str(replacement.entity_id),
+        },
+        content_type="application/json",
+    )
+    assert mixed.status_code == 400
+    assert owner_client.get(detail).json()["hardware_asset_name"] == "Replacement chassis"
 
 
 @pytest.mark.django_db
@@ -535,6 +618,7 @@ def test_asset_denial_blocks_device_creation_choices_but_not_ordinary_edits(owne
     assert owner_client.get(url, {"kind": "hardware_asset"}).status_code == 403
     listing = owner_client.get(reverse("organization-network-devices", kwargs=kwargs)).json()
     assert listing["can_create"] is False and listing["can_manage"] is True
+    assert listing["can_rebind_hardware"] is False
     assert listing["results"][0]["hardware_asset_name"] is None
     detail = reverse("organization-network-device-detail", kwargs={**kwargs, "device_entity_id": created.json()["id"]})
     updated = owner_client.patch(
@@ -542,3 +626,11 @@ def test_asset_denial_blocks_device_creation_choices_but_not_ordinary_edits(owne
     )
     assert updated.status_code == 200, updated.content
     assert updated.json()["rack_id"] == rack["id"] and updated.json()["rack_unit"] == 1
+    assert owner_client.patch(
+        detail,
+        {
+            "hardware_asset_id": created.json()["hardware_asset_id"],
+            "expected_hardware_asset_id": created.json()["hardware_asset_id"],
+        },
+        content_type="application/json",
+    ).status_code == 403

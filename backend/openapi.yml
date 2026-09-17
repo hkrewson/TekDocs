@@ -11549,6 +11549,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/networks/dns-records:
     get:
       operationId: workspaces_msp_networks_dns_records_retrieve_list
@@ -24466,6 +24478,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/dns-records:
     get:
       operationId: workspaces_organizations_networks_dns_records_retrieve_list
@@ -38869,6 +38893,8 @@ components:
           type: boolean
         can_manage:
           type: boolean
+        can_rebind_hardware:
+          type: boolean
         can_view_relationships:
           type: boolean
         can_create_relationships:
@@ -38880,6 +38906,7 @@ components:
       - can_create
       - can_create_relationships
       - can_manage
+      - can_rebind_hardware
       - can_view_relationships
       - count
       - has_more
@@ -38928,6 +38955,10 @@ components:
         hardware_asset_id:
           type: string
           format: uuid
+        expected_hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
         site_id:
           type: string
           format: uuid
@@ -40649,6 +40680,10 @@ components:
         hardware_asset_id:
           type: string
           format: uuid
+        expected_hardware_asset_id:
+          type: string
+          format: uuid
+          nullable: true
         site_id:
           type: string
           format: uuid

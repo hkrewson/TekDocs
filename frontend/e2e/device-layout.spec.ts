@@ -6,7 +6,8 @@ async function fixtures(page: Page, denied = false, failSave = false) {
   const columns = ['name', 'role', 'status', 'site', 'rack', 'rack_unit']
   let preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
   let relationships: Array<Record<string, unknown>> = []
-  const records = Array.from({ length: 31 }, (_, index) => ({ id: `device-${index + 1}`, name: `Device ${String(index + 1).padStart(2, '0')}`, role: 'switch', status: 'active', hardware_asset_id: null, hardware_asset_name: null, site_id: 'site-1', site_name: 'Campus'.repeat(40), location_id: 'room-1', location_name: 'Room'.repeat(50), rack_id: 'rack-1', rack_name: 'Equipment rack'.repeat(30), rack_unit: index + 1, rack_units: 1 }))
+  let availableHardware = [{ id: 'asset-replacement', name: 'Replacement chassis', identifier: 'asset-replacement' }]
+  const records = Array.from({ length: 31 }, (_, index) => ({ id: `device-${index + 1}`, name: `Device ${String(index + 1).padStart(2, '0')}`, role: 'switch', status: 'active', hardware_asset_id: null as string | null, hardware_asset_name: null as string | null, site_id: 'site-1', site_name: 'Campus'.repeat(40), location_id: 'room-1', location_name: 'Room'.repeat(50), rack_id: 'rack-1', rack_name: 'Equipment rack'.repeat(30), rack_unit: index + 1, rack_units: 1 }))
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: { user: { id: 'owner', email: 'layout@example.invalid', display_name: 'Layout owner' }, tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', permissions: ['networks.view', 'networks.edit'], surface: 'msp', organization: null, mfa_enrollment_required: false } }))
@@ -21,23 +22,34 @@ async function fixtures(page: Page, denied = false, failSave = false) {
     const size = Number(query.get('page_size')), pageNumber = Number(query.get('page'))
     let found = records.filter((item) => item.name.includes(query.get('q') ?? '') && (!query.get('status') || item.status === query.get('status')) && (!query.get('role') || item.role === query.get('role')))
     if (query.get('ordering')?.startsWith('-')) found = found.toReversed()
-    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: !denied, can_create: false, can_view_relationships: !denied, can_create_relationships: !denied, can_archive_relationships: !denied } })
+    return route.fulfill({ json: { results: found.slice((pageNumber - 1) * size, pageNumber * size), count: found.length, page: pageNumber, page_size: size, has_more: pageNumber * size < found.length, can_manage: !denied, can_create: false, can_rebind_hardware: !denied, can_view_relationships: !denied, can_create_relationships: !denied, can_archive_relationships: !denied } })
   })
   await page.route(/\/networks\/devices\/device-\d+$/, (route) => {
     const record = records.find((item) => route.request().url().endsWith(`/${item.id}`))
     if (!record) return route.fulfill({ status: 403, json: {} })
     if (route.request().method() === 'PATCH') {
       const values = route.request().postDataJSON() as Record<string, unknown>
-      expect(values).not.toHaveProperty('hardware_asset_id')
-      if ('name' in values) expect(Object.keys(values).sort()).toEqual(['name', 'role', 'status'])
+      if ('hardware_asset_id' in values) {
+        expect(Object.keys(values).sort()).toEqual(['expected_hardware_asset_id', 'hardware_asset_id'])
+        expect(values.expected_hardware_asset_id).toBe(record.hardware_asset_id)
+      } else if ('name' in values) expect(Object.keys(values).sort()).toEqual(['name', 'role', 'status'])
       else expect(Object.keys(values).sort()).toEqual(['location_id', 'rack_id', 'rack_unit', 'rack_units', 'site_id'])
       if (failSave) return route.fulfill({ status: 409, json: { detail: 'Placement conflict. Your entries have been kept.' } })
       Object.assign(record, values)
+      if ('hardware_asset_id' in values) {
+        record.hardware_asset_name = availableHardware.find((item) => item.id === values.hardware_asset_id)?.name ?? null
+        availableHardware = availableHardware.filter((item) => item.id !== values.hardware_asset_id)
+        delete (record as Record<string, unknown>).expected_hardware_asset_id
+      }
     }
     return route.fulfill({ json: record })
   })
   await page.route('**/networks/racks?*', (route) => route.fulfill({ json: { results: [{ id: 'rack-2', name: 'New rack' }], page: 1, page_size: 25, count: 1, has_more: false } }))
-  await page.route('**/networks/assignment-choices?*', (route) => route.fulfill({ json: { results: [], page: 1, page_size: 25, count: 0, has_more: false } }))
+  await page.route('**/networks/assignment-choices?*', (route) => {
+    const query = new URL(route.request().url()).searchParams
+    const results = query.get('kind') === 'hardware_asset' ? availableHardware.filter((item) => item.name.includes(query.get('q') ?? '')) : []
+    return route.fulfill({ json: { results, page: 1, page_size: 25, count: results.length, has_more: false } })
+  })
   await page.route('**/api/v1/entities/search?*', (route) => route.fulfill({ json: { results: [{ id: 'device-2', display_name: 'Device 02', entity_type: 'network_device', visibility: 'msp_private', workspace_label: 'Synthetic MSP', eligible_link_types: ['connected_to', 'related_to'] }], page: 1, page_size: 15, count: 1, has_more: false } }))
   await page.route(/\/api\/v1\/entities\/device-\d+\/links(?:\/link-1)?$/, (route) => {
     if (route.request().method() === 'POST') {
@@ -69,6 +81,9 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
     await section(page, 'Placement', 'placement', width)
     await expect(drawer).toContainText('Occupied units')
+    await section(page, 'Hardware', 'hardware', width)
+    await expect(drawer).toContainText('Hardware binding')
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     await section(page, 'Relationships', 'relationships', width)
     await expect(drawer).toContainText('No logical relationships have been added.')
     expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
@@ -95,6 +110,23 @@ test('device fact saves dismiss immediately without changing bindings', async ({
   await drawer.getByRole('button', { name: 'Save device', exact: true }).click()
   await expect(drawer.getByRole('button', { name: 'Edit device details' })).toBeVisible()
   await page.mouse.click(10, 100); await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+test('device hardware replacement keeps its choice through guarded navigation', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 600 }, hasTouch: true })
+  try {
+    const page = await context.newPage(); await fixtures(page)
+    await page.goto('/networks?view=devices&devices=device-1&devices_section=hardware')
+    const drawer = page.getByRole('dialog', { name: 'Device 01' })
+    await drawer.getByRole('button', { name: 'Replace hardware asset' }).tap()
+    await drawer.getByRole('combobox', { name: 'Available hardware assets' }).selectOption('asset-replacement')
+    await drawer.getByRole('combobox', { name: 'Sections', exact: true }).selectOption('history')
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(drawer.getByRole('combobox', { name: 'Available hardware assets' })).toHaveValue('asset-replacement')
+    await drawer.getByRole('button', { name: 'Confirm hardware replacement' }).tap()
+    await expect(drawer).toContainText('Replacement chassis')
+    await page.reload(); await expect(drawer).toContainText('Replacement chassis')
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+  } finally { await context.close() }
 })
 test('device relationships create, archive and guard an unfinished search', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 600 }, hasTouch: true })

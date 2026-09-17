@@ -27,6 +27,10 @@ class NetworkInventoryError(ValueError):
     pass
 
 
+class NetworkInventoryConflict(NetworkInventoryError):
+    pass
+
+
 def racks_for_scope(scope: DataScope) -> QuerySet[NetworkRack]:
     return (
         NetworkRack.scoped.for_scope(scope)
@@ -281,7 +285,11 @@ def create_device(
 
 @transaction.atomic
 def update_device(*, device: NetworkDevice, actor_id: UUID, values: dict[str, object]) -> NetworkDevice:
-    locked = NetworkDevice.objects.select_for_update().select_related("entity").get(pk=device.pk)
+    locked = (
+        NetworkDevice.objects.select_for_update(of=("self",))
+        .select_related("entity", "hardware_asset__entity")
+        .get(pk=device.pk)
+    )
     scope = DataScope.owner(locked.tenant, locked.organization)
     current_site = locked.site if locked.site_id else None
     current_location = locked.location if locked.location_id else None
@@ -307,13 +315,17 @@ def update_device(*, device: NetworkDevice, actor_id: UUID, values: dict[str, ob
         exclude_device_id=locked.id,
     )
     current_asset = locked.hardware_asset if locked.hardware_asset_id else None
-    asset_value = cast(
-        UUID | None,
-        values.get(
-            "hardware_asset_entity_id", current_asset.entity_id if current_asset is not None else None
-        ),
-    )
-    hardware_asset = _hardware_asset(scope, asset_value)
+    hardware_asset = current_asset
+    if "hardware_asset_entity_id" in values:
+        expected_asset_id = cast(UUID | None, values.get("expected_hardware_asset_entity_id"))
+        current_asset_id = current_asset.entity_id if current_asset is not None else None
+        if expected_asset_id != current_asset_id:
+            raise NetworkInventoryConflict(
+                "The hardware binding changed. Reload the device before trying again."
+            )
+        hardware_asset = _hardware_asset(scope, cast(UUID, values["hardware_asset_entity_id"]))
+        if current_asset is not None and hardware_asset is not None and hardware_asset.pk == current_asset.pk:
+            raise NetworkInventoryConflict("Choose a different hardware asset.")
     if hardware_asset is None and not locked.legacy_unbacked:
         raise NetworkInventoryError("Network devices must remain linked to a hardware asset.")
     if hardware_asset is not None and NetworkDevice.objects.filter(hardware_asset=hardware_asset).exclude(

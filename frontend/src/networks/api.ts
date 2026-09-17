@@ -118,7 +118,7 @@ export type DeviceWrite = Pick<NetworkDevice, 'name' | 'role' | 'status' | 'rack
 }
 
 export type ListResult<T> = { can_create?: boolean; results: T[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
-export type DeviceListResult = ListResult<NetworkDevice> & { can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
+export type DeviceListResult = ListResult<NetworkDevice> & { can_rebind_hardware: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }
 
 export type InventoryQuery = { q: string; page: number; page_size: number; ordering: string; status?: string; site_id?: string; rack_id?: string; role?: string }
 
@@ -147,6 +147,7 @@ export interface NetworksClient {
   listDevices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<DeviceListResult>
   createDevice(workspace: WorkspaceContext, values: DeviceWrite): Promise<NetworkDevice>
   updateDevice(workspace: WorkspaceContext, deviceId: string, values: Partial<DeviceWrite>): Promise<NetworkDevice>
+  rebindDeviceHardware(workspace: WorkspaceContext, deviceId: string, hardwareAssetId: string, expectedHardwareAssetId: string | null): Promise<NetworkDevice>
   choices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetworkChoices>
   listVRFs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<ListResult<NetworkVRF>>
   createVRF(workspace: WorkspaceContext, values: VRFWrite): Promise<NetworkVRF>
@@ -309,6 +310,7 @@ export const browserNetworksClient: NetworksClient = {
   },
   createDevice: (workspace, values) => write(`${basePath(workspace)}/devices`, 'POST', values),
   updateDevice: (workspace, deviceId, values) => write(`${basePath(workspace)}/devices/${encodeURIComponent(deviceId)}`, 'PATCH', values),
+  rebindDeviceHardware: (workspace, deviceId, hardwareAssetId, expectedHardwareAssetId) => write(`${basePath(workspace)}/devices/${encodeURIComponent(deviceId)}`, 'PATCH', { hardware_asset_id: hardwareAssetId, expected_hardware_asset_id: expectedHardwareAssetId }),
   async choices(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/choices`, { credentials: 'same-origin', signal }))
   },

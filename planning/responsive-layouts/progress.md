@@ -13,13 +13,19 @@ The Assets summary collection and typed browser API client are implemented under
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
-| 4 — Operational records | Pending | All planned migrations |
+| 4 — Operational records | In progress: Organizations/People/Sites grouped milestone | Complete the People record workspace, then migrate Sites and Organizations to the same accepted collection/drawer contract; see [operational-records.md](operational-records.md) |
 | 5 — Documentation/files | Pending | All planned migrations |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
 
 No route is marked fully accepted. Assets has an implemented replacement layout with remaining acceptance work. The shell route inventory uses actual App.tsx declarations; organization areas now derive from the existing capability registry. Additional auth/portal/shell states are recorded separately; nested record/workflow coverage remains an explicit task.
+
+## People record workspace checkpoint — 2026-09-17
+
+Implemented as the first piece of the grouped Organizations/People/Sites milestone under #81. Person names now open the complete record in the shared right-side drawer and full-screen mobile presentation. The overview exposes contact, role, responsibility, relationship, site and location details. Creation and editing stay within that workspace; the prior page-level overlay is removed. The `person` URL parameter restores records outside the current page using the existing scoped detail endpoint, with explicit loading and unavailable states. Failed mutations retain the form, Escape/backdrop/mobile return use a dirty-change guard, and archive retains its explicit confirmation.
+
+Verified: 13 focused People component/client scenarios pass, including an off-page direct link, complete overview, inline editing, retained denial, structured placement, archive, and canceled/discarded dirty dismissal. The full frontend gate passes lint, typechecking, OpenAPI drift, 584 tests across 116 files, the production build, and unchanged compressed bundle limits. No backend, schema, migration, version, deployment, or Wiki publication change is required. Sites and Organizations remain open in this same milestone; grouped responsive browser and live-stack acceptance is deferred to that boundary as recorded in [operational-records.md](operational-records.md).
 
 ## Verified — Assets collection checkpoint
 

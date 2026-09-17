@@ -46,6 +46,7 @@ export type PeopleScope = { organizationId?: string }
 
 export interface PeopleClient {
   list(scope: PeopleScope, query: PeopleQuery, signal?: AbortSignal): Promise<PeopleResult>
+  retrieve(scope: PeopleScope, id: string, signal?: AbortSignal): Promise<PersonRecord>
   create(scope: PeopleScope, input: PersonInput): Promise<PersonRecord>
   update(scope: PeopleScope, id: string, input: PersonInput): Promise<PersonRecord>
   archive(scope: PeopleScope, id: string): Promise<void>
@@ -125,6 +126,16 @@ export const browserPeopleClient: PeopleClient = {
     })
     if (!response.ok) throw new AuthRequestError('People could not be loaded.', response.status)
     return json<PeopleResult>(response)
+  },
+
+  async retrieve(scope, id, signal) {
+    const response = await fetch(detailPath(scope, id), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    })
+    if (!response.ok) throw new AuthRequestError('That person is unavailable or you no longer have access.', response.status)
+    return json<PersonRecord>(response)
   },
 
   async create(scope, input) {

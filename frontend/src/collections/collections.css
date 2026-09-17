@@ -26,6 +26,11 @@
 .record-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); gap: .75rem 1.5rem; }
 .record-facts dt { font-size: .875rem; color: var(--muted); }
 .record-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.operational-record { display: grid; gap: 1.25rem; }
+.operational-record-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.operational-record-actions button { display: inline-flex; align-items: center; gap: .4rem; }
+.operational-record-form { width: 100%; max-width: none; margin: 0; border: 0; box-shadow: none; }
+.operational-record-context { grid-column: 1 / -1; margin: 0; color: var(--muted); }
 .record-page { min-width: 0; overflow-wrap: anywhere; }
 .record-header h1 { font-size: 1.5rem; margin-block: 1rem .5rem; }
 .record-sections { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border); margin-block: 1rem; }

@@ -1,5 +1,6 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, vi } from 'vitest'
 import { People } from './People'
 import type { PeopleClient, PersonRecord } from './api'
@@ -45,6 +46,7 @@ const sitesClient = { list: vi.fn().mockImplementation(() => new Promise(() => u
 function peopleClient(overrides: Partial<PeopleClient> = {}): PeopleClient {
   return {
     list: vi.fn().mockResolvedValue({ results: [person], page: 1, page_size: 25, count: 1, has_more: false }),
+    retrieve: vi.fn().mockResolvedValue(person),
     create: vi.fn().mockResolvedValue(person),
     update: vi.fn().mockResolvedValue(person),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -61,7 +63,7 @@ describe('People', () => {
 
   it('shows the scoped directory and customizes visible columns', async () => {
     const user = userEvent.setup()
-    render(<People workspace={workspace} client={peopleClient()} sitesClient={sitesClient} />)
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient()} sitesClient={sitesClient} /></MemoryRouter>)
 
     expect(await screen.findByRole('cell', { name: 'Jordan Avery' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
@@ -74,15 +76,53 @@ describe('People', () => {
     expect(window.localStorage.getItem('tekdocs.people.visible-columns.v1')).toContain('responsibility')
   })
 
+  it('opens the complete person record from the name and edits within the drawer', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient()} sitesClient={sitesClient} /></MemoryRouter>)
+
+    await user.click(await screen.findByRole('button', { name: 'Jordan Avery' }))
+    const drawer = screen.getByRole('dialog', { name: 'Jordan Avery' })
+    expect(within(drawer).getByText('Network operations')).toBeInTheDocument()
+    expect(within(drawer).getByRole('link', { name: 'jordan@example.com' })).toHaveAttribute('href', 'mailto:jordan@example.com')
+
+    await user.click(within(drawer).getByRole('button', { name: 'Edit details' }))
+    expect(within(drawer).getByLabelText(/Preferred name/)).toHaveValue('Jordy')
+    expect(screen.queryByRole('dialog', { name: 'Edit Jordan Avery' })).not.toBeInTheDocument()
+  })
+
+  it('loads an off-page record from its URL and protects unfinished edits', async () => {
+    const user = userEvent.setup()
+    const retrieve = vi.fn().mockResolvedValue(person)
+    const client = peopleClient({
+      list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 1, has_more: false }),
+      retrieve,
+    })
+    render(<MemoryRouter initialEntries={[`/people?person=${person.id}`]}><People workspace={workspace} client={client} sitesClient={sitesClient} /></MemoryRouter>)
+
+    const drawer = await screen.findByRole('dialog', { name: 'Jordan Avery' })
+    expect(retrieve).toHaveBeenCalledWith({ organizationId: workspace.id }, person.id, expect.any(AbortSignal))
+    await user.click(within(drawer).getByRole('button', { name: 'Edit details' }))
+    await user.type(within(drawer).getByLabelText(/Preferred name/), ' changed')
+
+    fireEvent(drawer, new Event('cancel', { cancelable: true }))
+    const confirmation = within(drawer).getByRole('alertdialog', { name: 'Unsaved changes' })
+    expect(within(drawer).getByLabelText(/Preferred name/)).toHaveValue('Jordy changed')
+    await user.click(within(confirmation).getByRole('button', { name: 'Keep editing' }))
+    expect(within(drawer).queryByRole('alertdialog')).not.toBeInTheDocument()
+    fireEvent(drawer, new Event('cancel', { cancelable: true }))
+    await user.click(within(drawer).getByRole('button', { name: 'Discard changes' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('withholds prior-workspace people while the next workspace is loading', async () => {
     const list = vi.fn()
       .mockResolvedValueOnce({ results: [person], page: 1, page_size: 25, count: 1, has_more: false })
       .mockImplementationOnce(() => new Promise(() => undefined))
     const client = peopleClient({ list })
-    const { rerender } = render(<People workspace={workspace} client={client} sitesClient={sitesClient} />)
+    const { rerender } = render(<MemoryRouter><People workspace={workspace} client={client} sitesClient={sitesClient} /></MemoryRouter>)
     expect(await screen.findByRole('cell', { name: /^Jordan Avery$/ })).toBeInTheDocument()
 
-    rerender(<People workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000030', name: 'Second Client' }} client={client} sitesClient={sitesClient} />)
+    rerender(<MemoryRouter><People workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000030', name: 'Second Client' }} client={client} sitesClient={sitesClient} /></MemoryRouter>)
 
     expect(screen.queryByRole('cell', { name: /^Jordan Avery$/ })).not.toBeInTheDocument()
     expect(screen.getByText('Loading people…')).toBeInTheDocument()
@@ -91,7 +131,7 @@ describe('People', () => {
   it('searches all fields, filters one field, and changes sorting', async () => {
     const user = userEvent.setup()
     const list = vi.fn().mockResolvedValue({ results: [person], page: 1, page_size: 25, count: 1, has_more: false })
-    render(<People workspace={workspace} client={peopleClient({ list })} sitesClient={sitesClient} />)
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient({ list })} sitesClient={sitesClient} /></MemoryRouter>)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search all person fields' }), 'north')
@@ -116,7 +156,7 @@ describe('People', () => {
     const create = vi.fn().mockResolvedValue(person)
     const update = vi.fn().mockResolvedValue({ ...person, preferred_name: 'Jordan' })
     const archive = vi.fn().mockResolvedValue(undefined)
-    render(<People workspace={workspace} client={peopleClient({ create, update, archive })} sitesClient={sitesClient} />)
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient({ create, update, archive })} sitesClient={sitesClient} /></MemoryRouter>)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.click(screen.getByRole('button', { name: 'New person' }))
@@ -156,7 +196,7 @@ describe('People', () => {
         }],
       }),
     } as unknown as SitesClient
-    render(<People workspace={workspace} client={peopleClient({ create })} sitesClient={structuredSitesClient} />)
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient({ create })} sitesClient={structuredSitesClient} /></MemoryRouter>)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.click(screen.getByRole('button', { name: 'New person' }))
@@ -179,7 +219,7 @@ describe('People', () => {
   it('keeps the form open when the server denies a change', async () => {
     const user = userEvent.setup()
     const create = vi.fn().mockRejectedValue(new Error('Your account is not authorized to manage people in this workspace.'))
-    render(<People workspace={null} client={peopleClient({ list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }), create })} sitesClient={sitesClient} />)
+    render(<MemoryRouter><People workspace={null} client={peopleClient({ list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }), create })} sitesClient={sitesClient} /></MemoryRouter>)
     await screen.findByText('No people have been added to this workspace.')
 
     await user.click(screen.getByRole('button', { name: 'New person' }))
@@ -193,7 +233,7 @@ describe('People', () => {
   it('allows location text when saved sites cannot be loaded', async () => {
     const user = userEvent.setup()
     const unavailableSites = { ...sitesClient, list: vi.fn().mockRejectedValue(new Error('Unavailable')) }
-    render(<People workspace={workspace} client={peopleClient()} sitesClient={unavailableSites} />)
+    render(<MemoryRouter><People workspace={workspace} client={peopleClient()} sitesClient={unavailableSites} /></MemoryRouter>)
     await screen.findByRole('cell', { name: 'Jordan Avery' })
 
     await user.click(screen.getByRole('button', { name: 'New person' }))

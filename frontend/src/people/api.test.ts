@@ -43,6 +43,17 @@ describe('browserPeopleClient', () => {
     expect(requestPath).toContain('ordering=-full_name')
   })
 
+  it('loads one directly addressed person record', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(person), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(browserPeopleClient.retrieve({ organizationId: person.organization_id! }, person.id)).resolves.toEqual(person)
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/workspaces/organizations/${person.organization_id}/people/${person.id}`,
+      expect.objectContaining({ credentials: 'same-origin', signal: undefined }),
+    )
+  })
+
   it('sends scoped CSRF-protected mutations', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(person), { status: 201 }))

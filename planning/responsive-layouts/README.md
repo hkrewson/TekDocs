@@ -10,10 +10,12 @@ Record names open a full record workspace in a right overlay drawer (full-screen
 
 ## Delivery
 
+Delivery is organized around complete user-facing areas. Related routes are audited together, share one interaction contract, and are accepted as one milestone. Focused checks run while the milestone is being built; the broad project, browser, and live-stack gates run once at the milestone boundary unless a cross-cutting change justifies an earlier run. Small standalone follow-ups are reserved for data-integrity, authorization, or release blockers rather than routine visual refinements.
+
 1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: in progress; API and navigation/edit-protection foundations implemented.
 2. **Assets** — Complete reference layout, operational overview, focused sections in a full record drawer and optional full page. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
 3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts, the simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers with associated subnet navigation, Racks and Devices core record drawers with parent-scoped interface editing and IP/MAC assignment migrated; DNS zone/record drawers, focused editing, history and record transfers verified against PostgreSQL and the live browser; circuit register/service-detail editing and handoff browsing verified as a bounded checkpoint; remaining network object surfaces and acceptance open.
-4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: pending.
+4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: in progress; Organizations/People/Sites are the first grouped milestone, beginning with the complete People record workspace and then applying the same proven layout to Sites and Organizations.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: pending.
 6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: pending.
 7. **Shell and remaining surfaces** — Search, overviews, reminders, activity, notifications, recycle bin, metadata, account/access/setup/help/system status and client portal. Status: pending.
@@ -32,6 +34,8 @@ Docker make check plus focused API/component/browser tests per slice. Real backe
 Excluded: named saved views, resizable/reorderable columns, density modes, infinite scrolling and cross-page selection. Existing security/recurring/pilot obligations remain open. User and demo data must be preserved.
 
 ## Implementation records
+
+- [Operational records milestone](operational-records.md)
 
 - [Wireless site and VLAN assignment](wireless-site-vlan-assignment.md)
 - [VLAN and VRF registers](addressing-registers.md)

@@ -43,7 +43,24 @@ def sites_for_scope(scope: DataScope) -> QuerySet[Site]:
     )
 
 
-def query_sites(*, scope: DataScope, q: str) -> list[Site]:
+SITE_ORDERING_FIELDS = {
+    "name": "entity__display_name",
+    "code": "code",
+    "city": "city",
+    "region": "region",
+    "country_code": "country_code",
+    "timezone": "timezone",
+}
+
+
+def query_sites(
+    *,
+    scope: DataScope,
+    q: str,
+    ordering: str = "name",
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[Site], int, bool]:
     records = sites_for_scope(scope)
     if q:
         records = records.filter(
@@ -56,7 +73,15 @@ def query_sites(*, scope: DataScope, q: str) -> list[Site]:
             | Q(postal_code__icontains=q)
             | Q(locations__archived_at__isnull=True, locations__entity__display_name__icontains=q)
         ).distinct()
-    return list(records.order_by("entity__display_name", "entity_id")[:200])
+    descending = ordering.startswith("-")
+    order_by = SITE_ORDERING_FIELDS[ordering.removeprefix("-")]
+    if descending:
+        order_by = f"-{order_by}"
+    records = records.order_by(order_by, "entity_id")
+    count = records.count()
+    offset = (page - 1) * page_size
+    selected = list(records[offset : offset + page_size + 1])
+    return selected[:page_size], count, len(selected) > page_size
 
 
 @transaction.atomic

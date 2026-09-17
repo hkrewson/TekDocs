@@ -13713,7 +13713,10 @@ export interface components {
         };
         readonly SiteResult: {
             readonly results: readonly components["schemas"]["Site"][];
+            readonly page: number;
+            readonly page_size: number;
             readonly count: number;
+            readonly has_more: boolean;
         };
         readonly SiteWrite: {
             readonly name: string;
@@ -19500,6 +19503,9 @@ export interface operations {
     readonly sites_msp_list: {
         readonly parameters: {
             readonly query?: {
+                readonly ordering?: string;
+                readonly page?: number;
+                readonly page_size?: number;
                 readonly q?: string;
             };
             readonly header?: never;
@@ -35043,6 +35049,9 @@ export interface operations {
     readonly sites_organization_list: {
         readonly parameters: {
             readonly query?: {
+                readonly ordering?: string;
+                readonly page?: number;
+                readonly page_size?: number;
                 readonly q?: string;
             };
             readonly header?: never;

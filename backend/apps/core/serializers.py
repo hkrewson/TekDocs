@@ -8,6 +8,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from .collection_pagination import StrictQuerySerializer
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
@@ -205,13 +206,36 @@ class SiteSerializer(serializers.Serializer):
         return cast(list[dict[str, object]], LocationSerializer(records, many=True).data)
 
 
-class SiteQuerySerializer(serializers.Serializer):
+class SiteQuerySerializer(StrictQuerySerializer):
     q = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True, default="")
+    ordering = serializers.ChoiceField(
+        choices=(
+            "name",
+            "-name",
+            "code",
+            "-code",
+            "city",
+            "-city",
+            "region",
+            "-region",
+            "country_code",
+            "-country_code",
+            "timezone",
+            "-timezone",
+        ),
+        required=False,
+        default="name",
+    )
+    page = serializers.IntegerField(min_value=1, max_value=1000, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
 
 class SiteResultSerializer(serializers.Serializer):
     results = SiteSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
 
 
 PERSON_SORT_FIELDS = (

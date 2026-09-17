@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthRequestError } from '../auth/api'
 import { browserSitesClient } from './api'
-import type { LocationInput, SiteInput, SiteRecord } from './api'
+import type { LocationInput, SiteInput, SiteRecord, SitesQuery } from './api'
 
 const scope = { organizationId: '00000000-0000-4000-8000-000000000010' }
 const siteInput: SiteInput = {
@@ -11,19 +11,31 @@ const site: SiteRecord = {
   id: '00000000-0000-4000-8000-000000000020', organization_id: scope.organizationId, ...siteInput, locations: [], created_at: '2026-08-08T12:00:00Z', updated_at: '2026-08-08T12:00:00Z',
 }
 const locationInput: LocationInput = { name: 'Office 214', kind: 'office', code: '214', parent_id: null }
+const query: SitesQuery = { q: 'North & Main', ordering: '-timezone', page: 2, page_size: 25 }
 
 describe('browserSitesClient', () => {
   beforeEach(() => { document.cookie = 'csrftoken=sites-csrf; path=/' })
 
   it('loads an encoded workspace search', async () => {
-    const payload = { results: [site], count: 1 }
+    const payload = { results: [site], page: 2, page_size: 25, count: 26, has_more: false }
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(browserSitesClient.list(scope, 'North & Main')).resolves.toEqual(payload)
+    await expect(browserSitesClient.list(scope, query)).resolves.toEqual(payload)
+    const path = fetchMock.mock.calls[0][0] as string
+    expect(path).toContain(`/api/v1/workspaces/organizations/${scope.organizationId}/sites?`)
+    expect(path).toContain('q=North+%26+Main')
+    expect(path).toContain('ordering=-timezone')
+    expect(path).toContain('page=2')
+  })
+
+  it('loads one directly addressed site', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(site), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(browserSitesClient.retrieve(scope, site.id)).resolves.toEqual(site)
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/v1/workspaces/organizations/${scope.organizationId}/sites?q=North+%26+Main`,
-      expect.objectContaining({ credentials: 'same-origin' }),
+      `/api/v1/workspaces/organizations/${scope.organizationId}/sites/${site.id}`,
+      expect.objectContaining({ credentials: 'same-origin', signal: undefined }),
     )
   })
 

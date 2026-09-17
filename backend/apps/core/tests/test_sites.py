@@ -108,13 +108,19 @@ def test_owner_can_manage_nested_sites_and_locations_in_msp_and_organization_wor
 
     listed = owner_client.get(organization_url, {"q": "Office 214"}).json()
     assert listed["count"] == 1
+    assert listed["page"] == 1
+    assert listed["page_size"] == 25
+    assert listed["has_more"] is False
     assert [location["name"] for location in listed["results"][0]["locations"]] == ["Building A", "Office 214"]
     assert owner_client.get(msp_url).json()["results"][0]["name"] == "North Campus"
+    assert owner_client.get(msp_url, {"typo": "ignored"}).status_code == 400
 
     detail_url = reverse(
         "organization-site-detail",
         kwargs={"organization_entity_id": client_organization.entity_id, "site_entity_id": site_id},
     )
+
+
     updated = owner_client.patch(detail_url, {"phone": "+1 555 010 2000"}, content_type="application/json")
     assert updated.status_code == 200
     assert updated.json()["phone"] == "+1 555 010 2000"
@@ -143,6 +149,31 @@ def test_owner_can_manage_nested_sites_and_locations_in_msp_and_organization_wor
         .exclude(metadata={})
         .exists()
     )
+
+
+@pytest.mark.django_db
+def test_site_collection_is_sorted_and_bounded(owner_client):
+    url = reverse("msp-site-list-create")
+    for index in range(27):
+        response = owner_client.post(
+            url,
+            site_payload(name=f"Campus {index:02d}", code=f"SITE-{index:02d}"),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    first_page = owner_client.get(url, {"page_size": 10, "ordering": "-name"})
+    second_page = owner_client.get(url, {"page_size": 10, "page": 2, "ordering": "-name"})
+
+    assert first_page.status_code == 200
+    assert first_page.json()["count"] == 27
+    assert first_page.json()["has_more"] is True
+    assert [site["name"] for site in first_page.json()["results"]] == [
+        f"Campus {index:02d}" for index in range(26, 16, -1)
+    ]
+    assert second_page.status_code == 200
+    assert second_page.json()["page"] == 2
+    assert second_page.json()["results"][0]["name"] == "Campus 16"
 
 
 @pytest.mark.django_db

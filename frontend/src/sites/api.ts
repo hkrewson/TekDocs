@@ -34,10 +34,13 @@ export type SiteRecord = {
 export type SiteInput = Pick<SiteRecord, 'name' | 'code' | 'address_line_1' | 'address_line_2' | 'city' | 'region' | 'postal_code' | 'country_code' | 'timezone' | 'phone'>
 export type LocationInput = Pick<LocationRecord, 'name' | 'kind' | 'code' | 'parent_id'>
 export type SiteScope = { organizationId?: string }
-export type SiteResult = { results: SiteRecord[]; count: number }
+export type SiteOrdering = 'name' | '-name' | 'code' | '-code' | 'city' | '-city' | 'region' | '-region' | 'country_code' | '-country_code' | 'timezone' | '-timezone'
+export type SitesQuery = { q: string; ordering: SiteOrdering; page: number; page_size: number }
+export type SiteResult = { results: SiteRecord[]; page: number; page_size: number; count: number; has_more: boolean }
 
 export interface SitesClient {
-  list(scope: SiteScope, query?: string, signal?: AbortSignal): Promise<SiteResult>
+  list(scope: SiteScope, query: SitesQuery, signal?: AbortSignal): Promise<SiteResult>
+  retrieve(scope: SiteScope, id: string, signal?: AbortSignal): Promise<SiteRecord>
   create(scope: SiteScope, input: SiteInput): Promise<SiteRecord>
   update(scope: SiteScope, id: string, input: Partial<SiteInput>): Promise<SiteRecord>
   archive(scope: SiteScope, id: string): Promise<void>
@@ -100,17 +103,29 @@ async function mutation(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?
 }
 
 export const browserSitesClient: SitesClient = {
-  async list(scope, query = '', signal) {
-    const parameters = new URLSearchParams()
-    if (query) parameters.set('q', query)
-    const suffix = parameters.size ? `?${parameters}` : ''
-    const response = await fetch(`${collectionPath(scope)}${suffix}`, {
+  async list(scope, query, signal) {
+    const parameters = new URLSearchParams({
+      ordering: query.ordering,
+      page: String(query.page),
+      page_size: String(query.page_size),
+    })
+    if (query.q) parameters.set('q', query.q)
+    const response = await fetch(`${collectionPath(scope)}?${parameters}`, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal,
     })
     if (!response.ok) throw new AuthRequestError('Sites could not be loaded.', response.status)
     return json<SiteResult>(response)
+  },
+  async retrieve(scope, id, signal) {
+    const response = await fetch(sitePath(scope, id), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    })
+    if (!response.ok) throw new AuthRequestError('That site is unavailable or you no longer have access.', response.status)
+    return json<SiteRecord>(response)
   },
   async create(scope, input) {
     const response = await mutation(collectionPath(scope), 'POST', input)

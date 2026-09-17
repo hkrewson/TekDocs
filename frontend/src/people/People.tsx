@@ -49,6 +49,7 @@ const initialQuery: PeopleQuery = {
   page: 1,
   page_size: 25,
 }
+const placementSiteQuery = { q: '', ordering: 'name' as const, page: 1, page_size: 100 }
 
 function personInput(person: PersonRecord | null): PersonInput {
   return person ? {
@@ -195,7 +196,7 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
 
   useEffect(() => {
     const controller = new AbortController()
-    sitesClient.list(scope, '', controller.signal)
+    sitesClient.list(scope, placementSiteQuery, controller.signal)
       .then((result) => { if (!controller.signal.aborted) { setPlacementSites({ scopeKey, sites: result.results }); setSitesErrorScopeKey(null) } })
       .catch(() => { if (!controller.signal.aborted) { setPlacementSites(null); setSitesErrorScopeKey(scopeKey) } })
     return () => controller.abort()

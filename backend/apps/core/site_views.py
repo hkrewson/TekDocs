@@ -77,8 +77,19 @@ def _serialize_site(workspace: ResolvedWorkspace, site_entity_id: UUID) -> Respo
 def _list(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
     serializer = SiteQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
-    records = query_sites(scope=workspace.data_scope, q=serializer.validated_data["q"])
-    return Response(SiteResultSerializer({"results": records, "count": len(records)}).data)
+    values = serializer.validated_data
+    records, count, has_more = query_sites(scope=workspace.data_scope, **values)
+    return Response(
+        SiteResultSerializer(
+            {
+                "results": records,
+                "page": values["page"],
+                "page_size": values["page_size"],
+                "count": count,
+                "has_more": has_more,
+            }
+        ).data
+    )
 
 
 def _create(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
@@ -204,7 +215,12 @@ def _archive_location(
 class MSPSiteListCreateView(APIView):
     @extend_schema(
         operation_id="sites_msp_list",
-        parameters=[OpenApiParameter("q", str)],
+        parameters=[
+            OpenApiParameter("q", str),
+            OpenApiParameter("ordering", str),
+            OpenApiParameter("page", int),
+            OpenApiParameter("page_size", int),
+        ],
         responses={200: SiteResultSerializer},
     )
     def get(self, request):  # type: ignore[no-untyped-def]
@@ -260,7 +276,12 @@ class MSPLocationDetailView(APIView):
 class OrganizationSiteListCreateView(APIView):
     @extend_schema(
         operation_id="sites_organization_list",
-        parameters=[OpenApiParameter("q", str)],
+        parameters=[
+            OpenApiParameter("q", str),
+            OpenApiParameter("ordering", str),
+            OpenApiParameter("page", int),
+            OpenApiParameter("page_size", int),
+        ],
         responses={200: SiteResultSerializer},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]

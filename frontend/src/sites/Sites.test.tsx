@@ -1,5 +1,6 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import type { WorkspaceContext } from '../workspaces/api'
 import { Sites } from './Sites'
@@ -19,7 +20,8 @@ const site: SiteRecord = {
 
 function sitesClient(overrides: Partial<SitesClient> = {}): SitesClient {
   return {
-    list: vi.fn().mockResolvedValue({ results: [site], count: 1 }),
+    list: vi.fn().mockResolvedValue({ results: [site], page: 1, page_size: 25, count: 1, has_more: false }),
+    retrieve: vi.fn().mockResolvedValue(site),
     create: vi.fn().mockResolvedValue(site),
     update: vi.fn().mockResolvedValue(site),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -36,39 +38,41 @@ async function settleDebounce() {
 
 describe('Sites', () => {
   it('shows the scoped site and nested location hierarchy', async () => {
-    render(<Sites workspace={workspace} client={sitesClient()} />)
+    const user = userEvent.setup()
+    render(<MemoryRouter><Sites workspace={workspace} client={sitesClient()} /></MemoryRouter>)
 
-    expect(await screen.findByRole('heading', { name: 'North Campus' })).toBeInTheDocument()
-    expect(screen.getByText('100 Main Street · Madison, WI, 53703 · US · NORTH')).toBeInTheDocument()
-    expect(screen.getByText('Building A')).toBeInTheDocument()
-    expect(screen.getByText('Office 214')).toBeInTheDocument()
-    expect(screen.getByLabelText('More actions for Office 214')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'North Campus' }))
+    const drawer = screen.getByRole('dialog', { name: 'North Campus' })
+    expect(within(drawer).getByText('100 Main Street · Madison, WI, 53703 · US')).toBeInTheDocument()
+    expect(within(drawer).getByText('Building A')).toBeInTheDocument()
+    expect(within(drawer).getByText('Office 214')).toBeInTheDocument()
+    expect(within(drawer).getByLabelText('More actions for Office 214')).toBeInTheDocument()
   })
 
   it('clears prior-workspace sites while a new scope loads', async () => {
-    const list = vi.fn().mockResolvedValueOnce({ results: [site], count: 1 }).mockImplementationOnce(() => new Promise(() => undefined))
+    const list = vi.fn().mockResolvedValueOnce({ results: [site], page: 1, page_size: 25, count: 1, has_more: false }).mockImplementationOnce(() => new Promise(() => undefined))
     const client = sitesClient({ list })
-    const { rerender } = render(<Sites workspace={workspace} client={client} />)
-    expect(await screen.findByRole('heading', { name: 'North Campus' })).toBeInTheDocument()
+    const { rerender } = render(<MemoryRouter><Sites workspace={workspace} client={client} /></MemoryRouter>)
+    expect(await screen.findByRole('button', { name: 'North Campus' })).toBeInTheDocument()
 
-    rerender(<Sites workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000099', name: 'Second Client' }} client={client} />)
+    rerender(<MemoryRouter><Sites workspace={{ ...workspace, id: '00000000-0000-4000-8000-000000000099', name: 'Second Client' }} client={client} /></MemoryRouter>)
 
-    expect(screen.queryByRole('heading', { name: 'North Campus' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'North Campus' })).not.toBeInTheDocument()
     expect(screen.getByText('Loading sites…')).toBeInTheDocument()
   })
 
   it('searches and manages sites and nested locations in the selected workspace', async () => {
     const user = userEvent.setup()
-    const list = vi.fn().mockResolvedValue({ results: [site], count: 1 })
+    const list = vi.fn().mockResolvedValue({ results: [site], page: 1, page_size: 25, count: 1, has_more: false })
     const create = vi.fn().mockResolvedValue(site)
     const createLocation = vi.fn().mockResolvedValue(site.locations[1])
     const archiveLocation = vi.fn().mockResolvedValue(undefined)
-    render(<Sites workspace={workspace} client={sitesClient({ list, create, createLocation, archiveLocation })} />)
-    await screen.findByRole('heading', { name: 'North Campus' })
+    render(<MemoryRouter><Sites workspace={workspace} client={sitesClient({ list, create, createLocation, archiveLocation })} /></MemoryRouter>)
+    await screen.findByRole('button', { name: 'North Campus' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search sites and locations' }), 'office')
     await settleDebounce()
-    expect(list).toHaveBeenLastCalledWith({ organizationId: workspace.id }, 'office', expect.any(AbortSignal))
+    expect(list).toHaveBeenLastCalledWith({ organizationId: workspace.id }, expect.objectContaining({ q: 'office', page: 1, page_size: 25 }), expect.any(AbortSignal))
 
     await user.click(screen.getByRole('button', { name: 'New site' }))
     await user.type(screen.getByLabelText('Site name'), 'South Campus')
@@ -76,6 +80,8 @@ describe('Sites', () => {
     await user.click(screen.getByRole('button', { name: 'Save site' }))
     expect(create).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({ name: 'South Campus', code: 'SOUTH' }))
 
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+    await user.click(await screen.findByRole('button', { name: 'North Campus' }))
     await user.click(screen.getByRole('button', { name: 'Add location to North Campus' }))
     await user.type(screen.getByLabelText('Location name'), 'Desk 9')
     await user.selectOptions(screen.getByLabelText('Location type'), 'desk')
@@ -94,7 +100,7 @@ describe('Sites', () => {
   it('retains the form and reports a server denial', async () => {
     const user = userEvent.setup()
     const create = vi.fn().mockRejectedValue(new Error('Your account is not authorized to manage sites in this workspace.'))
-    render(<Sites workspace={null} client={sitesClient({ list: vi.fn().mockResolvedValue({ results: [], count: 0 }), create })} />)
+    render(<MemoryRouter><Sites workspace={null} client={sitesClient({ list: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }), create })} /></MemoryRouter>)
     await screen.findByText('No sites have been added to the MSP workspace.')
 
     await user.click(screen.getByRole('button', { name: 'New site' }))

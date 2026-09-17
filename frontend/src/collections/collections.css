@@ -14,6 +14,7 @@
 .collection-table .collection-identity { width: 25%; }
 .collection-table .collection-selection { width: 2.5rem; }
 .collection-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; font: inherit; font-weight: 600; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; overflow-wrap: anywhere; }
+.collection-secondary { display: block; margin-block-start: .2rem; color: var(--muted); font-size: .8rem; }
 .collection-record-link { display: inline-block; margin-block-start: .4rem; font-size: .875rem; }
 .collection-cell-label, .collection-mobile-order { display: none; }
 .collection-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(64rem, 90%); height: auto; max-width: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); overflow: hidden; }
@@ -31,6 +32,8 @@
 .operational-record-actions button { display: inline-flex; align-items: center; gap: .4rem; }
 .operational-record-form { width: 100%; max-width: none; margin: 0; border: 0; box-shadow: none; }
 .operational-record-context { grid-column: 1 / -1; margin: 0; color: var(--muted); }
+.site-location-section { padding-block-start: 1rem; border-top: 1px solid var(--border); }
+.site-location-section > .section-heading { margin-block-end: .75rem; }
 .record-page { min-width: 0; overflow-wrap: anywhere; }
 .record-header h1 { font-size: 1.5rem; margin-block: 1rem .5rem; }
 .record-sections { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border); margin-block: 1rem; }

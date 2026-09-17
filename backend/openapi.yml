@@ -6248,6 +6248,18 @@ paths:
       operationId: sites_msp_list
       parameters:
       - in: query
+        name: ordering
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
         name: q
         schema:
           type: string
@@ -28560,12 +28572,24 @@ paths:
     get:
       operationId: sites_organization_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          type: string
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
       - in: query
         name: q
         schema:
@@ -43383,10 +43407,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Site'
+        page:
+          type: integer
+        page_size:
+          type: integer
         count:
           type: integer
+        has_more:
+          type: boolean
       required:
       - count
+      - has_more
+      - page
+      - page_size
       - results
     SiteWrite:
       type: object

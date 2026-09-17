@@ -296,7 +296,7 @@ describe('application shell', () => {
     expect(await screen.findByText('No sites have been added to Acme Dental.')).toBeInTheDocument()
     expect(listSites).toHaveBeenCalledWith(
       { organizationId: '00000000-0000-4000-8000-000000000010' },
-      '',
+      { q: '', ordering: 'name', page: 1, page_size: 25 },
       expect.any(AbortSignal),
     )
   })

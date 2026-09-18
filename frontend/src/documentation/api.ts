@@ -23,6 +23,9 @@ export type DocumentFilters = {
   health?: DocumentHealthStatus | ''
   review_state?: DocumentReviewState | ''
   owner_id?: string
+  ordering?: 'title' | '-title' | 'updated_at' | '-updated_at' | 'category' | '-category'
+  page?: number
+  page_size?: number
 }
 export type PlacementResolutionMode = 'live' | 'pinned'
 export type PlacementAudienceProfile = 'shared' | 'msp_internal' | 'client_visible'
@@ -173,6 +176,9 @@ export type DocumentFacet = { value: string; count: number }
 export type DocumentResult = {
   results: DocumentRecord[]
   count: number
+  page?: number
+  page_size?: number
+  has_more?: boolean
   collections?: DocumentFacet[]
   tags?: DocumentFacet[]
   health?: DocumentFacet[]
@@ -500,6 +506,9 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.health) query.set('health', filters.health)
     if (filters.review_state) query.set('review_state', filters.review_state)
     if (filters.owner_id) query.set('owner_id', filters.owner_id)
+    if (filters.ordering) query.set('ordering', filters.ordering)
+    if (filters.page) query.set('page', String(filters.page))
+    if (filters.page_size) query.set('page_size', String(filters.page_size))
     const response = await fetch(`${collectionPath(scope)}/search${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
   },

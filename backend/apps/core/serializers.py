@@ -492,7 +492,7 @@ class DocumentRestructurePreviewSerializer(serializers.Serializer):
     dependencies = DocumentRestructureDependenciesSerializer()
 
 
-class DocumentListQuerySerializer(serializers.Serializer):
+class DocumentListQuerySerializer(StrictQuerySerializer):
     q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
     category = serializers.ChoiceField(
         choices=DocumentCategory.choices,
@@ -520,6 +520,13 @@ class DocumentListQuerySerializer(serializers.Serializer):
         default="",
     )
     owner_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    ordering = serializers.ChoiceField(
+        choices=("title", "-title", "updated_at", "-updated_at", "category", "-category"),
+        required=False,
+        default="title",
+    )
+    page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
 
 class DocumentTemplateInstantiateSerializer(serializers.Serializer):
@@ -1386,6 +1393,9 @@ class DocumentFacetSerializer(serializers.Serializer):
 class DocumentSearchResultSerializer(serializers.Serializer):
     results = DocumentSearchHitSerializer(many=True)
     count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     collections = DocumentFacetSerializer(many=True)
     tags = DocumentFacetSerializer(many=True)
     health = DocumentFacetSerializer(many=True)

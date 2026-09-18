@@ -207,7 +207,7 @@ def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) ->
         queryset = queryset.filter(review_state=values["review_state"])
     if values["owner_id"]:
         queryset = queryset.filter(owner_id=values["owner_id"])
-    records = list(queryset.order_by("entity__display_name", "entity_id").distinct()[:500])
+    records = list(queryset.order_by("entity__display_name", "entity_id").distinct())
     if values["tag"]:
         tag = values["tag"].strip().casefold()
         records = [
@@ -267,18 +267,42 @@ def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
             + sum(10 for term in terms if term in folded_title)
             + sum(min(folded_markdown.count(term), 5) for term in terms)
         )
-    if query:
+    ordering = serializer.validated_data["ordering"]
+    if query and ordering == "title":
         selected.sort(key=lambda record: (-ranks[record.id], record.entity.display_name.casefold()))
+    else:
+        descending = ordering.startswith("-")
+        field = ordering.removeprefix("-")
+        if field == "updated_at":
+            selected.sort(key=lambda record: (record.updated_at, str(record.id)), reverse=descending)
+        elif field == "category":
+            selected.sort(
+                key=lambda record: (record.category.casefold(), record.entity.display_name.casefold(), str(record.id)),
+                reverse=descending,
+            )
+        else:
+            selected.sort(
+                key=lambda record: (record.entity.display_name.casefold(), str(record.id)),
+                reverse=descending,
+            )
     collection_counts = Counter(record.collection for record in selected if record.collection)
     tag_counts = Counter(tag for record in selected for tag in document_tag_labels(record))
     health_counts = Counter(record.health_status for record in selected)
+    count = len(selected)
+    page = serializer.validated_data["page"]
+    page_size = serializer.validated_data["page_size"]
+    start = (page - 1) * page_size
+    page_records = selected[start : start + page_size]
     context = {
         "workspace": workspace,
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
     payload = {
-        "results": selected,
-        "count": len(selected),
+        "results": page_records,
+        "count": count,
+        "page": page,
+        "page_size": page_size,
+        "has_more": start + page_size < count,
         "collections": [{"value": value, "count": count} for value, count in sorted(collection_counts.items())],
         "tags": [{"value": value, "count": count} for value, count in sorted(tag_counts.items())],
         "health": [{"value": value, "count": count} for value, count in sorted(health_counts.items())],

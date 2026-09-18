@@ -9921,6 +9921,9 @@ export interface components {
         readonly DocumentSearchResult: {
             readonly results: readonly components["schemas"]["DocumentSearchHit"][];
             readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
             readonly collections: readonly components["schemas"]["DocumentFacet"][];
             readonly tags: readonly components["schemas"]["DocumentFacet"][];
             readonly health: readonly components["schemas"]["DocumentFacet"][];

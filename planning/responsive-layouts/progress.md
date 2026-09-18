@@ -14,7 +14,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
-| 5 — Documentation/files | Next | Begin the grouped document library, reader, editor, template, block, review, publication, export, and file workspace migration |
+| 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
@@ -72,6 +72,14 @@ The server rejects undeclared collection parameters, caps page size, returns can
 Verified: focused PostgreSQL inventory coverage and nine focused component/API-client scenarios pass. All 21 License browser scenarios pass across Chromium, Firefox, and WebKit at the six required widths. The clean frontend gate passes all 594 tests across 117 files with coverage, localization enforcement, typechecking, linting, production build, and unchanged bundle budgets. The isolated real browser-to-Django-to-PostgreSQL journey passes the complete connected workflow, including Product creation, software asset installation, License creation, seat assignment, renewal editing, downstream Contracts and accounting, plus independent database assertions. Earlier journey attempts exposed stale Product/Vendor navigation assumptions, the saved-create guard race, and a missing explicit License drawer close; each was corrected at its source before the green rerun.
 
 Phase 4 is accepted. Documents is next in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged. See [license-workspace.md](license-workspace.md).
+
+## Document library and focused workspace checkpoint — 2026-09-18
+
+Phase 5 now has its first substantial interface replacement. The unbounded document index and simultaneously visible editor are separated into two primary states: a bounded library and a focused reader/editor workspace. The library supports whole-workspace search and filters, deterministic sorting, 25-record pages, canonical range metadata, strict query validation, and refresh-restored collection state. Opening a document removes the competing library from the page and provides an explicit return path while retaining the complete reader, editor, settings, files, history, key, publication, relationship, and reuse tools. Selected records remain URL-addressed and off-page direct records continue to use the scoped detail endpoint.
+
+The API now returns page, page-size, count, and continuation metadata, rejects undeclared query parameters, and no longer truncates search visibility at 500 records. OpenAPI and generated TypeScript contracts are aligned. The new document-specific layout CSS remains in the lazy documentation chunk, preserving the shell stylesheet budget.
+
+Verified: seven focused PostgreSQL document-operation scenarios pass, including bounded ordering, page boundaries, and strict query handling. Forty-eight focused document component/client tests pass. The complete frontend gate passes all 595 tests across 117 files with coverage, linting, typechecking, the production build, and unchanged bundle limits. Existing document filter and mobile reader accessibility scenarios pass in Chromium, Firefox, and WebKit. Templates, block-library workflows, review/publication surfaces, exports, and managed files remain in the Phase 5 completion boundary. Version, deployment, Wiki publication, and existing user/demo data remain unchanged. See [document-workspace.md](document-workspace.md).
 
 ## Verified — Assets collection checkpoint
 

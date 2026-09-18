@@ -96,14 +96,14 @@ describe('documentation placement API client', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [], count: 0 }), { status: 200 })))
     const scope = { organizationId: 'org' }
 
-    await browserDocumentsClient.list(scope, undefined, { q: 'router', category: 'guide', template: 'templates' })
+    await browserDocumentsClient.list(scope, undefined, { q: 'router', category: 'guide', template: 'templates', ordering: '-updated_at', page: 2, page_size: 25 })
     await browserDocumentsClient.importMarkdown(scope, new File(['# Guide'], 'guide.md'), 'Guide', 'guide', true)
     await browserDocumentsClient.uploadAttachment(scope, 'doc', new File(['notes'], 'notes.txt'))
     await browserDocumentsClient.createFileBacked(scope, { title: 'Datasheet', notes: 'Reviewed', category: 'reference', file: new File(['file'], 'datasheet.txt') })
     await browserDocumentsClient.replacePrimaryFile(scope, 'doc', new File(['replacement'], 'datasheet-v2.txt'))
     await browserDocumentsClient.archiveAttachment(scope, 'doc', 'attachment')
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/search?q=router&category=guide&template=templates')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/search?q=router&category=guide&template=templates&ordering=-updated_at&page=2&page_size=25')
     expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/import')
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBeInstanceOf(FormData)
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/attachments')

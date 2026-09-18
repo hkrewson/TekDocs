@@ -84,10 +84,38 @@ def test_full_text_search_returns_excerpt_and_facets(owner_client, installation)
 
     assert result.status_code == 200
     assert result.json()["count"] == 1
+    assert result.json()["page"] == 1
+    assert result.json()["page_size"] == 25
+    assert result.json()["has_more"] is False
     assert "Rotate the recovery key" in result.json()["results"][0]["matching_excerpt"]
     assert result.json()["collections"] == [{"value": "Operations Runbooks", "count": 1}]
     assert {item["value"] for item in result.json()["tags"]} == {"critical", "recovery"}
     assert result.json()["health"] == [{"value": "stale", "count": 1}]
+
+
+@pytest.mark.django_db
+def test_document_search_is_bounded_sorted_and_paginated(owner_client):
+    for index in range(27):
+        create_document(owner_client, title=f"Runbook {index:02d}", markdown=f"Step {index}")
+
+    first = owner_client.get(reverse("msp-document-search"), {"ordering": "-title", "page_size": 25})
+    second = owner_client.get(reverse("msp-document-search"), {"ordering": "-title", "page": 2, "page_size": 25})
+
+    assert first.status_code == 200
+    assert first.json()["count"] == 27
+    assert first.json()["page"] == 1
+    assert first.json()["page_size"] == 25
+    assert first.json()["has_more"] is True
+    assert len(first.json()["results"]) == 25
+    assert first.json()["results"][0]["title"] == "Runbook 26"
+    assert second.status_code == 200
+    assert second.json()["page"] == 2
+    assert second.json()["has_more"] is False
+    assert [item["title"] for item in second.json()["results"]] == ["Runbook 01", "Runbook 00"]
+
+    unknown = owner_client.get(reverse("msp-document-search"), {"ordring": "title"})
+    assert unknown.status_code == 400
+    assert unknown.json()["ordring"] == ["Unknown query parameter."]
 
 
 @pytest.mark.django_db

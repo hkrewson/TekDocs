@@ -35065,6 +35065,12 @@ components:
             $ref: '#/components/schemas/DocumentSearchHit'
         count:
           type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
         collections:
           type: array
           items:
@@ -35080,7 +35086,10 @@ components:
       required:
       - collections
       - count
+      - has_more
       - health
+      - page
+      - page_size
       - results
       - tags
     DocumentTemplateInstantiate:

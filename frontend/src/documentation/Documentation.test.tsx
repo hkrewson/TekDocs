@@ -203,6 +203,27 @@ it('consolidates document filters into one keyboard-accessible menu', async () =
   expect(filterButton).toHaveFocus()
 })
 
+it('paginates the library and gives an opened document a focused workspace', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const listDocuments = vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 51, page: 1, page_size: 25, has_more: true })
+  documents.list = listDocuments
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(screen.queryByRole('heading', { name: 'Documentation' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Documents' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Documents' })).toBeVisible()
+  expect(screen.getByText('Firewall standard', { selector: '.document-reader-title strong' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
+    {}, expect.any(AbortSignal), expect.objectContaining({ page: 2, page_size: 25 }),
+  ))
+})
+
 it('exposes document settings and opens them before the document content', async () => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()

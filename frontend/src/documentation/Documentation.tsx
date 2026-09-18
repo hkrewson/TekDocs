@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
+import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
+import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
 import type { FilterMenuGroup } from '../FilterMenu'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
@@ -11,7 +12,8 @@ import { DocumentRelationshipRail } from './DocumentRelationshipRail'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import { browserDocumentsClient, RevisionConflictError } from './api'
 import type { DocumentKeyBinding, DocumentKeyReport, WorkspaceKeyBinding } from './api'
-import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentHealthStatus, DocumentInput, DocumentOperationsChoice, DocumentPlacement, DocumentPreflight, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentRemoteObservation, DocumentRemoteSource, DocumentRestructurePreview, DocumentTopicType, DocumentsClient, EntityMentionOption, PlacementAudienceProfile, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout, TopicSchema } from './api'
+import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentFilters, DocumentHealthStatus, DocumentInput, DocumentOperationsChoice, DocumentPlacement, DocumentPreflight, DocumentPublication, DocumentPublicationDetail, DocumentRecord, DocumentRemoteObservation, DocumentRemoteSource, DocumentRestructurePreview, DocumentTopicType, DocumentsClient, EntityMentionOption, PlacementAudienceProfile, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout, TopicSchema } from './api'
+import './documentation.css'
 
 const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
 const PdfViewer = lazy(async () => ({ default: (await import('./PdfViewer')).PdfViewer }))
@@ -63,10 +65,12 @@ function placementAudienceLabel(profile: PlacementAudienceProfile): string {
 }
 
 export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient, relationshipsClient, initialDocumentId }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient; relationshipsClient?: RelationshipsClient; initialDocumentId?: string | null }) {
+  const initialParameters = useMemo(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search), [])
+  const urlManaged = initialDocumentId !== undefined
   const requestedDocumentId = initialDocumentId ?? null
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
-  const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
+  const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; count: number; page: number; pageSize: number; hasMore: boolean; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
   const [newDocumentMode, setNewDocumentMode] = useState<'write' | 'file'>('write')
@@ -79,12 +83,23 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [topicSchemasLoading, setTopicSchemasLoading] = useState(true)
   const [isTemplate, setIsTemplate] = useState(false)
   const [libraryVisible, setLibraryVisible] = useState(false)
-  const [documentQuery, setDocumentQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | ''>('')
-  const [templateFilter, setTemplateFilter] = useState<'all' | 'documents' | 'templates'>('all')
-  const [collectionFilter, setCollectionFilter] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
-  const [healthFilter, setHealthFilter] = useState<DocumentHealthStatus | ''>('')
+  const [documentQuery, setDocumentQuery] = useState(() => urlManaged ? initialParameters.get('doc_q') ?? '' : '')
+  const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | ''>(() => urlManaged && categories.some((item) => item.value === initialParameters.get('doc_category')) ? initialParameters.get('doc_category') as DocumentCategory : '')
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'documents' | 'templates'>(() => urlManaged && ['documents', 'templates'].includes(initialParameters.get('doc_type') ?? '') ? initialParameters.get('doc_type') as 'documents' | 'templates' : 'all')
+  const [collectionFilter, setCollectionFilter] = useState(() => urlManaged ? initialParameters.get('doc_collection') ?? '' : '')
+  const [tagFilter, setTagFilter] = useState(() => urlManaged ? initialParameters.get('doc_tag') ?? '' : '')
+  const [healthFilter, setHealthFilter] = useState<DocumentHealthStatus | ''>(() => {
+    const value = initialParameters.get('doc_health')
+    return urlManaged && ['current', 'stale', 'unreviewed', 'unowned', 'pending', 'changes_requested'].includes(value ?? '') ? value as DocumentHealthStatus : ''
+  })
+  const [documentOrdering, setDocumentOrdering] = useState<NonNullable<DocumentFilters['ordering']>>(() => {
+    const value = initialParameters.get('doc_order')
+    return urlManaged && ['title', '-title', 'updated_at', '-updated_at', 'category', '-category'].includes(value ?? '') ? value as NonNullable<DocumentFilters['ordering']> : 'title'
+  })
+  const [documentPage, setDocumentPage] = useState(() => {
+    const value = Number(initialParameters.get('doc_page'))
+    return urlManaged && Number.isInteger(value) && value > 0 ? value : 1
+  })
   const [indexMode, setIndexMode] = useState<'browse' | 'health'>('browse')
   const [operationsChoices, setOperationsChoices] = useState<DocumentOperationsChoice[]>([])
   const [operationsDraft, setOperationsDraft] = useState({ ownerId: '', reviewDueOn: '', collection: '', tags: '', taxonomyTermIds: [] as string[] })
@@ -173,10 +188,10 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   useEffect(() => {
     const controller = new AbortController()
-    client.list(scope, controller.signal, { q: documentQuery, category: categoryFilter, template: templateFilter, collection: collectionFilter, tag: tagFilter, health: healthFilter })
+    client.list(scope, controller.signal, { q: documentQuery, category: categoryFilter, template: templateFilter, collection: collectionFilter, tag: tagFilter, health: healthFilter, ordering: documentOrdering, page: documentPage, page_size: 25 })
       .then(async (result) => {
         if (controller.signal.aborted) return
-        setLoaded({ key: scopeKey, results: result.results, collections: result.collections ?? [], tags: result.tags ?? [], health: result.health ?? [] })
+        setLoaded({ key: scopeKey, results: result.results, count: result.count, page: result.page ?? documentPage, pageSize: result.page_size ?? 25, hasMore: result.has_more ?? false, collections: result.collections ?? [], tags: result.tags ?? [], health: result.health ?? [] })
         setPhase('ready')
         const deepLinkKey = requestedDocumentId ? `${scopeKey}:${requestedDocumentId}` : null
         let deepLinked = requestedDocumentId ? result.results.find((item) => item.id === requestedDocumentId) : null
@@ -206,7 +221,38 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       })
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
-  }, [categoryFilter, client, collectionFilter, documentQuery, healthFilter, requestedDocumentId, revision, scope, scopeKey, tagFilter, templateFilter])
+  }, [categoryFilter, client, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, requestedDocumentId, revision, scope, scopeKey, tagFilter, templateFilter])
+
+  useEffect(() => {
+    if (!urlManaged) return
+    const parameters = new URLSearchParams(window.location.search)
+    const values: Record<string, string> = {
+      doc_q: documentQuery,
+      doc_category: categoryFilter,
+      doc_type: templateFilter === 'all' ? '' : templateFilter,
+      doc_collection: collectionFilter,
+      doc_tag: tagFilter,
+      doc_health: healthFilter,
+      doc_order: documentOrdering === 'title' ? '' : documentOrdering,
+      doc_page: documentPage === 1 ? '' : String(documentPage),
+    }
+    Object.entries(values).forEach(([key, value]) => value ? parameters.set(key, value) : parameters.delete(key))
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${parameters.size ? `?${parameters}` : ''}${window.location.hash}`)
+  }, [categoryFilter, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, tagFilter, templateFilter, urlManaged])
+
+  useEffect(() => {
+    if (!urlManaged) return
+    const restoreLibrary = () => {
+      if (new URLSearchParams(window.location.search).has('document')) return
+      setSelected(null)
+      setPublicationView(null)
+      setPublicationForm(null)
+      setPublicationControl(null)
+      setActivePanel(null)
+    }
+    window.addEventListener('popstate', restoreLibrary)
+    return () => window.removeEventListener('popstate', restoreLibrary)
+  }, [urlManaged])
 
   useEffect(() => {
     if (!client.listTaxonomies) return
@@ -293,10 +339,17 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
+  const updateDocumentLocation = (documentId: string | null, mode: 'push' | 'replace' = 'push') => {
+    if (!urlManaged) return
+    const parameters = new URLSearchParams(window.location.search)
+    if (documentId) parameters.set('document', documentId)
+    else parameters.delete('document')
+    window.history[mode === 'push' ? 'pushState' : 'replaceState'](window.history.state, '', `${window.location.pathname}${parameters.size ? `?${parameters}` : ''}${window.location.hash}`)
+  }
   const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setBlockLibraryQuery(''); setBlockLibrary([]); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setAddressableTypes([]); setBindingQuery(''); setBindingMatches([]); setPlacementAudience('shared'); setAudiencePreview('all'); setDocumentCheck(null) }
-  const open = (document: DocumentRecord) => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setTopicType(document.topic_type ?? 'unstructured'); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setOperationsDraft({ ownerId: document.owner_id ?? '', reviewDueOn: document.review_due_on ?? '', collection: document.collection ?? '', tags: (document.tags ?? []).join(', '), taxonomyTermIds: (document.taxonomy_terms ?? []).map((term) => term.id) }); setReviewDraft({ reviewerId: document.reviewer_id ?? '', note: '' }); setDecisionDraft({ decision: 'approved', note: '' }); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live'); setPlacementAudience('shared'); setAudiencePreview('all'); setExportAttachmentIds([]); if (document.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) }) }
+  const open = (document: DocumentRecord) => { updateDocumentLocation(document.id); resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setTopicType(document.topic_type ?? 'unstructured'); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setOperationsDraft({ ownerId: document.owner_id ?? '', reviewDueOn: document.review_due_on ?? '', collection: document.collection ?? '', tags: (document.tags ?? []).join(', '), taxonomyTermIds: (document.taxonomy_terms ?? []).map((term) => term.id) }); setReviewDraft({ reviewerId: document.reviewer_id ?? '', note: '' }); setDecisionDraft({ decision: 'approved', note: '' }); setMessage(null); setError(null); setShareQuery(''); setSourceDocumentId(''); setPlacementMode('live'); setPlacementAudience('shared'); setAudiencePreview('all'); setExportAttachmentIds([]); if (document.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) }) }
   const create = () => { resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setNewDocumentMode('write'); setNewPrimaryFile(null); setTitle(''); setMarkdown(''); setCategory('general'); setTopicType('unstructured'); setIsTemplate(false); setLibraryVisible(false); setMessage(null); setError(null) }
-  const close = () => { resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
+  const close = () => { updateDocumentLocation(null, 'replace'); resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]) }
   const openPublication = async (document: DocumentRecord, publication: DocumentPublication) => {
     resetRevisionUi(); setSelected(null); setPublicationForm(null); setPublicationControl(null); setPublicationView({ sourceId: document.id, phase: 'loading' }); setError(null); setMessage(null)
     try { setPublicationView({ sourceId: document.id, phase: 'ready', record: await client.getPublication(scope, document.id, publication.id) }) }
@@ -321,6 +374,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       const record = selected === 'new'
         ? await client.create(scope, input)
         : await client.update(scope, selected.id, { ...input, base_revision_id: selected.current_revision_id })
+      if (selected === 'new') updateDocumentLocation(record.id, 'replace')
       setSelected(record); setTitle(record.title); setMarkdown(record.markdown); setCategory(record.category); setTopicType(record.topic_type ?? 'unstructured'); setIsTemplate(record.is_template); setLibraryVisible(record.library_visible); setConflict(null); setMessage(`Document saved as revision ${record.revision_number}.`); setRevision((value) => value + 1)
       if (historyOpen) void loadHistory(record)
     } catch (saveError) {
@@ -378,6 +432,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setSaving(true); setError(null)
     try {
       const record = await client.createFileBacked(scope, { title: title.trim(), notes: markdown, category, file: newPrimaryFile })
+      updateDocumentLocation(record.id, 'replace')
       setSelected(record); setNewPrimaryFile(null); setTitle(record.title); setMarkdown(record.markdown); setMessage('File-backed document created.'); setRevision((value) => value + 1)
       if (record.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: record.primary_file.filename, url: client.attachmentDownloadUrl(scope, record.id, record.primary_file.id) })
     } catch (creationError) { setError(errorMessage(creationError)) } finally { setSaving(false) }
@@ -855,28 +910,28 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       label: translate('documentation.category'),
       value: categoryFilter,
       choices: [{ value: '', label: translate('documentation.allCategories') }, ...categories],
-      onChange: (value) => setCategoryFilter(value as DocumentCategory | ''),
+      onChange: (value) => { setCategoryFilter(value as DocumentCategory | ''); setDocumentPage(1) },
     },
     {
       kind: 'choices' as const,
       label: translate('documentation.collection'),
       value: collectionFilter,
       choices: [{ value: '', label: translate('documentation.allCollections') }, ...(loaded?.collections ?? []).map((item) => ({ value: item.value, label: `${item.value} (${item.count})` }))],
-      onChange: setCollectionFilter,
+      onChange: (value) => { setCollectionFilter(value); setDocumentPage(1) },
     },
     {
       kind: 'choices' as const,
       label: translate('documentation.tag'),
       value: tagFilter,
       choices: [{ value: '', label: translate('documentation.allTags') }, ...(loaded?.tags ?? []).map((item) => ({ value: item.value, label: `${item.value} (${item.count})` }))],
-      onChange: setTagFilter,
+      onChange: (value) => { setTagFilter(value); setDocumentPage(1) },
     },
     {
       kind: 'choices' as const,
       label: translate('documentation.health'),
       value: healthFilter,
       choices: [{ value: '', label: translate('documentation.allHealth') }, ...(loaded?.health ?? []).map((item) => ({ value: item.value, label: `${item.value.replaceAll('_', ' ')} (${item.count})` }))],
-      onChange: (value) => setHealthFilter(value as DocumentHealthStatus | ''),
+      onChange: (value) => { setHealthFilter(value as DocumentHealthStatus | ''); setDocumentPage(1) },
     },
     {
       kind: 'choices' as const,
@@ -887,7 +942,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         { value: 'documents', label: translate('documentation.documents') },
         { value: 'templates', label: translate('documentation.templates') },
       ],
-      onChange: (value) => setTemplateFilter(value as typeof templateFilter),
+      onChange: (value) => { setTemplateFilter(value as typeof templateFilter); setDocumentPage(1) },
     },
   ]
   const clearDocumentFilters = () => {
@@ -896,26 +951,30 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setTagFilter('')
     setHealthFilter('')
     setTemplateFilter('all')
+    setDocumentPage(1)
   }
+  const showLibrary = !selected && !publicationView
 
   return <>
-    <header className="page-header"><div><h1>{translate('documentation.heading')}</h1></div><div className="page-actions"><button className="secondary-button" type="button" aria-pressed={indexMode === 'health'} onClick={() => setIndexMode((value) => value === 'browse' ? 'health' : 'browse')}><CalendarCheck2 size={16} aria-hidden="true" /><span className="button-label">{indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')}</span></button><input ref={importInput} aria-label={translate('documentation.importFile')} className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={create}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>
+    {showLibrary && <header className="page-header"><div><h1>{translate('documentation.heading')}</h1></div><div className="page-actions"><button className="secondary-button" type="button" aria-pressed={indexMode === 'health'} onClick={() => setIndexMode((value) => value === 'browse' ? 'health' : 'browse')}><CalendarCheck2 size={16} aria-hidden="true" /><span className="button-label">{indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')}</span></button><input ref={importInput} aria-label={translate('documentation.importFile')} className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => importInput.current?.click()}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={create}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>}
     {error && <div className="form-message error" role="alert">{error}</div>}
     {message && <div className="form-message success" role="status">{message}</div>}
+    {showLibrary && <>
     <section className="content-section document-index" aria-labelledby="document-index-heading">
-      <div className="section-heading"><h2 id="document-index-heading">{indexMode === 'health' ? translate('documentation.contentHealth') : translate('documentation.documents')}</h2><span>{phase === 'ready' ? translate('documentation.resultCount', { count: results.length }) : translate('common.loading')}</span></div>
-      <div className="document-filters"><label className="document-search-field"><span>{translate('documentation.search')}</span><input type="search" value={documentQuery} onChange={(event) => setDocumentQuery(event.target.value)} /></label><FilterMenu groups={documentFilterGroups} activeCount={activeDocumentFilterCount} onClear={clearDocumentFilters} menuLabel={translate('documentation.filterMenu')} /></div>
+      <div className="section-heading"><h2 id="document-index-heading">{indexMode === 'health' ? translate('documentation.contentHealth') : translate('documentation.documents')}</h2><span>{phase === 'ready' ? translate('pagination.range', { first: loaded?.count ? (loaded.page - 1) * loaded.pageSize + 1 : 0, last: Math.min((loaded?.page ?? 1) * (loaded?.pageSize ?? 25), loaded?.count ?? 0), count: loaded?.count ?? 0 }) : translate('common.loading')}</span></div>
+      <div className="document-filters"><label className="document-search-field"><span>{translate('documentation.search')}</span><input type="search" value={documentQuery} onChange={(event) => { setDocumentQuery(event.target.value); setDocumentPage(1) }} /></label><label className="document-sort-field"><span>Sort</span><select value={documentOrdering} onChange={(event) => { setDocumentOrdering(event.target.value as NonNullable<DocumentFilters['ordering']>); setDocumentPage(1) }}><option value="title">{documentQuery.trim() ? 'Relevance' : 'Title A–Z'}</option><option value="-title">Title Z–A</option><option value="-updated_at">Recently updated</option><option value="updated_at">Least recently updated</option><option value="category">Category A–Z</option></select></label><FilterMenu groups={documentFilterGroups} activeCount={activeDocumentFilterCount} onClear={clearDocumentFilters} menuLabel={translate('documentation.filterMenu')} /></div>
       {visiblePhase === 'loading' && <p className="empty-state" role="status">{translate('documentation.loadingDocuments')}</p>}
       {visiblePhase === 'error' && <p className="empty-state">{translate('documentation.documentsUnavailable')}</p>}
       {visiblePhase === 'ready' && results.length === 0 && <p className="empty-state">{translate('documentation.noDocuments')}</p>}
       {visiblePhase === 'ready' && indexMode === 'health' && results.length > 0 && results.every((document) => document.health_status === 'current') && <p className="empty-state">{translate('documentation.healthEmpty')}</p>}
       {visiblePhase === 'ready' && results.length > 0 && <ul className="document-title-list">{results.filter((document) => indexMode === 'browse' || document.health_status !== 'current').map((document) => <li key={document.id}><button type="button" onClick={() => open(document)}><BookOpenText size={17} /><span><strong>{document.title || translate('documentation.untitled')}</strong><small>{[document.collection, categories.find((item) => item.value === document.category)?.label, document.health_status?.replaceAll('_', ' '), document.owner_name].filter(Boolean).join(' · ')}</small>{document.matching_excerpt && <span className="document-search-excerpt">{document.matching_excerpt}</span>}{(document.tags ?? []).length > 0 && <span className="document-tag-list">{document.tags!.join(' · ')}</span>}</span></button>{document.publications.length > 0 && <ul className="static-publication-list">{document.publications.map((publication) => <li key={publication.id}><button type="button" onClick={() => { void openPublication(document, publication) }}><FileCheck2 size={15} /><span><strong>{publication.title}</strong><small>{translate('documentation.publishedLabel', { state: publication.lifecycle_state.replace('_', ' '), audience: publication.audience === 'msp_internal' ? translate('documentation.audienceMspStaff') : translate('documentation.audienceClientPortal'), date: new Date(publication.published_at).toLocaleString() })}</small></span></button></li>)}</ul>}</li>)}</ul>}
+      {visiblePhase === 'ready' && loaded && <CollectionPagination label="documents" page={loaded.page} pageSize={loaded.pageSize} count={loaded.count} hasMore={loaded.hasMore} onPageChange={setDocumentPage} />}
     </section>
     {workspace && templateLibrary.length > 0 && <section className="content-section client-template-library" aria-labelledby="client-template-library-heading">
       <div className="section-heading"><div><h2 id="client-template-library-heading">{translate('documentation.mspTemplates')}</h2><p>{translate('documentation.mspTemplatesHelp')}</p></div><span>{translate('documentation.availableCount', { count: templateLibrary.length })}</span></div>
       <ul>{templateLibrary.map((template) => <li key={template.id}><span><strong>{template.title}</strong><small>{translate('documentation.sectionCount', { count: template.placement_count })} · {categories.find((item) => item.value === template.category)?.label}</small></span><button className="secondary-button" type="button" onClick={() => setTemplateDraft({ source: template, title: `${workspace.name} — ${template.title}`, rules: Object.fromEntries(template.placements.slice(1).map((placement) => [placement.block_id, 'copy'])) })}><Copy size={15} />{translate('documentation.useTemplate')}</button></li>)}</ul>
       {templateDraft && <section className="template-draft" aria-labelledby="template-draft-heading"><div className="section-heading"><div><h3 id="template-draft-heading">{translate('documentation.createFromTemplate', { title: templateDraft.source.title })}</h3><p>{translate('documentation.templateCopyHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.cancelTemplate')} onClick={() => setTemplateDraft(null)}><X size={16} /></button></div><label>{translate('documentation.clientDocumentTitle')}<input maxLength={240} value={templateDraft.title} onChange={(event) => setTemplateDraft({ ...templateDraft, title: event.target.value })} /></label>{templateDraft.source.placements.slice(1).map((placement) => <label key={placement.id}>{placement.block_name.replace(/ — content$/, '')}<select value={templateDraft.rules[placement.block_id] ?? 'copy'} onChange={(event) => setTemplateDraft({ ...templateDraft, rules: { ...templateDraft.rules, [placement.block_id]: event.target.value as TemplatePlacementMode } })}><option value="copy">{translate('documentation.templateCopyOnce')}</option><option value="live">{translate('documentation.templateKeepUpdated')}</option><option value="pinned">{translate('documentation.templateKeepVersion')}</option></select></label>)}<div className="document-actions"><button className="primary-button" type="button" disabled={saving || !templateDraft.title.trim()} onClick={() => { void instantiateClientTemplate() }}>{saving ? translate('documentation.creating') : translate('documentation.createDocument')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setTemplateDraft(null)}>{translate('common.cancel')}</button></div></section>}
-    </section>}
+    </section>}</>}
     {publicationView && <section className="document-workspace static-publication" aria-label={translate('documentation.publication')}>
       <div className="document-edit-heading"><div><h2>{publicationView.record?.title ?? translate('documentation.publication')}</h2><p>{translate('documentation.publicationHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.closePublication')} onClick={close}><X size={19} /></button></div>
       {publicationView.phase === 'loading' && <p className="empty-state" role="status">{translate('documentation.loadingPublication')}</p>}
@@ -967,7 +1026,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`new-${newDocumentMode}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="" organizationId={workspace?.id} onMarkdownChange={setMarkdown} /></Suspense>
         <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || (newDocumentMode === 'file' && !newPrimaryFile)} onClick={() => { if (newDocumentMode === 'file') void createFileBackedDocument(); else void save() }}>{saving ? translate('documentation.creating') : translate('documentation.createDocument')}</button><button className="secondary-button" type="button" onClick={close}>{translate('common.cancel')}</button></div>
       </> : <>
-        <header className="document-reader-header"><div><strong>{selected.title}</strong><span>{categories.find((item) => item.value === selected.category)?.label ?? selected.category}{selected.is_template ? ' · Template' : ''}{selected.is_reference ? ' · MSP reference' : ''}</span></div><div className="document-reader-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => beginPublication(selected)}><FileCheck2 size={15} />{translate('documentation.publishStatic')}</button><button className={activePanel === 'files' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => setActivePanel(activePanel === 'files' ? null : 'files')}><Paperclip size={15} />Files{selected.attachment_count > 0 ? ` (${selected.attachment_count})` : ''}</button><button className={activePanel === 'history' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setActivePanel(activePanel === 'history' ? null : 'history'); if (activePanel !== 'history') void loadHistory() }}><History size={15} />{translate('documentation.history')}</button><button className={activePanel === 'keys' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setActivePanel(activePanel === 'keys' ? null : 'keys'); if (activePanel !== 'keys') void loadKeys() }}><Key size={15} />{translate('documentation.keys')}{keyReport && keyReport.unresolved_count > 0 ? ` (${keyReport.unresolved_count})` : ''}</button><button className={activePanel === 'export' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => setActivePanel(activePanel === 'export' ? null : 'export')}><Download size={15} />{translate('documentation.export')}</button><button className={activePanel === 'details' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-label={translate('documentation.documentSettings')} aria-expanded={activePanel === 'details'} onClick={() => setActivePanel(activePanel === 'details' ? null : 'details')}><Settings size={15} aria-hidden="true" /><span>{translate('documentation.documentSettings')}</span></button><button className="icon-button" type="button" aria-label="Close document" onClick={close}><X size={19} /></button></div></header>
+        <header className="document-reader-header"><button className="document-library-return" type="button" onClick={close}><ArrowLeft size={17} aria-hidden="true" /><span>Documents</span></button><div className="document-reader-title"><strong>{selected.title}</strong><span>{categories.find((item) => item.value === selected.category)?.label ?? selected.category}{selected.is_template ? ' · Template' : ''}{selected.is_reference ? ' · MSP reference' : ''}</span></div><div className="document-reader-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => beginPublication(selected)}><FileCheck2 size={15} />{translate('documentation.publishStatic')}</button><button className={activePanel === 'files' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => setActivePanel(activePanel === 'files' ? null : 'files')}><Paperclip size={15} />Files{selected.attachment_count > 0 ? ` (${selected.attachment_count})` : ''}</button><button className={activePanel === 'history' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setActivePanel(activePanel === 'history' ? null : 'history'); if (activePanel !== 'history') void loadHistory() }}><History size={15} />{translate('documentation.history')}</button><button className={activePanel === 'keys' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => { setActivePanel(activePanel === 'keys' ? null : 'keys'); if (activePanel !== 'keys') void loadKeys() }}><Key size={15} />{translate('documentation.keys')}{keyReport && keyReport.unresolved_count > 0 ? ` (${keyReport.unresolved_count})` : ''}</button><button className={activePanel === 'export' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => setActivePanel(activePanel === 'export' ? null : 'export')}><Download size={15} />{translate('documentation.export')}</button><button className={activePanel === 'details' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-label={translate('documentation.documentSettings')} aria-expanded={activePanel === 'details'} onClick={() => setActivePanel(activePanel === 'details' ? null : 'details')}><Settings size={15} aria-hidden="true" /><span>{translate('documentation.documentSettings')}</span></button></div></header>
 
         {activePanel === 'details' && <section ref={documentSettingsRef} tabIndex={-1} className="document-context-panel document-settings-panel" aria-labelledby="document-details-heading"><div className="section-heading"><h2 id="document-details-heading">{translate('documentation.documentSettings')}</h2><button className="icon-button" type="button" aria-label={translate('documentation.closeDocumentSettings')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><div className="document-detail-fields"><label>Title<input maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label>{!workspace && <label className="checkbox-field"><input type="checkbox" checked={libraryVisible} onChange={(event) => setLibraryVisible(event.target.checked)} />Make reusable content findable in client documents</label>}</div><div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim()} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save settings'}</button>{selected.is_template && <button className="secondary-button" type="button" onClick={() => { void instantiateSelectedTemplate() }}><Copy size={15} />{translate('documentation.useTemplate')}</button>}{selected.template_enrollment_id && <button className="secondary-button" type="button" onClick={() => { void previewSelectedTemplateRollout() }}><History size={15} />{translate('documentation.checkTemplateUpdates')}</button>}{selected.placement_count === 1 && <button className="secondary-button" type="button" onClick={() => { void previewRestructure() }}><List size={15} />{translate('documentation.reviewSectionConversion')}</button>}<button className="secondary-button" type="button" onClick={() => { setActivePanel('remote'); void openRemoteSource() }}><Globe2 size={15} />{translate('documentation.remoteSource')}</button>{!workspace && <button className="secondary-button" type="button" onClick={() => setActivePanel('share')}><Share2 size={15} />{translate('documentation.clientListings')}</button>}{relationshipsClient && <button className="secondary-button" type="button" onClick={() => setActivePanel('relationships')}><Link2 size={15} />{translate('documentation.relatedRecords')}</button>}<button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}><Archive size={15} />{translate('common.archive')}</button></div></section>}
         {activePanel === 'details' && client.updateOperations && <section className="document-context-panel document-operations" aria-labelledby="document-operations-heading">
